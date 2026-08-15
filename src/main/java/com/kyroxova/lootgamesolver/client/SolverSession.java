@@ -139,20 +139,37 @@ public final class SolverSession {
         if (actions.isEmpty()) {
             if (snapshot.type == MiniGame.SUDOKU) {
                 bridge.submitSudokuCheck(snapshot);
-            }
-            if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
-                || "under_expanding".equals(snapshot.gol.getStageId()))) {
                 activeAction = null;
-                status = result.getMessage();
+                status = "Stage complete! Waiting for next stage...";
                 return;
             }
-            if (mode == ActionPlanner.Mode.SINGLE_STEP) {
-                mode = null;
+            if (snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
+                // If Minesweeper is reset for new stage, click center cell to start next stage
+                int cx = snapshot.minesweeper.getWidth() / 2;
+                int cy = snapshot.minesweeper.getHeight() / 2;
+                com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell centerCell = snapshot.minesweeper
+                    .get(cx, cy);
+                if (centerCell != null
+                    && centerCell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.UNKNOWN) {
+                    actions = new java.util.ArrayList<SolverAction>();
+                    actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
+                }
             }
-            activeAction = null;
-            status = result.getMessage()
-                + (result.getStatus() == SolveResult.Status.PROBABILISTIC ? " (guess disabled)" : "");
-            return;
+            if (actions.isEmpty()) {
+                if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
+                    || "under_expanding".equals(snapshot.gol.getStageId()))) {
+                    activeAction = null;
+                    status = "Watching sequence playback...";
+                    return;
+                }
+                if (mode == ActionPlanner.Mode.SINGLE_STEP) {
+                    mode = null;
+                }
+                activeAction = null;
+                status = result.getMessage()
+                    + (result.getStatus() == SolveResult.Status.PROBABILISTIC ? " (guess disabled)" : "");
+                return;
+            }
         }
 
         SolverAction nextAction = actions.get(0);
@@ -240,6 +257,17 @@ public final class SolverSession {
     public List<SolverAction> computeActionsForCurrentGame() {
         DetectedGame snapshot = getCurrentDetectedGame();
         if (snapshot == null) return java.util.Collections.emptyList();
+        if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
+            for (int r = 0; r < 9; r++) {
+                for (int c = 0; c < 9; c++) {
+                    int val = optimisticSudokuValues[r][c] != 0 ? optimisticSudokuValues[r][c]
+                        : snapshot.sudokuPlayerValues[r][c];
+                    if (snapshot.sudoku != null && val != 0) {
+                        snapshot.sudoku.set(r, c, val);
+                    }
+                }
+            }
+        }
         SolveResult result = snapshot.type == MiniGame.MINESWEEPER ? minesweeperSolver.solve(snapshot.minesweeper)
             : snapshot.type == MiniGame.SUDOKU ? sudokuSolver.solve(snapshot.sudoku) : golSolver.solve(snapshot.gol);
         return planner.plan(

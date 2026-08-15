@@ -65,17 +65,17 @@ public final class WorldOverlayRenderer {
         GL11.glLineWidth(1.5F);
 
         int index = 1;
-        int maxRender = Math.min(actions.size(), 32);
+        int maxRender = actions.size();
         for (int i = 0; i < maxRender; i++) {
             SolverAction action = actions.get(i);
             int[] block = session.getBlockPos(action.position);
             if (block == null) continue;
 
-            // Distance Restriction (16.0 block radius)
+            // Distance Restriction (32.0 block radius)
             double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
             double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
             double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
-            if (dx > 16.0D || dz > 16.0D || dy > 8.0D) continue;
+            if (dx > 32.0D || dz > 32.0D || dy > 16.0D) continue;
 
             double minX = block[0] + 0.02D, minY = block[1] + 0.02D, minZ = block[2] + 0.02D;
             double maxX = minX + 0.96D, maxY = minY + 0.96D, maxZ = minZ + 0.96D;
@@ -84,21 +84,21 @@ public final class WorldOverlayRenderer {
             if (current.type == MiniGame.MINESWEEPER) {
                 if (action.type == SolverAction.Type.FLAG) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
-                    drawFloatingText("FLAG", minX + 0.5D, minY + 1.45D, minZ + 0.5D, 0xFF4444, mc);
+                    drawFloatingText("FLAG", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFF4444, mc);
                 } else if (action.type == SolverAction.Type.REVEAL) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                    drawFloatingText("SAFE", minX + 0.5D, minY + 1.45D, minZ + 0.5D, 0x44FF44, mc);
+                    drawFloatingText("SAFE", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x44FF44, mc);
                 }
             } else if (current.type == MiniGame.SUDOKU) {
                 if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
-                drawFloatingText(String.valueOf(action.value), minX + 0.5D, minY + 1.45D, minZ + 0.5D, 0x55FFFF, mc);
+                drawFloatingText(String.valueOf(action.value), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x55FFFF, mc);
             } else if (current.type == MiniGame.GAME_OF_LIGHT) {
                 if (action.position.x == 1 && action.position.y == 1) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
-                    drawFloatingText("START", minX + 0.5D, minY + 1.45D, minZ + 0.5D, 0xFFFF44, mc);
+                    drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
                 } else {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
-                    drawFloatingText("#" + index, minX + 0.5D, minY + 1.45D, minZ + 0.5D, 0x00FFFF, mc);
+                    drawFloatingText("#" + index, minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
                 }
             }
             index++;
@@ -156,10 +156,12 @@ public final class WorldOverlayRenderer {
         GL11.glRotatef(rm.playerViewX, 1.0F, 0.0F, 0.0F);
         GL11.glScalef(-scale, -scale, scale);
         GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
 
         int strWidth = font.getStringWidth(text);
         font.drawStringWithShadow(text, -strWidth / 2, 0, color);
 
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glPopMatrix();
     }
