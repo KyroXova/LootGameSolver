@@ -74,6 +74,14 @@ public final class SolverSession {
         advanceAuto(bridge.detect());
     }
 
+    private int calculateClicksNeeded(int curVal, int targetVal) {
+        if (curVal == targetVal) return 0;
+        if (curVal == 0) return targetVal;
+        int diff = targetVal - curVal;
+        if (diff < 0) diff += 9;
+        return diff;
+    }
+
     private void advanceAuto(DetectedGame snapshot) {
         currentSnapshot = snapshot;
         if (snapshot == null) {
@@ -152,9 +160,7 @@ public final class SolverSession {
                 int curVal = (snapshot.sudokuPlayerValues != null)
                     ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
                     : 0;
-                int targetVal = activeAction.value;
-                remainingClicksForActiveAction = (targetVal - curVal + 9) % 9;
-                if (remainingClicksForActiveAction == 0) remainingClicksForActiveAction = 9;
+                remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
             } else {
                 remainingClicksForActiveAction = 1;
             }
