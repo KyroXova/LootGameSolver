@@ -4,8 +4,8 @@
 
 It provides two distinct ways to play:
 
-* **Auto-Solver** — The fast, fully automated option. The mod solves the game and physically performs the required clicks and movements for you.
-* **Hologram Mode** — The more survival-friendly option. The mod solves the game in the background and simply shows you what to do through in-world holograms, leaving all interactions to the player.
+* **Auto-Solver** - The fast, fully automated option. The mod solves the game and physically performs the required clicks and movements for you.
+* **Hologram Mode** - The more survival-friendly option. The mod solves the game in the background and simply shows you what to do through in-world holograms, leaving all interactions to the player.
 
 Whether you want the convenience of complete automation or prefer to remain in control, LootGameSolver lets you choose.
 
@@ -13,7 +13,7 @@ Whether you want the convenience of complete automation or prefer to remain in c
 
 ## Two Ways to Solve
 
-### Auto-Solver — Full Automation
+### Auto-Solver - Full Automation
 
 **Press `R` to toggle the Auto-Solver.**
 
@@ -33,7 +33,7 @@ This is the fastest and most hands-off way to complete LootGames.
 
 ---
 
-### Hologram Mode — Player-Assisted
+### Hologram Mode - Player-Assisted
 
 **Press `H` to toggle Holograms.**
 
@@ -48,7 +48,7 @@ Instead of interacting with the game, LootGameSolver displays the correct inform
 
 You remain completely in control and perform the actual interactions yourself.
 
-**The solver tells you what to do — you do it.**
+**The solver tells you what to do - you do it.**
 
 This makes Hologram Mode the more **survival-friendly and low-interference** option, while still providing the same solving intelligence behind the scenes.
 
@@ -101,7 +101,7 @@ Instead, it displays the correct numbers and target positions, allowing you to m
 
 ---
 
-## Game of Light — Work in Progress
+## Game of Light - Work in Progress
 
 **Game of Light support is currently incomplete and under active development.**
 
@@ -138,8 +138,8 @@ The hologram system is intentionally **visual-only**: it provides the informatio
 
 | Key | Function |
 | :---: | ------------------------------------------------------------------ |
-| **`R`** | Toggle **Auto-Solver** — fully automated movement & interaction |
-| **`H`** | Toggle **Holograms** — shows the correct moves without interacting |
+| **`R`** | Toggle **Auto-Solver** - fully automated movement & interaction |
+| **`H`** | Toggle **Holograms** - shows the correct moves without interacting |
 
 ### Which mode should I use?
 
@@ -165,7 +165,7 @@ Video demonstrations will be added below.
 
 ### Game of Light
 
-*Currently under development — showcase coming once the solver is complete.*
+*Currently under development - showcase coming once the solver is complete.*
 
 ---
 
@@ -173,10 +173,10 @@ Video demonstrations will be added below.
 
 | Feature | Status |
 | :--- | :---: |
-| Minesweeper — Auto-Solver | Complete |
-| Minesweeper — Holograms | Complete |
-| Sudoku — Auto-Solver | Complete |
-| Sudoku — Holograms | Complete |
+| Minesweeper - Auto-Solver | Complete |
+| Minesweeper - Holograms | Complete |
+| Sudoku - Auto-Solver | Complete |
+| Sudoku - Holograms | Complete |
 | Game of Light | In Development |
 | HUD & Hologram System | Complete |
 
