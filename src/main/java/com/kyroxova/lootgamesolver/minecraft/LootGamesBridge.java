@@ -295,6 +295,20 @@ public final class LootGamesBridge implements MiniGameDetector {
                     block[2],
                     1,
                     Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+                if (detected.sudokuPlayerValues != null) {
+                    int currentVal = detected.sudokuPlayerValues[action.position.y][action.position.x];
+                    int nextVal = (currentVal % 9) + 1;
+                    detected.sudokuPlayerValues[action.position.y][action.position.x] = nextVal;
+                    try {
+                        Object rawBoard = invoke(detected.game, "getBoard");
+                        if (rawBoard != null) {
+                            Class<?> posClass = Class.forName("ru.timeconqueror.lootgames.api.util.Pos2i");
+                            java.lang.reflect.Constructor<?> posCons = posClass.getConstructor(int.class, int.class);
+                            Object posObj = posCons.newInstance(action.position.x, action.position.y);
+                            invoke(rawBoard, "cSetPlayerValue", posObj, Integer.valueOf(nextVal));
+                        }
+                    } catch (Exception ignored) {}
+                }
             } else {
                 ItemStack held = mc.thePlayer.getHeldItem();
                 mc.playerController.onPlayerRightClick(
