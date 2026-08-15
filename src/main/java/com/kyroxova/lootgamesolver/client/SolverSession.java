@@ -98,6 +98,9 @@ public final class SolverSession {
                     } else if (optimisticSudokuValues[r][c] != 0) {
                         snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
                     }
+                    if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
+                        snapshot.sudoku.set(r, c, snapshot.sudokuPlayerValues[r][c]);
+                    }
                 }
             }
         }

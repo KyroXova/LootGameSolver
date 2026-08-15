@@ -180,7 +180,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             for (int x = 0; x < 9; x++) {
                 int puzzleVal = number(invoke(rawBoard, "getPuzzleValue", Integer.valueOf(x), Integer.valueOf(y)));
                 int playerVal = number(invoke(rawBoard, "getPlayerValue", Integer.valueOf(x), Integer.valueOf(y)));
-                board.set(y, x, puzzleVal);
+                int effectiveVal = playerVal != 0 ? playerVal : puzzleVal;
+                board.set(y, x, effectiveVal);
                 playerValues[y][x] = playerVal;
                 sig.append((char) ('0' + puzzleVal))
                     .append((char) ('0' + playerVal));
