@@ -35,6 +35,7 @@ public final class SolverSession {
     private MiniGame game = MiniGame.UNKNOWN;
     private int queued;
     private int remainingClicksForActiveAction = 0;
+    private final int[][] optimisticSudokuValues = new int[9][9];
 
     public void start(ActionPlanner.Mode requestedMode) {
         if (!LootGameSolverConfig.enabled) {
@@ -80,6 +81,19 @@ public final class SolverSession {
             return;
         }
         game = snapshot.type;
+
+        if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
+            for (int r = 0; r < 9; r++) {
+                for (int c = 0; c < 9; c++) {
+                    if (snapshot.sudokuPlayerValues[r][c] == optimisticSudokuValues[r][c]) {
+                        optimisticSudokuValues[r][c] = 0;
+                    } else if (optimisticSudokuValues[r][c] != 0) {
+                        snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
+                    }
+                }
+            }
+        }
+
         SolveResult result = snapshot.type == MiniGame.MINESWEEPER ? minesweeperSolver.solve(snapshot.minesweeper)
             : snapshot.type == MiniGame.SUDOKU ? sudokuSolver.solve(snapshot.sudoku) : golSolver.solve(snapshot.gol);
 
@@ -131,7 +145,8 @@ public final class SolverSession {
         }
 
         SolverAction nextAction = actions.get(0);
-        if (activeAction == null || !nextAction.position.equals(activeAction.position)) {
+        if (activeAction == null || !nextAction.position.equals(activeAction.position)
+            || remainingClicksForActiveAction <= 0) {
             activeAction = nextAction;
             if (activeAction.type == SolverAction.Type.SET_VALUE) {
                 int curVal = (snapshot.sudokuPlayerValues != null)
@@ -155,12 +170,18 @@ public final class SolverSession {
     }
 
     private void send(DetectedGame snapshot) {
+        if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
+            return;
+        }
         if (!bridge.interact(snapshot, activeAction)) {
             status = "Navigating to " + activeAction.position;
             return;
         }
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
             remainingClicksForActiveAction--;
+            if (remainingClicksForActiveAction <= 0 && snapshot.type == MiniGame.SUDOKU) {
+                optimisticSudokuValues[activeAction.position.y][activeAction.position.x] = activeAction.value;
+            }
         }
         beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();
@@ -180,6 +201,10 @@ public final class SolverSession {
         activeActions = null;
         beforeActionSignature = null;
         queued = 0;
+        remainingClicksForActiveAction = 0;
+        for (int r = 0; r < 9; r++) {
+            java.util.Arrays.fill(optimisticSudokuValues[r], 0);
+        }
         status = reason;
     }
 
