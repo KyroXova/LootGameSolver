@@ -161,10 +161,6 @@ public final class SolverSession {
         }
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
             remainingClicksForActiveAction--;
-            if (snapshot.sudokuPlayerValues != null) {
-                int c = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
-                snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] = (c % 9) + 1;
-            }
         }
         beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();

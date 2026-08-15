@@ -171,21 +171,18 @@ public final class ClientHooks {
 
         String statusStr = session.isActive() ? session.getStatus() : "Ready";
 
-        String line1 = "\u00A7b\u00A7lLootGameSolver \u00A78|\u00A7f " + gameTitle
-            + " \u00A78|\u00A7"
-            + (session.isActive() ? "a" : "e")
-            + " "
-            + statusStr;
-        String line2 = "\u00A77[" + autoKeyStr + "] Auto-Solve  \u00A78|\u00A77 [" + holoKeyStr + "] Holograms";
+        String line1 = "\u00A7b\u00A7lLoot Game Solver";
+        String line2 = "\u00A7f" + gameTitle + " \u00A78|\u00A7" + (session.isActive() ? "a" : "e") + " " + statusStr;
+        String line3 = "\u00A77[" + autoKeyStr + "] Auto-Solve \u00A78|\u00A77 [" + holoKeyStr + "] Holograms";
 
-        int width1 = mc.fontRenderer.getStringWidth("LootGameSolver | " + gameTitle + " | " + statusStr);
-        int width2 = mc.fontRenderer
-            .getStringWidth("[" + autoKeyStr + "] Auto-Solve  | [" + holoKeyStr + "] Holograms");
-        int maxWidth = Math.max(width1, width2);
+        int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
+        int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
+        int width3 = mc.fontRenderer.getStringWidth("[" + autoKeyStr + "] Auto-Solve | [" + holoKeyStr + "] Holograms");
+        int maxWidth = Math.max(width1, Math.max(width2, width3));
 
-        int panelWidth = maxWidth + 12;
-        int panelHeight = 24;
-        int x = resolution.getScaledWidth() - panelWidth - 12;
+        int panelWidth = maxWidth + 20;
+        int panelHeight = 36;
+        int x = resolution.getScaledWidth() - panelWidth - 15;
         int y = resolution.getScaledHeight() - panelHeight - 55;
 
         net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + panelHeight, 0xDD0F141C);
@@ -194,7 +191,8 @@ public final class ClientHooks {
         net.minecraft.client.gui.Gui.drawRect(x + panelWidth - 1, y, x + panelWidth, y + panelHeight, 0xFF3B4252);
         net.minecraft.client.gui.Gui.drawRect(x, y + panelHeight - 1, x + panelWidth, y + panelHeight, 0xFF3B4252);
 
-        mc.fontRenderer.drawStringWithShadow(line1, x + 6, y + 4, 0xFFFFFF);
-        mc.fontRenderer.drawStringWithShadow(line2, x + 6, y + 14, 0xAAAAAA);
+        mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 4, 0xFFFFFF);
+        mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 14, 0xFFFFFF);
+        mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 24, 0xAAAAAA);
     }
 }
