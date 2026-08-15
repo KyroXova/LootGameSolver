@@ -169,40 +169,32 @@ public final class ClientHooks {
             : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
                 : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "Game of Light" : "LootGames";
 
-        String statusStr = session.isActive() ? session.getStatus()
-            : "Ready - Press [" + autoKeyStr + "] to Start Auto-Solve";
+        String statusStr = session.isActive() ? session.getStatus() : "Ready";
 
-        String line1 = "LootGameSolver \u00A78|\u00A7f " + gameTitle;
-        String line2 = "Status: \u00A7f" + statusStr;
-        String line3 = "Controls: \u00A77[" + autoKeyStr
-            + "] Auto-Solve \u00A78|\u00A77 ["
-            + holoKeyStr
-            + "] Holograms";
+        String line1 = "\u00A7b\u00A7lLootGameSolver \u00A78|\u00A7f " + gameTitle
+            + " \u00A78|\u00A7"
+            + (session.isActive() ? "a" : "e")
+            + " "
+            + statusStr;
+        String line2 = "\u00A77[" + autoKeyStr + "] Auto-Solve  \u00A78|\u00A77 [" + holoKeyStr + "] Holograms";
 
-        int width1 = mc.fontRenderer.getStringWidth("LootGameSolver | " + gameTitle);
-        int width2 = mc.fontRenderer.getStringWidth("Status: " + statusStr);
-        int width3 = mc.fontRenderer
-            .getStringWidth("Controls: [" + autoKeyStr + "] Auto-Solve | [" + holoKeyStr + "] Holograms");
-        int maxWidth = Math.max(width1, Math.max(width2, width3));
+        int width1 = mc.fontRenderer.getStringWidth("LootGameSolver | " + gameTitle + " | " + statusStr);
+        int width2 = mc.fontRenderer
+            .getStringWidth("[" + autoKeyStr + "] Auto-Solve  | [" + holoKeyStr + "] Holograms");
+        int maxWidth = Math.max(width1, width2);
 
-        // Position: Bottom-right, offset 15px from right edge and raised 65px above bottom
-        int panelWidth = maxWidth + 16;
-        int panelHeight = 42;
-        int x = resolution.getScaledWidth() - panelWidth - 15;
-        int y = resolution.getScaledHeight() - panelHeight - 65;
+        int panelWidth = maxWidth + 12;
+        int panelHeight = 24;
+        int x = resolution.getScaledWidth() - panelWidth - 12;
+        int y = resolution.getScaledHeight() - panelHeight - 55;
 
-        // Draw semi-transparent dark background card with subtle border
-        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + panelHeight, 0xCC0D1117);
-        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + 1, 0xFF30363D);
-        net.minecraft.client.gui.Gui.drawRect(x, y, x + 1, y + panelHeight, 0xFF30363D);
-        net.minecraft.client.gui.Gui.drawRect(x + panelWidth - 1, y, x + panelWidth, y + panelHeight, 0xFF30363D);
-        net.minecraft.client.gui.Gui.drawRect(x, y + panelHeight - 1, x + panelWidth, y + panelHeight, 0xFF30363D);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + panelHeight, 0xDD0F141C);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + 1, 0xFF3B4252);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + 1, y + panelHeight, 0xFF3B4252);
+        net.minecraft.client.gui.Gui.drawRect(x + panelWidth - 1, y, x + panelWidth, y + panelHeight, 0xFF3B4252);
+        net.minecraft.client.gui.Gui.drawRect(x, y + panelHeight - 1, x + panelWidth, y + panelHeight, 0xFF3B4252);
 
-        int textX = x + 8;
-        int textY = y + 6;
-
-        mc.fontRenderer.drawStringWithShadow(line1, textX, textY, 0x00FFFF);
-        mc.fontRenderer.drawStringWithShadow(line2, textX, textY + 12, session.isActive() ? 0x55FF55 : 0xFFBB00);
-        mc.fontRenderer.drawStringWithShadow(line3, textX, textY + 24, 0xAAAAAA);
+        mc.fontRenderer.drawStringWithShadow(line1, x + 6, y + 4, 0xFFFFFF);
+        mc.fontRenderer.drawStringWithShadow(line2, x + 6, y + 14, 0xAAAAAA);
     }
 }

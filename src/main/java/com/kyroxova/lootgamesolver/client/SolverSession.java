@@ -34,6 +34,7 @@ public final class SolverSession {
     private String status = "Idle";
     private MiniGame game = MiniGame.UNKNOWN;
     private int queued;
+    private int remainingClicksForActiveAction = 0;
 
     public void start(ActionPlanner.Mode requestedMode) {
         if (!LootGameSolverConfig.enabled) {
@@ -61,8 +62,7 @@ public final class SolverSession {
         }
         game = snapshot.type;
 
-        if (activeAction == null || bridge.actionComplete(snapshot, activeAction)
-            || !snapshot.signature.equals(beforeActionSignature)) {
+        if (activeAction == null || isActionComplete(snapshot) || !snapshot.signature.equals(beforeActionSignature)) {
             advanceAuto(snapshot);
         } else if (now - lastActionAt > LootGameSolverConfig.boardUpdateTimeoutMs) {
             send(snapshot);
@@ -130,22 +130,52 @@ public final class SolverSession {
             return;
         }
 
-        activeAction = actions.get(0);
-        String actionName = activeAction.type == SolverAction.Type.REVEAL ? "Revealing Cell"
-            : activeAction.type == SolverAction.Type.FLAG ? "Flagging Mine"
-                : activeAction.type == SolverAction.Type.SET_VALUE ? "Setting Digit " + activeAction.value
-                    : "Interacting";
-        status = actionName + " at " + activeAction.position + " (" + actions.size() + " actions remaining)";
+        SolverAction nextAction = actions.get(0);
+        if (activeAction == null || !nextAction.position.equals(activeAction.position)) {
+            activeAction = nextAction;
+            if (activeAction.type == SolverAction.Type.SET_VALUE) {
+                int curVal = (snapshot.sudokuPlayerValues != null)
+                    ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
+                    : 0;
+                int targetVal = activeAction.value;
+                remainingClicksForActiveAction = (targetVal - curVal + 9) % 9;
+                if (remainingClicksForActiveAction == 0) remainingClicksForActiveAction = 9;
+            } else {
+                remainingClicksForActiveAction = 1;
+            }
+        } else {
+            activeAction = nextAction;
+        }
+
+        String actionName = activeAction.type == SolverAction.Type.REVEAL ? "Revealing"
+            : activeAction.type == SolverAction.Type.FLAG ? "Flagging"
+                : activeAction.type == SolverAction.Type.SET_VALUE ? "Setting " + activeAction.value : "Interacting";
+        status = actionName + " (" + actions.size() + " remaining)";
         send(snapshot);
     }
 
     private void send(DetectedGame snapshot) {
         if (!bridge.interact(snapshot, activeAction)) {
-            status = "Navigating towards cell at " + activeAction.position;
+            status = "Navigating to " + activeAction.position;
             return;
+        }
+        if (activeAction.type == SolverAction.Type.SET_VALUE) {
+            remainingClicksForActiveAction--;
+            if (snapshot.sudokuPlayerValues != null) {
+                int c = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
+                snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] = (c % 9) + 1;
+            }
         }
         beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();
+    }
+
+    public boolean isActionComplete(DetectedGame snapshot) {
+        if (activeAction == null) return true;
+        if (activeAction.type == SolverAction.Type.SET_VALUE) {
+            return remainingClicksForActiveAction <= 0;
+        }
+        return bridge.actionComplete(snapshot, activeAction);
     }
 
     public void cancel(String reason) {
