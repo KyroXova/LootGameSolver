@@ -62,9 +62,9 @@ public final class SolverSession {
         }
         game = snapshot.type;
 
-        if (activeAction == null || isActionComplete(snapshot) || !snapshot.signature.equals(beforeActionSignature)) {
+        if (activeAction == null || isActionComplete(snapshot)) {
             advanceAuto(snapshot);
-        } else if (now - lastActionAt > LootGameSolverConfig.boardUpdateTimeoutMs) {
+        } else {
             send(snapshot);
         }
     }
