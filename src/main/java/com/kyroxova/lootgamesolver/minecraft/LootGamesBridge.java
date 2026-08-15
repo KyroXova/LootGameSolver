@@ -304,6 +304,15 @@ public final class LootGamesBridge implements MiniGameDetector {
         }
     }
 
+    private static float updateRotation(float current, float target, float maxStep) {
+        float diff = current - target;
+        while (diff >= 180.0F) diff -= 360.0F;
+        while (diff < -180.0F) diff += 360.0F;
+        if (diff > maxStep) diff = maxStep;
+        if (diff < -maxStep) diff = -maxStep;
+        return current - diff;
+    }
+
     private static boolean preparePlayerPositionAndAim(EntityPlayer player, int x, int y, int z) {
         if (player == null) return false;
         double dx = x + 0.5D - player.posX;
@@ -315,12 +324,12 @@ public final class LootGamesBridge implements MiniGameDetector {
         float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
         float pitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
 
-        player.rotationYaw = yaw;
-        player.rotationPitch = pitch;
+        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
+        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
 
         // Auto-walk / auto-fly towards target block if out of reach range (> 4.2 blocks)
         if (distSq > 17.64D) {
-            double speed = 0.18D;
+            double speed = 0.15D;
             if (distXZ > 0.1D) {
                 player.motionX += (dx / distXZ) * speed;
                 player.motionZ += (dz / distXZ) * speed;
@@ -328,7 +337,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (player.capabilities.allowFlying) {
                 player.capabilities.isFlying = true;
                 if (Math.abs(dy) > 1.2D) {
-                    player.motionY = dy > 0 ? 0.15D : -0.15D;
+                    player.motionY = dy > 0 ? 0.12D : -0.12D;
                 }
             }
             return false;

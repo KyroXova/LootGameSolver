@@ -117,8 +117,8 @@ public final class ClientHooks {
         // Smooth humanized camera rotation to face target block
         float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
         float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
-        mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 45.0F);
-        mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 30.0F);
+        mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 35.0F);
+        mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 25.0F);
 
         // Step towards target block if > 2.8 blocks away
         if (distSq > 8.0D) {
