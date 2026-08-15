@@ -131,13 +131,17 @@ public final class SolverSession {
         }
 
         activeAction = actions.get(0);
-        status = "Auto-Solving (" + actions.size() + " left): " + activeAction.type + " " + activeAction.position;
+        String actionName = activeAction.type == SolverAction.Type.REVEAL ? "Revealing Cell"
+            : activeAction.type == SolverAction.Type.FLAG ? "Flagging Mine"
+                : activeAction.type == SolverAction.Type.SET_VALUE ? "Setting Digit " + activeAction.value
+                    : "Interacting";
+        status = actionName + " at " + activeAction.position + " (" + actions.size() + " actions remaining)";
         send(snapshot);
     }
 
     private void send(DetectedGame snapshot) {
         if (!bridge.interact(snapshot, activeAction)) {
-            status = "Moving to block: " + activeAction.position;
+            status = "Navigating towards cell at " + activeAction.position;
             return;
         }
         beforeActionSignature = snapshot.signature;

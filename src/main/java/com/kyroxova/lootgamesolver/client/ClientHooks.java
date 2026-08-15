@@ -161,21 +161,48 @@ public final class ClientHooks {
 
         Minecraft mc = Minecraft.getMinecraft();
         ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
-        int x = 8, y = resolution.getScaledHeight() - 42;
 
         String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
         String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
 
-        String gameStr = cur.type.name();
-        String statusStr = session.isActive() ? session.getStatus() : "Ready [Press " + autoKeyStr + " to Auto-Solve]";
+        String gameTitle = cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
+            : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
+                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "Game of Light" : "LootGames";
 
-        mc.fontRenderer.drawStringWithShadow("LootGameSolver | " + gameStr, x, y, 0x55FFFF);
-        mc.fontRenderer
-            .drawStringWithShadow("Status: " + statusStr, x, y + 10, session.isActive() ? 0x55FF55 : 0xFFCC00);
-        mc.fontRenderer.drawStringWithShadow(
-            "Controls: [" + autoKeyStr + "] Toggle Auto-Solve | [" + holoKeyStr + "] Toggle Holograms",
-            x,
-            y + 20,
-            0xAAAAAA);
+        String statusStr = session.isActive() ? session.getStatus()
+            : "Ready - Press [" + autoKeyStr + "] to Start Auto-Solve";
+
+        String line1 = "LootGameSolver \u00A78|\u00A7f " + gameTitle;
+        String line2 = "Status: \u00A7f" + statusStr;
+        String line3 = "Controls: \u00A77[" + autoKeyStr
+            + "] Auto-Solve \u00A78|\u00A77 ["
+            + holoKeyStr
+            + "] Holograms";
+
+        int width1 = mc.fontRenderer.getStringWidth("LootGameSolver | " + gameTitle);
+        int width2 = mc.fontRenderer.getStringWidth("Status: " + statusStr);
+        int width3 = mc.fontRenderer
+            .getStringWidth("Controls: [" + autoKeyStr + "] Auto-Solve | [" + holoKeyStr + "] Holograms");
+        int maxWidth = Math.max(width1, Math.max(width2, width3));
+
+        // Position: Bottom-right, offset 15px from right edge and raised 65px above bottom
+        int panelWidth = maxWidth + 16;
+        int panelHeight = 42;
+        int x = resolution.getScaledWidth() - panelWidth - 15;
+        int y = resolution.getScaledHeight() - panelHeight - 65;
+
+        // Draw semi-transparent dark background card with subtle border
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + panelHeight, 0xCC0D1117);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + panelWidth, y + 1, 0xFF30363D);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + 1, y + panelHeight, 0xFF30363D);
+        net.minecraft.client.gui.Gui.drawRect(x + panelWidth - 1, y, x + panelWidth, y + panelHeight, 0xFF30363D);
+        net.minecraft.client.gui.Gui.drawRect(x, y + panelHeight - 1, x + panelWidth, y + panelHeight, 0xFF30363D);
+
+        int textX = x + 8;
+        int textY = y + 6;
+
+        mc.fontRenderer.drawStringWithShadow(line1, textX, textY, 0x00FFFF);
+        mc.fontRenderer.drawStringWithShadow(line2, textX, textY + 12, session.isActive() ? 0x55FF55 : 0xFFBB00);
+        mc.fontRenderer.drawStringWithShadow(line3, textX, textY + 24, 0xAAAAAA);
     }
 }
