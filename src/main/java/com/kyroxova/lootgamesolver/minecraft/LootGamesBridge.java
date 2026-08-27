@@ -67,7 +67,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (game != null) return game;
         }
 
-        // Strategy 2: Check loaded tile entities list (restricted to 7x7 area around player)
+        // Strategy 2: Check loaded tile entities list (expanded to 32 block horizontal radius)
         List<TileEntity> tiles = world.loadedTileEntityList;
         for (int i = 0; i < tiles.size(); i++) {
             TileEntity tile = tiles.get(i);
@@ -75,7 +75,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             double dx = tile.xCoord + 0.5D - player.posX;
             double dy = tile.yCoord + 0.5D - player.posY;
             double dz = tile.zCoord + 0.5D - player.posZ;
-            if (Math.abs(dx) > 16.0D || Math.abs(dz) > 16.0D || Math.abs(dy) > 8.0D) continue;
+            if (Math.abs(dx) > 32.0D || Math.abs(dz) > 32.0D || Math.abs(dy) > 16.0D) continue;
 
             Object game = extractGameFromTile(world, tile, tile.xCoord, tile.yCoord, tile.zCoord);
             if (game == null) continue;
@@ -138,10 +138,39 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     private DetectedGame readMinesweeper(Object game) throws Exception {
-        if (!bool(game, "isBoardGenerated")) return null;
-        Object rawBoard = invoke(game, "getBoard");
-        int size = number(invoke(rawBoard, "size"));
-        int mines = number(invoke(rawBoard, "getBombCount"));
+        boolean generated = bool(game, "isBoardGenerated");
+        Object rawBoard = null;
+        try {
+            rawBoard = invoke(game, "getBoard");
+        } catch (Exception ignored) {}
+
+        int size = 9;
+        int mines = 10;
+        if (rawBoard != null) {
+            try {
+                size = number(invoke(rawBoard, "size"));
+            } catch (Exception ignored) {}
+            try {
+                mines = number(invoke(rawBoard, "getBombCount"));
+            } catch (Exception ignored) {}
+        } else {
+            try {
+                size = number(invoke(game, "getBoardSize"));
+            } catch (Exception ignored) {}
+        }
+
+        if (!generated || rawBoard == null) {
+            // Stage initial / ungenerated state: construct all-unknown board so solver can click to begin stage
+            MinesweeperBoard board = new MinesweeperBoard(size, size, mines);
+            for (int x = 0; x < size; x++) {
+                for (int y = 0; y < size; y++) {
+                    board.set(x, y, MinesweeperCell.unknown());
+                }
+            }
+            java.util.Map<CellPosition, int[]> posMap = precomputePositions(game, size, size);
+            return DetectedGame.minesweeper(game, board, "UNGENERATED:" + size, posMap);
+        }
+
         MinesweeperBoard board = new MinesweeperBoard(size, size, mines);
         StringBuilder sig = new StringBuilder(size * size);
         for (int x = 0; x < size; x++) for (int y = 0; y < size; y++) {
@@ -178,10 +207,10 @@ public final class LootGamesBridge implements MiniGameDetector {
 
         for (int y = 0; y < 9; y++) {
             for (int x = 0; x < 9; x++) {
-                int puzzleVal = number(invoke(rawBoard, "getPuzzleValue", Integer.valueOf(x), Integer.valueOf(y)));
-                int playerVal = number(invoke(rawBoard, "getPlayerValue", Integer.valueOf(x), Integer.valueOf(y)));
-                int effectiveVal = playerVal != 0 ? playerVal : puzzleVal;
-                board.set(y, x, effectiveVal);
+                int puzzleVal = readSudokuValue(rawBoard, "getPuzzleValue", x, y);
+                int playerVal = readSudokuValue(rawBoard, "getPlayerValue", x, y);
+                board.set(y, x, puzzleVal);
+                board.setPlayerValue(y, x, playerVal);
                 playerValues[y][x] = playerVal;
                 sig.append((char) ('0' + puzzleVal))
                     .append((char) ('0' + playerVal));
@@ -191,43 +220,241 @@ public final class LootGamesBridge implements MiniGameDetector {
         return DetectedGame.sudoku(game, board, playerValues, null, sig.toString(), posMap);
     }
 
+    private int readSudokuValue(Object rawBoard, String methodName, int x, int y) {
+        try {
+            return number(invoke(rawBoard, methodName, Integer.valueOf(x), Integer.valueOf(y)));
+        } catch (Exception ignored) {}
+        try {
+            return number(invoke(rawBoard, methodName, pos(x, y)));
+        } catch (Exception ignored) {}
+        try {
+            Field f = getFieldRecursive(rawBoard.getClass(), methodName);
+            if (f != null) {
+                Object val = f.get(rawBoard);
+                if (val instanceof int[][]) {
+                    return ((int[][]) val)[y][x];
+                }
+            }
+        } catch (Exception ignored) {}
+        return 0;
+    }
+
+    private final List<CellPosition> accumulatedGolSequence = new ArrayList<CellPosition>();
+    private final java.util.Set<Object> processedDisplayedSymbols = new java.util.HashSet<Object>();
+    private String lastGolStageId = "";
+
     private DetectedGame readGameOfLight(Object game) throws Exception {
         Object stage = invoke(game, "getStage");
         if (stage == null) return null;
         String stageId = String.valueOf(invoke(stage, "getID"));
         List<CellPosition> sequence = new ArrayList<CellPosition>();
         int currentSymbol = 0;
+        int boardSize = 3;
+        try {
+            boardSize = number(invoke(game, "getCurrentBoardSize"));
+        } catch (Exception ignored) {}
+        if (boardSize <= 0) boardSize = 3;
+
+        if (!stageId.equals(lastGolStageId)) {
+            if ("waiting_start".equals(stageId) || "show_sequence".equals(stageId)) {
+                accumulatedGolSequence.clear();
+                processedDisplayedSymbols.clear();
+            }
+            lastGolStageId = stageId;
+        }
+
         if ("show_sequence".equals(stageId) || "waiting_for_sequence".equals(stageId)) {
             try {
+                // Strategy 1: Read from stage.sequence
                 Field seqField = getFieldRecursive(stage.getClass(), "sequence");
                 if (seqField != null) {
-                    List<?> list = (List<?>) seqField.get(stage);
-                    if (list != null) {
-                        for (Object sym : list) {
-                            Object pos2i = invoke(sym, "getPos");
-                            int px = number(invoke(pos2i, "getX"));
-                            int py = number(invoke(pos2i, "getY"));
-                            sequence.add(new CellPosition(px, py));
+                    Object rawSeq = seqField.get(stage);
+                    if (rawSeq instanceof List) {
+                        List<?> list = (List<?>) rawSeq;
+                        for (Object item : list) {
+                            CellPosition pos = extractCellPositionFromSymbolOrPos(item);
+                            if (pos != null) {
+                                sequence.add(pos);
+                            }
+                        }
+                    } else if (rawSeq instanceof int[]) {
+                        int[] arr = (int[]) rawSeq;
+                        for (int idx : arr) {
+                            CellPosition pos = cellPositionFromSymbolIndex(idx);
+                            if (pos != null) {
+                                sequence.add(pos);
+                            }
                         }
                     }
                 }
+
+                // Strategy 2: Accumulate live displayed symbols from game.getDisplayedSymbols()
+                try {
+                    List<?> dispList = (List<?>) invoke(game, "getDisplayedSymbols");
+                    if (dispList != null && !dispList.isEmpty()) {
+                        for (Object item : dispList) {
+                            if (item == null) continue;
+                            if (processedDisplayedSymbols.add(item)) {
+                                Object sym = null;
+                                try {
+                                    sym = invoke(item, "getSymbol");
+                                } catch (Exception ignored) {
+                                    Field sf = getFieldRecursive(item.getClass(), "symbol");
+                                    if (sf != null) sym = sf.get(item);
+                                }
+                                CellPosition pos = extractCellPositionFromSymbolOrPos(sym);
+                                if (pos != null) {
+                                    accumulatedGolSequence.add(pos);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+
+                if (!sequence.isEmpty()) {
+                    accumulatedGolSequence.clear();
+                    accumulatedGolSequence.addAll(sequence);
+                } else if (!accumulatedGolSequence.isEmpty()) {
+                    sequence = new ArrayList<CellPosition>(accumulatedGolSequence);
+                }
+
                 if ("waiting_for_sequence".equals(stageId)) {
-                    Field curField = getFieldRecursive(stage.getClass(), "currentSymbol");
-                    if (curField != null) {
-                        currentSymbol = curField.getInt(stage);
+                    int readSymbol = extractIntFromStage(
+                        stage,
+                        "currentSymbol",
+                        "currentIndex",
+                        "index",
+                        "step",
+                        "currentStep",
+                        "symbolIndex",
+                        "placedSymbols");
+                    if (readSymbol >= 0) {
+                        currentSymbol = readSymbol;
                     }
                 }
             } catch (Exception e) {
                 LootGameSolver.LOG.debug("Error reading Game of Light sequence data", e);
             }
         }
-        if ("waiting_for_sequence".equals(stageId) && currentSymbol > 0 && currentSymbol <= sequence.size()) {
-            sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
+        boolean sequenceCompleted = false;
+        if ("waiting_for_sequence".equals(stageId)) {
+            if (currentSymbol > 0 && currentSymbol < sequence.size()) {
+                sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
+            } else if (currentSymbol >= sequence.size() && !sequence.isEmpty()) {
+                sequenceCompleted = true;
+                sequence = java.util.Collections.emptyList();
+            }
         }
-        GameOfLightBoard board = new GameOfLightBoard(stageId, sequence);
-        String signature = stageId + ":" + currentSymbol + ":" + sequence.size() + ":" + sequence.toString();
-        java.util.Map<CellPosition, int[]> posMap = precomputePositions(game, 3, 3);
+        GameOfLightBoard board = new GameOfLightBoard(stageId, sequence, boardSize, sequenceCompleted, currentSymbol);
+        String signature = stageId + ":"
+            + currentSymbol
+            + ":"
+            + sequence.size()
+            + ":"
+            + sequenceCompleted
+            + ":"
+            + sequence.toString();
+        java.util.Map<CellPosition, int[]> posMap = precomputePositions(game, boardSize, boardSize);
         return DetectedGame.gameOfLight(game, board, signature, posMap);
+    }
+
+    private int extractIntFromStage(Object stage, String... fieldNames) {
+        if (stage == null) return -1;
+        for (String name : fieldNames) {
+            Field f = getFieldRecursive(stage.getClass(), name);
+            if (f != null) {
+                try {
+                    Object val = f.get(stage);
+                    if (val instanceof Number) {
+                        return ((Number) val).intValue();
+                    } else if (val != null && val.getClass()
+                        .isEnum()) {
+                            return ((Enum<?>) val).ordinal();
+                        }
+                } catch (Exception ignored) {}
+            }
+            String getter = "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            try {
+                Method m = stage.getClass()
+                    .getMethod(getter);
+                Object val = m.invoke(stage);
+                if (val instanceof Number) {
+                    return ((Number) val).intValue();
+                } else if (val != null && val.getClass()
+                    .isEnum()) {
+                        return ((Enum<?>) val).ordinal();
+                    }
+            } catch (Exception ignored) {}
+        }
+        return -1;
+    }
+
+    private CellPosition extractCellPositionFromSymbolOrPos(Object item) {
+        if (item == null) return null;
+
+        if (item instanceof Number) {
+            return cellPositionFromSymbolIndex(((Number) item).intValue());
+        }
+
+        if (item.getClass()
+            .isEnum()) {
+            return cellPositionFromSymbolIndex(((Enum<?>) item).ordinal());
+        }
+
+        // Try getting position via Symbol enum index (0..7)
+        try {
+            Method getIndexMethod = item.getClass()
+                .getMethod("getIndex");
+            int idx = number(getIndexMethod.invoke(item));
+            return cellPositionFromSymbolIndex(idx);
+        } catch (Exception ignored) {}
+
+        Object pos2i = item;
+        if (!item.getClass()
+            .getName()
+            .contains("Pos2i")) {
+            try {
+                pos2i = invoke(item, "getPos");
+            } catch (Exception ignored) {
+                Field pf = getFieldRecursive(item.getClass(), "pos");
+                if (pf != null) {
+                    try {
+                        pos2i = pf.get(item);
+                    } catch (Exception ignored2) {}
+                }
+            }
+        }
+        if (pos2i != null) {
+            try {
+                int px = number(invoke(pos2i, "getX"));
+                int py = number(invoke(pos2i, "getY"));
+                return new CellPosition(px, py);
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private static CellPosition cellPositionFromSymbolIndex(int idx) {
+        switch (idx) {
+            case 0:
+                return new CellPosition(0, 0); // NORTH_WEST
+            case 1:
+                return new CellPosition(1, 0); // NORTH
+            case 2:
+                return new CellPosition(2, 0); // NORTH_EAST
+            case 3:
+                return new CellPosition(0, 1); // WEST
+            case 4:
+                return new CellPosition(2, 1); // EAST
+            case 5:
+                return new CellPosition(0, 2); // SOUTH_WEST
+            case 6:
+                return new CellPosition(1, 2); // SOUTH
+            case 7:
+                return new CellPosition(2, 2); // SOUTH_EAST
+            default:
+                return null;
+        }
     }
 
     private java.util.Map<CellPosition, int[]> precomputePositions(Object game, int width, int height) {
@@ -259,6 +486,15 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     /** Executes exactly one normal Minecraft interaction. Caller waits for a packet-driven board update. */
     public boolean interact(DetectedGame detected, SolverAction action) {
+        return interact(detected, action, false, 1);
+    }
+
+    /** Executes an interaction with optional sneak (shift) state and remaining click count. */
+    public boolean interact(DetectedGame detected, SolverAction action, boolean sneak) {
+        return interact(detected, action, sneak, 1);
+    }
+
+    public boolean interact(DetectedGame detected, SolverAction action, boolean sneak, int remainingClicks) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
@@ -270,8 +506,55 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             mc.thePlayer.swingItem();
 
-            if (action.type == SolverAction.Type.REVEAL) {
-                if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+            ensureEmptyHand(mc.thePlayer);
+            setSneakingState(mc, sneak);
+            try {
+                if (action.type == SolverAction.Type.REVEAL) {
+                    if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER) {
+                        boolean hasRevealed = false;
+                        if (detected.minesweeper != null) {
+                            for (CellPosition p : detected.minesweeper.positions()) {
+                                if (detected.minesweeper.get(p)
+                                    .getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.REVEALED) {
+                                    hasRevealed = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!hasRevealed
+                            || (detected.signature != null && detected.signature.startsWith("UNGENERATED"))) {
+                            // Starting an ungenerated stage or opening new board requires right-click on center block
+                            ItemStack held = mc.thePlayer.getHeldItem();
+                            mc.playerController.onPlayerRightClick(
+                                mc.thePlayer,
+                                mc.theWorld,
+                                held,
+                                block[0],
+                                block[1],
+                                block[2],
+                                1,
+                                Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+                        } else {
+                            // Safe cell reveal on active open board: LEFT-CLICK (clickBlock)
+                            mc.playerController.clickBlock(block[0], block[1], block[2], 1);
+                        }
+                    } else if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+                        ItemStack held = mc.thePlayer.getHeldItem();
+                        mc.playerController.onPlayerRightClick(
+                            mc.thePlayer,
+                            mc.theWorld,
+                            held,
+                            block[0],
+                            block[1],
+                            block[2],
+                            1,
+                            Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+                    } else {
+                        // Safe cell reveal for Minesweeper / Sudoku: LEFT-CLICK (clickBlock)
+                        mc.playerController.clickBlock(block[0], block[1], block[2], 1);
+                    }
+                } else {
+                    // Mine flagging / set value: RIGHT-CLICK (onPlayerRightClick)
                     ItemStack held = mc.thePlayer.getHeldItem();
                     mc.playerController.onPlayerRightClick(
                         mc.thePlayer,
@@ -282,20 +565,11 @@ public final class LootGamesBridge implements MiniGameDetector {
                         block[2],
                         1,
                         Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
-                } else {
-                    mc.playerController.clickBlock(block[0], block[1], block[2], 1);
                 }
-            } else {
-                ItemStack held = mc.thePlayer.getHeldItem();
-                mc.playerController.onPlayerRightClick(
-                    mc.thePlayer,
-                    mc.theWorld,
-                    held,
-                    block[0],
-                    block[1],
-                    block[2],
-                    1,
-                    Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+            } finally {
+                if (sneak && remainingClicks <= 1) {
+                    setSneakingState(mc, false);
+                }
             }
             return true;
         } catch (Exception e) {
@@ -313,6 +587,63 @@ public final class LootGamesBridge implements MiniGameDetector {
         return current - diff;
     }
 
+    private static void setSneakingState(Minecraft mc, boolean sneak) {
+        if (mc == null || mc.thePlayer == null) return;
+        mc.thePlayer.setSneaking(sneak);
+        if (mc.gameSettings != null && mc.gameSettings.keyBindSneak != null) {
+            net.minecraft.client.settings.KeyBinding.setKeyBindState(mc.gameSettings.keyBindSneak.getKeyCode(), sneak);
+        }
+        if (mc.thePlayer.sendQueue != null) {
+            try {
+                int actionId = sneak ? 1 : 2;
+                mc.thePlayer.sendQueue.addToSendQueue(
+                    new net.minecraft.network.play.client.C0BPacketEntityAction(mc.thePlayer, actionId));
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static void ensureEmptyHand(EntityPlayer player) {
+        if (player == null || player.inventory == null) return;
+        if (player.getHeldItem() == null) return;
+
+        for (int i = 0; i < 9; i++) {
+            if (player.inventory.mainInventory[i] == null) {
+                player.inventory.currentItem = i;
+                return;
+            }
+        }
+
+        for (int i = 9; i < 36; i++) {
+            if (player.inventory.mainInventory[i] == null) {
+                player.inventory.mainInventory[i] = player.inventory.mainInventory[8];
+                player.inventory.mainInventory[8] = null;
+                player.inventory.currentItem = 8;
+                return;
+            }
+        }
+
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = player.inventory.mainInventory[i];
+            if (stack != null && stack.getItem() != null) {
+                String name = stack.getItem()
+                    .getUnlocalizedName();
+                if (name != null) {
+                    name = name.toLowerCase();
+                    if (!name.contains("hammer") && !name.contains("wrench")
+                        && !name.contains("pickaxe")
+                        && !name.contains("sword")
+                        && !name.contains("axe")
+                        && !name.contains("wand")
+                        && !name.contains("tool")
+                        && !name.contains("chisel")) {
+                        player.inventory.currentItem = i;
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     private static boolean preparePlayerPositionAndAim(EntityPlayer player, int x, int y, int z) {
         if (player == null) return false;
         double dx = x + 0.5D - player.posX;
@@ -320,28 +651,26 @@ public final class LootGamesBridge implements MiniGameDetector {
         double dz = z + 0.5D - player.posZ;
         double distSq = dx * dx + dy * dy + dz * dz;
 
-        double distXZ = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-        float pitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
-
-        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
-        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
-
-        // Auto-walk / auto-fly towards target block if out of reach range (> 4.2 blocks)
-        if (distSq > 17.64D) {
-            double speed = 0.15D;
-            if (distXZ > 0.1D) {
-                player.motionX += (dx / distXZ) * speed;
-                player.motionZ += (dz / distXZ) * speed;
-            }
-            if (player.capabilities.allowFlying) {
-                player.capabilities.isFlying = true;
-                if (Math.abs(dy) > 1.2D) {
-                    player.motionY = dy > 0 ? 0.12D : -0.12D;
-                }
-            }
+        if (distSq > 1024.0D) {
             return false;
         }
+
+        // Reach assistance: nudge player motion if further than 4.0 blocks
+        if (distSq > 16.0D) {
+            double distXZ = Math.sqrt(dx * dx + dz * dz);
+            if (distXZ > 0.1D) {
+                player.motionX += (dx / distXZ) * 0.10D;
+                player.motionZ += (dz / distXZ) * 0.10D;
+            }
+        }
+
+        double distXZ = Math.sqrt(dx * dx + dz * dz);
+        float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+        float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
+
+        player.rotationYaw = updateRotation(player.rotationYaw, targetYaw, 60.0F);
+        player.rotationPitch = updateRotation(player.rotationPitch, targetPitch, 45.0F);
+
         return true;
     }
 

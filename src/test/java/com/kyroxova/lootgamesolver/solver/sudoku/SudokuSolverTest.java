@@ -73,4 +73,64 @@ public class SudokuSolverTest {
             new SudokuSolver().solve(new SudokuBoard(puzzle))
                 .getStatus());
     }
+
+    @Test
+    public void testOptimalClickPlanning() {
+        // Forward cases (0 -> 1..5)
+        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p1 = com.kyroxova.lootgamesolver.client.SolverSession
+            .calculateOptimalClicks(0, 1);
+        assertEquals(1, p1.clicks);
+        org.junit.Assert.assertFalse(p1.useSneak);
+
+        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p5 = com.kyroxova.lootgamesolver.client.SolverSession
+            .calculateOptimalClicks(0, 5);
+        assertEquals(5, p5.clicks);
+        org.junit.Assert.assertFalse(p5.useSneak);
+
+        // Backward / Sneak cases (0 -> 6..9)
+        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p6 = com.kyroxova.lootgamesolver.client.SolverSession
+            .calculateOptimalClicks(0, 6);
+        assertEquals(4, p6.clicks);
+        org.junit.Assert.assertTrue(p6.useSneak);
+
+        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p9 = com.kyroxova.lootgamesolver.client.SolverSession
+            .calculateOptimalClicks(0, 9);
+        assertEquals(1, p9.clicks);
+        org.junit.Assert.assertTrue(p9.useSneak);
+
+        // Non-zero start value
+        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan pFrom2To9 = com.kyroxova.lootgamesolver.client.SolverSession
+            .calculateOptimalClicks(2, 9);
+        assertEquals(3, pFrom2To9.clicks);
+        org.junit.Assert.assertTrue(pFrom2To9.useSneak);
+    }
+
+    @Test
+    public void handlesWrongPlayerValue() {
+        int[][] puzzle = { { 5, 3, 0, 0, 7, 0, 0, 0, 0 }, { 6, 0, 0, 1, 9, 5, 0, 0, 0 }, { 0, 9, 8, 0, 0, 0, 0, 6, 0 },
+            { 8, 0, 0, 0, 6, 0, 0, 0, 3 }, { 4, 0, 0, 8, 0, 3, 0, 0, 1 }, { 7, 0, 0, 0, 2, 0, 0, 0, 6 },
+            { 0, 6, 0, 0, 0, 0, 2, 8, 0 }, { 0, 0, 0, 4, 1, 9, 0, 0, 5 }, { 0, 0, 0, 0, 8, 0, 0, 7, 9 } };
+        SudokuBoard board = new SudokuBoard(puzzle);
+        // Correct value for (0, 2) is 4. Set a wrong player value of 1.
+        board.setPlayerValue(0, 2, 1);
+
+        SolveResult result = new SudokuSolver().solve(board);
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
+        // Should still generate actions for all 51 open cells (including the cell with wrong value 1)
+        assertEquals(
+            51,
+            result.getActions()
+                .size());
+
+        // Find action for (col 2, row 0) and verify it specifies correct target 4
+        com.kyroxova.lootgamesolver.core.SolverAction action = null;
+        for (com.kyroxova.lootgamesolver.core.SolverAction a : result.getActions()) {
+            if (a.position.x == 2 && a.position.y == 0) {
+                action = a;
+                break;
+            }
+        }
+        org.junit.Assert.assertNotNull(action);
+        assertEquals(4, action.value);
+    }
 }

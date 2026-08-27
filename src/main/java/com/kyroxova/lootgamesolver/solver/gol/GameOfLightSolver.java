@@ -20,11 +20,13 @@ public final class GameOfLightSolver implements MiniGameSolver<GameOfLightBoard>
         String stage = board.getStageId();
         if (GameOfLightBoard.STAGE_WAITING_START.equals(stage)) {
             List<SolverAction> actions = new ArrayList<SolverAction>();
-            actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(1, 1), 0, 1D));
+            int cx = board.getWidth() / 2;
+            int cy = board.getHeight() / 2;
+            actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
             return new SolveResult(
                 SolveResult.Status.GUARANTEED_SAFE,
                 actions,
-                1D,
+                1.0D,
                 "Click center block to start Game of Light");
         }
 
@@ -33,8 +35,13 @@ public final class GameOfLightSolver implements MiniGameSolver<GameOfLightBoard>
         }
 
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stage)) {
+            if (board.isSequenceCompleted()) {
+                return SolveResult.none(SolveResult.Status.NO_MOVE, "Sequence complete! Waiting for next round...");
+            }
             List<CellPosition> seq = board.getSequence();
-            if (seq.isEmpty()) return SolveResult.none(SolveResult.Status.NO_MOVE, "Waiting for sequence data");
+            if (seq.isEmpty()) {
+                return SolveResult.none(SolveResult.Status.NO_MOVE, "Watching sequence presentation...");
+            }
 
             List<SolverAction> actions = new ArrayList<SolverAction>();
             for (CellPosition pos : seq) {

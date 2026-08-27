@@ -60,4 +60,30 @@ public class GameOfLightSolverTest {
             result.getActions()
                 .isEmpty());
     }
+
+    @Test
+    public void handlesExpandingBoardCenterStart() {
+        GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_START, null, 5);
+        SolveResult result = new GameOfLightSolver().solve(board);
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
+        assertEquals(
+            1,
+            result.getActions()
+                .size());
+        assertEquals(
+            new CellPosition(2, 2),
+            result.getActions()
+                .get(0).position);
+    }
+
+    @Test
+    public void handlesCompletedSequence() {
+        GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, null, 3, true);
+        SolveResult result = new GameOfLightSolver().solve(board);
+        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
+        assertTrue(
+            result.getActions()
+                .isEmpty());
+        assertEquals("Sequence complete! Waiting for next round...", result.getMessage());
+    }
 }

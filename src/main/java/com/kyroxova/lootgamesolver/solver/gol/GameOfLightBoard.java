@@ -16,11 +16,30 @@ public final class GameOfLightBoard implements GameBoard {
 
     private final String stageId;
     private final List<CellPosition> sequence;
+    private final int boardSize;
+    private final boolean sequenceCompleted;
+    private final int currentSymbol;
 
     public GameOfLightBoard(String stageId, List<CellPosition> sequence) {
+        this(stageId, sequence, 3, false, 0);
+    }
+
+    public GameOfLightBoard(String stageId, List<CellPosition> sequence, int boardSize) {
+        this(stageId, sequence, boardSize, false, 0);
+    }
+
+    public GameOfLightBoard(String stageId, List<CellPosition> sequence, int boardSize, boolean sequenceCompleted) {
+        this(stageId, sequence, boardSize, sequenceCompleted, 0);
+    }
+
+    public GameOfLightBoard(String stageId, List<CellPosition> sequence, int boardSize, boolean sequenceCompleted,
+        int currentSymbol) {
         this.stageId = stageId != null ? stageId : "";
         this.sequence = sequence != null ? new ArrayList<CellPosition>(sequence)
             : Collections.<CellPosition>emptyList();
+        this.boardSize = boardSize > 0 ? boardSize : 3;
+        this.sequenceCompleted = sequenceCompleted;
+        this.currentSymbol = currentSymbol;
     }
 
     public String getStageId() {
@@ -31,11 +50,23 @@ public final class GameOfLightBoard implements GameBoard {
         return Collections.unmodifiableList(sequence);
     }
 
+    public int getBoardSize() {
+        return boardSize;
+    }
+
+    public boolean isSequenceCompleted() {
+        return sequenceCompleted;
+    }
+
+    public int getCurrentSymbol() {
+        return currentSymbol;
+    }
+
     public int getWidth() {
-        return 3;
+        return boardSize;
     }
 
     public int getHeight() {
-        return 3;
+        return boardSize;
     }
 }
