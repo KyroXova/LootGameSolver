@@ -35,4 +35,6 @@
  */
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    devOnlyNonPublishable("com.github.GTNewHorizons:LootGames:+:dev")
 }
+

@@ -20,9 +20,18 @@ public final class SudokuSolver implements MiniGameSolver<SudokuBoard> {
         SudokuBoard solved = board.copy();
         if (!solveRecursive(solved)) return SolveResult.none(SolveResult.Status.INVALID, "Sudoku has no solution");
         List<SolverAction> actions = new ArrayList<SolverAction>();
-        for (int row = 0; row < SudokuBoard.SIZE; row++)
-            for (int col = 0; col < SudokuBoard.SIZE; col++) if (board.get(row, col) == 0) actions.add(
-                new SolverAction(SolverAction.Type.SET_VALUE, new CellPosition(col, row), solved.get(row, col), 1D));
+        for (int row = 0; row < SudokuBoard.SIZE; row++) {
+            for (int col = 0; col < SudokuBoard.SIZE; col++) {
+                if (board.get(row, col) == 0) {
+                    int targetVal = solved.get(row, col);
+                    int playerVal = board.getPlayerValue(row, col);
+                    if (playerVal != targetVal) {
+                        actions.add(
+                            new SolverAction(SolverAction.Type.SET_VALUE, new CellPosition(col, row), targetVal, 1D));
+                    }
+                }
+            }
+        }
         return actions.isEmpty() ? SolveResult.none(SolveResult.Status.SOLVED, "Sudoku solved")
             : new SolveResult(
                 SolveResult.Status.GUARANTEED_SAFE,
