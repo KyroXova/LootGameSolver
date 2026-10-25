@@ -136,3 +136,11 @@ jobs:
           make_latest: ${{ steps.release-params.outputs.make_latest }}
           generate_release_notes: true
           files: build/libs/*.jar
+
+
+      - name: Publish to CurseForge
+        if: steps.release-params.outputs.is_prerelease != 'true'
+        run: ./gradlew curseforge -x test
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        continue-on-error: true
