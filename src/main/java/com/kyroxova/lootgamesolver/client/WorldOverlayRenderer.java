@@ -8,7 +8,6 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.AxisAlignedBB;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 
 import org.lwjgl.opengl.GL11;
@@ -23,19 +22,12 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
 /**
  * Ultra-optimized 3D overlay renderer.
- * Holograms are rendered ONLY if the block is within a 32-block area around the player.
+ * Renders ONLY when a LootGames puzzle is actively detected. Reads cached solver actions
+ * without performing any solver or world inspection work on the render thread.
+ * Fully isolates OpenGL states using glPushAttrib / glPopAttrib so world and chest lighting
+ * are completely unaffected.
  */
 public final class WorldOverlayRenderer {
-
-    private static final ResourceLocation TEXTURE_SAFE_FLAG = new ResourceLocation(
-        "lootgamesolver",
-        "textures/minesweeper/safe_flag.png");
-    private static final ResourceLocation TEXTURE_RED_FLAG = new ResourceLocation(
-        "lootgamesolver",
-        "textures/minesweeper/red_flag.png");
-    private static final ResourceLocation TEXTURE_GOL_SAFE_FLAG = new ResourceLocation(
-        "lootgamesolver",
-        "textures/gol/safe_flag.png");
 
     private final SolverSession session;
 
@@ -50,9 +42,6 @@ public final class WorldOverlayRenderer {
         if (current == null) return;
 
         List<SolverAction> actions = session.getActiveActions();
-        if (actions == null || actions.isEmpty()) {
-            actions = session.computeActionsForCurrentGame();
-        }
         if (actions == null || actions.isEmpty()) return;
 
         Minecraft mc = Minecraft.getMinecraft();
@@ -62,118 +51,72 @@ public final class WorldOverlayRenderer {
         double renderPosY = RenderManager.renderPosY;
         double renderPosZ = RenderManager.renderPosZ;
 
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
-        GL11.glTranslated(-renderPosX, -renderPosY, -renderPosZ);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
-        GL11.glDepthMask(false);
-        GL11.glLineWidth(1.5F);
+        try {
+            GL11.glTranslated(-renderPosX, -renderPosY, -renderPosZ);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            GL11.glDisable(GL11.GL_LIGHTING);
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthMask(false);
+            GL11.glLineWidth(1.5F);
 
-        int index = 1;
-        int maxRender = actions.size();
-        if (current.type == MiniGame.GAME_OF_LIGHT) {
-            boolean isStart = current.gol != null
-                && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId());
-            if (!isStart && !actions.isEmpty()) {
-                SolverAction firstAction = actions.get(0);
-                if (current.gol != null && firstAction.position.x == current.gol.getWidth() / 2
-                    && firstAction.position.y == current.gol.getHeight() / 2) {
-                    isStart = true;
+            int index = 1;
+            int maxRender = actions.size();
+            for (int i = 0; i < maxRender; i++) {
+                SolverAction action = actions.get(i);
+                int[] block = session.getBlockPos(action.position);
+                if (block == null) continue;
+
+                // Distance Restriction (32.0 block radius)
+                double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
+                double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
+                double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
+                if (dx > 32.0D || dz > 32.0D || dy > 16.0D) continue;
+
+                double minX = block[0] + 0.02D, minY = block[1] + 0.02D, minZ = block[2] + 0.02D;
+                double maxX = minX + 0.96D, maxY = minY + 0.96D, maxZ = minZ + 0.96D;
+                AxisAlignedBB box = AxisAlignedBB.getBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+
+                if (current.type == MiniGame.MINESWEEPER) {
+                    if (action.type == SolverAction.Type.FLAG) {
+                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
+                        drawFloatingText("FLAG", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFF4444, mc);
+                    } else if (action.type == SolverAction.Type.REVEAL) {
+                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
+                        drawFloatingText("SAFE", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x44FF44, mc);
+                    }
+                } else if (current.type == MiniGame.SUDOKU) {
+                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
+                    drawFloatingText(
+                        String.valueOf(action.value),
+                        minX + 0.5D,
+                        minY + 1.25D,
+                        minZ + 0.5D,
+                        0x55FFFF,
+                        mc);
+                } else if (current.type == MiniGame.GAME_OF_LIGHT) {
+                    if (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId())) {
+                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
+                        drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
+                    } else {
+                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
+                        drawFloatingText("#" + index, minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
+                    }
                 }
+                index++;
             }
-            if (!isStart) {
-                maxRender = 1;
-            }
+        } finally {
+            GL11.glDepthMask(true);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_LIGHTING);
+            GL11.glDisable(GL11.GL_BLEND);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
+            GL11.glPopAttrib();
         }
-
-        for (int i = 0; i < maxRender; i++) {
-            SolverAction action = actions.get(i);
-            int[] block = session.getBlockPos(action.position);
-            if (block == null) continue;
-
-            // Distance Restriction (32.0 block radius)
-            double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
-            double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
-            double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
-            if (dx > 32.0D || dz > 32.0D || dy > 16.0D) continue;
-
-            double minX = block[0] + 0.02D, minY = block[1] + 0.02D, minZ = block[2] + 0.02D;
-            double maxX = minX + 0.96D, maxY = minY + 0.96D, maxZ = minZ + 0.96D;
-            AxisAlignedBB box = AxisAlignedBB.getBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
-
-            if (current.type == MiniGame.MINESWEEPER) {
-                if (action.type == SolverAction.Type.FLAG) {
-                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
-                    drawTexturedHologram(TEXTURE_RED_FLAG, minX + 0.5D, minY + 1.25D, minZ + 0.5D, mc);
-                } else if (action.type == SolverAction.Type.REVEAL) {
-                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                    drawTexturedHologram(TEXTURE_SAFE_FLAG, minX + 0.5D, minY + 1.25D, minZ + 0.5D, mc);
-                }
-            } else if (current.type == MiniGame.SUDOKU) {
-                if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
-                drawFloatingText(String.valueOf(action.value), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x55FFFF, mc);
-            } else if (current.type == MiniGame.GAME_OF_LIGHT) {
-                boolean isStart = (current.gol != null && action.position.x == current.gol.getWidth() / 2
-                    && action.position.y == current.gol.getHeight() / 2)
-                    || (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId()));
-                if (isStart) {
-                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
-                    drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
-                } else {
-                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                    drawTexturedHologram(TEXTURE_GOL_SAFE_FLAG, minX + 0.5D, minY + 1.25D, minZ + 0.5D, mc);
-                }
-            }
-            index++;
-        }
-
-        GL11.glDepthMask(true);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glPopMatrix();
-    }
-
-    private static void drawTexturedHologram(ResourceLocation texture, double x, double y, double z, Minecraft mc) {
-        if (texture == null || mc.getTextureManager() == null) return;
-
-        RenderManager rm = RenderManager.instance;
-        float size = 0.40F;
-
-        GL11.glPushMatrix();
-        GL11.glTranslated(x, y, z);
-        GL11.glNormal3f(0.0F, 1.0F, 0.0F);
-        GL11.glRotatef(-rm.playerViewY, 0.0F, 1.0F, 0.0F);
-        GL11.glRotatef(rm.playerViewX, 1.0F, 0.0F, 0.0F);
-
-        OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glEnable(GL11.GL_ALPHA_TEST);
-        GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
-        GL11.glDisable(GL11.GL_CULL_FACE);
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-
-        mc.getTextureManager()
-            .bindTexture(texture);
-
-        Tessellator t = Tessellator.instance;
-        t.startDrawingQuads();
-        t.setColorRGBA_F(1.0F, 1.0F, 1.0F, 1.0F);
-        t.addVertexWithUV(-size, -size, 0.0D, 0.0D, 1.0D);
-        t.addVertexWithUV(size, -size, 0.0D, 1.0D, 1.0D);
-        t.addVertexWithUV(size, size, 0.0D, 1.0D, 0.0D);
-        t.addVertexWithUV(-size, size, 0.0D, 0.0D, 0.0D);
-        t.draw();
-
-        GL11.glEnable(GL11.GL_CULL_FACE);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glPopMatrix();
     }
 
     private static void drawWireframe(AxisAlignedBB box, float r, float g, float b) {

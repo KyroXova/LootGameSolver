@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import com.kyroxova.lootgamesolver.client.SolverSession;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 
 public class SudokuSolverTest {
@@ -75,34 +76,13 @@ public class SudokuSolverTest {
     }
 
     @Test
-    public void testOptimalClickPlanning() {
-        // Forward cases (0 -> 1..5)
-        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p1 = com.kyroxova.lootgamesolver.client.SolverSession
-            .calculateOptimalClicks(0, 1);
-        assertEquals(1, p1.clicks);
-        org.junit.Assert.assertFalse(p1.useSneak);
-
-        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p5 = com.kyroxova.lootgamesolver.client.SolverSession
-            .calculateOptimalClicks(0, 5);
-        assertEquals(5, p5.clicks);
-        org.junit.Assert.assertFalse(p5.useSneak);
-
-        // Backward / Sneak cases (0 -> 6..9)
-        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p6 = com.kyroxova.lootgamesolver.client.SolverSession
-            .calculateOptimalClicks(0, 6);
-        assertEquals(4, p6.clicks);
-        org.junit.Assert.assertTrue(p6.useSneak);
-
-        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan p9 = com.kyroxova.lootgamesolver.client.SolverSession
-            .calculateOptimalClicks(0, 9);
-        assertEquals(1, p9.clicks);
-        org.junit.Assert.assertTrue(p9.useSneak);
-
-        // Non-zero start value
-        com.kyroxova.lootgamesolver.client.SolverSession.ClickPlan pFrom2To9 = com.kyroxova.lootgamesolver.client.SolverSession
-            .calculateOptimalClicks(2, 9);
-        assertEquals(3, pFrom2To9.clicks);
-        org.junit.Assert.assertTrue(pFrom2To9.useSneak);
+    public void testClickPlanning() {
+        assertEquals(1, SolverSession.calculateClicksNeeded(0, 1));
+        assertEquals(5, SolverSession.calculateClicksNeeded(0, 5));
+        assertEquals(6, SolverSession.calculateClicksNeeded(0, 6));
+        assertEquals(9, SolverSession.calculateClicksNeeded(0, 9));
+        assertEquals(7, SolverSession.calculateClicksNeeded(2, 9));
+        assertEquals(0, SolverSession.calculateClicksNeeded(4, 4));
     }
 
     @Test

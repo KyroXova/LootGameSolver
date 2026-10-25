@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ '*' ]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release (e.g. 2.0.1, or leave empty for default)'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Determine JDK versions
+        id: list-jdk-versions
+        shell: bash
+        run: |
+          (
+            echo 'java-versions<<EOF'
+            echo 8
+            echo 17
+            echo 21
+            if [[ -f gradle/gradle-daemon-jvm.properties ]]; then
+              yq -pprops -oprops '.toolchainVersion' gradle/gradle-daemon-jvm.properties
+            fi
+            echo EOF
+          ) | tee -a "${GITHUB_OUTPUT}"
+
+      - name: Set up JDK versions
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ steps.list-jdk-versions.outputs.java-versions }}
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup workspace
+        run: ./gradlew setupCIWorkspace
+
+      - name: Build mod
+        run: ./gradlew assemble
+
+      - name: Determine release parameters
+        id: release-params
+        shell: bash
+        run: |
+          MANUAL_TAG="${{ inputs.tag_name }}"
+          IS_TAG="${{ startsWith(github.ref, 'refs/tags/') }}"
+          REF_NAME="${{ github.ref_name }}"
+
+          if [[ -n "$MANUAL_TAG" ]]; then
+            TARGET_TAG="$MANUAL_TAG"
+            RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
+            IS_PRE="${{ inputs.prerelease }}"
+            MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
+          elif [[ "$IS_TAG" == "true" && "$REF_NAME" != "latest" ]]; then
+            TARGET_TAG="$REF_NAME"
+            RELEASE_TITLE="LootGameSolver $REF_NAME"
+            if [[ "$REF_NAME" == *-snapshot || "$REF_NAME" == *-pre ]]; then
+              IS_PRE="true"
+              MAKE_LATEST="false"
+            else
+              IS_PRE="false"
+              MAKE_LATEST="true"
+            fi
+          else
+            TARGET_TAG="latest"
+            RELEASE_TITLE="LootGameSolver Latest Build"
+            IS_PRE="true"
+            MAKE_LATEST="false"
+          fi
+
+          echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
+          echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
+          echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.release-params.outputs.target_tag }}
+          name: ${{ steps.release-params.outputs.release_title }}
+          prerelease: ${{ steps.release-params.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ steps.release-params.outputs.make_latest }}
+          generate_release_notes: true
+          files: build/libs/*.jar
