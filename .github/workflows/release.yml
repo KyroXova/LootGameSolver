@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for release (e.g. 2.0.1, or leave empty for default)'
+        description: 'Tag name for release (e.g. 2.0.1-hotfix, or leave empty for version from gradle.properties)'
         required: false
         default: ''
       prerelease:
@@ -73,6 +73,7 @@ jobs:
           MANUAL_TAG="${{ inputs.tag_name }}"
           IS_TAG="${{ startsWith(github.ref, 'refs/tags/') }}"
           REF_NAME="${{ github.ref_name }}"
+          MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
 
           if [[ -n "$MANUAL_TAG" ]]; then
             TARGET_TAG="$MANUAL_TAG"
@@ -90,11 +91,34 @@ jobs:
               MAKE_LATEST="true"
             fi
           else
-            TARGET_TAG="latest"
-            RELEASE_TITLE="LootGameSolver Latest Build"
-            IS_PRE="true"
-            MAKE_LATEST="false"
+            TARGET_TAG="${MOD_VERSION:-latest}"
+            RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
+            if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
+              IS_PRE="true"
+              MAKE_LATEST="false"
+            else
+              IS_PRE="false"
+              MAKE_LATEST="true"
+            fi
           fi
+
+          # Extract commit description / changelog body
+          mkdir -p build
+          if git rev-parse -q --verify HEAD^2 >/dev/null 2>&1; then
+            COMMIT_BODY=$(git log -1 --format=%b HEAD^2)
+          else
+            COMMIT_BODY=$(git log -1 --format=%b HEAD)
+          fi
+
+          {
+            echo "## LootGameSolver ${TARGET_TAG}"
+            echo ""
+            if [[ -n "$COMMIT_BODY" ]]; then
+              echo "### Changes in this Release"
+              echo "$COMMIT_BODY"
+              echo ""
+            fi
+          } > build/release_body.md
 
           echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
           echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
@@ -107,6 +131,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ steps.release-params.outputs.target_tag }}
           name: ${{ steps.release-params.outputs.release_title }}
+          body_path: build/release_body.md
           prerelease: ${{ steps.release-params.outputs.is_prerelease == 'true' }}
           make_latest: ${{ steps.release-params.outputs.make_latest }}
           generate_release_notes: true
