@@ -1,5 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
+import java.util.Collections;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -12,7 +13,6 @@ import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
-import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 import com.kyroxova.lootgamesolver.solver.gol.GameOfLightSolver;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperSolver;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuSolver;
@@ -29,21 +29,27 @@ public final class SolverSession {
     private ActionPlanner.Mode mode;
     private SolverAction activeAction;
     private List<SolverAction> activeActions;
+    private List<SolverAction> cachedRenderActions;
     private DetectedGame currentSnapshot;
+    private String lastSnapshotSignature;
     private String beforeActionSignature;
     private long lastActionAt;
     private String status = "Idle";
     private MiniGame game = MiniGame.UNKNOWN;
     private int queued;
     private int remainingClicksForActiveAction = 0;
-    private long msStageDelayUntil = 0;
     private final int[][] optimisticSudokuValues = new int[9][9];
+
+    public void invalidateDormantCache() {
+        bridge.invalidateDormantCache();
+    }
 
     public void start(ActionPlanner.Mode requestedMode) {
         if (!LootGameSolverConfig.enabled) {
             status = "Disabled in config";
             return;
         }
+        bridge.invalidateDormantCache();
         cancel(
             "Preparing " + requestedMode.name()
                 .toLowerCase());
@@ -52,59 +58,49 @@ public final class SolverSession {
     }
 
     public void tick() {
-        currentSnapshot = bridge.detect();
+        currentSnapshot = bridge.detect(mode != null);
+        if (currentSnapshot == null) {
+            cachedRenderActions = null;
+            lastSnapshotSignature = null;
+            if (mode != null) {
+                cancel("No supported LootGames board nearby");
+            }
+            return;
+        }
+
+        game = currentSnapshot.type;
+
+        // Recompute cached actions only when snapshot signature changes or if cache is empty
+        if (cachedRenderActions == null || !currentSnapshot.signature.equals(lastSnapshotSignature)) {
+            cachedRenderActions = computeActionsForGame(currentSnapshot);
+            lastSnapshotSignature = currentSnapshot.signature;
+        }
+
         if (mode == null) return;
 
         long now = System.currentTimeMillis();
         if (now - lastActionAt < LootGameSolverConfig.clickDelayMs) return;
 
-        DetectedGame snapshot = currentSnapshot;
-        if (snapshot == null) {
-            cancel("No supported LootGames board nearby");
-            return;
-        }
-        game = snapshot.type;
-
-        if (activeAction == null || isActionComplete(snapshot)) {
-            advanceAuto(snapshot);
+        if (activeAction == null || isActionComplete(currentSnapshot)) {
+            advanceAuto(currentSnapshot);
         } else {
-            send(snapshot);
+            send(currentSnapshot);
         }
     }
 
     private void advance() {
-        advanceAuto(bridge.detect());
+        DetectedGame detected = bridge.detect(true);
+        currentSnapshot = detected;
+        advanceAuto(detected);
     }
 
-    private boolean activeActionUseSneak = false;
-
-    public static final class ClickPlan {
-
-        public final int clicks;
-        public final boolean useSneak;
-
-        public ClickPlan(int clicks, boolean useSneak) {
-            this.clicks = clicks;
-            this.useSneak = useSneak;
-        }
+    public static int calculateClicksNeeded(int curVal, int targetVal) {
+        if (curVal == targetVal) return 0;
+        if (curVal == 0) return targetVal;
+        int diff = targetVal - curVal;
+        if (diff < 0) diff += 9;
+        return diff;
     }
-
-    public static ClickPlan calculateOptimalClicks(int curVal, int targetVal) {
-        if (curVal == targetVal) return new ClickPlan(0, false);
-        // Forward distance (right-click increments: 0 -> 1 -> 2 -> ... -> 9 -> 0)
-        int fwd = (targetVal - curVal + 10) % 10;
-        // Backward distance (sneak right-click decrements: 0 -> 9 -> 8 -> ... -> 1 -> 0)
-        int bwd = (curVal - targetVal + 10) % 10;
-
-        if (bwd < fwd) {
-            return new ClickPlan(bwd, true);
-        } else {
-            return new ClickPlan(fwd, false);
-        }
-    }
-
-    private String lastGolStage = "";
-    private int golSequenceTotal = 0;
 
     private void advanceAuto(DetectedGame snapshot) {
         currentSnapshot = snapshot;
@@ -117,58 +113,14 @@ public final class SolverSession {
         if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
             for (int r = 0; r < 9; r++) {
                 for (int c = 0; c < 9; c++) {
-                    if (optimisticSudokuValues[r][c] != 0) {
-                        if (snapshot.sudokuPlayerValues[r][c] == optimisticSudokuValues[r][c]
-                            || remainingClicksForActiveAction <= 0) {
-                            optimisticSudokuValues[r][c] = 0;
-                        } else {
-                            snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
-                        }
+                    if (snapshot.sudokuPlayerValues[r][c] == optimisticSudokuValues[r][c]) {
+                        optimisticSudokuValues[r][c] = 0;
+                    } else if (optimisticSudokuValues[r][c] != 0) {
+                        snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
                     }
                     if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
-                        snapshot.sudoku.setPlayerValue(r, c, snapshot.sudokuPlayerValues[r][c]);
+                        snapshot.sudoku.set(r, c, snapshot.sudokuPlayerValues[r][c]);
                     }
-                }
-            }
-        }
-
-        if (snapshot.type == MiniGame.GAME_OF_LIGHT && snapshot.gol != null) {
-            String curStage = snapshot.gol.getStageId();
-            if (!curStage.equals(lastGolStage)) {
-                lastGolStage = curStage;
-                activeActions = null;
-                activeAction = null;
-                golSequenceTotal = 0;
-            }
-            if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(curStage)) {
-                if (activeActions != null && activeAction != null && isActionComplete(snapshot)) {
-                    activeActions.remove(0);
-                    activeAction = null;
-                }
-                if (activeActions == null || activeActions.isEmpty()) {
-                    SolveResult res = golSolver.solve(snapshot.gol);
-                    List<SolverAction> planned = planner.plan(
-                        res,
-                        mode,
-                        LootGameSolverConfig.allowProbabilityMoves,
-                        LootGameSolverConfig.probabilityThreshold);
-                    if (planned != null && !planned.isEmpty()) {
-                        activeActions = new java.util.ArrayList<SolverAction>(planned);
-                        golSequenceTotal = activeActions.size();
-                    }
-                }
-                if (activeActions != null && !activeActions.isEmpty()) {
-                    activeAction = activeActions.get(0);
-                    queued = activeActions.size();
-                    int stepNum = golSequenceTotal - activeActions.size() + 1;
-                    status = "Playing (" + stepNum + "/" + golSequenceTotal + ")";
-                    send(snapshot);
-                    return;
-                } else {
-                    activeAction = null;
-                    queued = 0;
-                    status = "Waiting...";
-                    return;
                 }
             }
         }
@@ -179,57 +131,9 @@ public final class SolverSession {
         List<SolverAction> actions = planner
             .plan(result, mode, LootGameSolverConfig.allowProbabilityMoves, LootGameSolverConfig.probabilityThreshold);
 
-        if (snapshot.type == MiniGame.MINESWEEPER && (actions == null || actions.isEmpty())) {
-            if (snapshot.minesweeper != null) {
-                int cx = snapshot.minesweeper.getWidth() / 2;
-                int cy = snapshot.minesweeper.getHeight() / 2;
-                boolean noRevealed = true;
-                for (CellPosition p : snapshot.minesweeper.positions()) {
-                    if (snapshot.minesweeper.get(p)
-                        .getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.REVEALED) {
-                        noRevealed = false;
-                        break;
-                    }
-                }
-                long now = System.currentTimeMillis();
-                if (noRevealed) {
-                    if (msStageDelayUntil == 0) {
-                        msStageDelayUntil = now + 2000;
-                    }
-                    if (now < msStageDelayUntil) {
-                        activeAction = null;
-                        activeActions = null;
-                        queued = 0;
-                        int secsLeft = (int) Math.ceil((msStageDelayUntil - now) / 1000.0D);
-                        status = "Opening in " + secsLeft + "s";
-                        return;
-                    }
-                    msStageDelayUntil = 0;
-                    actions = new java.util.ArrayList<SolverAction>();
-                    actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
-                } else {
-                    // Board is solved! Wait for LootGames structure expansion to create next stage ungenerated board
-                    if (msStageDelayUntil == 0) {
-                        msStageDelayUntil = now + 2500;
-                    }
-                    if (now < msStageDelayUntil) {
-                        activeAction = null;
-                        activeActions = null;
-                        queued = 0;
-                        int secsLeft = (int) Math.ceil((msStageDelayUntil - now) / 1000.0D);
-                        status = "Expanding (" + secsLeft + "s)";
-                        return;
-                    }
-                }
-            }
-        } else {
-            msStageDelayUntil = 0;
-        }
-
-        // Sort actions by distance to player so nearest target block is always executed first (Minesweeper & Sudoku
-        // only)
+        // Sort actions by distance to player so nearest target block is always executed first
         Minecraft mc = Minecraft.getMinecraft();
-        if (snapshot.type != MiniGame.GAME_OF_LIGHT && mc.thePlayer != null && actions.size() > 1) {
+        if (mc.thePlayer != null && actions.size() > 1) {
             final double px = mc.thePlayer.posX;
             final double py = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
             final double pz = mc.thePlayer.posZ;
@@ -249,46 +153,48 @@ public final class SolverSession {
             });
         }
 
+        activeActions = actions;
+        cachedRenderActions = actions;
+        lastSnapshotSignature = snapshot.signature;
+        queued = actions.size();
+
         if (actions.isEmpty()) {
-            if (snapshot.type == MiniGame.SUDOKU && snapshot.sudoku != null) {
-                if (isSudokuBoardFullyFilled(snapshot.sudoku) && result.getStatus() == SolveResult.Status.SOLVED) {
-                    bridge.submitSudokuCheck(snapshot);
-                    activeAction = null;
-                    activeActions = null;
-                    queued = 0;
-                    status = "Complete!";
-                    return;
-                } else {
-                    activeAction = null;
-                    activeActions = null;
-                    queued = 0;
-                    status = result.getMessage();
-                    return;
+            if (snapshot.type == MiniGame.SUDOKU) {
+                bridge.submitSudokuCheck(snapshot);
+                activeAction = null;
+                status = "Stage complete! Waiting for next stage...";
+                return;
+            }
+            if (snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
+                // If Minesweeper is reset for new stage, click center cell to start next stage
+                int cx = snapshot.minesweeper.getWidth() / 2;
+                int cy = snapshot.minesweeper.getHeight() / 2;
+                com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell centerCell = snapshot.minesweeper
+                    .get(cx, cy);
+                if (centerCell != null
+                    && centerCell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.UNKNOWN) {
+                    actions = new java.util.ArrayList<SolverAction>();
+                    actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
+                    activeActions = actions;
+                    cachedRenderActions = actions;
                 }
             }
             if (actions.isEmpty()) {
                 if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
                     || "under_expanding".equals(snapshot.gol.getStageId()))) {
                     activeAction = null;
-                    activeActions = null;
-                    queued = 0;
-                    status = "Watching pattern...";
+                    status = "Watching sequence playback...";
                     return;
                 }
                 if (mode == ActionPlanner.Mode.SINGLE_STEP) {
                     mode = null;
                 }
                 activeAction = null;
-                activeActions = null;
-                queued = 0;
                 status = result.getMessage()
                     + (result.getStatus() == SolveResult.Status.PROBABILISTIC ? " (guess disabled)" : "");
                 return;
             }
         }
-
-        activeActions = actions;
-        queued = actions.size();
 
         SolverAction nextAction = actions.get(0);
         if (activeAction == null || !nextAction.position.equals(activeAction.position)
@@ -298,12 +204,9 @@ public final class SolverSession {
                 int curVal = (snapshot.sudokuPlayerValues != null)
                     ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
                     : 0;
-                ClickPlan plan = calculateOptimalClicks(curVal, activeAction.value);
-                remainingClicksForActiveAction = plan.clicks;
-                activeActionUseSneak = plan.useSneak;
+                remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
             } else {
                 remainingClicksForActiveAction = 1;
-                activeActionUseSneak = false;
             }
         } else {
             activeAction = nextAction;
@@ -311,40 +214,19 @@ public final class SolverSession {
 
         String actionName = activeAction.type == SolverAction.Type.REVEAL ? "Revealing"
             : activeAction.type == SolverAction.Type.FLAG ? "Flagging"
-                : activeAction.type == SolverAction.Type.SET_VALUE
-                    ? "Setting " + activeAction.value + (activeActionUseSneak ? " [Shift]" : "")
-                    : "Interacting";
-        status = actionName + " (" + actions.size() + ")";
+                : activeAction.type == SolverAction.Type.SET_VALUE ? "Setting " + activeAction.value : "Interacting";
+        status = actionName + " (" + actions.size() + " remaining)";
         send(snapshot);
     }
-
-    private int sendAttempts = 0;
 
     private void send(DetectedGame snapshot) {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
-        long now = System.currentTimeMillis();
-        if (snapshot.type != MiniGame.GAME_OF_LIGHT && sendAttempts > 5 && now - lastActionAt > 500) {
-            beforeActionSignature = null;
-            sendAttempts = 0;
-        }
-
-        if (!bridge.interact(snapshot, activeAction, activeActionUseSneak, remainingClicksForActiveAction)) {
+        if (!bridge.interact(snapshot, activeAction)) {
             status = "Navigating to " + activeAction.position;
-            sendAttempts++;
-            if (snapshot.type != MiniGame.GAME_OF_LIGHT && sendAttempts > 20
-                && activeActions != null
-                && activeActions.size() > 1) {
-                // If stuck attempting one unreachable cell, rotate to next action
-                sendAttempts = 0;
-                SolverAction stuck = activeActions.remove(0);
-                activeActions.add(stuck);
-                activeAction = activeActions.get(0);
-            }
             return;
         }
-        sendAttempts = 0;
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
             remainingClicksForActiveAction--;
             if (remainingClicksForActiveAction <= 0 && snapshot.type == MiniGame.SUDOKU) {
@@ -357,12 +239,6 @@ public final class SolverSession {
 
     public boolean isActionComplete(DetectedGame snapshot) {
         if (activeAction == null) return true;
-        if (snapshot != null && snapshot.type == MiniGame.GAME_OF_LIGHT) {
-            if (System.currentTimeMillis() - lastActionAt >= LootGameSolverConfig.clickDelayMs) {
-                return true;
-            }
-            return false;
-        }
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
             return remainingClicksForActiveAction <= 0;
         }
@@ -373,13 +249,11 @@ public final class SolverSession {
         mode = null;
         activeAction = null;
         activeActions = null;
-        activeActionUseSneak = false;
+        cachedRenderActions = null;
+        lastSnapshotSignature = null;
         beforeActionSignature = null;
         queued = 0;
         remainingClicksForActiveAction = 0;
-        sendAttempts = 0;
-        lastGolStage = "";
-        golSequenceTotal = 0;
         for (int r = 0; r < 9; r++) {
             java.util.Arrays.fill(optimisticSudokuValues[r], 0);
         }
@@ -403,78 +277,41 @@ public final class SolverSession {
     }
 
     public DetectedGame getCurrentDetectedGame() {
-        return currentSnapshot != null ? currentSnapshot : bridge.detect();
+        return currentSnapshot;
     }
 
-    public List<SolverAction> computeActionsForCurrentGame() {
-        DetectedGame snapshot = getCurrentDetectedGame();
-        if (snapshot == null) return java.util.Collections.emptyList();
+    private List<SolverAction> computeActionsForGame(DetectedGame snapshot) {
+        if (snapshot == null) return Collections.emptyList();
         if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
             for (int r = 0; r < 9; r++) {
                 for (int c = 0; c < 9; c++) {
                     int val = optimisticSudokuValues[r][c] != 0 ? optimisticSudokuValues[r][c]
                         : snapshot.sudokuPlayerValues[r][c];
                     if (snapshot.sudoku != null && val != 0) {
-                        snapshot.sudoku.setPlayerValue(r, c, val);
+                        snapshot.sudoku.set(r, c, val);
                     }
                 }
             }
         }
         SolveResult result = snapshot.type == MiniGame.MINESWEEPER ? minesweeperSolver.solve(snapshot.minesweeper)
             : snapshot.type == MiniGame.SUDOKU ? sudokuSolver.solve(snapshot.sudoku) : golSolver.solve(snapshot.gol);
-        List<SolverAction> planned = planner.plan(
+        return planner.plan(
             result,
             ActionPlanner.Mode.SOLVE,
             LootGameSolverConfig.allowProbabilityMoves,
             LootGameSolverConfig.probabilityThreshold);
-
-        if (planned.isEmpty() && snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
-            boolean allUnknown = true;
-            for (CellPosition p : snapshot.minesweeper.positions()) {
-                if (snapshot.minesweeper.get(p)
-                    .getState() != com.kyroxova.lootgamesolver.solver.minesweeper.CellState.UNKNOWN) {
-                    allUnknown = false;
-                    break;
-                }
-            }
-            if (allUnknown) {
-                int cx = snapshot.minesweeper.getWidth() / 2;
-                int cy = snapshot.minesweeper.getHeight() / 2;
-                planned = java.util.Collections
-                    .singletonList(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
-            }
-        }
-        return planned;
     }
 
     public List<SolverAction> getActiveActions() {
-        if (activeActions != null && !activeActions.isEmpty()) return activeActions;
-        DetectedGame cur = getCurrentDetectedGame();
-        if (cur != null) {
-            SolveResult res = cur.type == MiniGame.MINESWEEPER ? minesweeperSolver.solve(cur.minesweeper)
-                : cur.type == MiniGame.SUDOKU ? sudokuSolver.solve(cur.sudoku) : golSolver.solve(cur.gol);
-            return res.getActions();
+        if (activeActions != null && !activeActions.isEmpty()) {
+            return activeActions;
         }
-        return null;
+        return cachedRenderActions;
     }
 
     public int[] getBlockPos(CellPosition position) {
         DetectedGame cur = getCurrentDetectedGame();
         if (cur == null || cur.blockPositions == null) return null;
         return cur.blockPositions.get(position);
-    }
-
-    private boolean isSudokuBoardFullyFilled(com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard board) {
-        if (board == null) return false;
-        for (int r = 0; r < 9; r++) {
-            for (int c = 0; c < 9; c++) {
-                int pVal = board.get(r, c);
-                int playerVal = board.getPlayerValue(r, c);
-                if (pVal == 0 && playerVal == 0) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 }

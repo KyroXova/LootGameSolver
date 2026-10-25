@@ -10,6 +10,7 @@ import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
@@ -41,15 +42,23 @@ public final class ClientHooks {
     }
 
     @SubscribeEvent
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.world != null && event.world.isRemote) {
+            session.invalidateDormantCache();
+        }
+    }
+
+    @SubscribeEvent
     public void clientTick(ClientTickEvent event) {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null || mc.theWorld == null) return;
 
-        // Poll board detection every 10 ticks when dormant so HUD is ALWAYS shown in structure
+        // Poll board detection every 20 ticks (1s) when dormant (using smart movement gate), or every tick when
+        // actively auto-solving
         detectCounter++;
-        if (session.isActive() || detectCounter % 10 == 0) {
+        if (session.isActive() || detectCounter % 20 == 0) {
             session.tick();
         }
 
@@ -63,6 +72,7 @@ public final class ClientHooks {
         boolean overlayPressed = isKeyJustPressed(Keybinds.toggleOverlay, LootGameSolverConfig.overlayKey);
 
         if (autoSolvePressed) {
+            session.invalidateDormantCache();
             if (session.isActive()) {
                 session.cancel("Auto-Solver Stopped");
             } else {
@@ -71,6 +81,7 @@ public final class ClientHooks {
         }
 
         if (overlayPressed) {
+            session.invalidateDormantCache();
             LootGameSolverConfig.showOverlay = !LootGameSolverConfig.showOverlay;
         }
     }
@@ -160,52 +171,67 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void overlay(RenderGameOverlayEvent.Text event) {
+        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
         DetectedGame cur = session.getCurrentDetectedGame();
         if (cur == null) return;
 
         Minecraft mc = Minecraft.getMinecraft();
-        ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+        if (mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return;
 
-        String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
-        String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GL11.glPushMatrix();
+        try {
+            ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
 
-        String gameTitle = cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
-            : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
-                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
+            String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
+            String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
 
-        String statusStr = session.isActive() ? session.getStatus() : "Ready";
+            String gameTitle = cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
+                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
+                    : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
-        boolean autoActive = session.isActive();
-        boolean holoActive = LootGameSolverConfig.showOverlay;
+            String statusStr = session.isActive() ? session.getStatus() : "Ready";
 
-        String autoColor = autoActive ? "\u00A7c" : "\u00A77";
-        String holoColor = holoActive ? "\u00A7e" : "\u00A77";
+            boolean autoActive = session.isActive();
+            boolean holoActive = LootGameSolverConfig.showOverlay;
 
-        String line1 = "\u00A7b\u00A7lLoot Game Solver";
-        String line2 = "\u00A7f" + gameTitle + " \u00A78|\u00A7" + (session.isActive() ? "a" : "e") + " " + statusStr;
-        String line3 = autoColor + "["
-            + autoKeyStr
-            + "] Auto \u00A78|\u00A77 "
-            + holoColor
-            + "["
-            + holoKeyStr
-            + "] Holograms";
+            String autoColor = autoActive ? "\u00A7c" : "\u00A77";
+            String holoColor = holoActive ? "\u00A7e" : "\u00A77";
 
-        int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
-        int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
-        int width3 = mc.fontRenderer.getStringWidth("[" + autoKeyStr + "] Auto | [" + holoKeyStr + "] Holograms");
-        int maxWidth = Math.max(width1, Math.max(width2, width3));
+            String line1 = "\u00A7b\u00A7lLoot Game Solver";
+            String line2 = "\u00A7f" + gameTitle
+                + " \u00A78|\u00A7"
+                + (session.isActive() ? "a" : "e")
+                + " "
+                + statusStr;
+            String line3 = autoColor + "["
+                + autoKeyStr
+                + "] Auto \u00A78|\u00A77 "
+                + holoColor
+                + "["
+                + holoKeyStr
+                + "] Holograms";
 
-        int panelWidth = maxWidth + 32;
-        int panelHeight = 44;
-        int x = resolution.getScaledWidth() - panelWidth - 15;
-        int y = resolution.getScaledHeight() - panelHeight - 55;
+            int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
+            int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
+            int width3 = mc.fontRenderer.getStringWidth("[" + autoKeyStr + "] Auto | [" + holoKeyStr + "] Holograms");
+            int maxWidth = Math.max(width1, Math.max(width2, width3));
 
-        drawNineSlice(TEXTURE_UI_9SLICE, x, y, panelWidth, panelHeight, mc);
+            int panelWidth = maxWidth + 32;
+            int panelHeight = 44;
+            int x = resolution.getScaledWidth() - panelWidth - 15;
+            int y = resolution.getScaledHeight() - panelHeight - 55;
 
-        mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
-        mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
-        mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
+            drawNineSlice(TEXTURE_UI_9SLICE, x, y, panelWidth, panelHeight, mc);
+
+            mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
+            mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
+            mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
+        } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
+            GL11.glPopAttrib();
+        }
     }
 
     private static final ResourceLocation TEXTURE_UI_9SLICE = new ResourceLocation(
