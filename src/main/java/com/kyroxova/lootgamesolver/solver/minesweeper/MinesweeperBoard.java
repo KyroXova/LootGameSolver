@@ -1,10 +1,10 @@
 package com.kyroxova.lootgamesolver.solver.minesweeper;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.GameBoard;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MinesweeperBoard implements GameBoard {
 
@@ -36,7 +36,7 @@ public final class MinesweeperBoard implements GameBoard {
     }
 
     public boolean contains(CellPosition p) {
-        return p.x >= 0 && p.y >= 0 && p.x < width && p.y < height;
+        return p.x() >= 0 && p.y() >= 0 && p.x() < width && p.y() < height;
     }
 
     public MinesweeperCell get(int x, int y) {
@@ -44,7 +44,7 @@ public final class MinesweeperBoard implements GameBoard {
     }
 
     public MinesweeperCell get(CellPosition p) {
-        return get(p.x, p.y);
+        return get(p.x(), p.y());
     }
 
     public void set(int x, int y, MinesweeperCell cell) {
@@ -53,10 +53,11 @@ public final class MinesweeperBoard implements GameBoard {
 
     public List<CellPosition> neighbors(CellPosition p) {
         List<CellPosition> result = new ArrayList<CellPosition>(8);
-        for (int y = p.y - 1; y <= p.y + 1; y++) for (int x = p.x - 1; x <= p.x + 1; x++) {
-            CellPosition candidate = new CellPosition(x, y);
-            if (!(x == p.x && y == p.y) && contains(candidate)) result.add(candidate);
-        }
+        for (int y = p.y() - 1; y <= p.y() + 1; y++)
+            for (int x = p.x() - 1; x <= p.x() + 1; x++) {
+                CellPosition candidate = new CellPosition(x, y);
+                if (!(x == p.x() && y == p.y()) && contains(candidate)) result.add(candidate);
+            }
         return result;
     }
 

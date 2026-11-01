@@ -1,15 +1,14 @@
 package com.kyroxova.lootgamesolver.solver.sudoku;
 
 import com.kyroxova.lootgamesolver.core.GameBoard;
-
-/** Mutable 9x9 solver model; zero is an empty cell. */
 public final class SudokuBoard implements GameBoard {
 
     public static final int SIZE = 9;
     private final int[][] values = new int[SIZE][SIZE];
     private final int[][] playerValues = new int[SIZE][SIZE];
 
-    public SudokuBoard() {}
+    public SudokuBoard() {
+    }
 
     public SudokuBoard(int[][] source) {
         this(source, null);

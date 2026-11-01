@@ -1,12 +1,12 @@
 package com.kyroxova.lootgamesolver.solver.gol;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.MiniGameSolver;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class GameOfLightSolver implements MiniGameSolver<GameOfLightBoard> {
 
@@ -17,7 +17,7 @@ public final class GameOfLightSolver implements MiniGameSolver<GameOfLightBoard>
     public SolveResult solve(GameOfLightBoard board) {
         if (board == null) return SolveResult.none(SolveResult.Status.INVALID, "No board state");
 
-        String stage = board.getStageId();
+        String stage = board.stageId();
         if (GameOfLightBoard.STAGE_WAITING_START.equals(stage)) {
             List<SolverAction> actions = new ArrayList<SolverAction>();
             int cx = board.getWidth() / 2;
@@ -35,10 +35,10 @@ public final class GameOfLightSolver implements MiniGameSolver<GameOfLightBoard>
         }
 
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stage)) {
-            if (board.isSequenceCompleted()) {
+            if (board.sequenceCompleted()) {
                 return SolveResult.none(SolveResult.Status.NO_MOVE, "Sequence complete! Waiting for next round...");
             }
-            List<CellPosition> seq = board.getSequence();
+            List<CellPosition> seq = board.sequence();
             if (seq.isEmpty()) {
                 return SolveResult.none(SolveResult.Status.NO_MOVE, "Watching sequence presentation...");
             }

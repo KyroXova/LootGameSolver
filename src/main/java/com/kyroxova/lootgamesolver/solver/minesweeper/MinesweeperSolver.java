@@ -1,27 +1,11 @@
 package com.kyroxova.lootgamesolver.solver.minesweeper;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.MiniGameSolver;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 
-/**
- * Advanced Minesweeper solver combining:
- * 1. Direct deduction and iterative Subset Reduction (Tank solver)
- * 2. Connected component MRV-backtracking with eager constraint forward-checking
- * 3. Exact global probability calculations for constrained and unconstrained cells
- */
+import java.util.*;
 public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard> {
 
     private static final int MAX_COMPONENT_VARIABLES = 60;
@@ -112,21 +96,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         return SolveResult.none(SolveResult.Status.SOLVED, "Board solved");
     }
 
-    private static final class CandidateSelection {
-
-        final CellPosition position;
-        final double safetyProbability;
-        final String description;
-
-        CandidateSelection(CellPosition position, double safetyProbability, String description) {
-            this.position = position;
-            this.safetyProbability = safetyProbability;
-            this.description = description;
-        }
-    }
-
     private CandidateSelection findSafestCandidate(MinesweeperBoard board,
-        Map<CellPosition, Double> frontierProbabilities, double expectedFrontierMines) {
+                                                   Map<CellPosition, Double> frontierProbabilities, double expectedFrontierMines) {
 
         CellPosition bestPos = null;
         double lowestMineProb = 1.1D;
@@ -186,8 +157,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         int h = board.getHeight();
 
         // Check four board corners first
-        CellPosition[] corners = new CellPosition[] { new CellPosition(0, 0), new CellPosition(w - 1, 0),
-            new CellPosition(0, h - 1), new CellPosition(w - 1, h - 1) };
+        CellPosition[] corners = new CellPosition[]{new CellPosition(0, 0), new CellPosition(w - 1, 0),
+            new CellPosition(0, h - 1), new CellPosition(w - 1, h - 1)};
         for (CellPosition c : corners) {
             if (unconstrained.contains(c)) return c;
         }
@@ -198,8 +169,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         CellPosition best = unconstrained.get(0);
         int bestDistSq = Integer.MAX_VALUE;
         for (CellPosition p : unconstrained) {
-            int dx = p.x - cx;
-            int dy = p.y - cy;
+            int dx = p.x() - cx;
+            int dy = p.y() - cy;
             int d = dx * dx + dy * dy;
             if (d < bestDistSq) {
                 bestDistSq = d;
@@ -212,7 +183,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     private SolveResult deterministicResult(List<SolverAction> actions, String message) {
         boolean hasReveal = false;
         for (SolverAction action : actions) {
-            if (action.type == SolverAction.Type.REVEAL) {
+            if (action.type() == SolverAction.Type.REVEAL) {
                 hasReveal = true;
                 break;
             }
@@ -261,26 +232,12 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         return result;
     }
 
-    private static final class ReductionResult {
-
-        final List<SolverAction> deducedActions;
-        final List<Constraint> remainingConstraints;
-        final boolean isContradictory;
-
-        ReductionResult(List<SolverAction> deducedActions, List<Constraint> remainingConstraints,
-            boolean isContradictory) {
-            this.deducedActions = deducedActions;
-            this.remainingConstraints = remainingConstraints;
-            this.isContradictory = isContradictory;
-        }
-    }
-
     /**
      * Performs iterative constraint simplification and subset reduction (Tank Solver algorithm).
      */
     private ReductionResult reduceConstraints(List<Constraint> initial) {
         Map<CellPosition, Boolean> knownAssignments = new LinkedHashMap<CellPosition, Boolean>(); // true = mine, false
-                                                                                                  // = safe
+        // = safe
         List<Constraint> current = new ArrayList<Constraint>();
         for (Constraint c : initial) {
             current.add(new Constraint(new LinkedHashSet<CellPosition>(c.variables), c.mines));
@@ -305,8 +262,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
                     }
                     if (mines < 0 || mines > vars.size()) {
                         return new ReductionResult(
-                            Collections.<SolverAction>emptyList(),
-                            Collections.<Constraint>emptyList(),
+                            Collections.emptyList(),
+                            Collections.emptyList(),
                             true);
                     }
                     if (!vars.isEmpty()) {
@@ -321,8 +278,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             for (Constraint c : current) {
                 if (c.mines < 0 || c.mines > c.variables.size()) {
                     return new ReductionResult(
-                        Collections.<SolverAction>emptyList(),
-                        Collections.<Constraint>emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
                         true);
                 }
                 if (c.mines == 0) {
@@ -360,8 +317,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
                         int diffMines = c2.mines - c1.mines;
                         if (diffMines < 0 || diffMines > diffVars.size()) {
                             return new ReductionResult(
-                                Collections.<SolverAction>emptyList(),
-                                Collections.<Constraint>emptyList(),
+                                Collections.emptyList(),
+                                Collections.emptyList(),
                                 true);
                         }
                         if (diffMines == 0) {
@@ -510,7 +467,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private void backtrack(int varIndex, boolean[] assignment, boolean[] assigned, int[][] terms, int[] required,
-        int[] currentMineCounts, int[] unsetCounts, Enumeration out) {
+                           int[] currentMineCounts, int[] unsetCounts, Enumeration out) {
 
         if (out.solutionCount >= MAX_SOLUTIONS_PER_COMPONENT) return;
 
@@ -551,7 +508,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private boolean canAssign(int varIndex, boolean isMine, int[][] terms, int[] required, int[] currentMineCounts,
-        int[] unsetCounts) {
+                              int[] unsetCounts) {
         for (int c = 0; c < terms.length; c++) {
             boolean containsVar = false;
             for (int v : terms[c]) {
@@ -572,7 +529,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private void applyAssignment(int varIndex, boolean isMine, int[][] terms, int[] currentMineCounts,
-        int[] unsetCounts) {
+                                 int[] unsetCounts) {
         for (int c = 0; c < terms.length; c++) {
             for (int v : terms[c]) {
                 if (v == varIndex) {
@@ -585,7 +542,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private void unapplyAssignment(int varIndex, boolean isMine, int[][] terms, int[] currentMineCounts,
-        int[] unsetCounts) {
+                                   int[] unsetCounts) {
         for (int c = 0; c < terms.length; c++) {
             for (int v : terms[c]) {
                 if (v == varIndex) {
@@ -605,15 +562,17 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         return false;
     }
 
-    private static final class Constraint {
+    private record CandidateSelection(CellPosition position, double safetyProbability, String description) {
 
-        final Set<CellPosition> variables;
-        final int mines;
+    }
 
-        Constraint(Set<CellPosition> variables, int mines) {
-            this.variables = variables;
-            this.mines = mines;
-        }
+    private record ReductionResult(List<SolverAction> deducedActions, List<Constraint> remainingConstraints,
+                                   boolean isContradictory) {
+
+    }
+
+    private record Constraint(Set<CellPosition> variables, int mines) {
+
     }
 
     private static final class Enumeration {
@@ -628,7 +587,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
 
         static Enumeration empty() {
-            return new Enumeration(Collections.<CellPosition>emptyList());
+            return new Enumeration(Collections.emptyList());
         }
     }
 
@@ -638,17 +597,12 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
         @Override
         public int compare(SolverAction a, SolverAction b) {
-            return a.position.compareTo(b.position);
+            return a.position().compareTo(b.position());
         }
     }
 
-    private static final class CellConstraintComparator implements Comparator<CellPosition> {
-
-        private final Map<CellPosition, Integer> constraintCount;
-
-        CellConstraintComparator(Map<CellPosition, Integer> constraintCount) {
-            this.constraintCount = constraintCount;
-        }
+    private record CellConstraintComparator(
+        Map<CellPosition, Integer> constraintCount) implements Comparator<CellPosition> {
 
         @Override
         public int compare(CellPosition a, CellPosition b) {

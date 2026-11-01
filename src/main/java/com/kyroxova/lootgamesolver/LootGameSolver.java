@@ -1,16 +1,12 @@
 package com.kyroxova.lootgamesolver;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.kyroxova.lootgamesolver.proxy.CommonProxy;
-
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
-
-/** Entry point. All puzzle logic is deliberately independent of Forge and Minecraft. */
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 @Mod(
     modid = LootGameSolver.MOD_ID,
     name = "LootGameSolver",
