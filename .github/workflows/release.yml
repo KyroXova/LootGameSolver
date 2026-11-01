@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      force_release:
+        description: 'Force release even if version matches latest release'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -24,7 +29,84 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      target_tag: ${{ steps.check.outputs.target_tag }}
+      release_title: ${{ steps.check.outputs.release_title }}
+      is_prerelease: ${{ steps.check.outputs.is_prerelease }}
+      make_latest: ${{ steps.check.outputs.make_latest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine if release is needed
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MANUAL_TAG="${{ inputs.tag_name }}"
+          FORCE_RELEASE="${{ inputs.force_release }}"
+          IS_TAG="${{ startsWith(github.ref, 'refs/tags/') }}"
+          REF_NAME="${{ github.ref_name }}"
+          MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
+
+          LATEST_RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name 2>/dev/null || echo "")
+          echo "Current modVersion: '$MOD_VERSION'"
+          echo "Latest release tag: '$LATEST_RELEASE_TAG'"
+
+          SHOULD_RELEASE="true"
+          TARGET_TAG=""
+          RELEASE_TITLE=""
+          IS_PRE="false"
+          MAKE_LATEST="true"
+
+          if [[ -n "$MANUAL_TAG" ]]; then
+            TARGET_TAG="$MANUAL_TAG"
+            RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
+            IS_PRE="${{ inputs.prerelease }}"
+            MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
+          elif [[ "$IS_TAG" == "true" ]]; then
+            TARGET_TAG="$REF_NAME"
+            RELEASE_TITLE="LootGameSolver $REF_NAME"
+            if [[ "$REF_NAME" == *-snapshot || "$REF_NAME" == *-pre ]]; then
+              IS_PRE="true"
+              MAKE_LATEST="false"
+            else
+              IS_PRE="false"
+              MAKE_LATEST="true"
+            fi
+          else
+            # Push to main/master branch
+            TARGET_TAG="${MOD_VERSION:-latest}"
+            RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
+            if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
+              IS_PRE="true"
+              MAKE_LATEST="false"
+            else
+              IS_PRE="false"
+              MAKE_LATEST="true"
+            fi
+
+            if [[ "$FORCE_RELEASE" != "true" && -n "$LATEST_RELEASE_TAG" && "$MOD_VERSION" == "$LATEST_RELEASE_TAG" ]]; then
+              echo "Version '$MOD_VERSION' already matches latest release '$LATEST_RELEASE_TAG'. Skipping release."
+              SHOULD_RELEASE="false"
+            fi
+          fi
+
+          echo "should_release=${SHOULD_RELEASE}" >> $GITHUB_OUTPUT
+          echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
+          echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
+          echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
+
   release:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -66,49 +148,18 @@ jobs:
       - name: Build mod
         run: ./gradlew assemble
 
-      - name: Determine release parameters
-        id: release-params
+      - name: Prepare release changelog notes
+        id: release-notes
         shell: bash
         run: |
-          MANUAL_TAG="${{ inputs.tag_name }}"
-          IS_TAG="${{ startsWith(github.ref, 'refs/tags/') }}"
-          REF_NAME="${{ github.ref_name }}"
-          MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
-
-          if [[ -n "$MANUAL_TAG" ]]; then
-            TARGET_TAG="$MANUAL_TAG"
-            RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
-            IS_PRE="${{ inputs.prerelease }}"
-            MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
-          elif [[ "$IS_TAG" == "true" && "$REF_NAME" != "latest" ]]; then
-            TARGET_TAG="$REF_NAME"
-            RELEASE_TITLE="LootGameSolver $REF_NAME"
-            if [[ "$REF_NAME" == *-snapshot || "$REF_NAME" == *-pre ]]; then
-              IS_PRE="true"
-              MAKE_LATEST="false"
-            else
-              IS_PRE="false"
-              MAKE_LATEST="true"
-            fi
-          else
-            TARGET_TAG="${MOD_VERSION:-latest}"
-            RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
-            if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
-              IS_PRE="true"
-              MAKE_LATEST="false"
-            else
-              IS_PRE="false"
-              MAKE_LATEST="true"
-            fi
-          fi
-
-          # Extract commit description / changelog body
           mkdir -p build
           if git rev-parse -q --verify HEAD^2 >/dev/null 2>&1; then
             COMMIT_BODY=$(git log -1 --format=%b HEAD^2)
           else
             COMMIT_BODY=$(git log -1 --format=%b HEAD)
           fi
+
+          TARGET_TAG="${{ needs.check-version.outputs.target_tag }}"
 
           {
             echo "## LootGameSolver ${TARGET_TAG}"
@@ -120,26 +171,20 @@ jobs:
             fi
           } > build/release_body.md
 
-          echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
-          echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
-          echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
-          echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ steps.release-params.outputs.target_tag }}
-          name: ${{ steps.release-params.outputs.release_title }}
+          tag_name: ${{ needs.check-version.outputs.target_tag }}
+          name: ${{ needs.check-version.outputs.release_title }}
           body_path: build/release_body.md
-          prerelease: ${{ steps.release-params.outputs.is_prerelease == 'true' }}
-          make_latest: ${{ steps.release-params.outputs.make_latest }}
+          prerelease: ${{ needs.check-version.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.check-version.outputs.make_latest }}
           generate_release_notes: true
           files: build/libs/*.jar
 
-
       - name: Publish to CurseForge
-        if: steps.release-params.outputs.is_prerelease != 'true'
+        if: needs.check-version.outputs.is_prerelease != 'true'
         run: ./gradlew curseforge -x test
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
