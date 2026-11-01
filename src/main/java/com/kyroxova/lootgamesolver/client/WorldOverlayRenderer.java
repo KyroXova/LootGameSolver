@@ -1,11 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
-import com.kyroxova.lootgamesolver.core.MiniGame;
-import com.kyroxova.lootgamesolver.core.SolverAction;
-import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
-import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -13,9 +9,24 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
+
 import org.lwjgl.opengl.GL11;
 
-import java.util.List;
+import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.core.MiniGame;
+import com.kyroxova.lootgamesolver.core.SolverAction;
+import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
+import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
+
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+
+/**
+ * Ultra-optimized 3D overlay renderer.
+ * Renders ONLY when a LootGames puzzle is actively detected. Reads cached solver actions
+ * without performing any solver or world inspection work on the render thread.
+ * Fully isolates OpenGL states using glPushAttrib / glPopAttrib so world and chest lighting
+ * are completely unaffected.
+ */
 public final class WorldOverlayRenderer {
 
     private final SolverSession session;
@@ -112,7 +123,7 @@ public final class WorldOverlayRenderer {
             int maxRender = actions.size();
             for (int i = 0; i < maxRender; i++) {
                 SolverAction action = actions.get(i);
-                int[] block = session.getBlockPos(action.position());
+                int[] block = session.getBlockPos(action.position);
                 if (block == null) continue;
 
                 // Distance Restriction (32.0 block radius)
@@ -126,24 +137,24 @@ public final class WorldOverlayRenderer {
                 AxisAlignedBB box = AxisAlignedBB.getBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
 
                 if (current.type == MiniGame.MINESWEEPER) {
-                    if (action.type() == SolverAction.Type.FLAG) {
+                    if (action.type == SolverAction.Type.FLAG) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
                         drawFloatingText("FLAG", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFF4444, mc);
-                    } else if (action.type() == SolverAction.Type.REVEAL) {
+                    } else if (action.type == SolverAction.Type.REVEAL) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
                         drawFloatingText("SAFE", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x44FF44, mc);
                     }
                 } else if (current.type == MiniGame.SUDOKU) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
                     drawFloatingText(
-                        String.valueOf(action.value()),
+                        String.valueOf(action.value),
                         minX + 0.5D,
                         minY + 1.25D,
                         minZ + 0.5D,
                         0x55FFFF,
                         mc);
                 } else if (current.type == MiniGame.GAME_OF_LIGHT) {
-                    if (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.stageId())) {
+                    if (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId())) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
                         drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
                     } else {

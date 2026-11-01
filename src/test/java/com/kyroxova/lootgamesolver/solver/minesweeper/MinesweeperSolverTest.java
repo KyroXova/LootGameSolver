@@ -1,12 +1,13 @@
 package com.kyroxova.lootgamesolver.solver.minesweeper;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class MinesweeperSolverTest {
 
@@ -18,7 +19,7 @@ public class MinesweeperSolverTest {
         board.set(0, 1, MinesweeperCell.unknown());
         board.set(1, 1, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertTrue(has(result, SolverAction.Type.REVEAL, 0, 1));
         assertTrue(has(result, SolverAction.Type.REVEAL, 1, 1));
     }
@@ -29,7 +30,7 @@ public class MinesweeperSolverTest {
         board.set(0, 0, MinesweeperCell.revealed(1));
         board.set(1, 0, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_MINE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_MINE, result.getStatus());
         assertTrue(has(result, SolverAction.Type.FLAG, 1, 0));
     }
 
@@ -43,7 +44,7 @@ public class MinesweeperSolverTest {
         board.set(1, 1, MinesweeperCell.unknown());
         board.set(2, 1, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertTrue(has(result, SolverAction.Type.REVEAL, 2, 1));
     }
 
@@ -55,7 +56,7 @@ public class MinesweeperSolverTest {
         board.set(0, 1, MinesweeperCell.revealed(1));
         board.set(1, 1, MinesweeperCell.revealed(1));
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.SOLVED, result.status());
+        assertEquals(SolveResult.Status.SOLVED, result.getStatus());
     }
 
     @Test
@@ -65,7 +66,7 @@ public class MinesweeperSolverTest {
         assertEquals(
             SolveResult.Status.INVALID,
             new MinesweeperSolver().solve(board)
-                .status());
+                .getStatus());
     }
 
     @Test
@@ -76,7 +77,7 @@ public class MinesweeperSolverTest {
         board.set(0, 1, MinesweeperCell.unknown());
         board.set(1, 1, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.NO_MOVE, result.status());
+        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
     }
 
     @Test
@@ -97,8 +98,8 @@ public class MinesweeperSolverTest {
 
         SolveResult result = new MinesweeperSolver().solve(board);
         assertTrue(
-            result.status() == SolveResult.Status.GUARANTEED_SAFE
-                || result.status() == SolveResult.Status.GUARANTEED_MINE);
+            result.getStatus() == SolveResult.Status.GUARANTEED_SAFE
+                || result.getStatus() == SolveResult.Status.GUARANTEED_MINE);
         assertTrue(has(result, SolverAction.Type.FLAG, 0, 1));
         assertTrue(has(result, SolverAction.Type.REVEAL, 1, 1));
         assertTrue(has(result, SolverAction.Type.FLAG, 2, 1));
@@ -120,16 +121,16 @@ public class MinesweeperSolverTest {
         SolveResult result = new MinesweeperSolver().solve(board);
         // Since (0, 2) is flagged, (1, 2) and (2, 2) must be safe, (3, 2) must be flagged, etc.
         assertTrue(
-            result.status() == SolveResult.Status.GUARANTEED_SAFE
-                || result.status() == SolveResult.Status.GUARANTEED_MINE);
+            result.getStatus() == SolveResult.Status.GUARANTEED_SAFE
+                || result.getStatus() == SolveResult.Status.GUARANTEED_MINE);
         assertTrue(has(result, SolverAction.Type.REVEAL, 1, 2));
         assertTrue(has(result, SolverAction.Type.REVEAL, 2, 2));
         assertTrue(has(result, SolverAction.Type.FLAG, 3, 2));
     }
 
     private boolean has(SolveResult result, SolverAction.Type type, int x, int y) {
-        for (SolverAction action : result.actions())
-            if (action.type() == type && action.position().equals(new CellPosition(x, y))) return true;
+        for (SolverAction action : result.getActions())
+            if (action.type == type && action.position.equals(new CellPosition(x, y))) return true;
         return false;
     }
 }

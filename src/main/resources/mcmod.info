@@ -1,21 +1,25 @@
 {
-	"modListVersion": 2,
-	"modList": [{
-		"modid": "${modId}",
-		"name": "${modName}",
-		"description": "A client-side GTNH mod that automates and provides 3D visual hints for LootGames minigames (Minesweeper, Sudoku, and Game of Light). Features full auto-solving, in-world 3D holograms.",
-		"version": "${modVersion}",
-		"mcversion": "${minecraftVersion}",
-		"url": "https://www.curseforge.com/minecraft/mc-mods/lootgamesolver",
-		"updateUrl": "",
-		"authorList": ["KyroXova"],
-		"credits": "",
-		"logoFile": "assets/lootgamesolver/textures/gui/logo.png",
-		"screenshots": [],
-		"parent": "",
-		"requiredMods": [],
-		"dependencies": [],
-		"dependants": [],
-		"useDependencyInformation": false
-	}]
+  "modListVersion": 2,
+  "modList": [
+    {
+      "modid": "${modId}",
+      "name": "${modName}",
+      "description": "A client-side GTNH mod that automates and provides 3D visual hints for LootGames minigames (Minesweeper, Sudoku, and Game of Light). Features full auto-solving, in-world 3D holograms.",
+      "version": "${modVersion}",
+      "mcversion": "${minecraftVersion}",
+      "url": "https://www.curseforge.com/minecraft/mc-mods/lootgamesolver",
+      "updateUrl": "",
+      "authorList": [
+        "KyroXova"
+      ],
+      "credits": "",
+      "logoFile": "assets/lootgamesolver/textures/gui/logo.png",
+      "screenshots": [],
+      "parent": "",
+      "requiredMods": [],
+      "dependencies": [],
+      "dependants": [],
+      "useDependencyInformation": false
+    }
+  ]
 }

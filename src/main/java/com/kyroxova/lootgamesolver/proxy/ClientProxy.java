@@ -1,10 +1,12 @@
 package com.kyroxova.lootgamesolver.proxy;
 
+import net.minecraftforge.common.MinecraftForge;
+
 import com.kyroxova.lootgamesolver.client.ClientHooks;
 import com.kyroxova.lootgamesolver.client.Keybinds;
+
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.common.MinecraftForge;
 
 public final class ClientProxy extends CommonProxy {
 

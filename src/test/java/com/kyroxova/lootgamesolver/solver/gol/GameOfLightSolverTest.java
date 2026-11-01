@@ -1,14 +1,15 @@
 package com.kyroxova.lootgamesolver.solver.gol;
 
-import com.kyroxova.lootgamesolver.core.CellPosition;
-import com.kyroxova.lootgamesolver.core.SolveResult;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+import com.kyroxova.lootgamesolver.core.CellPosition;
+import com.kyroxova.lootgamesolver.core.SolveResult;
 
 public class GameOfLightSolverTest {
 
@@ -16,15 +17,15 @@ public class GameOfLightSolverTest {
     public void handlesWaitingStartStage() {
         GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_START, null);
         SolveResult result = new GameOfLightSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertEquals(
             1,
-            result.actions()
+            result.getActions()
                 .size());
         assertEquals(
             new CellPosition(1, 1),
-            result.actions()
-                .get(0).position());
+            result.getActions()
+                .get(0).position);
     }
 
     @Test
@@ -35,28 +36,28 @@ public class GameOfLightSolverTest {
 
         GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, seq);
         SolveResult result = new GameOfLightSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertEquals(
             2,
-            result.actions()
+            result.getActions()
                 .size());
         assertEquals(
             new CellPosition(0, 0),
-            result.actions()
-                .get(0).position());
+            result.getActions()
+                .get(0).position);
         assertEquals(
             new CellPosition(2, 2),
-            result.actions()
-                .get(1).position());
+            result.getActions()
+                .get(1).position);
     }
 
     @Test
     public void handlesShowSequenceStage() {
         GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_SHOW_SEQUENCE, null);
         SolveResult result = new GameOfLightSolver().solve(board);
-        assertEquals(SolveResult.Status.NO_MOVE, result.status());
+        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
         assertTrue(
-            result.actions()
+            result.getActions()
                 .isEmpty());
     }
 
@@ -64,25 +65,25 @@ public class GameOfLightSolverTest {
     public void handlesExpandingBoardCenterStart() {
         GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_START, null, 5);
         SolveResult result = new GameOfLightSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertEquals(
             1,
-            result.actions()
+            result.getActions()
                 .size());
         assertEquals(
             new CellPosition(2, 2),
-            result.actions()
-                .get(0).position());
+            result.getActions()
+                .get(0).position);
     }
 
     @Test
     public void handlesCompletedSequence() {
         GameOfLightBoard board = new GameOfLightBoard(GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, null, 3, true);
         SolveResult result = new GameOfLightSolver().solve(board);
-        assertEquals(SolveResult.Status.NO_MOVE, result.status());
+        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
         assertTrue(
-            result.actions()
+            result.getActions()
                 .isEmpty());
-        assertEquals("Sequence complete! Waiting for next round...", result.message());
+        assertEquals("Sequence complete! Waiting for next round...", result.getMessage());
     }
 }

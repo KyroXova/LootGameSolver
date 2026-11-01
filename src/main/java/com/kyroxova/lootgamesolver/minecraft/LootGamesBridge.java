@@ -1,5 +1,18 @@
 package com.kyroxova.lootgamesolver.minecraft;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.Vec3;
+import net.minecraft.world.World;
+
 import com.kyroxova.lootgamesolver.LootGameSolver;
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.SolverAction;
@@ -8,18 +21,11 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.Vec3;
-import net.minecraft.world.World;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
+/**
+ * Optional, reflection-only adapter for LootGames 2.x. No LootGames classes
+ * appear in this mod's bytecode, so a missing or newer jar fails closed.
+ */
 public final class LootGamesBridge implements MiniGameDetector {
 
     private static final String LOOTGAMES_PKG = "ru.timeconqueror.lootgames.";
@@ -107,9 +113,8 @@ public final class LootGamesBridge implements MiniGameDetector {
     private static Object invoke(Object target, String name, Object... args) throws Exception {
         Method[] methods = target.getClass()
             .getMethods();
-        for (Method method : methods)
-            if (method.getName()
-                .equals(name) && method.getParameterTypes().length == args.length) return method.invoke(target, args);
+        for (Method method : methods) if (method.getName()
+            .equals(name) && method.getParameterTypes().length == args.length) return method.invoke(target, args);
         throw new NoSuchMethodException(
             target.getClass()
                 .getName() + "."
@@ -236,8 +241,8 @@ public final class LootGamesBridge implements MiniGameDetector {
     private Object extractGameFromTile(World world, TileEntity tile, int x, int y, int z) {
         if (tile != null && !tile.isInvalid()
             && tile.getClass()
-            .getName()
-            .startsWith(LOOTGAMES_PKG)) {
+                .getName()
+                .startsWith(LOOTGAMES_PKG)) {
             try {
                 Method getGame = tile.getClass()
                     .getMethod("getGame");
@@ -247,8 +252,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                         .getName();
                     if (MS_GAME.equals(gName) || SDK_GAME.equals(gName) || GOL_GAME.equals(gName)) return game;
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
 
         // Check if block at position is SmartSubordinateBlock
@@ -269,8 +273,8 @@ public final class LootGamesBridge implements MiniGameDetector {
                         TileEntity masterTile = world.getTileEntity(mx, my, mz);
                         if (masterTile != null && !masterTile.isInvalid()
                             && masterTile.getClass()
-                            .getName()
-                            .startsWith(LOOTGAMES_PKG)) {
+                                .getName()
+                                .startsWith(LOOTGAMES_PKG)) {
                             Method getGame = masterTile.getClass()
                                 .getMethod("getGame");
                             Object game = getGame.invoke(masterTile);
@@ -282,8 +286,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                             }
                         }
                     }
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ignored) {}
             }
         }
         return null;
@@ -297,28 +300,27 @@ public final class LootGamesBridge implements MiniGameDetector {
         int mines = number(invoke(rawBoard, "getBombCount"));
         MinesweeperBoard board = new MinesweeperBoard(size, size, mines);
         StringBuilder sig = new StringBuilder(size * size);
-        for (int x = 0; x < size; x++)
-            for (int y = 0; y < size; y++) {
-                Object field = invoke(rawBoard, "getField", pos(x, y));
-                boolean hidden = bool(field, "isHidden");
-                String mark = String.valueOf(invoke(field, "getMark"));
-                if (hidden) {
-                    if ("FLAG".equals(mark)) {
-                        board.set(x, y, MinesweeperCell.flagged());
-                        sig.append('F');
-                    } else if ("QUESTION".equals(mark) || "QUESTION_MARK".equals(mark)) {
-                        board.set(x, y, MinesweeperCell.question());
-                        sig.append('?');
-                    } else {
-                        board.set(x, y, MinesweeperCell.unknown());
-                        sig.append('#');
-                    }
+        for (int x = 0; x < size; x++) for (int y = 0; y < size; y++) {
+            Object field = invoke(rawBoard, "getField", pos(x, y));
+            boolean hidden = bool(field, "isHidden");
+            String mark = String.valueOf(invoke(field, "getMark"));
+            if (hidden) {
+                if ("FLAG".equals(mark)) {
+                    board.set(x, y, MinesweeperCell.flagged());
+                    sig.append('F');
+                } else if ("QUESTION".equals(mark) || "QUESTION_MARK".equals(mark)) {
+                    board.set(x, y, MinesweeperCell.question());
+                    sig.append('?');
                 } else {
-                    int clue = number(invoke(invoke(field, "getType"), "getId"));
-                    board.set(x, y, MinesweeperCell.revealed(clue));
-                    sig.append((char) ('0' + clue));
+                    board.set(x, y, MinesweeperCell.unknown());
+                    sig.append('#');
                 }
+            } else {
+                int clue = number(invoke(invoke(field, "getType"), "getId"));
+                board.set(x, y, MinesweeperCell.revealed(clue));
+                sig.append((char) ('0' + clue));
             }
+        }
         java.util.Map<CellPosition, int[]> posMap = precomputePositions(game, size, size);
         return DetectedGame.minesweeper(game, board, sig.toString(), posMap);
     }
@@ -369,8 +371,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                     try {
                         Field f = getFieldRecursive(game.getClass(), "size");
                         if (f != null) boardSize = f.getInt(game);
-                    } catch (Exception ignored) {
-                    }
+                    } catch (Exception ignored) {}
                 }
             }
         }
@@ -415,7 +416,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             + ":"
             + sequence.size()
             + ":"
-            + sequence;
+            + sequence.toString();
         java.util.Map<CellPosition, int[]> posMap = precomputePositions(game, boardSize, boardSize);
         return DetectedGame.gameOfLight(game, board, signature, posMap);
     }
@@ -428,8 +429,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                 try {
                     int[] block = boardBlock(game, pos);
                     map.put(pos, block);
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ignored) {}
             }
         }
         return map;
@@ -442,7 +442,7 @@ public final class LootGamesBridge implements MiniGameDetector {
         try {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
-            int[] block = boardBlock(detected.game, action.position());
+            int[] block = boardBlock(detected.game, action.position);
 
             // Realistic player interaction: auto-walk/fly into range, aim camera at block, and swing arm
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
@@ -450,7 +450,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             mc.thePlayer.swingItem();
 
-            if (action.type() == SolverAction.Type.REVEAL) {
+            if (action.type == SolverAction.Type.REVEAL) {
                 if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
                     ItemStack held = mc.thePlayer.getHeldItem();
                     mc.playerController.onPlayerRightClick(
@@ -486,19 +486,22 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public boolean actionComplete(DetectedGame current, SolverAction action) {
         if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER) {
-            MinesweeperCell cell = current.minesweeper.get(action.position());
-            return action.type() == SolverAction.Type.REVEAL
+            MinesweeperCell cell = current.minesweeper.get(action.position);
+            return action.type == SolverAction.Type.REVEAL
                 ? cell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.REVEALED
-                : action.type() == SolverAction.Type.FLAG && cell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.FLAGGED;
+                : action.type == SolverAction.Type.FLAG
+                    ? cell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.FLAGGED
+                    : false;
         }
         if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
-            && action.type() == SolverAction.Type.SET_VALUE) {
+            && action.type == SolverAction.Type.SET_VALUE) {
             if (current.sudokuPlayerValues != null) {
-                return current.sudokuPlayerValues[action.position().y()][action.position().x()] == action.value();
+                return current.sudokuPlayerValues[action.position.y][action.position.x] == action.value;
             }
             return true;
         }
-        return current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT;
+        if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) return true;
+        return false;
     }
 
     public void submitSudokuCheck(DetectedGame snapshot) {
@@ -532,9 +535,9 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     private int[] boardBlock(Object game, CellPosition position) throws Exception {
-        Object result = invoke(game, "convertToBlockPos", pos(position.x(), position.y()));
-        return new int[]{number(invoke(result, "getX")), number(invoke(result, "getY")),
-            number(invoke(result, "getZ"))};
+        Object result = invoke(game, "convertToBlockPos", pos(position.x, position.y));
+        return new int[] { number(invoke(result, "getX")), number(invoke(result, "getY")),
+            number(invoke(result, "getZ")) };
     }
 
     private Object pos(int x, int y) throws Exception {

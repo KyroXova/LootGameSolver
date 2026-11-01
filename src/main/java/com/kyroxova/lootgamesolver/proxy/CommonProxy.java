@@ -11,6 +11,5 @@ public class CommonProxy {
         LootGameSolverConfig.load(event.getSuggestedConfigurationFile());
     }
 
-    public void init(FMLInitializationEvent event) {
-    }
+    public void init(FMLInitializationEvent event) {}
 }

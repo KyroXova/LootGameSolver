@@ -1,10 +1,11 @@
 package com.kyroxova.lootgamesolver.solver.sudoku;
 
-import com.kyroxova.lootgamesolver.client.SolverSession;
-import com.kyroxova.lootgamesolver.core.SolveResult;
+import static org.junit.Assert.assertEquals;
+
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import com.kyroxova.lootgamesolver.client.SolverSession;
+import com.kyroxova.lootgamesolver.core.SolveResult;
 
 public class SudokuSolverTest {
 
@@ -14,10 +15,10 @@ public class SudokuSolverTest {
             { 8, 0, 0, 0, 6, 0, 0, 0, 3 }, { 4, 0, 0, 8, 0, 3, 0, 0, 1 }, { 7, 0, 0, 0, 2, 0, 0, 0, 6 },
             { 0, 6, 0, 0, 0, 0, 2, 8, 0 }, { 0, 0, 0, 4, 1, 9, 0, 0, 5 }, { 0, 0, 0, 0, 8, 0, 0, 7, 9 } };
         SolveResult result = new SudokuSolver().solve(new SudokuBoard(puzzle));
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         assertEquals(
             51,
-            result.actions()
+            result.getActions()
                 .size());
     }
 
@@ -27,10 +28,10 @@ public class SudokuSolverTest {
             { 8, 5, 9, 7, 6, 1, 4, 2, 3 }, { 4, 2, 6, 8, 5, 3, 7, 9, 1 }, { 7, 1, 3, 9, 2, 4, 8, 5, 6 },
             { 9, 6, 1, 5, 3, 7, 2, 8, 4 }, { 2, 8, 7, 4, 1, 9, 6, 3, 5 }, { 3, 4, 5, 2, 8, 6, 1, 7, 9 } };
         SolveResult result = new SudokuSolver().solve(new SudokuBoard(solved));
-        assertEquals(SolveResult.Status.SOLVED, result.status());
+        assertEquals(SolveResult.Status.SOLVED, result.getStatus());
         assertEquals(
             0,
-            result.actions()
+            result.getActions()
                 .size());
     }
 
@@ -42,7 +43,7 @@ public class SudokuSolverTest {
         assertEquals(
             SolveResult.Status.INVALID,
             new SudokuSolver().solve(new SudokuBoard(puzzle))
-                .status());
+                .getStatus());
     }
 
     @Test
@@ -71,7 +72,7 @@ public class SudokuSolverTest {
         assertEquals(
             SolveResult.Status.INVALID,
             new SudokuSolver().solve(new SudokuBoard(puzzle))
-                .status());
+                .getStatus());
     }
 
     @Test
@@ -94,22 +95,22 @@ public class SudokuSolverTest {
         board.setPlayerValue(0, 2, 1);
 
         SolveResult result = new SudokuSolver().solve(board);
-        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.status());
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
         // Should still generate actions for all 51 open cells (including the cell with wrong value 1)
         assertEquals(
             51,
-            result.actions()
+            result.getActions()
                 .size());
 
         // Find action for (col 2, row 0) and verify it specifies correct target 4
         com.kyroxova.lootgamesolver.core.SolverAction action = null;
-        for (com.kyroxova.lootgamesolver.core.SolverAction a : result.actions()) {
-            if (a.position().x() == 2 && a.position().y() == 0) {
+        for (com.kyroxova.lootgamesolver.core.SolverAction a : result.getActions()) {
+            if (a.position.x == 2 && a.position.y == 0) {
                 action = a;
                 break;
             }
         }
         org.junit.Assert.assertNotNull(action);
-        assertEquals(4, action.value());
+        assertEquals(4, action.value);
     }
 }

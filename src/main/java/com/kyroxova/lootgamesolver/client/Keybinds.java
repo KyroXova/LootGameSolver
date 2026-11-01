@@ -1,17 +1,19 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
-import cpw.mods.fml.client.registry.ClientRegistry;
 import net.minecraft.client.settings.KeyBinding;
+
 import org.lwjgl.input.Keyboard;
+
+import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+
+import cpw.mods.fml.client.registry.ClientRegistry;
 
 public final class Keybinds {
 
     public static KeyBinding toggleOverlay;
     public static KeyBinding toggleAutoSolve;
 
-    private Keybinds() {
-    }
+    private Keybinds() {}
 
     public static void register() {
         toggleOverlay = register("key.lootgamesolver.toggle_overlay", LootGameSolverConfig.overlayKey);

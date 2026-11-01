@@ -1,6 +1,14 @@
 package com.kyroxova.lootgamesolver.core;
 
-public record CellPosition(int x, int y) implements Comparable<CellPosition> {
+public final class CellPosition implements Comparable<CellPosition> {
+
+    public final int x;
+    public final int y;
+
+    public CellPosition(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
 
     @Override
     public int compareTo(CellPosition other) {
@@ -11,6 +19,11 @@ public record CellPosition(int x, int y) implements Comparable<CellPosition> {
     @Override
     public boolean equals(Object other) {
         return other instanceof CellPosition && ((CellPosition) other).x == x && ((CellPosition) other).y == y;
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * x + y;
     }
 
     @Override

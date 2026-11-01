@@ -1,9 +1,14 @@
 package com.kyroxova.lootgamesolver.config;
 
+import java.io.File;
+
 import net.minecraftforge.common.config.Configuration;
+
 import org.lwjgl.input.Keyboard;
 
-import java.io.File;
+/**
+ * Forge 1.7.10 configuration. Key values are LWJGL key codes.
+ */
 public final class LootGameSolverConfig {
 
     public static boolean enabled = true;
@@ -17,8 +22,7 @@ public final class LootGameSolverConfig {
     public static boolean showDebugInfo = false;
     public static int renderStyle = 0; // 0 = Minimal Outline & Text, 1 = Text Only
 
-    private LootGameSolverConfig() {
-    }
+    private LootGameSolverConfig() {}
 
     public static void load(File file) {
         Configuration cfg = new Configuration(file);
