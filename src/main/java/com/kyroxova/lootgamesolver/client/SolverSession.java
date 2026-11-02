@@ -6,7 +6,11 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
-import com.kyroxova.lootgamesolver.core.*;
+import com.kyroxova.lootgamesolver.core.ActionPlanner;
+import com.kyroxova.lootgamesolver.core.CellPosition;
+import com.kyroxova.lootgamesolver.core.MiniGame;
+import com.kyroxova.lootgamesolver.core.SolveResult;
+import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 import com.kyroxova.lootgamesolver.solver.gol.GameOfLightSolver;
