@@ -28,10 +28,13 @@ public final class ExplorationBeta {
     private int stalled;
     private double lastDistance = Double.MAX_VALUE;
     private boolean walking;
+    private boolean digging;
+    private int savedSlot = -1;
+    private int digTicks;
     private String status = "Scanning loaded terrain";
 
     public void toggle(Minecraft mc) {
-        if (!LootGameSolverConfig.enabled) return;
+        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
         if (walking) {
             stop(mc, "Walk stopped");
             return;
@@ -46,7 +49,21 @@ public final class ExplorationBeta {
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
         if (!walking) stop(mc, "No safe level route within 32 blocks");
-        else status = "Walking to LootGame — press G to stop";
+        else status = "Walking to LootGame";
+    }
+
+    public void toggleStaircase(Minecraft mc) {
+        if (walking) {
+            stop(mc, "Walk stopped");
+            return;
+        }
+        if (!LootGameSolverConfig.staircaseEnabled || !LootGameSolverConfig.explorationEnabled) return;
+        scan(mc);
+        digging = true;
+        walking = target != null;
+        savedSlot = mc.thePlayer.inventory.currentItem;
+        if (!walking) stop(mc, "No loaded target for staircase");
+        else status = "Staircase beta active";
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
@@ -59,7 +76,8 @@ public final class ExplorationBeta {
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (++ticks % 100 == 0 && !walking) scan(mc);
         if (!walking) return;
-        if (!LootGameSolverConfig.enabled || solverActive
+        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled
+            || solverActive
             || mc.currentScreen != null
             || mc.thePlayer.hurtTime > 0
             || mc.thePlayer.isInWater()
@@ -79,6 +97,15 @@ public final class ExplorationBeta {
             return;
         }
         if (route.isEmpty()) {
+            if (digging && target.yCoord < mc.thePlayer.boundingBox.minY - 2) {
+                if (!stairStep(mc)) stop(mc, "No safe staircase step; stopped");
+                return;
+            }
+            if (digging) {
+                digging = false;
+                plan(mc);
+                if (!route.isEmpty()) return;
+            }
             stop(mc, "Arrived beside LootGame");
             return;
         }
@@ -87,9 +114,20 @@ public final class ExplorationBeta {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (!safe(mc.theWorld, px, py, pz) || !safe(mc.theWorld, next[0], next[1], next[2])
-            || py != next[1]
-            || !mc.thePlayer.onGround
+            || (py != next[1] && !(digging && py == next[1] + 1))
+            || (!mc.thePlayer.onGround && !digging)
             || mc.thePlayer.isCollidedHorizontally) {
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
+            if (!digging && mc.thePlayer.onGround && safe(mc.theWorld, px, py, pz)) {
+                plan(mc);
+                if (!route.isEmpty()) {
+                    lastDistance = Double.MAX_VALUE;
+                    stalled = 0;
+                    status = "Rerouted around obstruction";
+                    return;
+                }
+            }
             stop(mc, "Route obstructed or unsafe");
             return;
         }
@@ -118,6 +156,11 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        if (digging && mc.playerController != null) mc.playerController.resetBlockRemoving();
+        if (savedSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = savedSlot;
+        savedSlot = -1;
+        digging = false;
+        digTicks = 0;
         if (walking && mc.thePlayer != null) {
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
@@ -179,12 +222,80 @@ public final class ExplorationBeta {
             for (int[] direction : directions) {
                 int nx = node[0] + direction[0], nz = node[2] + direction[1];
                 long key = key(nx, nz);
-                if (Math.abs(nx - x) > 32 || Math.abs(nz - z) > 32 || parents.containsKey(key)) continue;
+                if (Math.abs(nx - x) > LootGameSolverConfig.explorationRange
+                    || Math.abs(nz - z) > LootGameSolverConfig.explorationRange
+                    || parents.containsKey(key)) continue;
                 if (!safe(mc.theWorld, nx, y, nz)) continue;
                 parents.put(key, node);
                 queue.add(new int[] { nx, y, nz });
             }
         }
+    }
+
+    private boolean stairStep(Minecraft mc) {
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (!mc.thePlayer.onGround || !safe(mc.theWorld, x, y, z)) return false;
+        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D)
+            return false;
+        int dx = Integer.signum(target.xCoord - x), dz = Integer.signum(target.zCoord - z);
+        if (Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z)) dz = 0;
+        else dx = 0;
+        if (dx == 0 && dz == 0) return false;
+        int nx = x + dx, nz = z + dz;
+        World w = mc.theWorld;
+        // Only excavate beside the player, with a verified full floor below the future step.
+        if (!w.blockExists(nx, y - 2, nz) || !w.getBlock(nx, y - 2, nz)
+            .isNormalCube()) return false;
+        for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) for (int oy = -2; oy <= 2; oy++) {
+            if (!w.blockExists(nx + ox, y + oy, nz + oz)) return false;
+            net.minecraft.block.Block b = w.getBlock(nx + ox, y + oy, nz + oz);
+            if (b.getMaterial()
+                .isLiquid() || b == Blocks.fire
+                || b == Blocks.cactus
+                || b == Blocks.sand
+                || b == Blocks.gravel
+                || b == Blocks.portal) return false;
+        }
+        for (int by = y + 1; by >= y - 1; by--) {
+            net.minecraft.block.Block b = w.getBlock(nx, by, nz);
+            if (w.isAirBlock(nx, by, nz)) continue;
+            if (b != Blocks.stone && b != Blocks.dirt && b != Blocks.grass && b != Blocks.cobblestone) return false;
+            if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
+        }
+        for (int by = y + 1; by >= y - 1; by--) {
+            net.minecraft.block.Block b = w.getBlock(nx, by, nz);
+            if (w.isAirBlock(nx, by, nz)) continue;
+            int slot = -1;
+            float speed = 1F;
+            for (int i = 0; i < 9; i++) {
+                net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                if (stack == null || !stack.getItem()
+                    .canHarvestBlock(b, stack)
+                    || (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10)) continue;
+                float candidate = stack.getItem()
+                    .getDigSpeed(stack, b, w.getBlockMetadata(nx, by, nz));
+                if (candidate > speed) {
+                    speed = candidate;
+                    slot = i;
+                }
+            }
+            if (slot < 0 || ++digTicks > 200) return false;
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
+            mc.thePlayer.inventory.currentItem = slot;
+            if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
+            mc.thePlayer.swingItem();
+            mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
+            status = "Digging verified staircase step";
+            return true;
+        }
+        digTicks = 0;
+        if (!safe(w, nx, y - 1, nz)) return false;
+        route.add(new int[] { nx, y - 1, nz });
+        lastDistance = Double.MAX_VALUE;
+        stalled = 0;
+        return true;
     }
 
     private static long key(int x, int z) {
@@ -211,7 +322,11 @@ public final class ExplorationBeta {
     }
 
     public String hud(Minecraft mc) {
-        if (target == null) return "LootGames Beta: no loaded board | G: safe walk";
+        String controls = net.minecraft.client.settings.GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+            + ": walk | "
+            + net.minecraft.client.settings.GameSettings.getKeyDisplayString(Keybinds.staircase.getKeyCode())
+            + ": staircase";
+        if (target == null) return "LootGames Beta: no loaded board | " + controls;
         int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
         return "LootGames Beta: " + target.xCoord
             + ", "
@@ -220,7 +335,9 @@ public final class ExplorationBeta {
             + target.zCoord
             + " ("
             + distance
-            + "m) | G: safe walk | "
+            + "m) | "
+            + controls
+            + " | "
             + status;
     }
 }

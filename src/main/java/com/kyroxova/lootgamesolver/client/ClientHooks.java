@@ -165,6 +165,13 @@ public final class ClientHooks {
 
     private void checkKeyToggles() {
         Minecraft mc = Minecraft.getMinecraft();
+        if (exploration != null && Keybinds.staircase.isPressed()
+            && mc.currentScreen == null
+            && mc.thePlayer != null
+            && mc.theWorld != null) {
+            session.cancel("Staircase selected");
+            exploration.toggleStaircase(mc);
+        }
         if (exploration != null && Keybinds.explore.isPressed()
             && mc.currentScreen == null
             && mc.thePlayer != null
