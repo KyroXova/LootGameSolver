@@ -28,6 +28,7 @@ public final class ExplorationBeta {
     private boolean digging;
     private int savedSlot = -1;
     private int digTicks;
+    private int toolWaitTicks;
     private String status = "Scanning loaded terrain";
     private ProgressiveSearch search;
     private boolean searching;
@@ -255,6 +256,7 @@ public final class ExplorationBeta {
         stairZ = 0;
         stairSteps = 0;
         digTicks = 0;
+        toolWaitTicks = 0;
         if (walking && mc.thePlayer != null) {
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
@@ -418,24 +420,29 @@ public final class ExplorationBeta {
         for (int by = y + 1; by >= y - 1; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
-            int slot = -1;
-            float speed = 1F;
-            for (int i = 0; i < 9; i++) {
-                net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                if (stack == null || !stack.getItem()
-                    .canHarvestBlock(b, stack)
-                    || (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10)) continue;
-                float candidate = stack.getItem()
-                    .getDigSpeed(stack, b, w.getBlockMetadata(nx, by, nz));
-                if (candidate > speed) {
-                    speed = candidate;
-                    slot = i;
+            int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(nx, by, nz));
+            if (slot == -2) {
+                if (++toolWaitTicks > 40) {
+                    stop(
+                        mc,
+                        "\u00A7eAuto-dig paused: inventory swap could not finish. Close other inventories and clear the cursor.");
+                    return true;
                 }
+                status = "Preparing digging tool...";
+                return true;
             }
-            if (slot < 0 || ++digTicks > 200) return false;
+            toolWaitTicks = 0;
+            if (slot < 0) {
+                stop(
+                    mc,
+                    "\u00A7eAuto-dig paused: \u00A7fKeep a usable \u00A7bpickaxe\u00A7f and \u00A7bshovel\u00A7f in your inventory. Check tool durability and harvest level.");
+                return true;
+            }
+            if (++digTicks > 200) return false;
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
+            mc.playerController.updateController();
             double aimX = nx + 0.5D - mc.thePlayer.posX;
             double aimZ = nz + 0.5D - mc.thePlayer.posZ;
             double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();

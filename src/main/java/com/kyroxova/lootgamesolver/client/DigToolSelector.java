@@ -1,0 +1,59 @@
+package com.kyroxova.lootgamesolver.client;
+
+import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.common.ForgeHooks;
+
+/** Uses mod-provided harvesting and digging hooks, never item names or vanilla tool classes. */
+final class DigToolSelector {
+
+    static int bestSlot(float[] speeds, boolean[] usable) {
+        int best = -1;
+        float speed = 1F;
+        for (int i = 0; i < speeds.length; i++) {
+            if (usable[i] && speeds[i] > speed) {
+                best = i;
+                speed = speeds[i];
+            }
+        }
+        return best;
+    }
+
+    // -1: no suitable tool; -2: inventory operation pending or unsafe; otherwise selected hotbar slot.
+    static int equip(Minecraft mc, Block block, int metadata) {
+        if (mc.thePlayer.capabilities.isCreativeMode) return mc.thePlayer.inventory.currentItem;
+        float[] speeds = new float[36];
+        boolean[] usable = new boolean[36];
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack == null || stack.stackSize <= 0) continue;
+            if (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10) continue;
+            try {
+                usable[i] = ForgeHooks.canToolHarvestBlock(block, metadata, stack);
+                speeds[i] = stack.getItem()
+                    .getDigSpeed(stack, block, metadata);
+            } catch (RuntimeException ignored) {
+                usable[i] = false;
+            }
+        }
+        int selected = bestSlot(speeds, usable);
+        if (selected < 9) return selected;
+        if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null) return -2;
+        int hotbar = mc.thePlayer.inventory.currentItem;
+        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+            hotbar = i;
+            break;
+        }
+        Slot source = mc.thePlayer.inventoryContainer.getSlotFromInventory(mc.thePlayer.inventory, selected);
+        if (source == null || !source.canTakeStack(mc.thePlayer)) return -2;
+        // Vanilla number-key swap: the displaced stack stays in the source inventory slot; cursor stays untouched.
+        mc.playerController
+            .windowClick(mc.thePlayer.inventoryContainer.windowId, source.slotNumber, hotbar, 2, mc.thePlayer);
+        mc.thePlayer.inventory.currentItem = hotbar;
+        mc.playerController.updateController();
+        return -2;
+    }
+}

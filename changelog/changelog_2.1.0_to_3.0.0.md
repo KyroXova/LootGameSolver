@@ -35,6 +35,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Smooth mining turns and refresh structure targets while exploration is active.
 - Cache terrain checks within each route search and bound route-search time to reduce work on the client thread.
 - Attempt alternative staircase directions, select suitable hotbar tools, and restore the previous hotbar slot when stopped.
+- Dig without tools in creative mode; select modded survival tools using Forge harvesting and digging-speed hooks.
+- Find suitable tools throughout the main inventory and move them to the hotbar with item-preserving swaps.
+- Show a formatted reminder to carry a usable pickaxe and shovel when survival auto-digging lacks a suitable tool.
 - Check headroom, support, nearby hazards, falling blocks, tool durability, and mining progress before continuing excavation.
 - Stop for manual movement, menus, damage, unsafe terrain, or stalled progress.
 - Add configurable exploration enablement, staircase digging, route range, and progressive search limits.
