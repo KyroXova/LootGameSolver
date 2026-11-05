@@ -61,6 +61,11 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Target visible solid faces around thin plants and prefer their support block when it is already part of the safe planned excavation.
 - Stop pathfinding once the puzzle is visible and within interaction reach, including when standing below its master block.
 - Anchor waypoint labels to the structure's surface terrain instead of following the player's height.
+- Select explicit straight tunnels, upward/downward stairs, or compact clockwise spiral access layouts before falling back to terrain search.
+- Support a configurable 3x3 spiral footprint, or 4x4 for three steps between right turns, while preserving floors and checking clearance and hazards.
+- Clear the extra overhead block needed for upward stairs before jumping to the next step.
+- Retain reached access waypoints and offer Return on the same exploration key at the puzzle; stop if the saved path becomes obstructed.
+- Increase render-time camera turn speed while retaining easing, short-angle turns, and frame-rate-independent timing.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

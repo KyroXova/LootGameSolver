@@ -26,6 +26,7 @@ public final class LootGameSolverConfig {
     public static int explorationSearchLimit = 256;
     public static boolean explorationEnabled = true;
     public static boolean staircaseEnabled = true;
+    public static int spiralWidth = 3;
 
     private LootGameSolverConfig() {}
 
@@ -38,7 +39,14 @@ public final class LootGameSolverConfig {
             "staircaseEnabled",
             "explorationBeta",
             true,
-            "Allow automatic staircase digging when walking cannot reach a lower target. Only ordinary stone and dirt are mined.");
+            "Allow checked tunnel and stair access while preserving return-path floors.");
+        spiralWidth = cfg.getInt(
+            "spiralWidth",
+            "explorationBeta",
+            3,
+            3,
+            4,
+            "Outer spiral footprint: 3 gives two steps per turn; 4 gives three steps per turn.");
         explorationRange = cfg
             .getInt("routeRange", "explorationBeta", 32, 8, 48, "Maximum horizontal route search radius.");
         explorationSearchLimit = cfg.getInt(

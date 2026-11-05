@@ -329,7 +329,8 @@ public final class ClientHooks {
                 : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
                 line3 += " \u00A78|\u00A77 [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-                    + "] Explore";
+                    + "] "
+                    + exploration.explorationAction();
             }
             int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);

@@ -13,8 +13,8 @@ final class NavigationSteering {
         float error = turn(current, desired, 180F) - current;
         if (Math.abs(error) < 0.08F) return error;
         double elapsed = Math.max(0, Math.min(0.05D, seconds));
-        float eased = (float) (error * (1D - Math.exp(-elapsed / 0.075D)));
-        float maximum = (float) (240D * elapsed);
+        float eased = (float) (error * (1D - Math.exp(-elapsed / 0.06D)));
+        float maximum = (float) (300D * elapsed);
         return Math.max(-maximum, Math.min(maximum, eased));
     }
 

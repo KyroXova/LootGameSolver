@@ -8,6 +8,18 @@ import org.junit.Test;
 public class NavigationSteeringTest {
 
     @Test
+    public void halfTurnSettlesQuicklyWithoutOvershooting() {
+        for (int fps : new int[] { 30, 60, 144 }) {
+            float angle = 0;
+            for (int frame = 0; frame < fps; frame++) {
+                angle += NavigationSteering.cameraStep(angle, 179F, 1D / fps);
+                assertTrue(angle >= 0 && angle <= 179F);
+            }
+            assertEquals(179F, angle, 0.08F);
+        }
+    }
+
+    @Test
     public void headingStaysAlongSegmentAfterSmallOvershoot() {
         assertEquals(-45F, NavigationSteering.heading(1.5D, 2.5D, 2.5D, 3.5D, 20F), 0F);
         assertEquals(-90F, NavigationSteering.heading(1.5D, 2.5D, 2.5D, 2.5D, 20F), 0F);
@@ -22,7 +34,7 @@ public class NavigationSteeringTest {
             float yaw = 179F;
             for (int i = 0; i < fps; i++) {
                 float delta = NavigationSteering.cameraStep(yaw, -179F, 1D / fps);
-                assertTrue(delta >= 0 && delta <= 240D / fps + 0.001D);
+                assertTrue(delta >= 0 && delta <= 300D / fps + 0.001D);
                 yaw += delta;
             }
             assertEquals(181F, yaw, 0.08F);
@@ -31,7 +43,7 @@ public class NavigationSteeringTest {
             assertEquals(90F, yaw, 0.1F);
         }
         assertEquals(0F, NavigationSteering.cameraStep(0, 90, 0), 0F);
-        assertTrue(Math.abs(NavigationSteering.cameraStep(0, 180, 5)) <= 12F);
+        assertTrue(Math.abs(NavigationSteering.cameraStep(0, 180, 5)) <= 15F);
     }
 
     @Test
