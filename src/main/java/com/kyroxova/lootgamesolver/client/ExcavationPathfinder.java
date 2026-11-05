@@ -92,6 +92,16 @@ final class ExcavationPathfinder {
             for (int[] direction : directions) for (int dy = -1; dy <= 1; dy++) {
                 int nx = node.x + direction[0], ny = node.y + dy, nz = node.z + direction[1];
                 if (Math.abs(nx - x) > 40 || Math.abs(nz - z) > 40 || ny < gy - 2 || ny > y + 4) continue;
+                boolean cutsReturnStair = false;
+                for (Node ancestor = node; ancestor != null; ancestor = ancestor.parent) {
+                    if (ancestor.x == nx && ancestor.z == nz
+                        && ancestor.y - 1 >= ny
+                        && ancestor.y - 1 <= Math.max(node.y, ny) + 1) {
+                        cutsReturnStair = true;
+                        break;
+                    }
+                }
+                if (cutsReturnStair) continue;
                 long key = key(nx, ny, nz);
                 if (visited.contains(key)) continue;
                 int edge = terrain.cost(node.x, node.y, node.z, nx, ny, nz);

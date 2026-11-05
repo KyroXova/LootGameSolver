@@ -65,6 +65,8 @@ public final class ExplorationBeta {
     private GroundPathfinder.Search walkingSearch;
     private boolean walkingPlanFailed;
     private GroundPathfinder.Search continuationSearch;
+    private final java.util.Set<Long> returnSupports = new java.util.HashSet<Long>();
+    private final java.util.Map<String, Boolean> structureTools = new java.util.HashMap<String, Boolean>();
     private int continuationX, continuationZ;
 
     private boolean undergroundNearby(Minecraft mc) {
@@ -263,6 +265,8 @@ public final class ExplorationBeta {
             world = mc.theWorld;
             target = null;
             knownStructure = null;
+            returnSupports.clear();
+            structureTools.clear();
             walking = false;
             route.clear();
             search = null;
@@ -278,6 +282,7 @@ public final class ExplorationBeta {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (ticks % 20 == 0) structureTools.clear();
         int[] head = route.isEmpty() ? null : route.get(0);
         if (head != previewHead || route.size() != previewSize) {
             previewHead = head;
@@ -764,6 +769,7 @@ public final class ExplorationBeta {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
         settlingTicks = 0;
+        returnSupports.add(supportKey(x, y - 1, z));
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
             singleStep(mc, x, y, z, true);
             return true;
@@ -826,11 +832,30 @@ public final class ExplorationBeta {
         return attemptStairStep(mc, next[1]);
     }
 
-    private static boolean excavatable(World w, int x, int y, int z) {
+    private boolean excavatable(World w, int x, int y, int z) {
         if (!w.blockExists(x, y, z) || w.getTileEntity(x, y, z) != null) return false;
+        if (returnSupports.contains(supportKey(x, y, z))) return false;
         net.minecraft.block.Block block = w.getBlock(x, y, z);
         float hardness = block.getBlockHardness(w, x, y, z);
         net.minecraft.block.material.Material material = block.getMaterial();
+        boolean structure = block.getClass()
+            .getName()
+            .equals("eu.usrv.legacylootgames.blocks.DungeonBrick")
+            || block.getClass()
+                .getName()
+                .equals("eu.usrv.legacylootgames.blocks.DungeonLightSource");
+        if (structure) {
+            if (hardness < 0 || hardness > 10) return false;
+            String toolKey = block.getClass()
+                .getName() + ":"
+                + w.getBlockMetadata(x, y, z);
+            Boolean harvestable = structureTools.get(toolKey);
+            if (harvestable == null) {
+                harvestable = DigToolSelector.canHarvest(Minecraft.getMinecraft(), block, w.getBlockMetadata(x, y, z));
+                structureTools.put(toolKey, harvestable);
+            }
+            return harvestable;
+        }
         return hardness >= 0 && hardness <= 5
             && (material == net.minecraft.block.material.Material.rock
                 || material == net.minecraft.block.material.Material.ground
@@ -841,7 +866,7 @@ public final class ExplorationBeta {
                 || material == net.minecraft.block.material.Material.vine);
     }
 
-    private static int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
+    private int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
             .isNormalCube()) return -1;
         if (ny > y && !passable(w, x, y + 2, z)) return -1;
@@ -851,7 +876,9 @@ public final class ExplorationBeta {
             if (!excavatable(w, nx, by, nz)) return -1;
             firstBreak = Math.min(firstBreak, by);
             lastBreak = Math.max(lastBreak, by);
-            cost += 3;
+            net.minecraft.block.Block block = w.getBlock(nx, by, nz);
+            cost += Math.max(1, (int) Math.ceil(block.getBlockHardness(w, nx, by, nz) / 2F));
+            if (block.getMaterial() == net.minecraft.block.material.Material.wood) cost += 4;
         }
         for (int ox = -1; ox <= 1; ox++)
             for (int oz = -1; oz <= 1; oz++) for (int by = ny - 1; by <= Math.max(y, ny) + 2; by++) {
@@ -913,7 +940,9 @@ public final class ExplorationBeta {
             }, x, y, z, goal[0], goal[2], 32);
             if (candidate.isEmpty()) continue;
             int[] last = candidate.get(candidate.size() - 1);
-            if (!dryShore(w, last[0], last[1], last[2])) continue;
+            if (last[1] != goal[1] || Math.abs(last[0] - goal[0]) + Math.abs(last[2] - goal[2]) > 1
+                || !dryShore(w, last[0], last[1], last[2])) continue;
+            if (candidate.size() > Math.max(12D, 2D * Math.hypot(goal[0] - x, goal[2] - z))) continue;
             route.clear();
             route.addAll(candidate);
             segmentX = mc.thePlayer.posX;
@@ -975,7 +1004,12 @@ public final class ExplorationBeta {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
             int mineX = nx, mineY = by, mineZ = nz;
-            net.minecraft.util.MovingObjectPosition obstruction = mc.objectMouseOver;
+            net.minecraft.util.MovingObjectPosition obstruction = w.rayTraceBlocks(
+                net.minecraft.util.Vec3.createVectorHelper(
+                    mc.thePlayer.posX,
+                    mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                    mc.thePlayer.posZ),
+                net.minecraft.util.Vec3.createVectorHelper(nx + 0.5D, by + 0.5D, nz + 0.5D));
             if (obstruction != null
                 && obstruction.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
                 net.minecraft.block.Block visible = w
@@ -1060,6 +1094,7 @@ public final class ExplorationBeta {
         miningAim.reset();
         if (!safe(w, nx, destinationY, nz)) return false;
         singleStep(mc, nx, destinationY, nz, false);
+        returnSupports.add(supportKey(nx, destinationY - 1, nz));
         if (!excavationRoute.isEmpty()) excavationRoute.remove(0);
         excavationReplans = 0;
         stairSteps++;
@@ -1070,6 +1105,10 @@ public final class ExplorationBeta {
 
     private static long key(int x, int z) {
         return ((long) x << 32) ^ (z & 0xffffffffL);
+    }
+
+    private static long supportKey(int x, int y, int z) {
+        return ((long) x & 0x3ffffffL) << 38 | ((long) z & 0x3ffffffL) << 12 | (y & 0xfffL);
     }
 
     private static boolean safe(World world, int x, int y, int z) {

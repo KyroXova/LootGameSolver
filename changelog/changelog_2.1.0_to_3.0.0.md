@@ -52,6 +52,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Start checked staircase sections without waiting for a complete underground route, then replan as excavation progresses.
 - Clear soft plants intercepting the mining crosshair in the occupied or planned digging column before targeting the block behind them.
 - Show the number of checked nodes while planning underground access.
+- Preserve earlier stair floors across excavation plans so alternating steps cannot collapse the access route into a two-column shaft.
+- Permit breakable LootGames dungeon masonry with suitable tools, prefer softer cracked sections, and continue protecting shielded blocks and puzzle tile entities.
+- Restrict plant clearing to obstructions on the ray toward the planned mining block, instead of whichever plant the camera happens to face.
+- Reject dry-entrance routes that stop short of the selected point or take excessive detours; increase the cost of tunneling through wood.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

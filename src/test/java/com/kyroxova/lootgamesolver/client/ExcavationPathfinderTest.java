@@ -8,6 +8,26 @@ import org.junit.Test;
 public class ExcavationPathfinderTest {
 
     @Test
+    public void descentNeverExcavatesAnEarlierStairFloor() {
+        ExcavationPathfinder search = new ExcavationPathfinder(0, 12, 0, 0, 1, 0, true);
+        finish(search, (x, y, z, nx, ny, nz) -> 1);
+        assertFalse(search.path.isEmpty());
+        java.util.List<int[]> previous = new java.util.ArrayList<int[]>();
+        previous.add(new int[] { 0, 12, 0 });
+        int y = 12;
+        for (int[] step : search.path) {
+            for (int[] earlier : previous) {
+                boolean cutsFloor = earlier[0] == step[0] && earlier[2] == step[2]
+                    && earlier[1] - 1 >= step[1]
+                    && earlier[1] - 1 <= Math.max(y, step[1]) + 1;
+                assertFalse("A return stair floor would be removed", cutsFloor);
+            }
+            previous.add(step);
+            y = step[1];
+        }
+    }
+
+    @Test
     public void beginsSupportedDescentWithoutWaitingForCompleteDeepRoute() {
         ExcavationPathfinder search = new ExcavationPathfinder(0, 30, 0, 15, 0, 0, true);
         finish(search, (x, y, z, nx, ny, nz) -> ny == 30 ? 1 : 8);
