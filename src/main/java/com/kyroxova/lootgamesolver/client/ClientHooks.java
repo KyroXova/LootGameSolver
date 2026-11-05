@@ -265,7 +265,7 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void overlay(RenderGameOverlayEvent.Text event) {
-        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
+        if (!LootGameSolverConfig.enabled) return;
         DetectedGame cur = session.getCurrentDetectedGame();
         if (cur == null) return;
 

@@ -91,12 +91,12 @@ public class SudokuSolverTest {
             { 8, 0, 0, 0, 6, 0, 0, 0, 3 }, { 4, 0, 0, 8, 0, 3, 0, 0, 1 }, { 7, 0, 0, 0, 2, 0, 0, 0, 6 },
             { 0, 6, 0, 0, 0, 0, 2, 8, 0 }, { 0, 0, 0, 4, 1, 9, 0, 0, 5 }, { 0, 0, 0, 0, 8, 0, 0, 7, 9 } };
         SudokuBoard board = new SudokuBoard(puzzle);
-        // Correct value for (0, 2) is 4. Set a wrong player value of 1.
-        board.setPlayerValue(0, 2, 1);
+        // Correct value is 4; this entry duplicates a given in the same row.
+        board.setPlayerValue(0, 2, 5);
 
         SolveResult result = new SudokuSolver().solve(board);
         assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
-        // Should still generate actions for all 51 open cells (including the cell with wrong value 1)
+        // Keep all remaining hints, including the correction for the conflicting entry.
         assertEquals(
             51,
             result.getActions()

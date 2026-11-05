@@ -120,7 +120,7 @@ public final class SolverSession {
                         snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
                     }
                     if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
-                        snapshot.sudoku.set(r, c, snapshot.sudokuPlayerValues[r][c]);
+                        snapshot.sudoku.setPlayerValue(r, c, snapshot.sudokuPlayerValues[r][c]);
                     }
                 }
             }
@@ -290,7 +290,7 @@ public final class SolverSession {
                     int val = optimisticSudokuValues[r][c] != 0 ? optimisticSudokuValues[r][c]
                         : snapshot.sudokuPlayerValues[r][c];
                     if (snapshot.sudoku != null && val != 0) {
-                        snapshot.sudoku.set(r, c, val);
+                        snapshot.sudoku.setPlayerValue(r, c, val);
                     }
                 }
             }
