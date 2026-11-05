@@ -197,4 +197,3 @@ jobs:
           ./gradlew publishCurseforge --no-configuration-cache
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-
