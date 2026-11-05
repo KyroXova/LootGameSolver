@@ -278,11 +278,7 @@ public final class ClientHooks {
     public void overlay(RenderGameOverlayEvent.Text event) {
         if (!LootGameSolverConfig.enabled) return;
         DetectedGame cur = session.getCurrentDetectedGame();
-        Minecraft betaMc = Minecraft.getMinecraft();
-        if (exploration != null && betaMc.thePlayer != null && betaMc.currentScreen == null) {
-            betaMc.fontRenderer.drawStringWithShadow(exploration.hud(betaMc), 8, 8, 0xFFFF80);
-        }
-        if (cur == null) return;
+        if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return;
@@ -295,11 +291,12 @@ public final class ClientHooks {
             String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
             String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
 
-            String gameTitle = cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
-                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
-                    : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
+            String gameTitle = cur == null ? "Explore Beta"
+                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
+                    : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
+                        : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
-            String statusStr = session.isActive() ? session.getStatus() : "Ready";
+            String statusStr = cur == null ? exploration.hud(mc) : session.isActive() ? session.getStatus() : "Ready";
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
@@ -320,14 +317,20 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
+            String line4 = exploration != null && LootGameSolverConfig.explorationEnabled
+                ? "[" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+                    + "] Explore | "
+                    + exploration.hud(mc)
+                : "";
 
             int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
             int width3 = mc.fontRenderer.getStringWidth("[" + autoKeyStr + "] Auto | [" + holoKeyStr + "] Holograms");
             int maxWidth = Math.max(width1, Math.max(width2, width3));
+            maxWidth = Math.max(maxWidth, mc.fontRenderer.getStringWidth(line4));
 
             int panelWidth = maxWidth + 32;
-            int panelHeight = 44;
+            int panelHeight = line4.isEmpty() ? 44 : 54;
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -336,6 +339,11 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
+            if (!line4.isEmpty()) mc.fontRenderer.drawStringWithShadow(
+                line4,
+                x + (panelWidth - mc.fontRenderer.getStringWidth(line4)) / 2,
+                y + 37,
+                0xFFFF80);
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();

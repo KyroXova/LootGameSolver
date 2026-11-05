@@ -171,9 +171,13 @@ public final class ExplorationBeta {
                 .getName()
                 .startsWith("ru.timeconqueror.lootgames.")) continue;
             try {
-                Object game = tile.getClass()
-                    .getMethod("getGame")
-                    .invoke(tile);
+                boolean unopened = tile.getClass()
+                    .getName()
+                    .equals("ru.timeconqueror.lootgames.common.block.tile.PuzzleMasterTile");
+                Object game = unopened ? tile
+                    : tile.getClass()
+                        .getMethod("getGame")
+                        .invoke(tile);
                 if (game == null) continue;
                 double distance = mc.thePlayer
                     .getDistanceSq(tile.xCoord + 0.5D, tile.yCoord + 0.5D, tile.zCoord + 0.5D);
@@ -313,20 +317,8 @@ public final class ExplorationBeta {
     }
 
     public String hud(Minecraft mc) {
-        String controls = net.minecraft.client.settings.GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-            + ": start/stop exploration";
-        if (target == null) return "LootGames Beta: no loaded board | " + controls;
+        if (target == null) return "No structure in loaded terrain";
         int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
-        return "LootGames Beta: " + target.xCoord
-            + ", "
-            + target.yCoord
-            + ", "
-            + target.zCoord
-            + " ("
-            + distance
-            + "m) | "
-            + controls
-            + " | "
-            + status;
+        return target.xCoord + ", " + target.yCoord + ", " + target.zCoord + " (" + distance + "m)";
     }
 }
