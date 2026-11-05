@@ -10,6 +10,32 @@ import org.junit.Test;
 public class GroundPathfinderTest {
 
     @Test
+    public void openDiagonalApproachDoesNotZigzagEveryBlock() {
+        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        }, 0, 0, 0, 6, 6, 12);
+        assertFalse(route.isEmpty());
+        int bends = 0, x = 0, z = 0, lastX = 0, lastZ = 0;
+        for (int[] step : route) {
+            int dx = step[0] - x, dz = step[2] - z;
+            if ((lastX != 0 || lastZ != 0) && (dx != lastX || dz != lastZ)) bends++;
+            x = step[0];
+            z = step[2];
+            lastX = dx;
+            lastZ = dz;
+        }
+        assertTrue(bends <= 1);
+        assertTrue(Math.abs(x - 6) + Math.abs(z - 6) <= 1);
+    }
+
+    @Test
     public void surfaceWaterRouteCanClimbOntoBank() {
         List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 

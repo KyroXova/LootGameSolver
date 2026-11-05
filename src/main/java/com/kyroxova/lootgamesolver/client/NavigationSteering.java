@@ -3,6 +3,21 @@ package com.kyroxova.lootgamesolver.client;
 /** Continuous yaw avoids a full render-interpolation spin at the -180/180 boundary. */
 final class NavigationSteering {
 
+    static float heading(double ax, double az, double bx, double bz, float fallback) {
+        double dx = bx - ax, dz = bz - az;
+        if (dx * dx + dz * dz < 0.01D) return fallback;
+        return Math.abs(dx) >= Math.abs(dz) ? dx > 0 ? -90F : 90F : dz > 0 ? 0F : 180F;
+    }
+
+    static float cameraStep(float current, float desired, double seconds) {
+        float error = turn(current, desired, 180F) - current;
+        if (Math.abs(error) < 0.08F) return error;
+        double elapsed = Math.max(0, Math.min(0.05D, seconds));
+        float eased = (float) (error * (1D - Math.exp(-elapsed / 0.075D)));
+        float maximum = (float) (240D * elapsed);
+        return Math.max(-maximum, Math.min(maximum, eased));
+    }
+
     static boolean passed(double px, double pz, double ax, double az, double bx, double bz) {
         double dx = bx - ax, dz = bz - az;
         double length = Math.sqrt(dx * dx + dz * dz);

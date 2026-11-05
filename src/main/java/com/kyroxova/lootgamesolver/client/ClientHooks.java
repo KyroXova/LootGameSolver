@@ -144,6 +144,12 @@ public final class ClientHooks {
     }
 
     @SubscribeEvent
+    public void renderTick(cpw.mods.fml.common.gameevent.TickEvent.RenderTickEvent event) {
+        if (event.phase == cpw.mods.fml.common.gameevent.TickEvent.Phase.START && exploration != null)
+            exploration.renderCamera(Minecraft.getMinecraft());
+    }
+
+    @SubscribeEvent
     public void clientTick(ClientTickEvent event) {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 

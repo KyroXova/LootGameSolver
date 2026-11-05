@@ -21,6 +21,7 @@ final class ExcavationPathfinder {
 
         final int x, y, z, cost, remaining;
         final Node parent;
+        final int bends;
 
         Node(int x, int y, int z, int cost, int gx, int gy, int gz, Node parent) {
             this.x = x;
@@ -28,11 +29,16 @@ final class ExcavationPathfinder {
             this.z = z;
             this.cost = cost;
             this.parent = parent;
+            bends = parent == null ? 0
+                : parent.bends + (parent.parent != null
+                    && (x - parent.x != parent.x - parent.parent.x || z - parent.z != parent.z - parent.parent.z) ? 1
+                        : 0);
             remaining = Math.max(0, Math.abs(x - gx) + Math.abs(z - gz) - 2) + Math.abs(y - gy);
         }
 
         public int compareTo(Node other) {
             int order = Integer.compare(cost + remaining, other.cost + other.remaining);
+            if (order == 0) order = Integer.compare(bends, other.bends);
             return order != 0 ? order : Integer.compare(remaining, other.remaining);
         }
     }

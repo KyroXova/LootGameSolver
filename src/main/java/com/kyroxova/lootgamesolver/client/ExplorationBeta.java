@@ -51,6 +51,36 @@ public final class ExplorationBeta {
     private int[] previewHead;
     private int previewSize = -1;
     private int excavationReplans;
+    private boolean cameraActive;
+    private float cameraYaw, cameraPitch;
+    private long cameraFrame;
+
+    public void renderCamera(Minecraft mc) {
+        long now = System.nanoTime();
+        double seconds = cameraFrame == 0 ? 1D / 60D : (now - cameraFrame) / 1_000_000_000D;
+        cameraFrame = now;
+        if (!walking || !cameraActive
+            || mc.thePlayer == null
+            || mc.theWorld != world
+            || mc.currentScreen != null
+            || mc.isGamePaused()) return;
+        float yaw = NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, cameraYaw, seconds);
+        float pitch = NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, cameraPitch, seconds);
+        // Vanilla mouse look keeps the previous rotation in the same angular frame.
+        mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
+    }
+
+    private void look(float yaw, float pitch) {
+        cameraYaw = yaw;
+        cameraPitch = pitch;
+        cameraActive = true;
+    }
+
+    private void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        route.add(new int[] { x, y, z, center ? 2 : 0 });
+    }
 
     List<int[]> navigationRoute() {
         return navigationPreview;
@@ -112,6 +142,7 @@ public final class ExplorationBeta {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        cameraActive = false;
         if (walking && mc.thePlayer != null && navigationInput == null) {
             navigationInput = new NavigationInput(mc.thePlayer.movementInput);
             mc.thePlayer.movementInput = navigationInput;
@@ -280,7 +311,8 @@ public final class ExplorationBeta {
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
-        boolean passed = route.size() > 1 && py == next[1]
+        boolean centering = next.length > 3 && next[3] == 2;
+        boolean passed = !centering && py == next[1]
             && NavigationSteering
                 .passed(mc.thePlayer.posX, mc.thePlayer.posZ, segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D);
         if ((!digging || mc.thePlayer.onGround) && (passed
@@ -298,6 +330,7 @@ public final class ExplorationBeta {
                 return;
             }
             next = route.get(0);
+            centering = next.length > 3 && next[3] == 2;
             if (!safe(mc.theWorld, next[0], next[1], next[2])
                 || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
                 stop(mc, "Next route segment is no longer safe");
@@ -314,6 +347,17 @@ public final class ExplorationBeta {
             return;
         }
         settlingTicks = 0;
+        float desired = centering ? mc.thePlayer.rotationYaw
+            : NavigationSteering.heading(segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
+        float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
+        if (!centering) look(desired, 5F);
+        if (!centering && Math.abs(turn) > 15F) {
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            mc.thePlayer.setSprinting(false);
+            status = "Aligning with route";
+            return;
+        }
         if (distance >= lastDistance - 0.005D) stalled++;
         else stalled = 0;
         lastDistance = distance;
@@ -321,23 +365,6 @@ public final class ExplorationBeta {
             stop(mc, "Walk stopped: no progress");
             return;
         }
-        double aimX = dx, aimZ = dz;
-        if (!digging && route.size() > 1) {
-            int stepX = route.get(1)[0] - next[0], stepZ = route.get(1)[2] - next[2];
-            if (route.get(1)[1] == next[1]) for (int i = 1; i < Math.min(4, route.size()); i++) {
-                int[] ahead = route.get(i);
-                if (ahead[1] != next[1] || ahead[0] - next[0] != stepX * i || ahead[2] - next[2] != stepZ * i) break;
-                if (!safe(mc.theWorld, ahead[0], ahead[1], ahead[2])) break;
-                aimX = ahead[0] + 0.5D - mc.thePlayer.posX;
-                aimZ = ahead[2] + 0.5D - mc.thePlayer.posZ;
-            }
-        }
-        float desired = digging && (stairX != 0 || stairZ != 0)
-            ? (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F
-            : (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
-        float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        if (distance > 0.20D) mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, desired, 9F);
-        mc.thePlayer.rotationPitch += Math.max(-4F, Math.min(4F, 5F - mc.thePlayer.rotationPitch));
         boolean straight = route.size() >= 3 && !digging
             && !mc.thePlayer.isInWater()
             && next[1] == py
@@ -355,9 +382,9 @@ public final class ExplorationBeta {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
             navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
-            if (digging && distance > 0.02D) {
+            if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
-                double speed = Math.min(0.85D, distance * 1.5D);
+                double speed = Math.min(centering ? 0.4D : straight ? 1D : 0.85D, distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
@@ -365,6 +392,8 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        cameraActive = false;
+        cameraFrame = 0;
         excavationSearch = null;
         excavationRoute.clear();
         rejectedSteps.clear();
@@ -513,7 +542,7 @@ public final class ExplorationBeta {
         if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
         settlingTicks = 0;
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
-            route.add(new int[] { x, y, z });
+            singleStep(mc, x, y, z, true);
             return true;
         }
         if (excavationRoute.isEmpty()) {
@@ -656,7 +685,7 @@ public final class ExplorationBeta {
         settlingTicks = 0;
         if (!safe(mc.theWorld, x, y, z)) return false;
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
-            route.add(new int[] { x, y, z });
+            singleStep(mc, x, y, z, true);
             return true;
         }
         if (stairX == 0 && stairZ == 0) {
@@ -709,8 +738,7 @@ public final class ExplorationBeta {
             double aimZ = nz + 0.5D - mc.thePlayer.posZ;
             float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
             float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
-            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, yaw, 12F);
-            mc.thePlayer.rotationPitch += Math.max(-10F, Math.min(10F, pitch - mc.thePlayer.rotationPitch));
+            look(yaw, pitch);
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             boolean matches = hit != null
                 && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
@@ -739,7 +767,7 @@ public final class ExplorationBeta {
         digTicks = 0;
         miningAim.reset();
         if (!safe(w, nx, destinationY, nz)) return false;
-        route.add(new int[] { nx, destinationY, nz });
+        singleStep(mc, nx, destinationY, nz, false);
         if (!excavationRoute.isEmpty()) excavationRoute.remove(0);
         excavationReplans = 0;
         stairSteps++;

@@ -39,6 +39,8 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Plan connected side approaches around blocked roofs using level detours and supported stairs, with bounded search work across ticks.
 - Clear obstructing leaves and ordinary breakable wood or masonry while protecting tile entities and unbreakable blocks.
 - Turn toward movement and mining targets faster while retaining visible aim checks before breaking blocks.
+- Keep walking headings tied to route segments, consume overshot endpoints, and center on stairs without turning back toward the player's feet.
+- Update camera turns per rendered frame through vanilla mouse-look handling, hold the view while planning or waiting to land, and prefer fewer bends between equally scored routes.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

@@ -26,6 +26,7 @@ public final class GroundPathfinder {
     private static final class Node implements Comparable<Node> {
 
         final int x, y, z, cost;
+        final int bends;
         final double remaining;
         final Node parent;
 
@@ -35,11 +36,17 @@ public final class GroundPathfinder {
             this.z = z;
             this.cost = cost;
             this.parent = parent;
+            bends = parent == null ? 0
+                : parent.bends + (parent.parent != null
+                    && (x - parent.x != parent.x - parent.parent.x || z - parent.z != parent.z - parent.parent.z) ? 1
+                        : 0);
             remaining = Math.abs(x - gx) + Math.abs(z - gz);
         }
 
         public int compareTo(Node other) {
-            return Double.compare(cost + remaining, other.cost + other.remaining);
+            int order = Double.compare(cost + remaining, other.cost + other.remaining);
+            if (order == 0) order = Integer.compare(bends, other.bends);
+            return order != 0 ? order : Double.compare(remaining, other.remaining);
         }
     }
 
