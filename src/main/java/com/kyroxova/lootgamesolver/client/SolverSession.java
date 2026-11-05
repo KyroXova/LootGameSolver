@@ -42,13 +42,21 @@ public final class SolverSession {
     private MiniGame game = MiniGame.UNKNOWN;
     private int queued;
     private int remainingClicksForActiveAction = 0;
+    private boolean sudokuReverseClick;
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
         if (curVal == 0) return targetVal;
-        int diff = targetVal - curVal;
-        if (diff < 0) diff += 10;
-        return diff;
+        int forward = (targetVal - curVal + 10) % 10;
+        int reverse = (curVal - targetVal + 10) % 10;
+        return Math.min(forward, reverse);
+    }
+
+    public static boolean shouldUseReverseSudokuClicks(int curVal, int targetVal) {
+        if (curVal <= 0 || curVal > 9 || targetVal <= 0 || targetVal > 9) return false;
+        int forward = (targetVal - curVal + 10) % 10;
+        int reverse = (curVal - targetVal + 10) % 10;
+        return reverse < forward;
     }
 
     public void invalidateDormantCache() {
@@ -69,6 +77,7 @@ public final class SolverSession {
     }
 
     public void tick() {
+        bridge.tick();
         currentSnapshot = bridge.detect(mode != null);
         if (currentSnapshot == null) {
             cachedRenderActions = null;
@@ -220,8 +229,10 @@ public final class SolverSession {
                     ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
                     : 0;
                 remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
+                sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value);
             } else {
                 remainingClicksForActiveAction = 1;
+                sudokuReverseClick = false;
             }
         } else {
             activeAction = nextAction;
@@ -244,7 +255,7 @@ public final class SolverSession {
             status = "Waiting for Sudoku board update...";
             return;
         }
-        if (!bridge.interact(snapshot, activeAction)) {
+        if (!bridge.interact(snapshot, activeAction, sudokuReverseClick)) {
             status = "Navigating to " + activeAction.position;
             return;
         }
@@ -266,6 +277,7 @@ public final class SolverSession {
     }
 
     public void cancel(String reason) {
+        bridge.releaseSneak();
         mode = null;
         activeAction = null;
         activeActions = null;
@@ -276,6 +288,7 @@ public final class SolverSession {
         sudokuValueBeforeClick = -1;
         queued = 0;
         remainingClicksForActiveAction = 0;
+        sudokuReverseClick = false;
         for (int r = 0; r < 9; r++) {
             java.util.Arrays.fill(optimisticSudokuValues[r], 0);
         }

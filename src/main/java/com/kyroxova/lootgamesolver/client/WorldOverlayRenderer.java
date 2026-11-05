@@ -96,7 +96,7 @@ public final class WorldOverlayRenderer {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
-        if (exploration != null) NavigationOverlayRenderer.render(exploration);
+        if (exploration != null) NavigationOverlayRenderer.render(exploration, event.partialTicks);
         DetectedGame current = session.getCurrentDetectedGame();
         if (current == null) return;
 

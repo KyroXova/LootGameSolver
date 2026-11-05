@@ -1,6 +1,8 @@
 package com.kyroxova.lootgamesolver.solver.sudoku;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -81,10 +83,13 @@ public class SudokuSolverTest {
         assertEquals(5, SolverSession.calculateClicksNeeded(0, 5));
         assertEquals(6, SolverSession.calculateClicksNeeded(0, 6));
         assertEquals(9, SolverSession.calculateClicksNeeded(0, 9));
-        assertEquals(7, SolverSession.calculateClicksNeeded(2, 9));
+        assertEquals(3, SolverSession.calculateClicksNeeded(2, 9));
         assertEquals(0, SolverSession.calculateClicksNeeded(4, 4));
         assertEquals(2, SolverSession.calculateClicksNeeded(9, 1));
-        assertEquals(7, SolverSession.calculateClicksNeeded(8, 5));
+        assertEquals(3, SolverSession.calculateClicksNeeded(8, 5));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(8, 5));
+        assertFalse(SolverSession.shouldUseReverseSudokuClicks(9, 1));
+        assertFalse(SolverSession.shouldUseReverseSudokuClicks(0, 9));
     }
 
     @Test

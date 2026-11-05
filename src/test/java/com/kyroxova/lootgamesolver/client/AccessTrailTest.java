@@ -47,4 +47,18 @@ public class AccessTrailTest {
             trail.reverse(20, 20, 20)
                 .isEmpty());
     }
+
+    @Test
+    public void returnCanReconnectToSavedTrailAfterPuzzleInteractionMovedPlayer() {
+        AccessTrail trail = new AccessTrail();
+        trail.record(0, 64, 0);
+        trail.record(1, 63, 0);
+        trail.record(2, 62, 0);
+        assertEquals(2, trail.nearestIndex(3, 62, 0, 8));
+        List<int[]> back = trail.reverseFrom(2);
+        assertEquals(3, back.size());
+        assertArrayEquals(new int[] { 2, 62, 0 }, back.get(0));
+        assertArrayEquals(new int[] { 0, 64, 0 }, back.get(2));
+        assertEquals(-1, trail.nearestIndex(20, 20, 20, 8));
+    }
 }

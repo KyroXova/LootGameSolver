@@ -33,7 +33,36 @@ final class AccessTrail {
             }
         }
         if (start < 1) return route;
-        for (int i = start; i >= 0; i--) {
+        return reverseFrom(start, x, y, z);
+    }
+
+    int nearestIndex(int x, int y, int z, int maxDistance) {
+        int index = -1, closest = Integer.MAX_VALUE;
+        for (int i = 0; i < points.size(); i++) {
+            int[] p = points.get(i);
+            int distance = Math.abs(p[0] - x) + Math.abs(p[1] - y) + Math.abs(p[2] - z);
+            if (distance < closest) {
+                index = i;
+                closest = distance;
+            }
+        }
+        return closest <= maxDistance ? index : -1;
+    }
+
+    int[] pointAt(int index) {
+        return index < 0 || index >= points.size() ? null
+            : points.get(index)
+                .clone();
+    }
+
+    List<int[]> reverseFrom(int index) {
+        return reverseFrom(index, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE);
+    }
+
+    private List<int[]> reverseFrom(int index, int x, int y, int z) {
+        List<int[]> route = new ArrayList<int[]>();
+        if (index < 0 || index >= points.size()) return route;
+        for (int i = index; i >= 0; i--) {
             int[] p = points.get(i);
             if (p[0] != x || p[1] != y || p[2] != z) route.add(p.clone());
         }

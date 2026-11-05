@@ -28,6 +28,9 @@ import com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard;
  */
 public final class LootGamesBridge implements MiniGameDetector {
 
+    private boolean pendingSneakRelease;
+    private boolean restoreSneaking;
+
     private static final String LOOTGAMES_PKG = "ru.timeconqueror.lootgames.";
     private static final String MS_GAME = "ru.timeconqueror.lootgames.minigame.minesweeper.GameMineSweeper";
     private static final String SDK_GAME = "ru.timeconqueror.lootgames.minigame.sudoku.GameSudoku";
@@ -462,9 +465,14 @@ public final class LootGamesBridge implements MiniGameDetector {
      * Executes exactly one normal Minecraft interaction. Caller waits for a packet-driven board update.
      */
     public boolean interact(DetectedGame detected, SolverAction action) {
+        return interact(detected, action, false);
+    }
+
+    public boolean interact(DetectedGame detected, SolverAction action, boolean sudokuReverseClick) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+            releasePendingSneak(mc);
             int[] block = boardBlock(detected.game, action.position);
 
             // Realistic player interaction: auto-walk/fly into range, aim camera at block, and swing arm
@@ -473,8 +481,33 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             mc.thePlayer.swingItem();
 
-            if (action.type == SolverAction.Type.REVEAL) {
-                if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+            boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
+                && action.type == SolverAction.Type.SET_VALUE
+                && sudokuReverseClick;
+            boolean wasSneaking = mc.thePlayer.isSneaking();
+            if (shouldSneak && !wasSneaking) {
+                mc.getNetHandler()
+                    .addToSendQueue(
+                        new net.minecraft.network.play.client.C0BPacketEntityAction(mc.thePlayer, shouldSneak ? 1 : 2));
+                mc.thePlayer.setSneaking(shouldSneak);
+            }
+            try {
+                if (action.type == SolverAction.Type.REVEAL) {
+                    if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+                        ItemStack held = mc.thePlayer.getHeldItem();
+                        mc.playerController.onPlayerRightClick(
+                            mc.thePlayer,
+                            mc.theWorld,
+                            held,
+                            block[0],
+                            block[1],
+                            block[2],
+                            1,
+                            Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+                    } else {
+                        mc.playerController.clickBlock(block[0], block[1], block[2], 1);
+                    }
+                } else {
                     ItemStack held = mc.thePlayer.getHeldItem();
                     mc.playerController.onPlayerRightClick(
                         mc.thePlayer,
@@ -485,26 +518,37 @@ public final class LootGamesBridge implements MiniGameDetector {
                         block[2],
                         1,
                         Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
-                } else {
-                    mc.playerController.clickBlock(block[0], block[1], block[2], 1);
                 }
-            } else {
-                ItemStack held = mc.thePlayer.getHeldItem();
-                mc.playerController.onPlayerRightClick(
-                    mc.thePlayer,
-                    mc.theWorld,
-                    held,
-                    block[0],
-                    block[1],
-                    block[2],
-                    1,
-                    Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+            } finally {
+                // Keep reverse-cycle sneak active through the click's network tick.
+                if (shouldSneak && !wasSneaking) {
+                    pendingSneakRelease = true;
+                    restoreSneaking = wasSneaking;
+                }
             }
             return true;
         } catch (Exception e) {
             LootGameSolver.LOG.warn("LootGames interaction failed; automation stopped", e);
             return false;
         }
+    }
+
+    public void tick() {
+        releasePendingSneak(Minecraft.getMinecraft());
+    }
+
+    public void releaseSneak() {
+        releasePendingSneak(Minecraft.getMinecraft());
+    }
+
+    private void releasePendingSneak(Minecraft mc) {
+        if (!pendingSneakRelease) return;
+        pendingSneakRelease = false;
+        if (mc.thePlayer == null || mc.getNetHandler() == null) return;
+        mc.getNetHandler()
+            .addToSendQueue(
+                new net.minecraft.network.play.client.C0BPacketEntityAction(mc.thePlayer, restoreSneaking ? 1 : 2));
+        mc.thePlayer.setSneaking(restoreSneaking);
     }
 
     /** Opens the nearby master block with one ordinary, aimed player interaction. */
@@ -527,6 +571,48 @@ public final class LootGamesBridge implements MiniGameDetector {
             z,
             hit.sideHit,
             hit.hitVec);
+    }
+
+    /** Returns the nearby game object even before its board has been revealed. */
+    public Object nearbyGame(boolean forceScan) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.thePlayer == null || mc.currentScreen != null) return null;
+        return findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
+    }
+
+    /** Clicks the floor cell LootGames uses to generate and reveal a new board. */
+    public boolean activateBoardCenter(Object game) {
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (game == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null)
+                return false;
+            int[] position = gameCenter(game);
+            if (position == null) return false;
+            int x = position[0], y = position[1], z = position[2];
+            if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+            net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+            if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+                || hit.blockX != x
+                || hit.blockY != y
+                || hit.blockZ != z) return false;
+            mc.thePlayer.swingItem();
+            mc.playerController.clickBlock(x, y, z, hit.sideHit);
+            return true;
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);
+            return false;
+        }
+    }
+
+    public int[] gameCenter(Object game) {
+        try {
+            Object center = invoke(game, "getGameCenter");
+            return new int[] { number(invoke(center, "getX")), number(invoke(center, "getY")),
+                number(invoke(center, "getZ")) };
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the LootGames board center", e);
+            return null;
+        }
     }
 
     public void recordSubmittedAction(DetectedGame snapshot) {

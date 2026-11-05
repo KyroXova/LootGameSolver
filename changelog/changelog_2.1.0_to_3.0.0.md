@@ -89,6 +89,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Resume progressive exploration after a confirmed LootGames win and persist solved master locations per world and dimension.
 - Keep the explorer stopped after a loss or an unopenable puzzle, without marking it solved.
 - Follow a cleared excavation route into the room using normal running movement instead of stepping through the entrance one block at a time.
+- After activating the puzzle master, walk to and click the board's center floor cell to generate and reveal it before auto-solving.
+- Use fewer Sudoku clicks by sneaking for backward number cycling, keeping sneak active through the server click and restoring the prior state on the following tick.
+- Record safe approach waypoints on existing routes and excavated access, reconnect to the nearest saved waypoint after solving, then walk back out before searching onward.
+- Render a full-height blue cylindrical structure waypoint with animated rings and rising particles.
 
 ## Build and releases
 

@@ -125,6 +125,12 @@ public final class ExplorationBeta {
     private boolean puzzleArrivalPending;
     private ExcavationPathfinder existingAccessPlan;
     private boolean planningExistingAccess;
+    private boolean movingToPuzzleCenter;
+    private boolean puzzleCenterArrivalPending;
+    private TileEntity puzzleMasterTarget;
+    private boolean resumeSearchAfterReturn;
+    private GroundPathfinder.Search returnJoinSearch;
+    private List<int[]> returnTrailRoute;
 
     private boolean undergroundNearby(Minecraft mc) {
         return !returning && !searching
@@ -225,6 +231,44 @@ public final class ExplorationBeta {
         return knownStructure == null ? null : knownStructure.clone();
     }
 
+    boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
+        if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
+        puzzleMasterTarget = target;
+        TileEntity point = new TileEntity();
+        point.xCoord = center[0];
+        point.yCoord = center[1];
+        point.zCoord = center[2];
+        target = point;
+        movingToPuzzleCenter = true;
+        puzzleCenterArrivalPending = false;
+        route.clear();
+        digging = false;
+        searching = false;
+        walkingSearch = null;
+        continuationSearch = null;
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        plan(mc);
+        walking = walkingSearch != null || !route.isEmpty();
+        if (!walking) {
+            double distance = mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
+            if (distance > 4.2D) {
+                target = puzzleMasterTarget;
+                puzzleMasterTarget = null;
+                movingToPuzzleCenter = false;
+                return false;
+            }
+        }
+        status = "Moving to board center";
+        return true;
+    }
+
+    boolean consumePuzzleCenterArrival() {
+        if (!puzzleCenterArrivalPending) return false;
+        puzzleCenterArrivalPending = false;
+        return true;
+    }
+
     void finishPuzzle(Minecraft mc, boolean solved) {
         if (solved && knownStructure != null && mc.theWorld != null) {
             try {
@@ -234,13 +278,69 @@ public final class ExplorationBeta {
                 status = "Solved; could not save local structure history";
             }
         }
+        int px = (int) Math.floor(mc.thePlayer.posX);
+        int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        List<int[]> back = accessTrail.reverse(px, py, pz);
+        returnJoinSearch = null;
+        returnTrailRoute = null;
+        puzzleArrivalPending = false;
+        returnAvailable = false;
+        if (back.isEmpty() && mc.theWorld != null && mc.thePlayer != null) {
+            int nearest = accessTrail.nearestIndex(px, py, pz, 8);
+            int[] join = accessTrail.pointAt(nearest);
+            if (join != null) {
+                returnTrailRoute = accessTrail.reverseFrom(nearest);
+                returnJoinSearch = new GroundPathfinder.Search(
+                    walkingTerrain(mc.theWorld),
+                    px,
+                    py,
+                    pz,
+                    join[0],
+                    join[2],
+                    Math.max(8, LootGameSolverConfig.explorationRange));
+                segmentX = mc.thePlayer.posX;
+                segmentZ = mc.thePlayer.posZ;
+                route.clear();
+                returning = true;
+                resumeSearchAfterReturn = true;
+                walking = true;
+                searching = false;
+                digging = false;
+                walkingSearch = null;
+                continuationSearch = null;
+                status = "Rejoining saved access route";
+                return;
+            }
+        }
+        if (!back.isEmpty()) {
+            target = null;
+            route.clear();
+            route.addAll(back);
+            returning = true;
+            resumeSearchAfterReturn = true;
+            walking = true;
+            searching = false;
+            digging = false;
+            walkingSearch = null;
+            continuationSearch = null;
+            status = "Returning along the saved access route";
+            return;
+        }
+        continueProgressiveSearch(mc, solved);
+    }
+
+    private void continueProgressiveSearch(Minecraft mc, boolean solved) {
         target = null;
         knownStructure = null;
-        puzzleArrivalPending = false;
         accessTrail.clear();
         trailTarget = null;
-        returnAvailable = false;
         returning = false;
+        resumeSearchAfterReturn = false;
+        returnJoinSearch = null;
+        returnTrailRoute = null;
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
@@ -248,6 +348,22 @@ public final class ExplorationBeta {
         walking = nextSearchLeg(mc);
         if (!walking) stop(mc, solved ? "Puzzle solved; nearby search finished" : "Puzzle ended; search paused");
         else status = solved ? "Puzzle solved; searching for the next structure" : "Puzzle ended; continuing search";
+    }
+
+    private static boolean samePosition(int[] first, int[] second) {
+        return first[0] == second[0] && first[1] == second[1] && first[2] == second[2];
+    }
+
+    private void beginAccessTrail(Minecraft mc) {
+        if (knownStructure == null || mc.thePlayer == null) return;
+        if (trailTarget == null || !samePosition(trailTarget, knownStructure)) {
+            accessTrail.clear();
+            trailTarget = knownStructure.clone();
+            accessTrail.record(
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ));
+        }
     }
 
     private String worldIdentity(Minecraft mc) {
@@ -361,6 +477,7 @@ public final class ExplorationBeta {
             if (!walking) stop(mc, "No safe exploration route available");
             return;
         }
+        beginAccessTrail(mc);
         boolean underground = LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
             && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 40;
         if (underground) {
@@ -414,6 +531,10 @@ public final class ExplorationBeta {
             accessTrail.clear();
             trailTarget = null;
             puzzleArrivalPending = false;
+            puzzleCenterArrivalPending = false;
+            movingToPuzzleCenter = false;
+            puzzleMasterTarget = null;
+            resumeSearchAfterReturn = false;
             planningExistingAccess = false;
             existingAccessPlan = null;
             returning = false;
@@ -519,8 +640,28 @@ public final class ExplorationBeta {
             }
             return;
         }
-        if (reachableBoard(mc)) {
-            if (digging && mc.thePlayer.onGround) accessTrail.record(
+        if (returnJoinSearch != null) {
+            if (!returnJoinSearch.advance(3_000_000L)) {
+                status = "Finding a safe link to saved access route";
+                return;
+            }
+            List<int[]> join = returnJoinSearch.path();
+            returnJoinSearch = null;
+            if (join.isEmpty() && returnTrailRoute != null) {
+                route.addAll(returnTrailRoute);
+            } else {
+                route.addAll(join);
+                if (returnTrailRoute != null) route.addAll(returnTrailRoute);
+            }
+            returnTrailRoute = null;
+            if (route.isEmpty()) {
+                returning = false;
+                continueProgressiveSearch(mc, true);
+            } else status = "Following saved access route out";
+            return;
+        }
+        if (!movingToPuzzleCenter && reachableBoard(mc)) {
+            if (mc.thePlayer.onGround && trailTarget != null) accessTrail.record(
                 (int) Math.floor(mc.thePlayer.posX),
                 (int) Math.floor(mc.thePlayer.boundingBox.minY),
                 (int) Math.floor(mc.thePlayer.posZ));
@@ -560,14 +701,28 @@ public final class ExplorationBeta {
             walkingSearch = null;
             walkingPlanFailed = route.isEmpty();
         }
-        if (!returning && !digging && !seekingDryEntrance && route.size() >= 2 && route.size() <= 8 && ticks % 10 == 0)
-            extendRoute(mc);
+        if (!returning && !digging
+            && !seekingDryEntrance
+            && !movingToPuzzleCenter
+            && route.size() >= 1
+            && route.size() <= 8
+            && ticks % 5 == 0) extendRoute(mc);
         prepareApproach(mc);
         if (route.isEmpty()) {
+            if (movingToPuzzleCenter) {
+                target = puzzleMasterTarget;
+                puzzleMasterTarget = null;
+                movingToPuzzleCenter = false;
+                stop(mc, "At LootGames board center");
+                puzzleCenterArrivalPending = true;
+                return;
+            }
             if (returning) {
                 returning = false;
                 returnAvailable = false;
-                stop(mc, "Returned to access entrance");
+                if (resumeSearchAfterReturn) {
+                    continueProgressiveSearch(mc, true);
+                } else stop(mc, "Returned to access entrance");
                 return;
             }
             if (seekingDryEntrance) {
@@ -611,6 +766,7 @@ public final class ExplorationBeta {
             if (searching) {
                 scan(mc);
                 if (target != null) {
+                    beginAccessTrail(mc);
                     searching = false;
                     if (mc.thePlayer.getDistanceSq(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D)
                         <= 16D) {
@@ -701,7 +857,7 @@ public final class ExplorationBeta {
             || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1))) {
             segmentX = next[0] + 0.5D;
             segmentZ = next[2] + 0.5D;
-            if (digging) accessTrail.record(next[0], next[1], next[2]);
+            if (!returning && trailTarget != null) accessTrail.record(next[0], next[1], next[2]);
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
@@ -733,7 +889,10 @@ public final class ExplorationBeta {
         float desired = centering ? mc.thePlayer.rotationYaw
             : NavigationSteering.heading(segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        if (!centering) look(desired, 5F);
+        double verticalAim = next[1] - py;
+        float desiredPitch = (float) Math
+            .max(-35D, Math.min(35D, -Math.atan2(verticalAim, Math.max(0.25D, distance)) * 180D / Math.PI));
+        if (!centering) look(desired, desiredPitch);
         status = centering ? "Centering on supported ground"
             : returning ? "Returning along saved access path" : "Following checked route";
         if (!centering && Math.abs(turn) > 60F) {
@@ -750,26 +909,26 @@ public final class ExplorationBeta {
             stop(mc, "Walk stopped: no progress");
             return;
         }
-        boolean straight = route.size() >= 3 && !digging
-            && !mc.thePlayer.isInWater()
+        boolean straight = !digging && !mc.thePlayer.isInWater()
             && next[1] == py
-            && route.get(1)[1] == py
-            && route.get(2)[1] == py
-            && route.get(2)[0] - next[0] == 2 * (route.get(1)[0] - next[0])
-            && route.get(2)[2] - next[2] == 2 * (route.get(1)[2] - next[2])
-            && safe(mc.theWorld, route.get(1)[0], py, route.get(1)[2])
-            && safe(mc.theWorld, route.get(2)[0], py, route.get(2)[2]);
+            && (route.size() == 1 && distance > 0.35D || route.size() >= 3 && !mc.thePlayer.isInWater()
+                && route.get(1)[1] == py
+                && route.get(2)[1] == py
+                && route.get(2)[0] - next[0] == 2 * (route.get(1)[0] - next[0])
+                && route.get(2)[2] - next[2] == 2 * (route.get(1)[2] - next[2])
+                && safe(mc.theWorld, route.get(1)[0], py, route.get(1)[2])
+                && safe(mc.theWorld, route.get(2)[0], py, route.get(2)[2]));
         mc.thePlayer.setSprinting(
             straight && Math.abs(turn) < 10F
                 && mc.thePlayer.getFoodStats()
                     .getFoodLevel() > 6);
         if (navigationInput != null) {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
-                : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
+                : route.size() == 1 ? (float) Math.min(1D, distance * 1.5D) : 1F;
             navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
-                double speed = Math.min(centering ? 0.4D : straight ? 1D : 0.85D, distance * 1.5D);
+                double speed = Math.min(centering ? 0.4D : straight ? 1D : 0.95D, distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
@@ -777,8 +936,13 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
+        puzzleMasterTarget = null;
+        movingToPuzzleCenter = false;
         if (returning) returnAvailable = true;
         returning = false;
+        returnJoinSearch = null;
+        returnTrailRoute = null;
         releaseMiningInput(mc);
         toolTransfer.cancel(mc);
         miningTarget = Long.MIN_VALUE;
