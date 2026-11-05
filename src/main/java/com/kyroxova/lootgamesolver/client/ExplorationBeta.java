@@ -71,6 +71,10 @@ public final class ExplorationBeta {
     private boolean returning, returnAvailable;
     private int returnReplans;
     private int cameraPitchDirection;
+    private boolean returnDigging;
+    private TileEntity returnOriginalTarget;
+    private List<int[]> returnAfterDig;
+    private boolean returnDigResumeSearch;
     private String excavationMode = "Access route";
 
     String explorationAction() {
@@ -400,6 +404,55 @@ public final class ExplorationBeta {
         return false;
     }
 
+    private boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
+        if (mc.thePlayer == null || mc.theWorld == null || savedRoute == null || savedRoute.size() < 2) return false;
+        int anchorIndex = Math.min(6, savedRoute.size() - 1);
+        int[] anchor = savedRoute.get(anchorIndex);
+        TileEntity digGoal = new TileEntity();
+        digGoal.xCoord = anchor[0];
+        digGoal.yCoord = anchor[1];
+        digGoal.zCoord = anchor[2];
+        returnOriginalTarget = target;
+        target = digGoal;
+        returnAfterDig = new ArrayList<int[]>();
+        for (int i = anchorIndex; i < savedRoute.size(); i++) returnAfterDig.add(
+            savedRoute.get(i)
+                .clone());
+        returnDigResumeSearch = resumeSearchAfterReturn;
+        returnDigging = true;
+        returnJoinSearch = null;
+        returnTrailRoute = null;
+        route.clear();
+        excavationRoute.clear();
+        excavationSearch = new ExcavationPathfinder(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            anchor[0],
+            anchor[1],
+            anchor[2]);
+        digging = true;
+        returning = false;
+        searching = false;
+        entranceSelected = true;
+        walking = true;
+        status = "Planning a checked exit link to the saved tunnel";
+        return true;
+    }
+
+    private void resumeSavedReturnAfterDig() {
+        target = returnOriginalTarget;
+        returnOriginalTarget = null;
+        route.clear();
+        if (returnAfterDig != null) route.addAll(returnAfterDig);
+        returnAfterDig = null;
+        returnDigging = false;
+        digging = false;
+        returning = true;
+        resumeSearchAfterReturn = returnDigResumeSearch;
+        status = "Exit opened; continuing along saved access route";
+    }
+
     private String worldIdentity(Minecraft mc) {
         if (mc.isSingleplayer() && mc.getIntegratedServer() != null) return "save:" + mc.getIntegratedServer()
             .getFolderName();
@@ -693,6 +746,11 @@ public final class ExplorationBeta {
             List<int[]> join = returnJoinSearch.path();
             returnJoinSearch = null;
             if (join.isEmpty() && returnTrailRoute != null) {
+                int[] first = returnTrailRoute.get(0);
+                int px = (int) Math.floor(mc.thePlayer.posX), py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int pz = (int) Math.floor(mc.thePlayer.posZ);
+                if ((Math.abs(first[0] - px) + Math.abs(first[2] - pz) > 1 || Math.abs(first[1] - py) > 1)
+                    && startReturnDig(mc, returnTrailRoute)) return;
                 route.addAll(returnTrailRoute);
             } else {
                 route.addAll(join);
@@ -705,7 +763,7 @@ public final class ExplorationBeta {
             } else status = "Following saved access route out";
             return;
         }
-        if (!movingToPuzzleCenter && reachableBoard(mc)) {
+        if (!movingToPuzzleCenter && !returnDigging && reachableBoard(mc)) {
             if (mc.thePlayer.onGround && trailTarget != null) accessTrail.record(
                 (int) Math.floor(mc.thePlayer.posX),
                 (int) Math.floor(mc.thePlayer.boundingBox.minY),
@@ -765,6 +823,17 @@ public final class ExplorationBeta {
                 movingToPuzzleCenter = false;
                 stop(mc, "At LootGames board center");
                 puzzleCenterArrivalPending = true;
+                return;
+            }
+            if (returnDigging) {
+                int horizontal = Math.abs((int) Math.floor(mc.thePlayer.posX) - target.xCoord)
+                    + Math.abs((int) Math.floor(mc.thePlayer.posZ) - target.zCoord);
+                int vertical = Math.abs((int) Math.floor(mc.thePlayer.boundingBox.minY) - target.yCoord);
+                if (horizontal <= 3 && vertical <= 1) {
+                    resumeSavedReturnAfterDig();
+                    return;
+                }
+                if (!stairStep(mc)) stop(mc, "No safe breakable link to the saved tunnel");
                 return;
             }
             if (returning) {
@@ -999,6 +1068,13 @@ public final class ExplorationBeta {
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
         puzzleMasterTarget = null;
         movingToPuzzleCenter = false;
+        if (returnDigging) {
+            target = returnOriginalTarget;
+            returnOriginalTarget = null;
+            returnAfterDig = null;
+            returnDigging = false;
+            returnAvailable = true;
+        }
         if (returning) returnAvailable = true;
         returning = false;
         returnJoinSearch = null;
@@ -1287,13 +1363,15 @@ public final class ExplorationBeta {
         if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
         settlingTicks = 0;
         returnSupports.add(supportKey(x, y - 1, z));
-        if (trailTarget == null || trailTarget[0] != target.xCoord
-            || trailTarget[1] != target.yCoord
-            || trailTarget[2] != target.zCoord) {
-            accessTrail.clear();
-            trailTarget = new int[] { target.xCoord, target.yCoord, target.zCoord };
+        if (!returnDigging) {
+            if (trailTarget == null || trailTarget[0] != target.xCoord
+                || trailTarget[1] != target.yCoord
+                || trailTarget[2] != target.zCoord) {
+                accessTrail.clear();
+                trailTarget = new int[] { target.xCoord, target.yCoord, target.zCoord };
+            }
+            accessTrail.record(x, y, z);
         }
-        accessTrail.record(x, y, z);
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
             singleStep(mc, x, y, z, true);
             return true;
