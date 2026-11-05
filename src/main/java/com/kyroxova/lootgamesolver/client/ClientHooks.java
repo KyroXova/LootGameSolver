@@ -29,6 +29,7 @@ public final class ClientHooks {
         "lootgamesolver",
         "textures/gui/ui_9slice.png");
     private final SolverSession session = new SolverSession();
+    private final ExplorationBeta exploration = ExplorationBeta.ENABLED ? new ExplorationBeta() : null;
     private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session);
     private boolean lastAutoSolveKey = false;
     private boolean lastOverlayKey = false;
@@ -147,6 +148,7 @@ public final class ClientHooks {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
+        if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
 
         // Poll board detection every 20 ticks (1s) when dormant (using smart movement gate), or every tick when
@@ -162,6 +164,14 @@ public final class ClientHooks {
     }
 
     private void checkKeyToggles() {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (exploration != null && Keybinds.explore.isPressed()
+            && mc.currentScreen == null
+            && mc.thePlayer != null
+            && mc.theWorld != null) {
+            session.cancel("Exploration selected");
+            exploration.toggle(mc);
+        }
         boolean autoSolvePressed = isKeyJustPressed(Keybinds.toggleAutoSolve, LootGameSolverConfig.solveKey);
         boolean overlayPressed = isKeyJustPressed(Keybinds.toggleOverlay, LootGameSolverConfig.overlayKey);
 
@@ -268,6 +278,10 @@ public final class ClientHooks {
     public void overlay(RenderGameOverlayEvent.Text event) {
         if (!LootGameSolverConfig.enabled) return;
         DetectedGame cur = session.getCurrentDetectedGame();
+        Minecraft betaMc = Minecraft.getMinecraft();
+        if (exploration != null && betaMc.thePlayer != null && betaMc.currentScreen == null) {
+            betaMc.fontRenderer.drawStringWithShadow(exploration.hud(betaMc), 8, 8, 0xFFFF80);
+        }
         if (cur == null) return;
 
         Minecraft mc = Minecraft.getMinecraft();
