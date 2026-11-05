@@ -133,7 +133,11 @@ public final class ExplorationBeta {
                 digging = true;
                 savedSlot = mc.thePlayer.inventory.currentItem;
             }
-            if ((digging || target.yCoord < mc.thePlayer.boundingBox.minY - 2) && mc.thePlayer.isInWater()) {
+            if ((digging || target.yCoord < mc.thePlayer.boundingBox.minY - 2) && !dryShore(
+                mc.theWorld,
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ))) {
                 digging = false;
                 if (!findDryEntrance(mc)) stop(mc, "No verified dry entrance near the water; digging stopped");
                 return;
@@ -235,7 +239,7 @@ public final class ExplorationBeta {
             ? (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F
             : (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
+        if (!digging && next[1] == py) mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
             .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, turn)));
         boolean straight = route.size() >= 3 && !digging
             && !mc.thePlayer.isInWater()
@@ -254,7 +258,7 @@ public final class ExplorationBeta {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
             navigationInput.hop = next[1] > py || mc.thePlayer.isInWater();
-            if (digging && distance > 0.02D) {
+            if ((digging || next[1] != py) && distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
                 double speed = Math.min(0.5D, distance);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
@@ -403,6 +407,17 @@ public final class ExplorationBeta {
         return false;
     }
 
+    private static boolean dryShore(World world, int x, int y, int z) {
+        if (!passable(world, x, y, z) || !world.getBlock(x, y - 1, z)
+            .isNormalCube()) return false;
+        for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -2; dy <= 1; dy++) {
+            if (!world.blockExists(x + dx, y + dy, z + dz) || world.getBlock(x + dx, y + dy, z + dz)
+                .getMaterial()
+                .isLiquid()) return false;
+        }
+        return true;
+    }
+
     private boolean findDryEntrance(final Minecraft mc) {
         final World w = mc.theWorld;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -412,7 +427,8 @@ public final class ExplorationBeta {
         for (int radius = 3; radius <= 12; radius += 3)
             for (int[] direction : directions) for (int dy = 0; dy <= 1; dy++) {
                 int gx = x + direction[0] * radius, gy = y + dy, gz = z + direction[1] * radius;
-                if (!safe(w, gx, gy, gz) || !passable(w, gx, gy, gz)
+                if (!dryShore(w, gx, gy, gz) || !safe(w, gx, gy, gz)
+                    || !passable(w, gx, gy, gz)
                     || !w.getBlock(gx, gy - 1, gz)
                         .isNormalCube())
                     continue;
@@ -429,8 +445,10 @@ public final class ExplorationBeta {
                 }, x, y, z, gx, gz, 16);
                 if (candidate.isEmpty()) continue;
                 int[] last = candidate.get(candidate.size() - 1);
-                if (!passable(w, last[0], last[1], last[2]) || !w.getBlock(last[0], last[1] - 1, last[2])
-                    .isNormalCube()) continue;
+                if (!dryShore(w, last[0], last[1], last[2]) || !passable(w, last[0], last[1], last[2])
+                    || !w.getBlock(last[0], last[1] - 1, last[2])
+                        .isNormalCube())
+                    continue;
                 route.clear();
                 route.addAll(candidate);
                 seekingDryEntrance = true;
@@ -505,11 +523,6 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
-            float desiredYaw = (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F;
-            float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(desiredYaw - mc.thePlayer.rotationYaw);
-            mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
-                .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, yawDelta)));
-            mc.thePlayer.rotationPitch += Math.max(-5F, Math.min(5F, 20F - mc.thePlayer.rotationPitch));
             if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
             mc.thePlayer.swingItem();
             mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
