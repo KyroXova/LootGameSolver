@@ -13,7 +13,6 @@ public final class Keybinds {
     public static KeyBinding toggleOverlay;
     public static KeyBinding toggleAutoSolve;
     public static KeyBinding explore;
-    public static KeyBinding staircase;
 
     private Keybinds() {}
 
@@ -22,7 +21,6 @@ public final class Keybinds {
         toggleAutoSolve = register("key.lootgamesolver.toggle_auto_solve", LootGameSolverConfig.solveKey);
         if (ExplorationBeta.ENABLED) {
             explore = register("key.lootgamesolver.explore", LootGameSolverConfig.exploreKey);
-            staircase = register("key.lootgamesolver.staircase", LootGameSolverConfig.staircaseKey);
         }
     }
 

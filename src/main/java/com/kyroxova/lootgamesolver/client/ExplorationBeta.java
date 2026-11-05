@@ -45,25 +45,14 @@ public final class ExplorationBeta {
             return;
         }
         plan(mc);
-        walking = !route.isEmpty();
+        digging = route.isEmpty() && LootGameSolverConfig.staircaseEnabled
+            && target.yCoord < mc.thePlayer.boundingBox.minY - 2;
+        walking = !route.isEmpty() || digging;
+        if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
-        if (!walking) stop(mc, "No safe level route within 32 blocks");
+        if (!walking) stop(mc, "No safe route to target");
         else status = "Walking to LootGame";
-    }
-
-    public void toggleStaircase(Minecraft mc) {
-        if (walking) {
-            stop(mc, "Walk stopped");
-            return;
-        }
-        if (!LootGameSolverConfig.staircaseEnabled || !LootGameSolverConfig.explorationEnabled) return;
-        scan(mc);
-        digging = true;
-        walking = target != null;
-        savedSlot = mc.thePlayer.inventory.currentItem;
-        if (!walking) stop(mc, "No loaded target for staircase");
-        else status = "Staircase beta active";
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
@@ -236,8 +225,10 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround || !safe(mc.theWorld, x, y, z)) return false;
-        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D)
-            return false;
+        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
+            route.add(new int[] { x, y, z });
+            return true;
+        }
         int dx = Integer.signum(target.xCoord - x), dz = Integer.signum(target.zCoord - z);
         if (Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z)) dz = 0;
         else dx = 0;
@@ -323,9 +314,7 @@ public final class ExplorationBeta {
 
     public String hud(Minecraft mc) {
         String controls = net.minecraft.client.settings.GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-            + ": walk | "
-            + net.minecraft.client.settings.GameSettings.getKeyDisplayString(Keybinds.staircase.getKeyCode())
-            + ": staircase";
+            + ": start/stop exploration";
         if (target == null) return "LootGames Beta: no loaded board | " + controls;
         int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
         return "LootGames Beta: " + target.xCoord
