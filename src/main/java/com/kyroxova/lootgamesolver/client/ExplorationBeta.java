@@ -36,6 +36,7 @@ public final class ExplorationBeta {
     private int stairX;
     private int stairZ;
     private int stairSteps;
+    private boolean seekingDryEntrance;
 
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
@@ -74,6 +75,7 @@ public final class ExplorationBeta {
         }
         if (navigationInput != null) {
             navigationInput.forward = 0;
+            navigationInput.sideways = 0;
             navigationInput.hop = false;
         }
         if (world != mc.theWorld) {
@@ -126,6 +128,16 @@ public final class ExplorationBeta {
             return;
         }
         if (route.isEmpty()) {
+            if (seekingDryEntrance) {
+                seekingDryEntrance = false;
+                digging = true;
+                savedSlot = mc.thePlayer.inventory.currentItem;
+            }
+            if ((digging || target.yCoord < mc.thePlayer.boundingBox.minY - 2) && mc.thePlayer.isInWater()) {
+                digging = false;
+                if (!findDryEntrance(mc)) stop(mc, "No verified dry entrance near the water; digging stopped");
+                return;
+            }
             if (!searching && !digging) {
                 double horizontal = Math.abs(mc.thePlayer.posX - target.xCoord)
                     + Math.abs(mc.thePlayer.posZ - target.zCoord);
@@ -203,7 +215,8 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ *= 0.4D;
             return;
         }
-        if (distance < (route.size() > 1 ? 0.35D : 0.18D) && py == next[1]
+        if (distance < (route.size() > 1 ? 0.35D : 0.18D)
+            && (py == next[1] || (mc.thePlayer.isInWater() && Math.abs(py - next[1]) <= 1))
             && (mc.thePlayer.onGround || mc.thePlayer.isInWater())) {
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
@@ -218,7 +231,9 @@ public final class ExplorationBeta {
             stop(mc, "Walk stopped: no progress");
             return;
         }
-        float desired = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
+        float desired = digging && (stairX != 0 || stairZ != 0)
+            ? (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F
+            : (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
         mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
             .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, turn)));
@@ -239,6 +254,12 @@ public final class ExplorationBeta {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
             navigationInput.hop = next[1] > py || mc.thePlayer.isInWater();
+            if (digging && distance > 0.02D) {
+                double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
+                double speed = Math.min(0.5D, distance);
+                navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
+                navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
+            }
         }
     }
 
@@ -255,6 +276,7 @@ public final class ExplorationBeta {
         stairX = 0;
         stairZ = 0;
         stairSteps = 0;
+        seekingDryEntrance = false;
         digTicks = 0;
         toolWaitTicks = 0;
         if (walking && mc.thePlayer != null) {
@@ -381,6 +403,46 @@ public final class ExplorationBeta {
         return false;
     }
 
+    private boolean findDryEntrance(final Minecraft mc) {
+        final World w = mc.theWorld;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int attempts = 0;
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        for (int radius = 3; radius <= 12; radius += 3)
+            for (int[] direction : directions) for (int dy = 0; dy <= 1; dy++) {
+                int gx = x + direction[0] * radius, gy = y + dy, gz = z + direction[1] * radius;
+                if (!safe(w, gx, gy, gz) || !passable(w, gx, gy, gz)
+                    || !w.getBlock(gx, gy - 1, gz)
+                        .isNormalCube())
+                    continue;
+                if (++attempts > 4) return false;
+                List<int[]> candidate = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+
+                    public boolean stand(int a, int b, int c) {
+                        return safe(w, a, b, c);
+                    }
+
+                    public boolean clear(int a, int b, int c) {
+                        return passable(w, a, b, c);
+                    }
+                }, x, y, z, gx, gz, 16);
+                if (candidate.isEmpty()) continue;
+                int[] last = candidate.get(candidate.size() - 1);
+                if (!passable(w, last[0], last[1], last[2]) || !w.getBlock(last[0], last[1] - 1, last[2])
+                    .isNormalCube()) continue;
+                route.clear();
+                route.addAll(candidate);
+                seekingDryEntrance = true;
+                searching = false;
+                stairX = 0;
+                stairZ = 0;
+                status = "Moving to dry staircase entrance";
+                return true;
+            }
+        return false;
+    }
+
     private boolean attemptStairStep(Minecraft mc) {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
@@ -443,15 +505,11 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
-            double aimX = nx + 0.5D - mc.thePlayer.posX;
-            double aimZ = nz + 0.5D - mc.thePlayer.posZ;
-            double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
-            float desiredYaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
+            float desiredYaw = (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F;
             float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(desiredYaw - mc.thePlayer.rotationYaw);
             mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
                 .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, yawDelta)));
-            float desiredPitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
-            mc.thePlayer.rotationPitch += Math.max(-10F, Math.min(10F, desiredPitch - mc.thePlayer.rotationPitch));
+            mc.thePlayer.rotationPitch += Math.max(-5F, Math.min(5F, 20F - mc.thePlayer.rotationPitch));
             if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
             mc.thePlayer.swingItem();
             mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
@@ -461,10 +519,7 @@ public final class ExplorationBeta {
         digTicks = 0;
         if (!safe(w, nx, y - 1, nz)) return false;
         route.add(new int[] { nx, y - 1, nz });
-        if (++stairSteps % 4 == 0) {
-            stairX = -stairX;
-            stairZ = -stairZ;
-        }
+        stairSteps++;
         lastDistance = Double.MAX_VALUE;
         stalled = 0;
         return true;

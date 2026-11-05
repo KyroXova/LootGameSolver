@@ -33,6 +33,8 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Support surface-swimming routes while rejecting lava and stopping when air is low.
 - Preserve forward swimming when jump is held, and avoid reversing toward a waypoint before landing.
 - Smooth mining turns and refresh structure targets while exploration is active.
+- Preserve staircase heading while centering with sideways movement, and seek a dry supported entrance before digging from water.
+- Tolerate surface bobbing when completing swimming waypoints.
 - Cache terrain checks within each route search and bound route-search time to reduce work on the client thread.
 - Attempt alternative staircase directions, select suitable hotbar tools, and restore the previous hotbar slot when stopped.
 - Dig without tools in creative mode; select modded survival tools using Forge harvesting and digging-speed hooks.

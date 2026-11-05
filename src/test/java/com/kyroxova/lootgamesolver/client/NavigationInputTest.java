@@ -10,6 +10,15 @@ import org.junit.Test;
 public class NavigationInputTest {
 
     @Test
+    public void centeringCanStrafeWithoutTurningTheCamera() {
+        NavigationInput input = new NavigationInput(new MovementInput());
+        input.sideways = 0.3F;
+        input.updatePlayerMoveState();
+        assertEquals(0.3F, input.moveStrafe, 0F);
+        assertEquals(0F, input.moveForward, 0F);
+    }
+
+    @Test
     public void jumpForSwimmingDoesNotSuppressForwardMovement() {
         MovementInput manual = new MovementInput();
         manual.jump = true;

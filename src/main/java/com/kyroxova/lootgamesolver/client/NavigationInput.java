@@ -7,6 +7,7 @@ final class NavigationInput extends MovementInput {
 
     final MovementInput original;
     float forward;
+    float sideways;
     boolean hop;
 
     NavigationInput(MovementInput original) {
@@ -17,7 +18,7 @@ final class NavigationInput extends MovementInput {
         original.updatePlayerMoveState();
         boolean manual = original.moveForward != 0 || original.moveStrafe != 0 || original.sneak;
         moveForward = manual ? original.moveForward : forward;
-        moveStrafe = original.moveStrafe;
+        moveStrafe = manual ? original.moveStrafe : sideways;
         jump = original.jump || (!manual && hop);
         sneak = original.sneak;
     }
