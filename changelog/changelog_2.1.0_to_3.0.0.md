@@ -56,6 +56,11 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Permit breakable LootGames dungeon masonry with suitable tools, prefer softer cracked sections, and continue protecting shielded blocks and puzzle tile entities.
 - Restrict plant clearing to obstructions on the ray toward the planned mining block, instead of whichever plant the camera happens to face.
 - Reject dry-entrance routes that stop short of the selected point or take excessive detours; increase the cost of tunneling through wood.
+- Hold vanilla attack input while mining so normal client processing preserves block-breaking progress; count work after aim checks using tool-speed-based limits.
+- Open the player inventory visibly, perform the standard GUI hotbar swap, verify the tool, and close the screen before resuming excavation.
+- Target visible solid faces around thin plants and prefer their support block when it is already part of the safe planned excavation.
+- Stop pathfinding once the puzzle is visible and within interaction reach, including when standing below its master block.
+- Anchor waypoint labels to the structure's surface terrain instead of following the player's height.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

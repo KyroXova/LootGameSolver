@@ -51,7 +51,7 @@ final class NavigationOverlayRenderer {
                 WorldOverlayRenderer.drawFloatingText(
                     "LootGame | " + distance + " blocks away",
                     waypoint[0] + 0.5D,
-                    Math.max(waypoint[1] + 3D, start[1] + 3D),
+                    exploration.waypointLabelY(),
                     waypoint[2] + 0.5D,
                     0x5599FF,
                     mc);

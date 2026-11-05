@@ -2,7 +2,6 @@ package com.kyroxova.lootgamesolver.client;
 
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
-import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.ForgeHooks;
 
@@ -33,7 +32,7 @@ final class DigToolSelector {
         return best;
     }
 
-    // -1: no suitable tool; -2: inventory operation pending or unsafe; otherwise selected hotbar slot.
+    // Returns an inventory index; the caller opens the inventory UI for indices outside the hotbar.
     static int equip(Minecraft mc, Block block, int metadata) {
         if (mc.thePlayer.capabilities.isCreativeMode) return mc.thePlayer.inventory.currentItem;
         float[] speeds = new float[36];
@@ -55,21 +54,6 @@ final class DigToolSelector {
             || block.getMaterial() == net.minecraft.block.material.Material.plants
             || block.getMaterial() == net.minecraft.block.material.Material.vine))
             return mc.thePlayer.inventory.currentItem;
-        if (selected < 9) return selected;
-        if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
-            || mc.thePlayer.inventory.getItemStack() != null) return -2;
-        int hotbar = mc.thePlayer.inventory.currentItem;
-        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-            hotbar = i;
-            break;
-        }
-        Slot source = mc.thePlayer.inventoryContainer.getSlotFromInventory(mc.thePlayer.inventory, selected);
-        if (source == null || !source.canTakeStack(mc.thePlayer)) return -2;
-        // Vanilla number-key swap: the displaced stack stays in the source inventory slot; cursor stays untouched.
-        mc.playerController
-            .windowClick(mc.thePlayer.inventoryContainer.windowId, source.slotNumber, hotbar, 2, mc.thePlayer);
-        mc.thePlayer.inventory.currentItem = hotbar;
-        mc.playerController.updateController();
-        return -2;
+        return selected;
     }
 }

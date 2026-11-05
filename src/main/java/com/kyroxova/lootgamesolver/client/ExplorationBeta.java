@@ -61,6 +61,47 @@ public final class ExplorationBeta {
     private ExcavationPathfinder approachPlan;
     private int[] approachAnchor;
     private boolean approachReady;
+    private final InventoryToolTransfer toolTransfer = new InventoryToolTransfer();
+    private final MiningAttackInput miningAttack = new MiningAttackInput();
+    private long miningTarget = Long.MIN_VALUE;
+    private int miningSlot = -1;
+    private int aimTicks;
+    private double waypointLabelY;
+
+    double waypointLabelY() {
+        return waypointLabelY;
+    }
+
+    private void releaseMiningInput(Minecraft mc) {
+        miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+    }
+
+    private boolean reachableBoard(Minecraft mc) {
+        if (searching || knownStructure == null) return false;
+        net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        net.minecraft.util.Vec3 goal = net.minecraft.util.Vec3
+            .createVectorHelper(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D);
+        double reach = Math.min(4.2D, mc.playerController.getBlockReachDistance());
+        if (eye.squareDistanceTo(goal) > reach * reach) return false;
+        net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, goal);
+        return hit != null && hit.blockX == target.xCoord && hit.blockY == target.yCoord && hit.blockZ == target.zCoord;
+    }
+
+    private net.minecraft.util.Vec3 visibleMiningPoint(Minecraft mc, int x, int y, int z) {
+        net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        double[][] offsets = { { 0.5, 0.5, 0.5 }, { 0.15, 0.85, 0.15 }, { 0.85, 0.85, 0.15 }, { 0.15, 0.85, 0.85 },
+            { 0.85, 0.85, 0.85 }, { 0.15, 0.15, 0.15 }, { 0.85, 0.15, 0.85 } };
+        for (double[] offset : offsets) {
+            net.minecraft.util.Vec3 point = net.minecraft.util.Vec3
+                .createVectorHelper(x + offset[0], y + offset[1], z + offset[2]);
+            net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
+            if (hit != null && hit.blockX == x && hit.blockY == y && hit.blockZ == z) return point;
+        }
+        return null;
+    }
+
     private boolean pausedForControl;
     private GroundPathfinder.Search walkingSearch;
     private boolean walkingPlanFailed;
@@ -248,6 +289,7 @@ public final class ExplorationBeta {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        releaseMiningInput(mc);
         cameraActive = false;
         if (walking && mc.thePlayer != null && navigationInput == null) {
             navigationInput = new NavigationInput(mc.thePlayer.movementInput);
@@ -282,6 +324,11 @@ public final class ExplorationBeta {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (toolTransfer.active()) {
+            status = "Moving tool using inventory screen";
+            if (!toolTransfer.tick(mc)) stop(mc, "Inventory transfer interrupted; inspect the tool slots");
+            return;
+        }
         if (ticks % 20 == 0) structureTools.clear();
         int[] head = route.isEmpty() ? null : route.get(0);
         if (head != previewHead || route.size() != previewSize) {
@@ -334,6 +381,10 @@ public final class ExplorationBeta {
         }
         if (target == null || target.isInvalid()) {
             stop(mc, "Target no longer loaded");
+            return;
+        }
+        if (reachableBoard(mc)) {
+            stop(mc, "Arrived at reachable LootGame");
             return;
         }
         if (pausedForControl) {
@@ -558,6 +609,10 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        releaseMiningInput(mc);
+        toolTransfer.cancel(mc);
+        miningTarget = Long.MIN_VALUE;
+        miningSlot = -1;
         walkingSearch = null;
         continuationSearch = null;
         pausedForControl = false;
@@ -642,7 +697,21 @@ public final class ExplorationBeta {
                 }
             } catch (ReflectiveOperationException ignored) {}
         }
-        if (target != null) knownStructure = new int[] { target.xCoord, target.yCoord, target.zCoord };
+        if (target != null) {
+            knownStructure = new int[] { target.xCoord, target.yCoord, target.zCoord };
+            waypointLabelY = target.yCoord + 3D;
+            if (mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
+                for (int y = Math.min(254, mc.theWorld.getHeightValue(target.xCoord, target.zCoord)); y
+                    >= target.yCoord; y--) {
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(target.xCoord, y, target.zCoord);
+                    if (block.isNormalCube() && block.getMaterial() != net.minecraft.block.material.Material.leaves
+                        && block.getMaterial() != net.minecraft.block.material.Material.wood) {
+                        waypointLabelY = y + 3D;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     private boolean nextSearchLeg(Minecraft mc) {
@@ -1004,6 +1073,7 @@ public final class ExplorationBeta {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
             int mineX = nx, mineY = by, mineZ = nz;
+            net.minecraft.util.Vec3 aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
             net.minecraft.util.MovingObjectPosition obstruction = w.rayTraceBlocks(
                 net.minecraft.util.Vec3.createVectorHelper(
                     mc.thePlayer.posX,
@@ -1017,7 +1087,7 @@ public final class ExplorationBeta {
                 boolean plant = visible instanceof net.minecraft.block.BlockBush
                     || visible.getMaterial() == net.minecraft.block.material.Material.plants
                     || visible.getMaterial() == net.minecraft.block.material.Material.vine;
-                if (FoliagePolicy.canClear(
+                if (aimPoint == null && FoliagePolicy.canClear(
                     plant,
                     w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
                     visible.getBlockHardness(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ),
@@ -1029,14 +1099,39 @@ public final class ExplorationBeta {
                     z,
                     nx,
                     nz)) {
-                    mineX = obstruction.blockX;
-                    mineY = obstruction.blockY;
-                    mineZ = obstruction.blockZ;
-                    b = visible;
+                    int rootY = obstruction.blockY;
+                    for (int scan = 0; scan < 3; scan++) {
+                        net.minecraft.block.material.Material material = w
+                            .getBlock(obstruction.blockX, rootY, obstruction.blockZ)
+                            .getMaterial();
+                        if (material != net.minecraft.block.material.Material.plants
+                            && material != net.minecraft.block.material.Material.vine) break;
+                        rootY--;
+                    }
+                    boolean plannedSupport = obstruction.blockX == nx && obstruction.blockZ == nz
+                        && rootY >= destinationY
+                        && rootY <= Math.max(y, destinationY) + 1
+                        && excavatable(w, nx, rootY, nz);
+                    net.minecraft.util.Vec3 supportAim = plannedSupport ? visibleMiningPoint(mc, nx, rootY, nz) : null;
+                    if (supportAim != null) {
+                        mineY = rootY;
+                        aimPoint = supportAim;
+                        b = w.getBlock(nx, rootY, nz);
+                    } else {
+                        mineX = obstruction.blockX;
+                        mineY = obstruction.blockY;
+                        mineZ = obstruction.blockZ;
+                        b = visible;
+                        aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
+                    }
                 }
             }
             int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(mineX, mineY, mineZ));
-            if (slot == -2) {
+            if (slot >= 9) {
+                if (toolTransfer.start(mc, slot)) {
+                    status = "Opening inventory to prepare tool";
+                    return true;
+                }
                 if (++toolWaitTicks > 40) {
                     stop(
                         mc,
@@ -1053,15 +1148,23 @@ public final class ExplorationBeta {
                     "\u00A7eAuto-dig paused: \u00A7fKeep a usable \u00A7bpickaxe\u00A7f and \u00A7bshovel\u00A7f in your inventory. Check tool durability and harvest level.");
                 return true;
             }
-            if (++digTicks > 200) return false;
+            long targetKey = supportKey(mineX, mineY, mineZ);
+            if (targetKey != miningTarget || slot != miningSlot) {
+                miningTarget = targetKey;
+                miningSlot = slot;
+                digTicks = 0;
+                aimTicks = 0;
+            }
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
             if (mc.thePlayer.getDistanceSq(mineX + 0.5D, mineY + 0.5D, mineZ + 0.5D) > 16D) return false;
-            double aimX = mineX + 0.5D - mc.thePlayer.posX;
-            double aimY = mineY + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
-            double aimZ = mineZ + 0.5D - mc.thePlayer.posZ;
+            if (aimPoint == null)
+                aimPoint = net.minecraft.util.Vec3.createVectorHelper(mineX + 0.5D, mineY + 0.5D, mineZ + 0.5D);
+            double aimX = aimPoint.xCoord - mc.thePlayer.posX;
+            double aimY = aimPoint.yCoord - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            double aimZ = aimPoint.zCoord - mc.thePlayer.posZ;
             float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
             float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
             look(yaw, pitch);
@@ -1082,12 +1185,22 @@ public final class ExplorationBeta {
                 yawError,
                 pitch - mc.thePlayer.rotationPitch)) {
                 mc.playerController.resetBlockRemoving();
+                if (++aimTicks > 80) {
+                    status = "Mining target has no reachable visible face";
+                    return false;
+                }
                 status = "Aiming at visible excavation block";
                 return true;
             }
-            mc.thePlayer.swingItem();
-            mc.playerController.onPlayerDamageBlock(mineX, mineY, mineZ, hit.sideHit);
-            status = "Digging verified staircase step";
+            aimTicks = 0;
+            float damage = b.getPlayerRelativeBlockHardness(mc.thePlayer, w, mineX, mineY, mineZ);
+            int allowance = MiningAttackInput.allowance(damage, mc.thePlayer.capabilities.isCreativeMode);
+            if (allowance == 0 || ++digTicks > allowance) {
+                stop(mc, "Mining stalled; check tool strength or block protection");
+                return true;
+            }
+            miningAttack.hold(mc.gameSettings.keyBindAttack);
+            status = "Mining checked block: " + digTicks + "/" + allowance;
             return true;
         }
         digTicks = 0;

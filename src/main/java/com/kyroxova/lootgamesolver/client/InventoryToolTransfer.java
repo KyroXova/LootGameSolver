@@ -1,0 +1,89 @@
+package com.kyroxova.lootgamesolver.client;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.inventory.GuiInventory;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.play.client.C16PacketClientStatus;
+
+/** Visible inventory, vanilla GUI number-key swap, verification, then ordinary close. No cursor stack is picked up. */
+final class InventoryToolTransfer {
+
+    private static final class ToolScreen extends GuiInventory {
+
+        ToolScreen(Minecraft mc) {
+            super(mc.thePlayer);
+        }
+
+        void swap(Minecraft mc, int source, int hotbar) {
+            Slot slot = inventorySlots.getSlotFromInventory(mc.thePlayer.inventory, source);
+            if (slot != null && slot.canTakeStack(mc.thePlayer)) handleMouseClick(slot, slot.slotNumber, hotbar, 2);
+        }
+    }
+
+    private ToolScreen screen;
+    private ItemStack expected;
+    private int source, hotbar, ticks;
+    private boolean swapped;
+
+    boolean active() {
+        return screen != null;
+    }
+
+    boolean start(Minecraft mc, int inventorySlot) {
+        if (active() || mc.currentScreen != null
+            || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null) return false;
+        ItemStack stack = mc.thePlayer.inventory.getStackInSlot(inventorySlot);
+        if (stack == null) return false;
+        expected = stack.copy();
+        source = inventorySlot;
+        hotbar = mc.thePlayer.inventory.currentItem;
+        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+            hotbar = i;
+            break;
+        }
+        ticks = 0;
+        swapped = false;
+        screen = new ToolScreen(mc);
+        mc.getNetHandler()
+            .addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
+        mc.displayGuiScreen(screen);
+        return true;
+    }
+
+    boolean tick(Minecraft mc) {
+        if (mc.currentScreen != screen || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null) {
+            cancel(mc);
+            return false;
+        }
+        if (++ticks == 6) {
+            if (!ItemStack.areItemStacksEqual(expected, mc.thePlayer.inventory.getStackInSlot(source))) {
+                cancel(mc);
+                return false;
+            }
+            screen.swap(mc, source, hotbar);
+            swapped = true;
+        }
+        if (ticks >= 12) {
+            boolean valid = swapped
+                && ItemStack.areItemStacksEqual(expected, mc.thePlayer.inventory.getStackInSlot(hotbar));
+            if (valid) {
+                mc.thePlayer.inventory.currentItem = hotbar;
+                mc.playerController.updateController();
+            }
+            cancel(mc);
+            return valid;
+        }
+        return true;
+    }
+
+    void cancel(Minecraft mc) {
+        if (screen != null && mc.currentScreen == screen
+            && mc.thePlayer != null
+            && mc.thePlayer.inventory.getItemStack() == null) mc.thePlayer.closeScreen();
+        screen = null;
+        expected = null;
+    }
+}
