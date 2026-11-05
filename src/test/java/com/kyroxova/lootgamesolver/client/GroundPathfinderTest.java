@@ -10,6 +10,62 @@ import org.junit.Test;
 public class GroundPathfinderTest {
 
     @Test
+    public void diagonalDoesNotCutThroughBlockedCorner() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 && x == z;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        assertTrue(
+            new GroundPathfinder().find(terrain, 0, 0, 0, 6, 6, 12)
+                .isEmpty());
+    }
+
+    @Test
+    public void openGroundUsesDirectDiagonalSteps() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        List<int[]> route = new GroundPathfinder().find(terrain, 0, 0, 0, 6, 6, 12);
+        assertFalse(route.isEmpty());
+        for (int[] step : route) assertTrue(step[0] == step[2]);
+    }
+
+    @Test
+    public void partialRoutesCanContinueFromTheirEndpoint() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 && z == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        int x = 0;
+        for (int i = 0; i < 5 && x < 49; i++) {
+            List<int[]> route = new GroundPathfinder().find(terrain, x, 0, 0, 50, 0, 12);
+            assertFalse(route.isEmpty());
+            assertTrue(route.get(0)[0] == x + 1);
+            x = route.get(route.size() - 1)[0];
+        }
+        assertTrue(x >= 49);
+    }
+
+    @Test
     public void openDiagonalApproachDoesNotZigzagEveryBlock() {
         List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 

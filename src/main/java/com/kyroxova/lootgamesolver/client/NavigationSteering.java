@@ -6,7 +6,7 @@ final class NavigationSteering {
     static float heading(double ax, double az, double bx, double bz, float fallback) {
         double dx = bx - ax, dz = bz - az;
         if (dx * dx + dz * dz < 0.01D) return fallback;
-        return Math.abs(dx) >= Math.abs(dz) ? dx > 0 ? -90F : 90F : dz > 0 ? 0F : 180F;
+        return (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
     }
 
     static float cameraStep(float current, float desired, double seconds) {

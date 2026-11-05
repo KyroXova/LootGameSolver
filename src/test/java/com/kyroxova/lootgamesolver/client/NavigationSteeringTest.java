@@ -9,6 +9,7 @@ public class NavigationSteeringTest {
 
     @Test
     public void headingStaysAlongSegmentAfterSmallOvershoot() {
+        assertEquals(-45F, NavigationSteering.heading(1.5D, 2.5D, 2.5D, 3.5D, 20F), 0F);
         assertEquals(-90F, NavigationSteering.heading(1.5D, 2.5D, 2.5D, 2.5D, 20F), 0F);
         assertEquals(0F, NavigationSteering.heading(2.5D, 2.5D, 2.5D, 3.5D, 20F), 0F);
         assertEquals(20F, NavigationSteering.heading(2.5D, 2.5D, 2.5D, 2.5D, 20F), 0F);

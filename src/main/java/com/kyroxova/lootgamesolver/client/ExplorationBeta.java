@@ -54,6 +54,46 @@ public final class ExplorationBeta {
     private boolean cameraActive;
     private float cameraYaw, cameraPitch;
     private long cameraFrame;
+    private int searchGoalX, searchGoalZ;
+    private int[] extendedFrom;
+    private int approachAttempts;
+    private int[] knownStructure;
+    private ExcavationPathfinder approachPlan;
+    private int[] approachAnchor;
+    private boolean approachReady;
+
+    private void prepareApproach(Minecraft mc) {
+        if (digging || searching || route.isEmpty() || route.size() > 8 || !LootGameSolverConfig.staircaseEnabled)
+            return;
+        int[] end = route.get(route.size() - 1);
+        if (target.yCoord >= end[1] - 2 || Math.abs(end[0] - target.xCoord) + Math.abs(end[2] - target.zCoord) > 32)
+            return;
+        if (approachAnchor != end) {
+            approachAnchor = end;
+            approachPlan = null;
+            approachReady = false;
+            if (!dryShore(mc.theWorld, end[0], end[1], end[2])) return;
+            approachPlan = new ExcavationPathfinder(
+                end[0],
+                end[1],
+                end[2],
+                target.xCoord,
+                target.yCoord + 1,
+                target.zCoord);
+        }
+        if (approachPlan != null && !approachReady) approachReady = approachPlan.advance(
+            (x, y, z, nx, ny, nz) -> excavationCost(mc.theWorld, x, y, z, nx, ny, nz),
+            12,
+            System.nanoTime() + 1_500_000L);
+    }
+
+    int[] structureWaypoint() {
+        return knownStructure;
+    }
+
+    String navigationStatus() {
+        return status;
+    }
 
     public void renderCamera(Minecraft mc) {
         long now = System.nanoTime();
@@ -111,6 +151,10 @@ public final class ExplorationBeta {
         entranceSelected = false;
         excavationSearch = null;
         excavationReplans = 0;
+        approachAttempts = 0;
+        extendedFrom = null;
+        approachPlan = null;
+        approachAnchor = null;
         excavationRoute.clear();
         rejectedSteps.clear();
         entranceCandidates.clear();
@@ -158,6 +202,7 @@ public final class ExplorationBeta {
             savedFinder = null;
             world = mc.theWorld;
             target = null;
+            knownStructure = null;
             walking = false;
             route.clear();
             search = null;
@@ -215,6 +260,9 @@ public final class ExplorationBeta {
             stop(mc, "Target no longer loaded");
             return;
         }
+        if (!digging && !seekingDryEntrance && route.size() >= 2 && route.size() <= 8 && ticks % 10 == 0)
+            extendRoute(mc);
+        prepareApproach(mc);
         if (route.isEmpty()) {
             if (seekingDryEntrance) {
                 seekingDryEntrance = false;
@@ -276,7 +324,20 @@ public final class ExplorationBeta {
             }
             if (digging && (target.yCoord < mc.thePlayer.boundingBox.minY - 1
                 || Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) > 3)) {
-                if (!stairStep(mc)) stop(mc, "No safe staircase step; stopped");
+                if (!stairStep(mc)) {
+                    if (++approachAttempts <= 3) {
+                        excavationSearch = null;
+                        excavationRoute.clear();
+                        miningAim.reset();
+                        digging = false;
+                        entranceSelected = false;
+                        if (findDryEntrance(mc)) {
+                            status = "Checking a different supported entrance";
+                            return;
+                        }
+                    }
+                    stop(mc, "No supported entrance found within the search limit");
+                }
                 return;
             }
             if (digging) {
@@ -291,6 +352,12 @@ public final class ExplorationBeta {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
+        boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
+        if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
+            if (!digging) plan(mc);
+            else stop(mc, "Diagonal clearance changed");
+            return;
+        }
         if (!safe(mc.theWorld, next[0], next[1], next[2]) || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)
 
         ) {
@@ -351,7 +418,8 @@ public final class ExplorationBeta {
             : NavigationSteering.heading(segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
         if (!centering) look(desired, 5F);
-        if (!centering && Math.abs(turn) > 15F) {
+        status = centering ? "Centering on supported ground" : "Following checked route";
+        if (!centering && Math.abs(turn) > 60F) {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
             mc.thePlayer.setSprinting(false);
@@ -392,6 +460,8 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        approachPlan = null;
+        approachAnchor = null;
         cameraActive = false;
         cameraFrame = 0;
         excavationSearch = null;
@@ -429,6 +499,7 @@ public final class ExplorationBeta {
 
     private void scan(Minecraft mc) {
         target = null;
+        knownStructure = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
         double nearest = Double.MAX_VALUE;
         if (savedFinder != null) {
@@ -470,6 +541,7 @@ public final class ExplorationBeta {
                 }
             } catch (ReflectiveOperationException ignored) {}
         }
+        if (target != null) knownStructure = new int[] { target.xCoord, target.yCoord, target.zCoord };
     }
 
     private boolean nextSearchLeg(Minecraft mc) {
@@ -483,6 +555,8 @@ public final class ExplorationBeta {
             double dx = goal[0] - x, dz = goal[1] - z;
             double length = Math.sqrt(dx * dx + dz * dz);
             if (length < 4) continue;
+            searchGoalX = goal[0];
+            searchGoalZ = goal[1];
             double step = Math.min(16D, length);
             target = new TileEntity();
             target.xCoord = x + (int) Math.round(dx / length * step);
@@ -501,31 +575,72 @@ public final class ExplorationBeta {
         return false;
     }
 
-    private void plan(final Minecraft mc) {
-        route.clear();
-        segmentX = mc.thePlayer.posX;
-        segmentZ = mc.thePlayer.posZ;
-        route.addAll(new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+    private GroundPathfinder.Terrain walkingTerrain(final World terrainWorld) {
+        return new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
-                return safe(mc.theWorld, x, y, z);
+                return safe(terrainWorld, x, y, z);
             }
 
             public boolean clear(int x, int y, int z) {
-                return passable(mc.theWorld, x, y, z);
+                return passable(terrainWorld, x, y, z);
             }
 
             public int extraCost(int x, int y, int z) {
-                return mc.theWorld.getBlock(x, y, z)
+                return terrainWorld.getBlock(x, y, z)
                     .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
             }
-        },
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.boundingBox.minY),
-            (int) Math.floor(mc.thePlayer.posZ),
-            target.xCoord,
-            target.zCoord,
-            LootGameSolverConfig.explorationRange));
+        };
+    }
+
+    private void extendRoute(Minecraft mc) {
+        int[] tail = route.get(route.size() - 1);
+        if (tail == extendedFrom) return;
+        int gx = searching ? searchGoalX : target.xCoord;
+        int gz = searching ? searchGoalZ : target.zCoord;
+        if (Math.abs(tail[0] - gx) + Math.abs(tail[2] - gz) <= 2) {
+            if (!searching || search == null) return;
+            int[] goal = search.next();
+            if (goal == null) return;
+            gx = goal[0];
+            gz = goal[1];
+        }
+        extendedFrom = tail;
+        List<int[]> continuation = new GroundPathfinder().find(
+            walkingTerrain(mc.theWorld),
+            tail[0],
+            tail[1],
+            tail[2],
+            gx,
+            gz,
+            LootGameSolverConfig.explorationRange,
+            3_000_000L);
+        if (continuation.isEmpty()) return;
+        route.addAll(continuation);
+        if (searching) {
+            searchGoalX = gx;
+            searchGoalZ = gz;
+            int[] end = route.get(route.size() - 1);
+            target.xCoord = end[0];
+            target.yCoord = end[1];
+            target.zCoord = end[2];
+        }
+    }
+
+    private void plan(final Minecraft mc) {
+        route.clear();
+        extendedFrom = null;
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        route.addAll(
+            new GroundPathfinder().find(
+                walkingTerrain(mc.theWorld),
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ),
+                target.xCoord,
+                target.zCoord,
+                LootGameSolverConfig.explorationRange));
     }
 
     private static boolean passable(World world, int x, int y, int z) {
@@ -545,6 +660,14 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
+        if (approachPlan != null) {
+            if (approachAnchor[0] == x && approachAnchor[1] == y && approachAnchor[2] == z) {
+                if (approachReady) excavationRoute.addAll(approachPlan.path);
+                else excavationSearch = approachPlan;
+            }
+            approachPlan = null;
+            approachAnchor = null;
+        }
         if (excavationRoute.isEmpty()) {
             if (excavationSearch == null) {
                 excavationSearch = new ExcavationPathfinder(x, y, z, target.xCoord, target.yCoord + 1, target.zCoord);
@@ -561,6 +684,20 @@ public final class ExplorationBeta {
             excavationRoute.addAll(excavationSearch.path);
             excavationSearch = null;
             if (excavationRoute.isEmpty()) return false;
+        }
+        if (excavationRoute.size() >= 2) {
+            int[] first = excavationRoute.get(0), second = excavationRoute.get(1);
+            if (first[1] == y && second[1] == y
+                && Math.abs(second[0] - x) == 1
+                && Math.abs(second[2] - z) == 1
+                && safe(mc.theWorld, second[0], y, z)
+                && safe(mc.theWorld, x, y, second[2])
+                && safe(mc.theWorld, second[0], y, second[2])) {
+                singleStep(mc, second[0], y, second[2], false);
+                excavationRoute.remove(0);
+                excavationRoute.remove(0);
+                return true;
+            }
         }
         int[] next = excavationRoute.get(0);
         stairX = next[0] - x;
@@ -593,23 +730,26 @@ public final class ExplorationBeta {
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
             .isNormalCube()) return -1;
         if (ny > y && !passable(w, x, y + 2, z)) return -1;
+        int cost = 1 + Math.abs(ny - y), firstBreak = Integer.MAX_VALUE, lastBreak = Integer.MIN_VALUE;
+        for (int by = ny; by <= Math.max(y, ny) + 1; by++) {
+            if (passable(w, nx, by, nz)) continue;
+            if (!excavatable(w, nx, by, nz)) return -1;
+            firstBreak = Math.min(firstBreak, by);
+            lastBreak = Math.max(lastBreak, by);
+            cost += 3;
+        }
         for (int ox = -1; ox <= 1; ox++)
             for (int oz = -1; oz <= 1; oz++) for (int by = ny - 1; by <= Math.max(y, ny) + 2; by++) {
                 if (!w.blockExists(nx + ox, by, nz + oz)) return -1;
                 net.minecraft.block.Block block = w.getBlock(nx + ox, by, nz + oz);
-                if (block.getMaterial()
-                    .isLiquid() || block == Blocks.fire
+                if ((block.getMaterial()
+                    .isLiquid() && by >= firstBreak - 1
+                    && by <= lastBreak + 1) || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.sand
                     || block == Blocks.gravel
                     || block == Blocks.portal) return -1;
             }
-        int cost = 1 + Math.abs(ny - y);
-        for (int by = ny; by <= Math.max(y, ny) + 1; by++) {
-            if (passable(w, nx, by, nz)) continue;
-            if (!excavatable(w, nx, by, nz)) return -1;
-            cost += 3;
-        }
         return cost;
     }
 

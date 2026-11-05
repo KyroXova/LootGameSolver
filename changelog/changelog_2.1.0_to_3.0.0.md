@@ -41,6 +41,11 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Turn toward movement and mining targets faster while retaining visible aim checks before breaking blocks.
 - Keep walking headings tied to route segments, consume overshot endpoints, and center on stairs without turning back toward the player's feet.
 - Update camera turns per rendered frame through vanilla mouse-look handling, hold the view while planning or waiting to land, and prefer fewer bends between equally scored routes.
+- Walk diagonally across clear level ground while checking both side passages to prevent cutting through corners.
+- Extend partial walking routes before reaching their endpoints, scan for structures during outward exploration, and retry alternate dry approaches when excavation cannot reach the target.
+- Prepare underground access routes while approaching a dry checkpoint, then revalidate planned steps against the live world before moving or mining.
+- Distinguish walking beside water from opening a hole beside water, allowing supported shoreline detours without permitting flooding excavation.
+- Show the current navigation decision in the HUD and a blue direction line and vertical marker for the selected structure.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

@@ -325,6 +325,8 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
+            String navigationLine = cur == null && exploration != null ? "\u00A77" + exploration.navigationStatus()
+                : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
                 line3 += " \u00A78|\u00A77 [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] Explore";
@@ -333,9 +335,11 @@ public final class ClientHooks {
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
             int width3 = mc.fontRenderer.getStringWidth(line3);
             int maxWidth = Math.max(width1, Math.max(width2, width3));
+            int navigationWidth = navigationLine == null ? 0 : mc.fontRenderer.getStringWidth(navigationLine);
+            maxWidth = Math.max(maxWidth, navigationWidth);
 
             int panelWidth = maxWidth + 32;
-            int panelHeight = 44;
+            int panelHeight = navigationLine == null ? 44 : 54;
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -344,6 +348,8 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
+            if (navigationLine != null) mc.fontRenderer
+                .drawStringWithShadow(navigationLine, x + (panelWidth - navigationWidth) / 2, y + 37, 0xFFFFFF);
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();

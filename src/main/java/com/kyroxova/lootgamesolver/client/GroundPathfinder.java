@@ -40,7 +40,8 @@ public final class GroundPathfinder {
                 : parent.bends + (parent.parent != null
                     && (x - parent.x != parent.x - parent.parent.x || z - parent.z != parent.z - parent.parent.z) ? 1
                         : 0);
-            remaining = Math.abs(x - gx) + Math.abs(z - gz);
+            int dx = Math.abs(x - gx), dz = Math.abs(z - gz);
+            remaining = 10 * Math.max(dx, dz) + 4 * Math.min(dx, dz);
         }
 
         public int compareTo(Node other) {
@@ -51,25 +52,32 @@ public final class GroundPathfinder {
     }
 
     public List<int[]> find(Terrain terrain, int x, int y, int z, int gx, int gz, int radius) {
+        return find(terrain, x, y, z, gx, gz, radius, 8_000_000L);
+    }
+
+    List<int[]> find(Terrain terrain, int x, int y, int z, int gx, int gz, int radius, long budget) {
         List<int[]> result = new ArrayList<int[]>();
         if (!terrain.stand(x, y, z)) return result;
         PriorityQueue<Node> open = new PriorityQueue<Node>();
         Set<Long> visited = new HashSet<Long>();
         Map<Long, Boolean> standable = new HashMap<Long, Boolean>();
-        final long deadline = System.nanoTime() + 8_000_000L;
+        final long deadline = System.nanoTime() + budget;
         Node start = new Node(x, y, z, 0, gx, gz, null), best = start;
         open.add(start);
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
         while (!open.isEmpty() && visited.size() < 2048 && System.nanoTime() < deadline) {
             Node node = open.remove();
             if (!visited.add(key(node.x, node.y, node.z))) continue;
             if (node.remaining < best.remaining) best = node;
-            if (node.remaining <= 1) {
+            if (node.remaining <= 10) {
                 best = node;
                 break;
             }
             for (int[] direction : directions) for (int dy = -1; dy <= 1; dy++) {
                 int nx = node.x + direction[0], ny = node.y + dy, nz = node.z + direction[1];
+                boolean diagonal = direction[0] != 0 && direction[1] != 0;
+                if (diagonal && (dy != 0 || !stand(terrain, standable, nx, node.y, node.z)
+                    || !stand(terrain, standable, node.x, node.y, nz))) continue;
                 if (Math.abs(nx - x) > radius || Math.abs(nz - z) > radius || Math.abs(ny - y) > 12) continue;
                 long position = key(nx, ny, nz);
                 if (visited.contains(position)) continue;
@@ -82,7 +90,14 @@ public final class GroundPathfinder {
                 if (dy > 0 && !terrain.clear(node.x, node.y + 2, node.z)) continue;
                 if (dy < 0 && !terrain.clear(nx, node.y + 1, nz)) continue;
                 open.add(
-                    new Node(nx, ny, nz, node.cost + 1 + Math.abs(dy) + terrain.extraCost(nx, ny, nz), gx, gz, node));
+                    new Node(
+                        nx,
+                        ny,
+                        nz,
+                        node.cost + (diagonal ? 14 : 10) + 10 * Math.abs(dy) + 10 * terrain.extraCost(nx, ny, nz),
+                        gx,
+                        gz,
+                        node));
             }
         }
         if (best.remaining >= start.remaining) return result;
@@ -94,5 +109,15 @@ public final class GroundPathfinder {
 
     private static long key(int x, int y, int z) {
         return ((long) x & 0x3ffffffL) << 38 | ((long) z & 0x3ffffffL) << 12 | (y & 0xfffL);
+    }
+
+    private static boolean stand(Terrain terrain, Map<Long, Boolean> cache, int x, int y, int z) {
+        long key = key(x, y, z);
+        Boolean value = cache.get(key);
+        if (value == null) {
+            value = terrain.stand(x, y, z);
+            cache.put(key, value);
+        }
+        return value;
     }
 }

@@ -13,7 +13,9 @@ final class NavigationOverlayRenderer {
 
     static void render(ExplorationBeta exploration) {
         Minecraft mc = Minecraft.getMinecraft();
-        if (!exploration.navigating() || mc.theWorld == null || mc.thePlayer == null) return;
+        if (mc.theWorld == null || mc.thePlayer == null) return;
+        int[] waypoint = exploration.structureWaypoint();
+        if (!exploration.navigating() && waypoint == null) return;
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
         try {
@@ -28,12 +30,21 @@ final class NavigationOverlayRenderer {
             Tessellator t = Tessellator.instance;
             t.startDrawing(GL11.GL_LINES);
             double[] start = { mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ };
-            double[] end = draw(t, exploration.navigationRoute(), start, false);
-            draw(t, exploration.excavationPreview(), end, true);
-            for (int[] blocked : exploration.rejectedPreview()) {
-                t.setColorRGBA_F(1F, 0.15F, 0.1F, 0.5F);
-                t.addVertex(blocked[3] + 0.5D, blocked[4] + 0.15D, blocked[5] + 0.5D);
-                t.addVertex(blocked[0] + 0.5D, blocked[1] + 0.15D, blocked[2] + 0.5D);
+            if (waypoint != null) {
+                t.setColorRGBA_F(0.15F, 0.55F, 1F, 0.8F);
+                t.addVertex(start[0], start[1] + 0.5D, start[2]);
+                t.addVertex(waypoint[0] + 0.5D, waypoint[1] + 1D, waypoint[2] + 0.5D);
+                t.addVertex(waypoint[0] + 0.5D, waypoint[1] + 0.1D, waypoint[2] + 0.5D);
+                t.addVertex(waypoint[0] + 0.5D, Math.max(waypoint[1] + 8D, start[1] + 8D), waypoint[2] + 0.5D);
+            }
+            if (exploration.navigating()) {
+                double[] end = draw(t, exploration.navigationRoute(), start, false);
+                draw(t, exploration.excavationPreview(), end, true);
+                for (int[] blocked : exploration.rejectedPreview()) {
+                    t.setColorRGBA_F(1F, 0.15F, 0.1F, 0.5F);
+                    t.addVertex(blocked[3] + 0.5D, blocked[4] + 0.15D, blocked[5] + 0.5D);
+                    t.addVertex(blocked[0] + 0.5D, blocked[1] + 0.15D, blocked[2] + 0.5D);
+                }
             }
             t.draw();
         } finally {
