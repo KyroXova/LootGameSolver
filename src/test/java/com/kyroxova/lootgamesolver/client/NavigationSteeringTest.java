@@ -8,6 +8,12 @@ import org.junit.Test;
 public class NavigationSteeringTest {
 
     @Test
+    public void passedWaypointDoesNotRequireTurningBack() {
+        assertTrue(NavigationSteering.passed(2.65D, 0.5D, 1.5D, 0.5D, 2.5D, 0.5D));
+        org.junit.Assert.assertFalse(NavigationSteering.passed(2.65D, 1.2D, 1.5D, 0.5D, 2.5D, 0.5D));
+    }
+
+    @Test
     public void crossesYawBoundaryWithoutFullRevolution() {
         assertEquals(181F, NavigationSteering.turn(179F, -179F, 8F), 0.001F);
         assertEquals(-181F, NavigationSteering.turn(-179F, 179F, 8F), 0.001F);

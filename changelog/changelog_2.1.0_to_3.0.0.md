@@ -39,6 +39,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Keep yaw continuous across the camera angle boundary to prevent full-turn render interpolation.
 - Advance reached waypoints without forced airborne braking or stale forward input toward the previous segment.
 - Check player-width body clearance, prefer dry detours to water crossings, and search more shoreline entrance directions and elevations.
+- Separate dry entrance selection from the underground target, retain the chosen entrance, and check alternative entrances across ticks.
+- Continue a verified staircase as a level tunnel once it reaches the structure's height, without mining directly under the player.
+- Plan swimming at surface height and tolerate the player's lower floating foot position when approaching a bank.
+- Look ahead along straight route segments, ease camera turns, and consume passed waypoints without turning back.
 - Cache terrain checks within each route search and bound route-search time to reduce work on the client thread.
 - Attempt alternative staircase directions, select suitable hotbar tools, and restore the previous hotbar slot when stopped.
 - Dig without tools in creative mode; select modded survival tools using Forge harvesting and digging-speed hooks.

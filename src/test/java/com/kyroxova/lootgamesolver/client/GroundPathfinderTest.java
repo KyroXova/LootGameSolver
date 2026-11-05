@@ -10,6 +10,23 @@ import org.junit.Test;
 public class GroundPathfinderTest {
 
     @Test
+    public void surfaceWaterRouteCanClimbOntoBank() {
+        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return z == 0 && y == (x < 3 ? 63 : 64);
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        }, 0, 63, 0, 6, 0, 12);
+        assertFalse(route.isEmpty());
+        int[] last = route.get(route.size() - 1);
+        assertTrue(last[0] >= 5 && last[1] == 64);
+    }
+
+    @Test
     public void prefersDryDetourOverShortWaterCrossing() {
         List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 
