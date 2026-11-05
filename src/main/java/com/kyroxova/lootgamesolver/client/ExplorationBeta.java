@@ -118,6 +118,13 @@ public final class ExplorationBeta {
     private final java.util.Set<Long> returnSupports = new java.util.HashSet<Long>();
     private final java.util.Map<String, Boolean> structureTools = new java.util.HashMap<String, Boolean>();
     private int continuationX, continuationZ;
+    private final SolvedStructureStore solvedStructures = new SolvedStructureStore(
+        new java.io.File(
+            new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
+            "solved-structures.json"));
+    private boolean puzzleArrivalPending;
+    private ExcavationPathfinder existingAccessPlan;
+    private boolean planningExistingAccess;
 
     private boolean undergroundNearby(Minecraft mc) {
         return !returning && !searching
@@ -208,8 +215,54 @@ public final class ExplorationBeta {
         return knownStructure;
     }
 
+    boolean consumePuzzleArrival() {
+        if (!puzzleArrivalPending) return false;
+        puzzleArrivalPending = false;
+        return true;
+    }
+
+    int[] puzzlePosition() {
+        return knownStructure == null ? null : knownStructure.clone();
+    }
+
+    void finishPuzzle(Minecraft mc, boolean solved) {
+        if (solved && knownStructure != null && mc.theWorld != null) {
+            try {
+                solvedStructures
+                    .mark(worldIdentity(mc), mc.theWorld.provider.dimensionId, knownStructure, knownStructure);
+            } catch (java.io.IOException e) {
+                status = "Solved; could not save local structure history";
+            }
+        }
+        target = null;
+        knownStructure = null;
+        puzzleArrivalPending = false;
+        accessTrail.clear();
+        trailTarget = null;
+        returnAvailable = false;
+        returning = false;
+        search = new ProgressiveSearch(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.posZ),
+            LootGameSolverConfig.explorationSearchLimit);
+        walking = nextSearchLeg(mc);
+        if (!walking) stop(mc, solved ? "Puzzle solved; nearby search finished" : "Puzzle ended; search paused");
+        else status = solved ? "Puzzle solved; searching for the next structure" : "Puzzle ended; continuing search";
+    }
+
+    private String worldIdentity(Minecraft mc) {
+        if (mc.isSingleplayer() && mc.getIntegratedServer() != null) return "save:" + mc.getIntegratedServer()
+            .getFolderName();
+        net.minecraft.client.multiplayer.ServerData server = mc.func_147104_D();
+        return "server:" + (server == null ? "unknown" : server.serverIP);
+    }
+
     String navigationStatus() {
         return status;
+    }
+
+    void setAutomationStatus(String message) {
+        status = message;
     }
 
     public void renderCamera(Minecraft mc) {
@@ -283,6 +336,9 @@ public final class ExplorationBeta {
             }
         }
         returnAvailable = false;
+        puzzleArrivalPending = false;
+        planningExistingAccess = false;
+        existingAccessPlan = null;
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
@@ -305,18 +361,28 @@ public final class ExplorationBeta {
             if (!walking) stop(mc, "No safe exploration route available");
             return;
         }
-        if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
-            && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 32) {
+        boolean underground = LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
+            && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 40;
+        if (underground) {
+            existingAccessPlan = new ExcavationPathfinder(
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ),
+                target.xCoord,
+                target.yCoord + 1,
+                target.zCoord);
+            planningExistingAccess = true;
             walking = true;
-            route.clear();
-            status = "Selecting dry underground approach";
-            return;
+            status = "Checking for a safe existing entrance";
+        } else {
+            plan(mc);
+            walking = walkingSearch != null || !route.isEmpty();
+            if (!walking && LootGameSolverConfig.staircaseEnabled
+                && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
+                digging = true;
+                walking = true;
+            }
         }
-        plan(mc);
-        digging = walkingSearch == null && route.isEmpty()
-            && LootGameSolverConfig.staircaseEnabled
-            && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord);
-        walking = walkingSearch != null || !route.isEmpty() || digging;
         if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
@@ -347,6 +413,9 @@ public final class ExplorationBeta {
             knownStructure = null;
             accessTrail.clear();
             trailTarget = null;
+            puzzleArrivalPending = false;
+            planningExistingAccess = false;
+            existingAccessPlan = null;
             returning = false;
             returnAvailable = false;
             returnSupports.clear();
@@ -425,6 +494,31 @@ public final class ExplorationBeta {
             stop(mc, "Target no longer loaded");
             return;
         }
+        if (planningExistingAccess && existingAccessPlan != null) {
+            boolean complete = existingAccessPlan.advance(
+                (x, y, z, nx, ny, nz) -> existingWalkCost(mc.theWorld, x, y, z, nx, ny, nz),
+                32,
+                System.nanoTime() + 2_500_000L);
+            status = "Checking existing route: " + existingAccessPlan.expandedNodes() + " positions";
+            if (complete) {
+                List<int[]> existing = existingAccessPlan.path;
+                existingAccessPlan = null;
+                planningExistingAccess = false;
+                if (!existing.isEmpty()) {
+                    route.clear();
+                    route.addAll(existing);
+                    digging = false;
+                    status = "Following safe existing entrance";
+                } else {
+                    plan(mc);
+                    if (walkingSearch == null && route.isEmpty()) {
+                        digging = true;
+                        status = "No open route; planning a safe dig entrance";
+                    } else status = "Walking to the nearest safe entrance";
+                }
+            }
+            return;
+        }
         if (reachableBoard(mc)) {
             if (digging && mc.thePlayer.onGround) accessTrail.record(
                 (int) Math.floor(mc.thePlayer.posX),
@@ -439,7 +533,8 @@ public final class ExplorationBeta {
                         (int) Math.floor(mc.thePlayer.boundingBox.minY),
                         (int) Math.floor(mc.thePlayer.posZ))
                     .isEmpty();
-            stop(mc, "Arrived at reachable LootGame");
+            stop(mc, "Arrived at LootGame; opening puzzle");
+            puzzleArrivalPending = true;
             return;
         }
         if (pausedForControl) {
@@ -732,9 +827,13 @@ public final class ExplorationBeta {
         target = null;
         knownStructure = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
+        String currentWorld = worldIdentity(mc);
         double nearest = Double.MAX_VALUE;
         if (savedFinder != null) {
             for (int[] position : savedFinder.positions()) {
+                if (solvedStructures
+                    .contains(currentWorld, mc.theWorld.provider.dimensionId, position[0], position[1], position[2]))
+                    continue;
                 double distance = mc.thePlayer
                     .getDistanceSq(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
                 if (distance < nearest) {
@@ -755,6 +854,9 @@ public final class ExplorationBeta {
             if (tile.isInvalid() || !tile.getClass()
                 .getName()
                 .startsWith("ru.timeconqueror.lootgames.")) continue;
+            if (solvedStructures
+                .contains(currentWorld, mc.theWorld.provider.dimensionId, tile.xCoord, tile.yCoord, tile.zCoord))
+                continue;
             try {
                 boolean unopened = tile.getClass()
                     .getName()
@@ -836,6 +938,16 @@ public final class ExplorationBeta {
                     .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
             }
         };
+    }
+
+    private int existingWalkCost(World w, int x, int y, int z, int nx, int ny, int nz) {
+        if (Math.abs(nx - x) + Math.abs(nz - z) > 1 || Math.abs(ny - y) > 1) return -1;
+        if (!safe(w, nx, ny, nz) || w.getBlock(nx, ny, nz)
+            .getMaterial()
+            .isLiquid()) return -1;
+        if (ny > y && !passable(w, x, y + 2, z)) return -1;
+        if (ny < y && !passable(w, nx, y + 1, nz)) return -1;
+        return 10 + 10 * Math.abs(ny - y);
     }
 
     private void extendRoute(Minecraft mc) {

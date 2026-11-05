@@ -8,7 +8,10 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
@@ -19,6 +22,7 @@ import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
+import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent;
@@ -34,6 +38,21 @@ public final class ClientHooks {
     private boolean lastAutoSolveKey = false;
     private boolean lastOverlayKey = false;
     private int detectCounter = 0;
+    private final LootGamesBridge puzzleBridge = new LootGamesBridge();
+    private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+
+    private enum AutoPuzzleState {
+        IDLE,
+        OPENING,
+        SOLVING,
+        FAILED
+    }
+
+    private AutoPuzzleState autoPuzzleState = AutoPuzzleState.IDLE;
+    private int[] autoPuzzlePosition;
+    private int puzzleWaitTicks;
+    private boolean masterClickSent;
+    private net.minecraft.world.World puzzleWorld;
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
         if (texture == null || mc == null || mc.getTextureManager() == null) return;
@@ -144,6 +163,18 @@ public final class ClientHooks {
     }
 
     @SubscribeEvent
+    public void onChat(ClientChatReceivedEvent event) {
+        if (event == null || event.message == null || autoPuzzleState != AutoPuzzleState.SOLVING) return;
+        capturePuzzleMessage(event.message);
+    }
+
+    private void capturePuzzleMessage(IChatComponent message) {
+        if (message instanceof ChatComponentTranslation)
+            puzzleCompletion.message(((ChatComponentTranslation) message).getKey());
+        for (IChatComponent sibling : message.getSiblings()) capturePuzzleMessage(sibling);
+    }
+
+    @SubscribeEvent
     public void renderTick(cpw.mods.fml.common.gameevent.TickEvent.RenderTickEvent event) {
         if (event.phase == cpw.mods.fml.common.gameevent.TickEvent.Phase.START && exploration != null)
             exploration.renderCamera(Minecraft.getMinecraft());
@@ -154,8 +185,24 @@ public final class ClientHooks {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
+        if (puzzleWorld != mc.theWorld) {
+            puzzleWorld = mc.theWorld;
+            if (autoPuzzleState != AutoPuzzleState.IDLE) {
+                session.cancel("World changed during puzzle automation");
+                puzzleCompletion.clear();
+                autoPuzzleState = AutoPuzzleState.IDLE;
+                autoPuzzlePosition = null;
+            }
+        }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
+            autoPuzzlePosition = exploration.puzzlePosition();
+            autoPuzzleState = AutoPuzzleState.OPENING;
+            puzzleWaitTicks = 0;
+            masterClickSent = false;
+            puzzleCompletion.begin();
+        }
 
         // Poll board detection every 20 ticks (1s) when dormant (using smart movement gate), or every tick when
         // actively auto-solving
@@ -164,8 +211,45 @@ public final class ClientHooks {
             session.tick();
         }
 
+        tickAutoPuzzle(mc);
+
         if (session.isActive()) {
             handleAutoMovement(mc);
+        }
+    }
+
+    private void tickAutoPuzzle(Minecraft mc) {
+        if (autoPuzzleState == AutoPuzzleState.OPENING) {
+            puzzleWaitTicks++;
+            DetectedGame opened = puzzleBridge.detect(true);
+            if (opened != null) {
+                session.start(ActionPlanner.Mode.SOLVE);
+                if (session.isActive()) autoPuzzleState = AutoPuzzleState.SOLVING;
+                else autoPuzzleState = AutoPuzzleState.FAILED;
+                return;
+            }
+            if (!masterClickSent && autoPuzzlePosition != null) masterClickSent = puzzleBridge
+                .activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2]);
+            if (puzzleWaitTicks > 200) {
+                autoPuzzleState = AutoPuzzleState.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Puzzle did not open; explorer held");
+            }
+            return;
+        }
+        if (autoPuzzleState == AutoPuzzleState.SOLVING) {
+            if (puzzleCompletion.lost()) {
+                session.cancel("LootGames reported a loss; explorer held");
+                autoPuzzleState = AutoPuzzleState.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Puzzle lost; explorer held");
+                return;
+            }
+            if (puzzleCompletion.won(mc.theWorld != null, !session.isActive())) {
+                session.cancel("Puzzle solved");
+                puzzleCompletion.clear();
+                autoPuzzleState = AutoPuzzleState.IDLE;
+                if (exploration != null) exploration.finishPuzzle(mc, true);
+                autoPuzzlePosition = null;
+            }
         }
     }
 
@@ -176,6 +260,8 @@ public final class ClientHooks {
             && mc.thePlayer != null
             && mc.theWorld != null) {
             session.cancel("Exploration selected");
+            puzzleCompletion.clear();
+            autoPuzzleState = AutoPuzzleState.IDLE;
             exploration.toggle(mc);
         }
         boolean autoSolvePressed = isKeyJustPressed(Keybinds.toggleAutoSolve, LootGameSolverConfig.solveKey);
@@ -185,6 +271,7 @@ public final class ClientHooks {
             session.invalidateDormantCache();
             if (session.isActive()) {
                 session.cancel("Auto-Solver Stopped");
+                if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
                 session.start(ActionPlanner.Mode.SOLVE);
             }

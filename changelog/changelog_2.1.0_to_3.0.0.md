@@ -84,6 +84,11 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Check headroom, support, nearby hazards, falling blocks, tool durability, and mining progress before continuing excavation.
 - Stop for manual movement, menus, damage, unsafe terrain, or stalled progress.
 - Add configurable exploration enablement, staircase digging, route range, and progressive search limits.
+- Search for a safe, already-open route into an underground structure before choosing a dig route.
+- Click the LootGames master block on arrival, start the solver automatically, and hold exploration until the puzzle finishes.
+- Resume progressive exploration after a confirmed LootGames win and persist solved master locations per world and dimension.
+- Keep the explorer stopped after a loss or an unopenable puzzle, without marking it solved.
+- Follow a cleared excavation route into the room using normal running movement instead of stepping through the entrance one block at a time.
 
 ## Build and releases
 

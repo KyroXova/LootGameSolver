@@ -507,6 +507,28 @@ public final class LootGamesBridge implements MiniGameDetector {
         }
     }
 
+    /** Opens the nearby master block with one ordinary, aimed player interaction. */
+    public boolean activateMaster(int x, int y, int z) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+            || hit.blockX != x
+            || hit.blockY != y
+            || hit.blockZ != z) return false;
+        mc.thePlayer.swingItem();
+        return mc.playerController.onPlayerRightClick(
+            mc.thePlayer,
+            mc.theWorld,
+            mc.thePlayer.getHeldItem(),
+            x,
+            y,
+            z,
+            hit.sideHit,
+            hit.hitVec);
+    }
+
     public void recordSubmittedAction(DetectedGame snapshot) {
         if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
             golSubmitted++;
