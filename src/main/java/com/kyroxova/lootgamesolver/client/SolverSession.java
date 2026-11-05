@@ -35,7 +35,8 @@ public final class SolverSession {
     private DetectedGame currentSnapshot;
     private String lastSnapshotSignature;
     private String beforeActionSignature;
-    private String submittedSudokuSignature;
+    private String sudokuPuzzleSignature;
+    private int sudokuValueBeforeClick = -1;
     private long lastActionAt;
     private String status = "Idle";
     private MiniGame game = MiniGame.UNKNOWN;
@@ -79,6 +80,18 @@ public final class SolverSession {
         }
 
         game = currentSnapshot.type;
+        if (currentSnapshot.type == MiniGame.SUDOKU) {
+            StringBuilder puzzle = new StringBuilder(81);
+            for (int r = 0; r < 9; r++)
+                for (int c = 0; c < 9; c++) puzzle.append((char) ('0' + currentSnapshot.sudoku.get(r, c)));
+            String signature = puzzle.toString();
+            if (!signature.equals(sudokuPuzzleSignature)) {
+                activeAction = null;
+                beforeActionSignature = null;
+                sudokuValueBeforeClick = -1;
+                sudokuPuzzleSignature = signature;
+            }
+        }
 
         // Recompute cached actions only when snapshot signature changes or if cache is empty
         if (cachedRenderActions == null || !currentSnapshot.signature.equals(lastSnapshotSignature)) {
@@ -162,12 +175,8 @@ public final class SolverSession {
 
         if (actions.isEmpty()) {
             if (snapshot.type == MiniGame.SUDOKU && result.getStatus() == SolveResult.Status.SOLVED) {
-                if (!snapshot.signature.equals(submittedSudokuSignature)) {
-                    bridge.submitSudokuCheck(snapshot);
-                    submittedSudokuSignature = snapshot.signature;
-                }
                 activeAction = null;
-                status = "Stage complete! Waiting for next stage...";
+                status = "All Sudoku numbers confirmed. Waiting for next stage...";
                 return;
             }
             if (snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
@@ -204,6 +213,7 @@ public final class SolverSession {
         SolverAction nextAction = actions.get(0);
         if (activeAction == null || !nextAction.position.equals(activeAction.position)
             || remainingClicksForActiveAction <= 0) {
+            sudokuValueBeforeClick = -1;
             activeAction = nextAction;
             if (activeAction.type == SolverAction.Type.SET_VALUE) {
                 int curVal = (snapshot.sudokuPlayerValues != null)
@@ -228,8 +238,8 @@ public final class SolverSession {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
-        if (activeAction.type == SolverAction.Type.SET_VALUE && beforeActionSignature != null
-            && beforeActionSignature.equals(snapshot.signature)
+        if (activeAction.type == SolverAction.Type.SET_VALUE && sudokuValueBeforeClick >= 0
+            && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] == sudokuValueBeforeClick
             && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {
             status = "Waiting for Sudoku board update...";
             return;
@@ -239,6 +249,9 @@ public final class SolverSession {
             return;
         }
         bridge.recordSubmittedAction(snapshot);
+        if (activeAction.type == SolverAction.Type.SET_VALUE) {
+            sudokuValueBeforeClick = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
+        }
         beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();
     }
@@ -259,7 +272,8 @@ public final class SolverSession {
         cachedRenderActions = null;
         lastSnapshotSignature = null;
         beforeActionSignature = null;
-        submittedSudokuSignature = null;
+        sudokuPuzzleSignature = null;
+        sudokuValueBeforeClick = -1;
         queued = 0;
         remainingClicksForActiveAction = 0;
         for (int r = 0; r < 9; r++) {
