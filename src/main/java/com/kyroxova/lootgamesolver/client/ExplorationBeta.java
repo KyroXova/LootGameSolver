@@ -31,6 +31,10 @@ public final class ExplorationBeta {
     private String status = "Scanning loaded terrain";
     private ProgressiveSearch search;
     private boolean searching;
+    private NavigationInput navigationInput;
+    private int stairX;
+    private int stairZ;
+    private int stairSteps;
 
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
@@ -63,7 +67,16 @@ public final class ExplorationBeta {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (walking && mc.thePlayer != null && navigationInput == null) {
+            navigationInput = new NavigationInput(mc.thePlayer.movementInput);
+            mc.thePlayer.movementInput = navigationInput;
+        }
+        if (navigationInput != null) {
+            navigationInput.forward = 0;
+            navigationInput.hop = false;
+        }
         if (world != mc.theWorld) {
+            if (navigationInput != null) stop(mc, "World changed");
             if (savedFinder != null) savedFinder.cancel();
             savedFinder = null;
             world = mc.theWorld;
@@ -89,7 +102,7 @@ public final class ExplorationBeta {
             || solverActive
             || mc.currentScreen != null
             || mc.thePlayer.hurtTime > 0
-            || mc.thePlayer.isInWater()
+            || (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 100)
             || mc.thePlayer.capabilities.isFlying
             || GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
@@ -173,16 +186,15 @@ public final class ExplorationBeta {
             stop(mc, "Route obstructed or unsafe");
             return;
         }
-        if (next[1] > py && mc.thePlayer.onGround) mc.thePlayer.jump();
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
-        if (distance < 0.15D && py == next[1] && mc.thePlayer.onGround) {
+        if (distance < (route.size() > 1 ? 0.35D : 0.18D) && py == next[1]
+            && (mc.thePlayer.onGround || mc.thePlayer.isInWater())) {
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
-            mc.thePlayer.motionX = 0;
-            mc.thePlayer.motionZ = 0;
+            if (!route.isEmpty() && navigationInput != null) navigationInput.forward = 0.7F;
             return;
         }
         if (distance >= lastDistance - 0.005D) stalled++;
@@ -192,18 +204,42 @@ public final class ExplorationBeta {
             stop(mc, "Walk stopped: no progress");
             return;
         }
-        mc.thePlayer.rotationYaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
-        if (distance < 0.02D) return;
-        double speed = Math.min(0.10D, distance);
-        mc.thePlayer.motionX = dx / distance * speed;
-        mc.thePlayer.motionZ = dz / distance * speed;
+        float desired = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
+        float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
+        mc.thePlayer.rotationYaw += Math.max(-18F, Math.min(18F, turn));
+        boolean straight = route.size() >= 3 && !digging
+            && !mc.thePlayer.isInWater()
+            && next[1] == py
+            && route.get(1)[1] == py
+            && route.get(2)[1] == py
+            && route.get(2)[0] - next[0] == 2 * (route.get(1)[0] - next[0])
+            && route.get(2)[2] - next[2] == 2 * (route.get(1)[2] - next[2])
+            && safe(mc.theWorld, route.get(1)[0], py, route.get(1)[2])
+            && safe(mc.theWorld, route.get(2)[0], py, route.get(2)[2]);
+        mc.thePlayer.setSprinting(
+            straight && Math.abs(turn) < 10F
+                && mc.thePlayer.getFoodStats()
+                    .getFoodLevel() > 6);
+        if (navigationInput != null) {
+            navigationInput.forward = Math.abs(turn) > 35F ? 0F
+                : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
+            navigationInput.hop = next[1] > py || mc.thePlayer.isInWater();
+        }
     }
 
     private void stop(Minecraft mc, String message) {
+        if (navigationInput != null && mc.thePlayer != null) {
+            if (mc.thePlayer.movementInput == navigationInput) mc.thePlayer.movementInput = navigationInput.original;
+            navigationInput = null;
+            mc.thePlayer.setSprinting(false);
+        }
         if (digging && mc.playerController != null) mc.playerController.resetBlockRemoving();
         if (savedSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = savedSlot;
         savedSlot = -1;
         digging = false;
+        stairX = 0;
+        stairZ = 0;
+        stairSteps = 0;
         digTicks = 0;
         if (walking && mc.thePlayer != null) {
             mc.thePlayer.motionX = 0;
@@ -319,6 +355,17 @@ public final class ExplorationBeta {
     }
 
     private boolean stairStep(Minecraft mc) {
+        for (int attempt = 0; attempt < 4; attempt++) {
+            if (attemptStairStep(mc)) return true;
+            if (digTicks > 200) return false;
+            int previousX = stairX;
+            stairX = stairZ == 0 && previousX == 0 ? 1 : -stairZ;
+            stairZ = previousX;
+        }
+        return false;
+    }
+
+    private boolean attemptStairStep(Minecraft mc) {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround || !safe(mc.theWorld, x, y, z)) return false;
@@ -326,11 +373,14 @@ public final class ExplorationBeta {
             route.add(new int[] { x, y, z });
             return true;
         }
-        int dx = Integer.signum(target.xCoord - x), dz = Integer.signum(target.zCoord - z);
-        if (Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z)) dz = 0;
-        else dx = 0;
-        if (dx == 0 && dz == 0) return false;
-        int nx = x + dx, nz = z + dz;
+        if (stairX == 0 && stairZ == 0) {
+            stairX = Integer.signum(target.xCoord - x);
+            stairZ = Integer.signum(target.zCoord - z);
+            if (Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z)) stairZ = 0;
+            else stairX = 0;
+            if (stairX == 0 && stairZ == 0) stairX = 1;
+        }
+        int nx = x + stairX, nz = z + stairZ;
         World w = mc.theWorld;
         // Only excavate beside the player, with a verified full floor below the future step.
         if (!w.blockExists(nx, y - 2, nz) || !w.getBlock(nx, y - 2, nz)
@@ -347,13 +397,13 @@ public final class ExplorationBeta {
         }
         for (int by = y + 1; by >= y - 1; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-            if (w.isAirBlock(nx, by, nz)) continue;
+            if (passable(w, nx, by, nz)) continue;
             if (b != Blocks.stone && b != Blocks.dirt && b != Blocks.grass && b != Blocks.cobblestone) return false;
             if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
         }
         for (int by = y + 1; by >= y - 1; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-            if (w.isAirBlock(nx, by, nz)) continue;
+            if (passable(w, nx, by, nz)) continue;
             int slot = -1;
             float speed = 1F;
             for (int i = 0; i < 9; i++) {
@@ -372,6 +422,12 @@ public final class ExplorationBeta {
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
+            double aimX = nx + 0.5D - mc.thePlayer.posX;
+            double aimZ = nz + 0.5D - mc.thePlayer.posZ;
+            double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            mc.thePlayer.rotationYaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
+            mc.thePlayer.rotationPitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D
+                / Math.PI);
             if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
             mc.thePlayer.swingItem();
             mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
@@ -381,6 +437,10 @@ public final class ExplorationBeta {
         digTicks = 0;
         if (!safe(w, nx, y - 1, nz)) return false;
         route.add(new int[] { nx, y - 1, nz });
+        if (++stairSteps % 4 == 0) {
+            stairX = -stairX;
+            stairZ = -stairZ;
+        }
         lastDistance = Double.MAX_VALUE;
         stalled = 0;
         return true;
@@ -396,13 +456,17 @@ public final class ExplorationBeta {
             for (int dy = -1; dy <= 2; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
-                if (block.getMaterial()
-                    .isLiquid() || block == Blocks.fire
+                if ((block.getMaterial()
+                    .isLiquid() && block.getMaterial() != net.minecraft.block.material.Material.water)
+                    || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.web
                     || block == Blocks.portal) return false;
             }
         }
+        if (world.getBlock(x, y, z)
+            .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y + 1, z)
+            && passable(world, x, y + 2, z)) return true;
         return world.getBlock(x, y - 1, z)
             .isNormalCube() && passable(world, x, y, z)
             && passable(world, x, y + 1, z)
