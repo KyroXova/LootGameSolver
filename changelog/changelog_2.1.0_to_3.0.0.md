@@ -34,7 +34,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Preserve forward swimming when jump is held, and avoid reversing toward a waypoint before landing.
 - Smooth mining turns and refresh structure targets while exploration is active.
 - Preserve staircase heading while centering with sideways movement, and seek a dry supported entrance before digging from water.
-- Keep the camera unchanged while digging and traversing vertical steps; require a three-block liquid buffer around staircase entrances.
+- Aim visibly at each excavation block and require a matching crosshair target, reach check, and stable aim before mining its selected face.
+- Wait for landing before advancing staircase steps instead of stopping during the descent.
+- Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.
 - Keep yaw continuous across the camera angle boundary to prevent full-turn render interpolation.
 - Advance reached waypoints without forced airborne braking or stale forward input toward the previous segment.

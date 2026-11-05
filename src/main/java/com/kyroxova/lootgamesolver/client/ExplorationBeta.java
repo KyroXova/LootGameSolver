@@ -42,6 +42,8 @@ public final class ExplorationBeta {
     private int entranceCandidate;
     private double segmentX;
     private double segmentZ;
+    private final MiningAimGate miningAim = new MiningAimGate();
+    private int settlingTicks;
 
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
@@ -236,7 +238,8 @@ public final class ExplorationBeta {
         boolean passed = route.size() > 1 && py == next[1]
             && NavigationSteering
                 .passed(mc.thePlayer.posX, mc.thePlayer.posZ, segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D);
-        if (passed || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1)) {
+        if ((!digging || mc.thePlayer.onGround) && (passed
+            || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1))) {
             segmentX = next[0] + 0.5D;
             segmentZ = next[2] + 0.5D;
             route.remove(0);
@@ -259,6 +262,13 @@ public final class ExplorationBeta {
             dz = next[2] + 0.5D - mc.thePlayer.posZ;
             distance = Math.sqrt(dx * dx + dz * dz);
         }
+        if (digging && distance < 0.2D && !mc.thePlayer.onGround) {
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
+            if (++settlingTicks > 40) stop(mc, "Stair landing did not complete");
+            return;
+        }
+        settlingTicks = 0;
         if (distance >= lastDistance - 0.005D) stalled++;
         else stalled = 0;
         lastDistance = distance;
@@ -311,6 +321,8 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        miningAim.reset();
+        settlingTicks = 0;
         if (navigationInput != null && mc.thePlayer != null) {
             if (mc.thePlayer.movementInput == navigationInput) mc.thePlayer.movementInput = navigationInput.original;
             navigationInput = null;
@@ -533,7 +545,12 @@ public final class ExplorationBeta {
     private boolean attemptStairStep(Minecraft mc) {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!mc.thePlayer.onGround || !safe(mc.theWorld, x, y, z)) return false;
+        if (!mc.thePlayer.onGround) {
+            status = "Waiting to land on the next stair";
+            return ++settlingTicks <= 40;
+        }
+        settlingTicks = 0;
+        if (!safe(mc.theWorld, x, y, z)) return false;
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
             route.add(new int[] { x, y, z });
             return true;
@@ -595,12 +612,40 @@ public final class ExplorationBeta {
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
             if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
+            double aimX = nx + 0.5D - mc.thePlayer.posX;
+            double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            double aimZ = nz + 0.5D - mc.thePlayer.posZ;
+            float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
+            float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
+            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, yaw, 6F);
+            mc.thePlayer.rotationPitch += Math.max(-5F, Math.min(5F, pitch - mc.thePlayer.rotationPitch));
+            net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+            boolean matches = hit != null
+                && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+                && hit.blockX == nx
+                && hit.blockY == by
+                && hit.blockZ == nz;
+            float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+            if (!miningAim.ready(
+                nx,
+                by,
+                nz,
+                matches,
+                Math.sqrt(aimX * aimX + aimY * aimY + aimZ * aimZ),
+                Math.min(4.2D, mc.playerController.getBlockReachDistance()),
+                yawError,
+                pitch - mc.thePlayer.rotationPitch)) {
+                mc.playerController.resetBlockRemoving();
+                status = "Aiming at visible excavation block";
+                return true;
+            }
             mc.thePlayer.swingItem();
-            mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
+            mc.playerController.onPlayerDamageBlock(nx, by, nz, hit.sideHit);
             status = "Digging verified staircase step";
             return true;
         }
         digTicks = 0;
+        miningAim.reset();
         if (!safe(w, nx, destinationY, nz)) return false;
         route.add(new int[] { nx, destinationY, nz });
         stairSteps++;
