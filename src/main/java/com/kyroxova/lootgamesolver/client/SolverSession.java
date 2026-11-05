@@ -134,7 +134,7 @@ public final class SolverSession {
 
         // Sort actions by distance to player so nearest target block is always executed first
         Minecraft mc = Minecraft.getMinecraft();
-        if (mc.thePlayer != null && actions.size() > 1) {
+        if (snapshot.type != MiniGame.GAME_OF_LIGHT && mc.thePlayer != null && actions.size() > 1) {
             final double px = mc.thePlayer.posX;
             final double py = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
             final double pz = mc.thePlayer.posZ;
@@ -234,6 +234,7 @@ public final class SolverSession {
                 optimisticSudokuValues[activeAction.position.y][activeAction.position.x] = activeAction.value;
             }
         }
+        bridge.recordSubmittedAction(snapshot);
         beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();
     }

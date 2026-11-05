@@ -34,6 +34,11 @@ public final class LootGamesBridge implements MiniGameDetector {
     private static final String GOL_GAME = "ru.timeconqueror.lootgames.minigame.gol.GameOfLight";
     private static final String POS = "ru.timeconqueror.lootgames.api.util.Pos2i";
 
+    private Object golGame;
+    private Object golStage;
+    private List<CellPosition> golSequence = new ArrayList<CellPosition>();
+    private int golSubmitted;
+
     // Reflection caches
     private static boolean subordinateReflectionInitialized = false;
     private static Class<?> cachedSubordinateClass = null;
@@ -358,6 +363,12 @@ public final class LootGamesBridge implements MiniGameDetector {
             return null;
         }
 
+        if (golGame != game || (golStage != stage && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
+            golSequence.clear();
+            golSubmitted = 0;
+        }
+        golGame = game;
+        golStage = stage;
         int boardSize = 3;
         try {
             boardSize = number(invoke(game, "getSize"));
@@ -404,11 +415,23 @@ public final class LootGamesBridge implements MiniGameDetector {
                 LootGameSolver.LOG.debug("Error reading Game of Light sequence data", e);
             }
         }
+        if (GameOfLightBoard.STAGE_SHOW_SEQUENCE.equals(stageId)) {
+            golSequence = new ArrayList<CellPosition>(sequence);
+            golSubmitted = 0;
+        } else if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && sequence.isEmpty()) {
+            sequence = new ArrayList<CellPosition>(golSequence);
+            currentSymbol = golSubmitted;
+        }
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && currentSymbol > 0
             && currentSymbol <= sequence.size()) {
             sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
         }
-        GameOfLightBoard board = new GameOfLightBoard(stageId, sequence, boardSize, sequence.isEmpty(), currentSymbol);
+        GameOfLightBoard board = new GameOfLightBoard(
+            stageId,
+            sequence,
+            boardSize,
+            !golSequence.isEmpty() && currentSymbol == golSequence.size(),
+            currentSymbol);
         String signature = stageId + ":"
             + boardSize
             + ":"
@@ -481,6 +504,12 @@ public final class LootGamesBridge implements MiniGameDetector {
         } catch (Exception e) {
             LootGameSolver.LOG.warn("LootGames interaction failed; automation stopped", e);
             return false;
+        }
+    }
+
+    public void recordSubmittedAction(DetectedGame snapshot) {
+        if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
+            golSubmitted++;
         }
     }
 
