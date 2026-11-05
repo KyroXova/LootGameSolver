@@ -31,6 +31,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Route around obstacles and handle one-block terrain changes using bounded ground pathfinding.
 - Use normal player movement with smoother turns and sprinting on checked straight sections.
 - Support surface-swimming routes while rejecting lava and stopping when air is low.
+- Preserve forward swimming when jump is held, and avoid reversing toward a waypoint before landing.
+- Smooth mining turns and refresh structure targets while exploration is active.
+- Cache terrain checks within each route search and bound route-search time to reduce work on the client thread.
 - Attempt alternative staircase directions, select suitable hotbar tools, and restore the previous hotbar slot when stopped.
 - Check headroom, support, nearby hazards, falling blocks, tool durability, and mining progress before continuing excavation.
 - Stop for manual movement, menus, damage, unsafe terrain, or stalled progress.

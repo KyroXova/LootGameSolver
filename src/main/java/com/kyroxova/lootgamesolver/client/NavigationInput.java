@@ -15,10 +15,10 @@ final class NavigationInput extends MovementInput {
 
     public void updatePlayerMoveState() {
         original.updatePlayerMoveState();
-        boolean manual = original.moveForward != 0 || original.moveStrafe != 0 || original.jump || original.sneak;
+        boolean manual = original.moveForward != 0 || original.moveStrafe != 0 || original.sneak;
         moveForward = manual ? original.moveForward : forward;
         moveStrafe = original.moveStrafe;
-        jump = manual ? original.jump : hop;
+        jump = original.jump || (!manual && hop);
         sneak = original.sneak;
     }
 }

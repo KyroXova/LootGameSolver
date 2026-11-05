@@ -97,6 +97,14 @@ public final class ExplorationBeta {
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (++ticks % 100 == 0 && !walking) scan(mc);
+        if (walking && searching && ticks % 40 == 0) {
+            TileEntity previous = target;
+            scan(mc);
+            if (target != null) {
+                searching = false;
+                route.clear();
+            } else target = previous;
+        }
         if (!walking) return;
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled
             || solverActive
@@ -108,7 +116,6 @@ public final class ExplorationBeta {
             || GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindRight)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindJump)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindSneak)) {
             stop(mc, "Walk cancelled");
             return;
@@ -189,6 +196,12 @@ public final class ExplorationBeta {
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance < 0.30D && (!mc.thePlayer.onGround && !mc.thePlayer.isInWater())) {
+            mc.thePlayer.setSprinting(false);
+            mc.thePlayer.motionX *= 0.4D;
+            mc.thePlayer.motionZ *= 0.4D;
+            return;
+        }
         if (distance < (route.size() > 1 ? 0.35D : 0.18D) && py == next[1]
             && (mc.thePlayer.onGround || mc.thePlayer.isInWater())) {
             route.remove(0);
@@ -206,7 +219,8 @@ public final class ExplorationBeta {
         }
         float desired = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        mc.thePlayer.rotationYaw += Math.max(-18F, Math.min(18F, turn));
+        mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
+            .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, turn)));
         boolean straight = route.size() >= 3 && !digging
             && !mc.thePlayer.isInWater()
             && next[1] == py
@@ -425,9 +439,12 @@ public final class ExplorationBeta {
             double aimX = nx + 0.5D - mc.thePlayer.posX;
             double aimZ = nz + 0.5D - mc.thePlayer.posZ;
             double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
-            mc.thePlayer.rotationYaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
-            mc.thePlayer.rotationPitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D
-                / Math.PI);
+            float desiredYaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
+            float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(desiredYaw - mc.thePlayer.rotationYaw);
+            mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
+                .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, yawDelta)));
+            float desiredPitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
+            mc.thePlayer.rotationPitch += Math.max(-10F, Math.min(10F, desiredPitch - mc.thePlayer.rotationPitch));
             if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
             mc.thePlayer.swingItem();
             mc.playerController.onPlayerDamageBlock(nx, by, nz, 1);
