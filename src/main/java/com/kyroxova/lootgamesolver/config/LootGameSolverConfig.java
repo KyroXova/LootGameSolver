@@ -23,6 +23,7 @@ public final class LootGameSolverConfig {
     public static int renderStyle = 0; // 0 = Minimal Outline & Text, 1 = Text Only
     public static int exploreKey = Keyboard.KEY_G;
     public static int explorationRange = 32;
+    public static int explorationSearchLimit = 256;
     public static boolean explorationEnabled = true;
     public static boolean staircaseEnabled = true;
 
@@ -40,6 +41,13 @@ public final class LootGameSolverConfig {
             "Allow automatic staircase digging when walking cannot reach a lower target. Only ordinary stone and dirt are mined.");
         explorationRange = cfg
             .getInt("routeRange", "explorationBeta", 32, 8, 48, "Maximum horizontal route search radius.");
+        explorationSearchLimit = cfg.getInt(
+            "searchLimit",
+            "explorationBeta",
+            256,
+            16,
+            1024,
+            "Maximum progressive search distance from its starting point. Travel only uses verified loaded ground.");
         exploreKey = cfg
             .getInt("exploreKey", "keybinds", exploreKey, 0, 255, "Default walk toggle; also rebind in Controls.");
         overlayKey = cfg.getInt("overlayKey", "keybinds", overlayKey, 0, 255, "LWJGL key code for toggling holograms.");

@@ -33,6 +33,8 @@ public final class ExplorationBeta {
     private int savedSlot = -1;
     private int digTicks;
     private String status = "Scanning loaded terrain";
+    private ProgressiveSearch search;
+    private boolean searching;
 
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
@@ -40,20 +42,28 @@ public final class ExplorationBeta {
             stop(mc, "Walk stopped");
             return;
         }
+        search = new ProgressiveSearch(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.posZ),
+            LootGameSolverConfig.explorationSearchLimit);
         scan(mc);
         if (target == null) {
-            stop(mc, "No loaded LootGames board nearby");
+            walking = nextSearchLeg(mc);
+            if (!walking) stop(mc, "No safe exploration route available");
             return;
         }
         plan(mc);
         digging = route.isEmpty() && LootGameSolverConfig.staircaseEnabled
-            && target.yCoord < mc.thePlayer.boundingBox.minY - 2;
+            && target.yCoord < mc.thePlayer.boundingBox.minY - 2
+            && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord);
         walking = !route.isEmpty() || digging;
         if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
-        if (!walking) stop(mc, "No safe route to target");
-        else status = "Walking to LootGame";
+        if (!walking) {
+            walking = nextSearchLeg(mc);
+            if (!walking) stop(mc, "No safe exploration route available");
+        } else status = "Walking to LootGame";
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
@@ -64,6 +74,8 @@ public final class ExplorationBeta {
             target = null;
             walking = false;
             route.clear();
+            search = null;
+            searching = false;
             if (world != null && mc.isSingleplayer() && mc.getIntegratedServer() != null) {
                 java.io.File save = new java.io.File(
                     new java.io.File(mc.mcDataDir, "saves"),
@@ -98,6 +110,27 @@ public final class ExplorationBeta {
             return;
         }
         if (route.isEmpty()) {
+            if (searching) {
+                scan(mc);
+                if (target != null) {
+                    searching = false;
+                    if (mc.thePlayer.getDistanceSq(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D)
+                        <= 16D) {
+                        stop(mc, "Found nearby LootGame");
+                        return;
+                    }
+                    plan(mc);
+                    if (!route.isEmpty()) return;
+                    if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
+                        && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
+                        digging = true;
+                        savedSlot = mc.thePlayer.inventory.currentItem;
+                        return;
+                    }
+                }
+                if (!nextSearchLeg(mc)) stop(mc, "Search limit reached or no safe route remains");
+                return;
+            }
             if (digging && target.yCoord < mc.thePlayer.boundingBox.minY - 2) {
                 if (!stairStep(mc)) stop(mc, "No safe staircase step; stopped");
                 return;
@@ -167,6 +200,7 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
         }
         walking = false;
+        searching = false;
         route.clear();
         status = message;
         if (mc.thePlayer != null) mc.thePlayer.addChatMessage(new ChatComponentText("[LootGames Beta] " + message));
@@ -215,6 +249,35 @@ public final class ExplorationBeta {
                 }
             } catch (ReflectiveOperationException ignored) {}
         }
+    }
+
+    private boolean nextSearchLeg(Minecraft mc) {
+        if (search == null) return false;
+        // Bound pathfinding work per decision; stop rather than spin on unreachable goals.
+        for (int attempt = 0; attempt < 4; attempt++) {
+            int[] goal = search.next();
+            if (goal == null) return false;
+            int x = (int) Math.floor(mc.thePlayer.posX), z = (int) Math.floor(mc.thePlayer.posZ);
+            int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            double dx = goal[0] - x, dz = goal[1] - z;
+            double length = Math.sqrt(dx * dx + dz * dz);
+            if (length < 4) continue;
+            double step = Math.min(16D, length);
+            target = new TileEntity();
+            target.xCoord = x + (int) Math.round(dx / length * step);
+            target.yCoord = y;
+            target.zCoord = z + (int) Math.round(dz / length * step);
+            if (!mc.theWorld.blockExists(target.xCoord, y, target.zCoord)) continue;
+            plan(mc);
+            if (route.isEmpty()) continue;
+            searching = true;
+            digging = false;
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            status = "Exploring outward";
+            return true;
+        }
+        return false;
     }
 
     private void plan(Minecraft mc) {
