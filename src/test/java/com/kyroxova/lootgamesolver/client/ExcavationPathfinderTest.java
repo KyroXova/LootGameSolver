@@ -7,6 +7,16 @@ import org.junit.Test;
 
 public class ExcavationPathfinderTest {
 
+    @Test
+    public void beginsSupportedDescentWithoutWaitingForCompleteDeepRoute() {
+        ExcavationPathfinder search = new ExcavationPathfinder(0, 30, 0, 15, 0, 0, true);
+        finish(search, (x, y, z, nx, ny, nz) -> ny == 30 ? 1 : 8);
+        assertFalse(search.path.isEmpty());
+        int[] last = search.path.get(search.path.size() - 1);
+        assertTrue(last[1] <= 28);
+        assertTrue(search.expandedNodes() < 4096);
+    }
+
     private static void finish(ExcavationPathfinder search, ExcavationPathfinder.Terrain terrain) {
         for (int i = 0; i < 5000; i++) {
             if (search.advance(terrain, 24, Long.MAX_VALUE)) return;

@@ -49,6 +49,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Choose dry underground access while walking toward a structure, rank candidate entrances by travel distance, and inspect upcoming checkpoints for obstructions before reaching them.
 - Pause with a specific reason for movement input, menus, flight, or damage, then replan from the player's current position when resuming.
 - Retain walking-route search progress across time slices instead of interpreting an expired frame budget as an unreachable path.
+- Start checked staircase sections without waiting for a complete underground route, then replan as excavation progresses.
+- Clear soft plants intercepting the mining crosshair in the occupied or planned digging column before targeting the block behind them.
+- Show the number of checked nodes while planning underground access.
 - Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.

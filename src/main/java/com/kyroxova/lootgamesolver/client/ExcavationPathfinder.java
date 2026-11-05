@@ -37,7 +37,7 @@ final class ExcavationPathfinder {
         }
 
         public int compareTo(Node other) {
-            int order = Integer.compare(cost + remaining, other.cost + other.remaining);
+            int order = Integer.compare(cost + 4 * remaining, other.cost + 4 * other.remaining);
             if (order == 0) order = Integer.compare(bends, other.bends);
             return order != 0 ? order : Integer.compare(remaining, other.remaining);
         }
@@ -50,15 +50,23 @@ final class ExcavationPathfinder {
     final List<int[]> rejected = new ArrayList<int[]>();
     private final int x, y, z, gx, gy, gz;
     private boolean done;
+    private final boolean horizon;
+    private Node best;
 
     ExcavationPathfinder(int x, int y, int z, int gx, int gy, int gz) {
+        this(x, y, z, gx, gy, gz, false);
+    }
+
+    ExcavationPathfinder(int x, int y, int z, int gx, int gy, int gz, boolean horizon) {
         this.x = x;
         this.y = y;
         this.z = z;
         this.gx = gx;
         this.gy = gy;
         this.gz = gz;
-        open.add(new Node(x, y, z, 0, gx, gy, gz, null));
+        this.horizon = horizon;
+        best = new Node(x, y, z, 0, gx, gy, gz, null);
+        open.add(best);
         costs.put(key(x, y, z), 0);
     }
 
@@ -70,11 +78,15 @@ final class ExcavationPathfinder {
             Node node = open.remove();
             if (!visited.add(key(node.x, node.y, node.z))) continue;
             expanded++;
+            if (node.remaining < best.remaining || (node.remaining == best.remaining && node.y < best.y)) best = node;
             if (node.remaining == 0) {
-                for (Node step = node; step.parent != null; step = step.parent)
-                    path.add(new int[] { step.x, step.y, step.z });
-                Collections.reverse(path);
-                done = true;
+                finish(node);
+                return true;
+            }
+            if (horizon && visited.size() >= 96
+                && best.y <= y - 2
+                && best.remaining <= Math.max(0, Math.abs(x - gx) + Math.abs(z - gz) - 2) + Math.abs(y - gy)) {
+                finish(best);
                 return true;
             }
             for (int[] direction : directions) for (int dy = -1; dy <= 1; dy++) {
@@ -97,6 +109,16 @@ final class ExcavationPathfinder {
         }
         done = open.isEmpty() || visited.size() >= 4096;
         return done;
+    }
+
+    int expandedNodes() {
+        return visited.size();
+    }
+
+    private void finish(Node node) {
+        for (Node step = node; step.parent != null; step = step.parent) path.add(new int[] { step.x, step.y, step.z });
+        Collections.reverse(path);
+        done = true;
     }
 
     private static long key(int x, int y, int z) {

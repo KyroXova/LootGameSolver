@@ -135,7 +135,8 @@ public final class ExplorationBeta {
                 end[2],
                 target.xCoord,
                 target.yCoord + 1,
-                target.zCoord);
+                target.zCoord,
+                true);
         }
         if (approachPlan != null && !approachReady) approachReady = approachPlan.advance(
             (x, y, z, nx, ny, nz) -> excavationCost(mc.theWorld, x, y, z, nx, ny, nz),
@@ -777,7 +778,14 @@ public final class ExplorationBeta {
         }
         if (excavationRoute.isEmpty()) {
             if (excavationSearch == null) {
-                excavationSearch = new ExcavationPathfinder(x, y, z, target.xCoord, target.yCoord + 1, target.zCoord);
+                excavationSearch = new ExcavationPathfinder(
+                    x,
+                    y,
+                    z,
+                    target.xCoord,
+                    target.yCoord + 1,
+                    target.zCoord,
+                    true);
                 rejectedSteps.clear();
             }
             boolean complete = excavationSearch.advance(
@@ -786,7 +794,7 @@ public final class ExplorationBeta {
                 System.nanoTime() + 3_000_000L);
             rejectedSteps.clear();
             rejectedSteps.addAll(excavationSearch.rejected);
-            status = "Planning supported side entrance";
+            status = "Planning access: " + excavationSearch.expandedNodes() + " checked nodes";
             if (!complete) return true;
             excavationRoute.addAll(excavationSearch.path);
             excavationSearch = null;
@@ -966,7 +974,34 @@ public final class ExplorationBeta {
         for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
-            int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(nx, by, nz));
+            int mineX = nx, mineY = by, mineZ = nz;
+            net.minecraft.util.MovingObjectPosition obstruction = mc.objectMouseOver;
+            if (obstruction != null
+                && obstruction.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
+                net.minecraft.block.Block visible = w
+                    .getBlock(obstruction.blockX, obstruction.blockY, obstruction.blockZ);
+                boolean plant = visible instanceof net.minecraft.block.BlockBush
+                    || visible.getMaterial() == net.minecraft.block.material.Material.plants
+                    || visible.getMaterial() == net.minecraft.block.material.Material.vine;
+                if (FoliagePolicy.canClear(
+                    plant,
+                    w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
+                    visible.getBlockHardness(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ),
+                    obstruction.blockX,
+                    obstruction.blockY,
+                    obstruction.blockZ,
+                    x,
+                    y,
+                    z,
+                    nx,
+                    nz)) {
+                    mineX = obstruction.blockX;
+                    mineY = obstruction.blockY;
+                    mineZ = obstruction.blockZ;
+                    b = visible;
+                }
+            }
+            int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(mineX, mineY, mineZ));
             if (slot == -2) {
                 if (++toolWaitTicks > 40) {
                     stop(
@@ -989,24 +1024,24 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
-            if (mc.thePlayer.getDistanceSq(nx + 0.5D, by + 0.5D, nz + 0.5D) > 16D) return false;
-            double aimX = nx + 0.5D - mc.thePlayer.posX;
-            double aimY = by + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
-            double aimZ = nz + 0.5D - mc.thePlayer.posZ;
+            if (mc.thePlayer.getDistanceSq(mineX + 0.5D, mineY + 0.5D, mineZ + 0.5D) > 16D) return false;
+            double aimX = mineX + 0.5D - mc.thePlayer.posX;
+            double aimY = mineY + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            double aimZ = mineZ + 0.5D - mc.thePlayer.posZ;
             float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
             float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
             look(yaw, pitch);
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             boolean matches = hit != null
                 && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-                && hit.blockX == nx
-                && hit.blockY == by
-                && hit.blockZ == nz;
+                && hit.blockX == mineX
+                && hit.blockY == mineY
+                && hit.blockZ == mineZ;
             float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
             if (!miningAim.ready(
-                nx,
-                by,
-                nz,
+                mineX,
+                mineY,
+                mineZ,
                 matches,
                 Math.sqrt(aimX * aimX + aimY * aimY + aimZ * aimZ),
                 Math.min(4.2D, mc.playerController.getBlockReachDistance()),
@@ -1017,7 +1052,7 @@ public final class ExplorationBeta {
                 return true;
             }
             mc.thePlayer.swingItem();
-            mc.playerController.onPlayerDamageBlock(nx, by, nz, hit.sideHit);
+            mc.playerController.onPlayerDamageBlock(mineX, mineY, mineZ, hit.sideHit);
             status = "Digging verified staircase step";
             return true;
         }
