@@ -2,4 +2,4 @@ plugins {
     id("com.gtnewhorizons.gtnhconvention")
 }
 
-version = "2.0.1-hotfix"
+version = "2.1.0"
