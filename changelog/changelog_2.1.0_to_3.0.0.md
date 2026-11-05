@@ -92,7 +92,11 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - After activating the puzzle master, walk to and click the board's center floor cell to generate and reveal it before auto-solving.
 - Use fewer Sudoku clicks by sneaking for backward number cycling, keeping sneak active through the server click and restoring the prior state on the following tick.
 - Record safe approach waypoints on existing routes and excavated access, reconnect to the nearest saved waypoint after solving, then walk back out before searching onward.
-- Render a full-height blue cylindrical structure waypoint with animated rings and rising particles.
+- Render a full-height blue waypoint as rotating circular rings instead of a dotted laser-like spine.
+- Cycle backward from Sudoku zero with a single sneaking click when that is the shorter route.
+- Retry aimed master and board-center interactions when the board state has not arrived yet, and continue from the authoritative server win message.
+- Rejoin the saved approach trail when resuming from inside a structure, even when the Return action was not armed.
+- Hold the camera at a steady up or down angle through stair runs, and keep it level while swimming.
 
 ## Build and releases
 

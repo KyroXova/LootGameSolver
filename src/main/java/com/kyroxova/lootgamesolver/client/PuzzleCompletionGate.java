@@ -1,6 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Only a server win signal plus an ended, loaded game can confirm a solved structure. */
+/** Only a server win signal for the current loaded world can confirm a solved structure. */
 final class PuzzleCompletionGate {
 
     private boolean bound, win, loss;
@@ -23,8 +23,8 @@ final class PuzzleCompletionGate {
         if ("msg.lootgames.lose".equals(translationKey)) loss = true;
     }
 
-    boolean won(boolean loaded, boolean ended) {
-        return bound && win && !loss && loaded && ended;
+    boolean won(boolean loaded) {
+        return bound && win && !loss && loaded;
     }
 
     boolean lost() {

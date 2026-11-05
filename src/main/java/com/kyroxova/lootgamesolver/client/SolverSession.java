@@ -46,14 +46,13 @@ public final class SolverSession {
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
-        if (curVal == 0) return targetVal;
         int forward = (targetVal - curVal + 10) % 10;
         int reverse = (curVal - targetVal + 10) % 10;
         return Math.min(forward, reverse);
     }
 
     public static boolean shouldUseReverseSudokuClicks(int curVal, int targetVal) {
-        if (curVal <= 0 || curVal > 9 || targetVal <= 0 || targetVal > 9) return false;
+        if (curVal < 0 || curVal > 9 || targetVal <= 0 || targetVal > 9 || curVal == targetVal) return false;
         int forward = (targetVal - curVal + 10) % 10;
         int reverse = (curVal - targetVal + 10) % 10;
         return reverse < forward;

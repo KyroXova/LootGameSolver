@@ -53,8 +53,10 @@ public final class ClientHooks {
     private AutoPuzzleState autoPuzzleState = AutoPuzzleState.IDLE;
     private int[] autoPuzzlePosition;
     private int puzzleWaitTicks;
-    private boolean masterClickSent;
-    private boolean centerClickSent;
+    private int masterClickAttempts;
+    private int centerClickAttempts;
+    private int lastMasterClickTick = -40;
+    private int lastCenterClickTick = -40;
     private net.minecraft.world.World puzzleWorld;
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
@@ -203,8 +205,10 @@ public final class ClientHooks {
             autoPuzzlePosition = exploration.puzzlePosition();
             autoPuzzleState = AutoPuzzleState.OPENING;
             puzzleWaitTicks = 0;
-            masterClickSent = false;
-            centerClickSent = false;
+            masterClickAttempts = 0;
+            centerClickAttempts = 0;
+            lastMasterClickTick = -40;
+            lastCenterClickTick = -40;
             puzzleCompletion.begin();
         }
 
@@ -243,8 +247,12 @@ public final class ClientHooks {
                     exploration.setAutomationStatus("Could not reach the board center; explorer held");
                 return;
             }
-            if (!masterClickSent && autoPuzzlePosition != null) masterClickSent = puzzleBridge
-                .activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2]);
+            if (autoPuzzlePosition != null && masterClickAttempts < 4
+                && puzzleWaitTicks - lastMasterClickTick >= 40
+                && puzzleBridge.activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])) {
+                masterClickAttempts++;
+                lastMasterClickTick = puzzleWaitTicks;
+            }
             if (puzzleWaitTicks > 200) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Puzzle did not open; explorer held");
@@ -255,6 +263,8 @@ public final class ClientHooks {
             if (exploration != null && exploration.consumePuzzleCenterArrival()) {
                 autoPuzzleState = AutoPuzzleState.REVEALING;
                 puzzleWaitTicks = 0;
+                centerClickAttempts = 0;
+                lastCenterClickTick = -40;
             } else if (exploration == null || !exploration.navigating()) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null)
@@ -270,7 +280,12 @@ public final class ClientHooks {
                 return;
             }
             Object game = puzzleBridge.nearbyGame(true);
-            if (game != null && !centerClickSent) centerClickSent = puzzleBridge.activateBoardCenter(game);
+            if (game != null && centerClickAttempts < 4
+                && puzzleWaitTicks - lastCenterClickTick >= 20
+                && puzzleBridge.activateBoardCenter(game)) {
+                centerClickAttempts++;
+                lastCenterClickTick = puzzleWaitTicks;
+            }
             if (puzzleWaitTicks > 200) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Board did not reveal; explorer held");
@@ -284,7 +299,7 @@ public final class ClientHooks {
                 if (exploration != null) exploration.setAutomationStatus("Puzzle lost; explorer held");
                 return;
             }
-            if (puzzleCompletion.won(mc.theWorld != null, !session.isActive())) {
+            if (puzzleCompletion.won(mc.theWorld != null)) {
                 session.cancel("Puzzle solved");
                 puzzleCompletion.clear();
                 autoPuzzleState = AutoPuzzleState.IDLE;

@@ -70,45 +70,27 @@ final class NavigationOverlayRenderer {
 
     private static void drawWaypointBeam(Tessellator t, double x, double z, double ground, double top, double time) {
         double height = top - ground;
-        double phase = time * 0.035D;
-        // Translucent cylindrical shell makes the marker readable at a distance and from every angle.
-        t.startDrawing(GL11.GL_QUADS);
-        for (int i = 0; i < 16; i++) {
-            double a0 = Math.PI * 2D * i / 16D, a1 = Math.PI * 2D * (i + 1) / 16D;
-            t.setColorRGBA_F(0.12F, 0.5F, 1F, 0.12F);
-            t.addVertex(x + Math.cos(a0) * 0.24D, ground, z + Math.sin(a0) * 0.24D);
-            t.addVertex(x + Math.cos(a1) * 0.24D, ground, z + Math.sin(a1) * 0.24D);
-            t.addVertex(x + Math.cos(a1) * 0.24D, top, z + Math.sin(a1) * 0.24D);
-            t.addVertex(x + Math.cos(a0) * 0.24D, top, z + Math.sin(a0) * 0.24D);
-        }
-        t.draw();
-
-        // Horizontal rings and sparkles rise continuously through the beam.
-        t.startDrawing(GL11.GL_LINE_LOOP);
-        for (int ring = 0; ring < 12; ring++) {
-            double progress = (ring / 12D + time * 0.008D) % 1D;
+        double rotation = time * 0.06D;
+        GL11.glLineWidth(4F);
+        // Use explicit line pairs instead of GL_LINE_LOOP/point primitives: legacy 1.7 drivers
+        // can render those as a dotted vertical spine. These rings remain visibly circular and rotate.
+        t.startDrawing(GL11.GL_LINES);
+        for (int ring = 0; ring < 36; ring++) {
+            double progress = (ring / 36D + time * 0.006D) % 1D;
             double y = ground + progress * height;
-            float alpha = (float) (0.25D + 0.45D * Math.sin(progress * Math.PI));
-            t.setColorRGBA_F(0.34F, 0.78F, 1F, alpha);
-            for (int i = 0; i < 20; i++) {
-                double angle = Math.PI * 2D * i / 20D + phase;
-                t.addVertex(x + Math.cos(angle) * 0.25D, y, z + Math.sin(angle) * 0.25D);
+            double radius = 0.26D + 0.05D * Math.sin(progress * Math.PI * 2D + rotation);
+            for (int segment = 0; segment < 32; segment++) {
+                double angle = Math.PI * 2D * segment / 32D + rotation;
+                float pulse = (float) (0.48D + 0.42D * (0.5D + 0.5D * Math.sin(angle * 2D - rotation * 3D)));
+                float alpha = pulse * (float) (0.55D + 0.35D * Math.sin(progress * Math.PI));
+                t.setColorRGBA_F(0.28F, 0.72F, 1F, alpha);
+                t.addVertex(x + Math.cos(angle) * radius, y, z + Math.sin(angle) * radius);
+                double next = Math.PI * 2D * (segment + 1) / 32D + rotation;
+                t.addVertex(x + Math.cos(next) * radius, y, z + Math.sin(next) * radius);
             }
-            // Tessellator line loops must be drawn separately; close this ring with its first point.
-            t.addVertex(x + Math.cos(phase) * 0.25D, y, z + Math.sin(phase) * 0.25D);
-            t.draw();
-            if (ring != 11) t.startDrawing(GL11.GL_LINE_LOOP);
-        }
-        GL11.glPointSize(5F);
-        t.startDrawing(GL11.GL_POINTS);
-        for (int i = 0; i < 40; i++) {
-            double progress = (i / 40D + time * 0.014D) % 1D;
-            double angle = i * 2.399963D + phase * 1.8D;
-            float alpha = (float) (0.55D + 0.4D * (0.5D + 0.5D * Math.sin(time * 0.12D + i)));
-            t.setColorRGBA_F(0.38F, 0.82F, 1F, alpha);
-            t.addVertex(x + Math.cos(angle) * 0.2D, ground + progress * height, z + Math.sin(angle) * 0.2D);
         }
         t.draw();
+        GL11.glLineWidth(2F);
     }
 
     private static double[] draw(Tessellator t, List<int[]> route, double[] start, boolean excavation) {

@@ -81,15 +81,16 @@ public class SudokuSolverTest {
     public void testClickPlanning() {
         assertEquals(1, SolverSession.calculateClicksNeeded(0, 1));
         assertEquals(5, SolverSession.calculateClicksNeeded(0, 5));
-        assertEquals(6, SolverSession.calculateClicksNeeded(0, 6));
-        assertEquals(9, SolverSession.calculateClicksNeeded(0, 9));
+        assertEquals(4, SolverSession.calculateClicksNeeded(0, 6));
+        assertEquals(1, SolverSession.calculateClicksNeeded(0, 9));
         assertEquals(3, SolverSession.calculateClicksNeeded(2, 9));
         assertEquals(0, SolverSession.calculateClicksNeeded(4, 4));
         assertEquals(2, SolverSession.calculateClicksNeeded(9, 1));
         assertEquals(3, SolverSession.calculateClicksNeeded(8, 5));
         assertTrue(SolverSession.shouldUseReverseSudokuClicks(8, 5));
         assertFalse(SolverSession.shouldUseReverseSudokuClicks(9, 1));
-        assertFalse(SolverSession.shouldUseReverseSudokuClicks(0, 9));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(0, 6));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(0, 9));
     }
 
     @Test
