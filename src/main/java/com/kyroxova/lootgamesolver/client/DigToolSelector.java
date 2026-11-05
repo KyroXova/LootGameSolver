@@ -39,6 +39,10 @@ final class DigToolSelector {
             }
         }
         int selected = bestSlot(speeds, usable);
+        if (selected < 0 && (block.getMaterial() == net.minecraft.block.material.Material.leaves
+            || block.getMaterial() == net.minecraft.block.material.Material.plants
+            || block.getMaterial() == net.minecraft.block.material.Material.vine))
+            return mc.thePlayer.inventory.currentItem;
         if (selected < 9) return selected;
         if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null) return -2;

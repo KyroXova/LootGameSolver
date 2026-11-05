@@ -30,7 +30,7 @@ public final class ClientHooks {
         "textures/gui/ui_9slice.png");
     private final SolverSession session = new SolverSession();
     private final ExplorationBeta exploration = ExplorationBeta.ENABLED ? new ExplorationBeta() : null;
-    private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session);
+    private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session, exploration);
     private boolean lastAutoSolveKey = false;
     private boolean lastOverlayKey = false;
     private int detectCounter = 0;

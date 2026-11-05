@@ -30,9 +30,11 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 public final class WorldOverlayRenderer {
 
     private final SolverSession session;
+    private final ExplorationBeta exploration;
 
-    public WorldOverlayRenderer(SolverSession session) {
+    public WorldOverlayRenderer(SolverSession session, ExplorationBeta exploration) {
         this.session = session;
+        this.exploration = exploration;
     }
 
     private static void drawWireframe(AxisAlignedBB box, float r, float g, float b) {
@@ -94,6 +96,7 @@ public final class WorldOverlayRenderer {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
+        if (exploration != null) NavigationOverlayRenderer.render(exploration);
         DetectedGame current = session.getCurrentDetectedGame();
         if (current == null) return;
 

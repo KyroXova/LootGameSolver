@@ -44,6 +44,29 @@ public final class ExplorationBeta {
     private double segmentZ;
     private final MiningAimGate miningAim = new MiningAimGate();
     private int settlingTicks;
+    private ExcavationPathfinder excavationSearch;
+    private final List<int[]> excavationRoute = new ArrayList<int[]>();
+    private final List<int[]> rejectedSteps = new ArrayList<int[]>();
+    private final List<int[]> navigationPreview = new ArrayList<int[]>();
+    private int[] previewHead;
+    private int previewSize = -1;
+    private int excavationReplans;
+
+    List<int[]> navigationRoute() {
+        return navigationPreview;
+    }
+
+    List<int[]> excavationPreview() {
+        return excavationRoute;
+    }
+
+    List<int[]> rejectedPreview() {
+        return rejectedSteps;
+    }
+
+    boolean navigating() {
+        return walking;
+    }
 
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
@@ -56,6 +79,10 @@ public final class ExplorationBeta {
             (int) Math.floor(mc.thePlayer.posZ),
             LootGameSolverConfig.explorationSearchLimit);
         entranceSelected = false;
+        excavationSearch = null;
+        excavationReplans = 0;
+        excavationRoute.clear();
+        rejectedSteps.clear();
         entranceCandidates.clear();
         scan(mc);
         if (target == null) {
@@ -72,7 +99,7 @@ public final class ExplorationBeta {
         }
         plan(mc);
         digging = route.isEmpty() && LootGameSolverConfig.staircaseEnabled
-            && target.yCoord < mc.thePlayer.boundingBox.minY - 2
+            && target.yCoord <= mc.thePlayer.boundingBox.minY + 3
             && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord);
         walking = !route.isEmpty() || digging;
         if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
@@ -115,6 +142,20 @@ public final class ExplorationBeta {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        int[] head = route.isEmpty() ? null : route.get(0);
+        if (head != previewHead || route.size() != previewSize) {
+            previewHead = head;
+            previewSize = route.size();
+            navigationPreview.clear();
+            for (int i = 0; i < Math.min(96, route.size()); i++) {
+                int[] step = route.get(i);
+                boolean water = mc.theWorld.getBlock(step[0], step[1], step[2])
+                    .getMaterial() == net.minecraft.block.material.Material.water
+                    || mc.theWorld.getBlock(step[0], step[1] - 1, step[2])
+                        .getMaterial() == net.minecraft.block.material.Material.water;
+                navigationPreview.add(new int[] { step[0], step[1], step[2], water ? 1 : 0 });
+            }
+        }
         if (++ticks % 100 == 0 && !walking) scan(mc);
         if (walking && searching && ticks % 40 == 0) {
             TileEntity previous = target;
@@ -168,7 +209,11 @@ public final class ExplorationBeta {
                 if (horizontal > 32 || (horizontal > 3 && target.yCoord >= mc.thePlayer.boundingBox.minY - 2)) {
                     plan(mc);
                     if (!route.isEmpty()) return;
-                    stop(mc, "No verified route around the obstruction");
+                    if (LootGameSolverConfig.staircaseEnabled && horizontal <= 32 && !mc.thePlayer.isInWater()) {
+                        digging = true;
+                        entranceSelected = true;
+                        savedSlot = mc.thePlayer.inventory.currentItem;
+                    } else stop(mc, "No verified route around the obstruction");
                     return;
                 }
                 if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2) {
@@ -291,9 +336,8 @@ public final class ExplorationBeta {
             ? (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F
             : (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        if (!digging && distance > 0.20D)
-            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, desired, 4F);
-        if (!digging) mc.thePlayer.rotationPitch += Math.max(-1F, Math.min(1F, 5F - mc.thePlayer.rotationPitch));
+        if (distance > 0.20D) mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, desired, 9F);
+        mc.thePlayer.rotationPitch += Math.max(-4F, Math.min(4F, 5F - mc.thePlayer.rotationPitch));
         boolean straight = route.size() >= 3 && !digging
             && !mc.thePlayer.isInWater()
             && next[1] == py
@@ -313,7 +357,7 @@ public final class ExplorationBeta {
             navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
             if (digging && distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
-                double speed = Math.min(0.5D, distance);
+                double speed = Math.min(0.85D, distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
@@ -321,6 +365,9 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        excavationSearch = null;
+        excavationRoute.clear();
+        rejectedSteps.clear();
         miningAim.reset();
         settlingTicks = 0;
         if (navigationInput != null && mc.thePlayer != null) {
@@ -461,23 +508,80 @@ public final class ExplorationBeta {
     }
 
     private boolean stairStep(Minecraft mc) {
-        if (mc.thePlayer.boundingBox.minY <= target.yCoord + 1) {
-            int x = (int) Math.floor(mc.thePlayer.posX), z = (int) Math.floor(mc.thePlayer.posZ);
-            for (int[] direction : ExcavationPolicy.approachDirections(x, z, target.xCoord, target.zCoord)) {
-                stairX = direction[0];
-                stairZ = direction[1];
-                if (attemptStairStep(mc)) return true;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
+        settlingTicks = 0;
+        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
+            route.add(new int[] { x, y, z });
+            return true;
+        }
+        if (excavationRoute.isEmpty()) {
+            if (excavationSearch == null) {
+                excavationSearch = new ExcavationPathfinder(x, y, z, target.xCoord, target.yCoord + 1, target.zCoord);
+                rejectedSteps.clear();
             }
-            return false;
+            boolean complete = excavationSearch.advance(
+                (a, b, c, nx, ny, nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
+                24,
+                System.nanoTime() + 3_000_000L);
+            rejectedSteps.clear();
+            rejectedSteps.addAll(excavationSearch.rejected);
+            status = "Planning supported side entrance";
+            if (!complete) return true;
+            excavationRoute.addAll(excavationSearch.path);
+            excavationSearch = null;
+            if (excavationRoute.isEmpty()) return false;
         }
-        for (int attempt = 0; attempt < 4; attempt++) {
-            if (attemptStairStep(mc)) return true;
-            if (digTicks > 200) return false;
-            int previousX = stairX;
-            stairX = stairZ == 0 && previousX == 0 ? 1 : -stairZ;
-            stairZ = previousX;
+        int[] next = excavationRoute.get(0);
+        stairX = next[0] - x;
+        stairZ = next[2] - z;
+        if (!ExcavationPolicy.beside(x, z, next[0], next[2])
+            || excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
+            excavationRoute.clear();
+            miningAim.reset();
+            return ++excavationReplans <= 3;
         }
-        return false;
+        return attemptStairStep(mc, next[1]);
+    }
+
+    private static boolean excavatable(World w, int x, int y, int z) {
+        if (!w.blockExists(x, y, z) || w.getTileEntity(x, y, z) != null) return false;
+        net.minecraft.block.Block block = w.getBlock(x, y, z);
+        float hardness = block.getBlockHardness(w, x, y, z);
+        net.minecraft.block.material.Material material = block.getMaterial();
+        return hardness >= 0 && hardness <= 5
+            && (material == net.minecraft.block.material.Material.rock
+                || material == net.minecraft.block.material.Material.ground
+                || material == net.minecraft.block.material.Material.grass
+                || material == net.minecraft.block.material.Material.wood
+                || material == net.minecraft.block.material.Material.leaves
+                || material == net.minecraft.block.material.Material.plants
+                || material == net.minecraft.block.material.Material.vine);
+    }
+
+    private static int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
+        if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
+            .isNormalCube()) return -1;
+        if (ny > y && !passable(w, x, y + 2, z)) return -1;
+        for (int ox = -1; ox <= 1; ox++)
+            for (int oz = -1; oz <= 1; oz++) for (int by = ny - 1; by <= Math.max(y, ny) + 2; by++) {
+                if (!w.blockExists(nx + ox, by, nz + oz)) return -1;
+                net.minecraft.block.Block block = w.getBlock(nx + ox, by, nz + oz);
+                if (block.getMaterial()
+                    .isLiquid() || block == Blocks.fire
+                    || block == Blocks.cactus
+                    || block == Blocks.sand
+                    || block == Blocks.gravel
+                    || block == Blocks.portal) return -1;
+            }
+        int cost = 1 + Math.abs(ny - y);
+        for (int by = ny; by <= Math.max(y, ny) + 1; by++) {
+            if (passable(w, nx, by, nz)) continue;
+            if (!excavatable(w, nx, by, nz)) return -1;
+            cost += 3;
+        }
+        return cost;
     }
 
     private static boolean dryShore(World world, int x, int y, int z) {
@@ -542,7 +646,7 @@ public final class ExplorationBeta {
         return false;
     }
 
-    private boolean attemptStairStep(Minecraft mc) {
+    private boolean attemptStairStep(Minecraft mc, int destinationY) {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround) {
@@ -562,30 +666,18 @@ public final class ExplorationBeta {
             else stairX = 0;
             if (stairX == 0 && stairZ == 0) stairX = 1;
         }
-        int destinationY = ExcavationPolicy.destinationY(y, target.yCoord);
         int nx = x + stairX, nz = z + stairZ;
         if (!ExcavationPolicy.beside(x, z, nx, nz)) return false;
         World w = mc.theWorld;
-        // Only excavate beside the player, with a verified full floor below the future step.
-        if (!w.blockExists(nx, destinationY - 1, nz) || !w.getBlock(nx, destinationY - 1, nz)
-            .isNormalCube()) return false;
-        for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) for (int oy = -2; oy <= 2; oy++) {
-            if (!w.blockExists(nx + ox, y + oy, nz + oz)) return false;
-            net.minecraft.block.Block b = w.getBlock(nx + ox, y + oy, nz + oz);
-            if (b.getMaterial()
-                .isLiquid() || b == Blocks.fire
-                || b == Blocks.cactus
-                || b == Blocks.sand
-                || b == Blocks.gravel
-                || b == Blocks.portal) return false;
-        }
-        for (int by = y + 1; by >= destinationY; by--) {
+        // Recheck the same support, hazard and clearance rules used by the planner.
+        if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
+        for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
-            if (b != Blocks.stone && b != Blocks.dirt && b != Blocks.grass && b != Blocks.cobblestone) return false;
+            if (!excavatable(w, nx, by, nz)) return false;
             if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
         }
-        for (int by = y + 1; by >= destinationY; by--) {
+        for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
             int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(nx, by, nz));
@@ -617,8 +709,8 @@ public final class ExplorationBeta {
             double aimZ = nz + 0.5D - mc.thePlayer.posZ;
             float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
             float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
-            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, yaw, 6F);
-            mc.thePlayer.rotationPitch += Math.max(-5F, Math.min(5F, pitch - mc.thePlayer.rotationPitch));
+            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, yaw, 12F);
+            mc.thePlayer.rotationPitch += Math.max(-10F, Math.min(10F, pitch - mc.thePlayer.rotationPitch));
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             boolean matches = hit != null
                 && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
@@ -648,6 +740,8 @@ public final class ExplorationBeta {
         miningAim.reset();
         if (!safe(w, nx, destinationY, nz)) return false;
         route.add(new int[] { nx, destinationY, nz });
+        if (!excavationRoute.isEmpty()) excavationRoute.remove(0);
+        excavationReplans = 0;
         stairSteps++;
         lastDistance = Double.MAX_VALUE;
         stalled = 0;

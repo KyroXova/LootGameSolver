@@ -36,6 +36,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Preserve staircase heading while centering with sideways movement, and seek a dry supported entrance before digging from water.
 - Aim visibly at each excavation block and require a matching crosshair target, reach check, and stable aim before mining its selected face.
 - Wait for landing before advancing staircase steps instead of stopping during the descent.
+- Plan connected side approaches around blocked roofs using level detours and supported stairs, with bounded search work across ticks.
+- Clear obstructing leaves and ordinary breakable wood or masonry while protecting tile entities and unbreakable blocks.
+- Turn toward movement and mining targets faster while retaining visible aim checks before breaking blocks.
+- Show cached route decisions as green checked walking segments, yellow excavation or water/height transitions, and red rejected steps; the hologram toggle also hides these lines.
 - Require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.
 - Keep yaw continuous across the camera angle boundary to prevent full-turn render interpolation.
