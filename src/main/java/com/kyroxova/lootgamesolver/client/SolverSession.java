@@ -35,6 +35,7 @@ public final class SolverSession {
     private DetectedGame currentSnapshot;
     private String lastSnapshotSignature;
     private String beforeActionSignature;
+    private String submittedSudokuSignature;
     private long lastActionAt;
     private String status = "Idle";
     private MiniGame game = MiniGame.UNKNOWN;
@@ -45,7 +46,7 @@ public final class SolverSession {
         if (curVal == targetVal) return 0;
         if (curVal == 0) return targetVal;
         int diff = targetVal - curVal;
-        if (diff < 0) diff += 9;
+        if (diff < 0) diff += 10;
         return diff;
     }
 
@@ -160,8 +161,11 @@ public final class SolverSession {
         queued = actions.size();
 
         if (actions.isEmpty()) {
-            if (snapshot.type == MiniGame.SUDOKU) {
-                bridge.submitSudokuCheck(snapshot);
+            if (snapshot.type == MiniGame.SUDOKU && result.getStatus() == SolveResult.Status.SOLVED) {
+                if (!snapshot.signature.equals(submittedSudokuSignature)) {
+                    bridge.submitSudokuCheck(snapshot);
+                    submittedSudokuSignature = snapshot.signature;
+                }
                 activeAction = null;
                 status = "Stage complete! Waiting for next stage...";
                 return;
@@ -224,15 +228,15 @@ public final class SolverSession {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
+        if (activeAction.type == SolverAction.Type.SET_VALUE && beforeActionSignature != null
+            && beforeActionSignature.equals(snapshot.signature)
+            && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {
+            status = "Waiting for Sudoku board update...";
+            return;
+        }
         if (!bridge.interact(snapshot, activeAction)) {
             status = "Navigating to " + activeAction.position;
             return;
-        }
-        if (activeAction.type == SolverAction.Type.SET_VALUE) {
-            remainingClicksForActiveAction--;
-            if (remainingClicksForActiveAction <= 0 && snapshot.type == MiniGame.SUDOKU) {
-                optimisticSudokuValues[activeAction.position.y][activeAction.position.x] = activeAction.value;
-            }
         }
         bridge.recordSubmittedAction(snapshot);
         beforeActionSignature = snapshot.signature;
@@ -242,7 +246,8 @@ public final class SolverSession {
     public boolean isActionComplete(DetectedGame snapshot) {
         if (activeAction == null) return true;
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
-            return remainingClicksForActiveAction <= 0;
+            return snapshot.sudokuPlayerValues != null
+                && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] == activeAction.value;
         }
         return bridge.actionComplete(snapshot, activeAction);
     }
@@ -254,6 +259,7 @@ public final class SolverSession {
         cachedRenderActions = null;
         lastSnapshotSignature = null;
         beforeActionSignature = null;
+        submittedSudokuSignature = null;
         queued = 0;
         remainingClicksForActiveAction = 0;
         for (int r = 0; r < 9; r++) {

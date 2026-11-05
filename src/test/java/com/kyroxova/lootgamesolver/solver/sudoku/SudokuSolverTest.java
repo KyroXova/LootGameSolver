@@ -83,6 +83,8 @@ public class SudokuSolverTest {
         assertEquals(9, SolverSession.calculateClicksNeeded(0, 9));
         assertEquals(7, SolverSession.calculateClicksNeeded(2, 9));
         assertEquals(0, SolverSession.calculateClicksNeeded(4, 4));
+        assertEquals(2, SolverSession.calculateClicksNeeded(9, 1));
+        assertEquals(7, SolverSession.calculateClicksNeeded(8, 5));
     }
 
     @Test

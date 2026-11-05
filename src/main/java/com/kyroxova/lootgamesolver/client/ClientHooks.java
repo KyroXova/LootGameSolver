@@ -181,7 +181,8 @@ public final class ClientHooks {
     }
 
     private boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {
-        if (binding != null && binding.isPressed()) return true;
+        if (Minecraft.getMinecraft().currentScreen != null) return false;
+        if (binding != null) return binding.isPressed();
         int code = binding != null ? binding.getKeyCode() : fallbackCode;
         if (code > 0 && code < 256) {
             boolean down = Keyboard.isKeyDown(code);

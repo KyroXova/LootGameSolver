@@ -13,14 +13,26 @@ import com.kyroxova.lootgamesolver.core.SolverAction;
  */
 public final class SudokuSolver implements MiniGameSolver<SudokuBoard> {
 
+    private String cachedPuzzle;
+    private SudokuBoard cachedSolution;
+
     public boolean canSolve(SudokuBoard board) {
         return isValid(board);
     }
 
     public SolveResult solve(SudokuBoard board) {
         if (!isValid(board)) return SolveResult.none(SolveResult.Status.INVALID, "Sudoku has contradictory givens");
-        SudokuBoard solved = board.copy();
-        if (!solveRecursive(solved)) return SolveResult.none(SolveResult.Status.INVALID, "Sudoku has no solution");
+        StringBuilder key = new StringBuilder(81);
+        for (int row = 0; row < 9; row++)
+            for (int col = 0; col < 9; col++) key.append((char) ('0' + board.get(row, col)));
+        String puzzle = key.toString();
+        SudokuBoard solved = cachedSolution;
+        if (!puzzle.equals(cachedPuzzle) || solved == null) {
+            solved = board.copy();
+            if (!solveRecursive(solved)) return SolveResult.none(SolveResult.Status.INVALID, "Sudoku has no solution");
+            cachedPuzzle = puzzle;
+            cachedSolution = solved;
+        }
         List<SolverAction> actions = new ArrayList<SolverAction>();
         for (int row = 0; row < SudokuBoard.SIZE; row++) {
             for (int col = 0; col < SudokuBoard.SIZE; col++) {
