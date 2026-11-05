@@ -278,7 +278,9 @@ public final class ClientHooks {
     public void overlay(RenderGameOverlayEvent.Text event) {
         if (!LootGameSolverConfig.enabled) return;
         DetectedGame cur = session.getCurrentDetectedGame();
-        if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
+        if (cur == null
+            && (!LootGameSolverConfig.showOverlay || exploration == null || !LootGameSolverConfig.explorationEnabled))
+            return;
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return;
@@ -317,20 +319,17 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
-            String line4 = exploration != null && LootGameSolverConfig.explorationEnabled
-                ? "[" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-                    + "] Explore | "
-                    + exploration.hud(mc)
-                : "";
-
+            if (exploration != null && LootGameSolverConfig.explorationEnabled) {
+                line3 += " \u00A78|\u00A77 [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+                    + "] Explore";
+            }
             int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
-            int width3 = mc.fontRenderer.getStringWidth("[" + autoKeyStr + "] Auto | [" + holoKeyStr + "] Holograms");
+            int width3 = mc.fontRenderer.getStringWidth(line3);
             int maxWidth = Math.max(width1, Math.max(width2, width3));
-            maxWidth = Math.max(maxWidth, mc.fontRenderer.getStringWidth(line4));
 
             int panelWidth = maxWidth + 32;
-            int panelHeight = line4.isEmpty() ? 44 : 54;
+            int panelHeight = 44;
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -339,11 +338,6 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
-            if (!line4.isEmpty()) mc.fontRenderer.drawStringWithShadow(
-                line4,
-                x + (panelWidth - mc.fontRenderer.getStringWidth(line4)) / 2,
-                y + 37,
-                0xFFFF80);
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();

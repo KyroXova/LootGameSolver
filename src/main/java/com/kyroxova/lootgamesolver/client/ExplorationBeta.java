@@ -163,7 +163,7 @@ public final class ExplorationBeta {
     private void scan(Minecraft mc) {
         target = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
-        double nearest = 128D * 128D;
+        double nearest = Double.MAX_VALUE;
         for (Object entry : mc.theWorld.loadedTileEntityList) {
             if (!(entry instanceof TileEntity)) continue;
             TileEntity tile = (TileEntity) entry;
@@ -317,7 +317,7 @@ public final class ExplorationBeta {
     }
 
     public String hud(Minecraft mc) {
-        if (target == null) return "No structure in loaded terrain";
+        if (target == null) return "Searching nearby";
         int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
         return target.xCoord + ", " + target.yCoord + ", " + target.zCoord + " (" + distance + "m)";
     }
