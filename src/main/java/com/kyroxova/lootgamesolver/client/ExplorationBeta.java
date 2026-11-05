@@ -1,11 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
@@ -104,12 +100,25 @@ public final class ExplorationBeta {
             stop(mc, "Walk cancelled");
             return;
         }
-        if (target == null || target.isInvalid()
-            || !mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
+        if (target == null || target.isInvalid()) {
             stop(mc, "Target no longer loaded");
             return;
         }
         if (route.isEmpty()) {
+            if (!searching && !digging) {
+                double horizontal = Math.abs(mc.thePlayer.posX - target.xCoord)
+                    + Math.abs(mc.thePlayer.posZ - target.zCoord);
+                if (horizontal > 3) {
+                    plan(mc);
+                    if (!route.isEmpty()) return;
+                    stop(mc, "No verified route around the obstruction");
+                    return;
+                }
+                if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2) {
+                    digging = true;
+                    savedSlot = mc.thePlayer.inventory.currentItem;
+                }
+            }
             if (searching) {
                 scan(mc);
                 if (target != null) {
@@ -147,10 +156,9 @@ public final class ExplorationBeta {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
-        if (!safe(mc.theWorld, px, py, pz) || !safe(mc.theWorld, next[0], next[1], next[2])
-            || (py != next[1] && !(digging && py == next[1] + 1))
-            || (!mc.thePlayer.onGround && !digging)
-            || mc.thePlayer.isCollidedHorizontally) {
+        if (!safe(mc.theWorld, next[0], next[1], next[2]) || Math.abs(py - next[1]) > 1
+
+        ) {
             mc.thePlayer.motionX = 0;
             mc.thePlayer.motionZ = 0;
             if (!digging && mc.thePlayer.onGround && safe(mc.theWorld, px, py, pz)) {
@@ -165,10 +173,11 @@ public final class ExplorationBeta {
             stop(mc, "Route obstructed or unsafe");
             return;
         }
+        if (next[1] > py && mc.thePlayer.onGround) mc.thePlayer.jump();
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
-        if (distance < 0.15D) {
+        if (distance < 0.15D && py == next[1] && mc.thePlayer.onGround) {
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
@@ -184,6 +193,7 @@ public final class ExplorationBeta {
             return;
         }
         mc.thePlayer.rotationYaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
+        if (distance < 0.02D) return;
         double speed = Math.min(0.10D, distance);
         mc.thePlayer.motionX = dx / distance * speed;
         mc.thePlayer.motionZ = dz / distance * speed;
@@ -280,40 +290,32 @@ public final class ExplorationBeta {
         return false;
     }
 
-    private void plan(Minecraft mc) {
+    private void plan(final Minecraft mc) {
         route.clear();
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!safe(mc.theWorld, x, y, z)) return;
-        ArrayDeque<int[]> queue = new ArrayDeque<int[]>();
-        Map<Long, int[]> parents = new HashMap<Long, int[]>();
-        queue.add(new int[] { x, y, z });
-        parents.put(key(x, z), null);
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-        while (!queue.isEmpty() && parents.size() <= 4096) {
-            int[] node = queue.remove();
-            double dx = node[0] + 0.5D - target.xCoord;
-            double dz = node[2] + 0.5D - target.zCoord;
-            if (dx * dx + dz * dz <= 9D && Math.abs(y - target.yCoord) <= 3) {
-                while (parents.get(key(node[0], node[2])) != null) {
-                    route.add(node);
-                    node = parents.get(key(node[0], node[2]));
-                }
-                Collections.reverse(route);
-                return;
+        route.addAll(new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return safe(mc.theWorld, x, y, z);
             }
-            for (int[] direction : directions) {
-                int nx = node[0] + direction[0], nz = node[2] + direction[1];
-                long key = key(nx, nz);
-                if (Math.abs(nx - x) > LootGameSolverConfig.explorationRange
-                    || Math.abs(nz - z) > LootGameSolverConfig.explorationRange
-                    || parents.containsKey(key)) continue;
-                if (!safe(mc.theWorld, nx, y, nz)) continue;
-                parents.put(key, node);
-                queue.add(new int[] { nx, y, nz });
+
+            public boolean clear(int x, int y, int z) {
+                return passable(mc.theWorld, x, y, z);
             }
-        }
+        },
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            target.xCoord,
+            target.zCoord,
+            LootGameSolverConfig.explorationRange));
+    }
+
+    private static boolean passable(World world, int x, int y, int z) {
+        return world.blockExists(x, y, z) && !world.getBlock(x, y, z)
+            .getMaterial()
+            .isLiquid()
+            && world.getBlock(x, y, z)
+                .getCollisionBoundingBoxFromPool(world, x, y, z) == null;
     }
 
     private boolean stairStep(Minecraft mc) {
@@ -402,9 +404,9 @@ public final class ExplorationBeta {
             }
         }
         return world.getBlock(x, y - 1, z)
-            .isNormalCube() && world.isAirBlock(x, y, z)
-            && world.isAirBlock(x, y + 1, z)
-            && world.isAirBlock(x, y + 2, z);
+            .isNormalCube() && passable(world, x, y, z)
+            && passable(world, x, y + 1, z)
+            && passable(world, x, y + 2, z);
     }
 
     public String hud(Minecraft mc) {
