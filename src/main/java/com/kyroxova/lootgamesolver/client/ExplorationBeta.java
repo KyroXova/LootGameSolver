@@ -61,6 +61,62 @@ public final class ExplorationBeta {
     private ExcavationPathfinder approachPlan;
     private int[] approachAnchor;
     private boolean approachReady;
+    private boolean pausedForControl;
+    private GroundPathfinder.Search walkingSearch;
+    private boolean walkingPlanFailed;
+    private GroundPathfinder.Search continuationSearch;
+    private int continuationX, continuationZ;
+
+    private boolean undergroundNearby(Minecraft mc) {
+        return !searching && LootGameSolverConfig.staircaseEnabled
+            && target != null
+            && ExcavationPolicy.shouldApproach(
+                mc.thePlayer.posX,
+                mc.thePlayer.boundingBox.minY,
+                mc.thePlayer.posZ,
+                target.xCoord,
+                target.yCoord,
+                target.zCoord);
+    }
+
+    private void chooseApproachDuringWalking(Minecraft mc) {
+        if (digging || seekingDryEntrance || route.isEmpty() || !undergroundNearby(mc)) return;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (mc.thePlayer.onGround && dryShore(mc.theWorld, x, y, z) && safe(mc.theWorld, x, y, z)) {
+            route.clear();
+            extendedFrom = null;
+            approachPlan = null;
+            walkingSearch = null;
+            continuationSearch = null;
+            excavationSearch = null;
+            excavationRoute.clear();
+            digging = true;
+            entranceSelected = true;
+            savedSlot = mc.thePlayer.inventory.currentItem;
+            status = "Planning underground access from current dry ground";
+        } else if (ticks % 10 == 0) {
+            findDryEntrance(mc);
+        }
+    }
+
+    private void inspectUpcomingRoute(Minecraft mc) {
+        if (digging || seekingDryEntrance || route.size() < 2 || ticks % 10 != 0) return;
+        int[] previous = { (int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ) };
+        for (int i = 0; i < Math.min(6, route.size()); i++) {
+            int[] step = route.get(i);
+            boolean diagonal = step[0] != previous[0] && step[2] != previous[2] && step[1] == previous[1];
+            if (!safe(mc.theWorld, step[0], step[1], step[2])
+                || (diagonal && (!safe(mc.theWorld, step[0], step[1], previous[2])
+                    || !safe(mc.theWorld, previous[0], step[1], step[2])))) {
+                plan(mc);
+                status = "Replanning before blocked checkpoint";
+                return;
+            }
+            previous = step;
+        }
+    }
 
     private void prepareApproach(Minecraft mc) {
         if (digging || searching || route.isEmpty() || route.size() > 8 || !LootGameSolverConfig.staircaseEnabled)
@@ -155,6 +211,8 @@ public final class ExplorationBeta {
         extendedFrom = null;
         approachPlan = null;
         approachAnchor = null;
+        walkingSearch = null;
+        continuationSearch = null;
         excavationRoute.clear();
         rejectedSteps.clear();
         entranceCandidates.clear();
@@ -172,10 +230,11 @@ public final class ExplorationBeta {
             return;
         }
         plan(mc);
-        digging = route.isEmpty() && LootGameSolverConfig.staircaseEnabled
+        digging = walkingSearch == null && route.isEmpty()
+            && LootGameSolverConfig.staircaseEnabled
             && target.yCoord <= mc.thePlayer.boundingBox.minY + 3
             && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord);
-        walking = !route.isEmpty() || digging;
+        walking = walkingSearch != null || !route.isEmpty() || digging;
         if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
@@ -244,21 +303,54 @@ public final class ExplorationBeta {
         if (!walking) return;
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled
             || solverActive
-            || mc.currentScreen != null
-            || mc.thePlayer.hurtTime > 0
-            || (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 100)
-            || mc.thePlayer.capabilities.isFlying
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
+            || (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 100)) {
+            stop(
+                mc,
+                solverActive ? "Solver took control"
+                    : !LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled ? "Exploration disabled"
+                        : "Stopped: low air underwater");
+            return;
+        }
+        boolean manual = GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
             || GameSettings.isKeyDown(mc.gameSettings.keyBindRight)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindSneak)) {
-            stop(mc, "Walk cancelled");
+            || GameSettings.isKeyDown(mc.gameSettings.keyBindSneak);
+        if (manual || mc.currentScreen != null || mc.thePlayer.hurtTime > 0 || mc.thePlayer.capabilities.isFlying) {
+            pausedForControl = true;
+            mc.thePlayer.setSprinting(false);
+            mc.playerController.resetBlockRemoving();
+            miningAim.reset();
+            status = manual ? "Paused: release movement keys to resume"
+                : mc.currentScreen != null ? "Paused: close menu to resume"
+                    : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return;
         }
         if (target == null || target.isInvalid()) {
             stop(mc, "Target no longer loaded");
             return;
+        }
+        if (pausedForControl) {
+            pausedForControl = false;
+            excavationRoute.clear();
+            excavationSearch = null;
+            approachPlan = null;
+            approachAnchor = null;
+            digging = false;
+            seekingDryEntrance = false;
+            entranceSelected = false;
+            plan(mc);
+        }
+        inspectUpcomingRoute(mc);
+        chooseApproachDuringWalking(mc);
+        if (walkingSearch != null) {
+            if (!walkingSearch.advance(3_000_000L)) {
+                status = "Continuing route search";
+                return;
+            }
+            route.addAll(walkingSearch.path());
+            walkingSearch = null;
+            walkingPlanFailed = route.isEmpty();
         }
         if (!digging && !seekingDryEntrance && route.size() >= 2 && route.size() <= 8 && ticks % 10 == 0)
             extendRoute(mc);
@@ -286,8 +378,8 @@ public final class ExplorationBeta {
                 double horizontal = Math.abs(mc.thePlayer.posX - target.xCoord)
                     + Math.abs(mc.thePlayer.posZ - target.zCoord);
                 if (horizontal > 32 || (horizontal > 3 && target.yCoord >= mc.thePlayer.boundingBox.minY - 2)) {
-                    plan(mc);
-                    if (!route.isEmpty()) return;
+                    if (!walkingPlanFailed) plan(mc);
+                    if (!route.isEmpty() || walkingSearch != null) return;
                     if (LootGameSolverConfig.staircaseEnabled && horizontal <= 32 && !mc.thePlayer.isInWater()) {
                         digging = true;
                         entranceSelected = true;
@@ -311,7 +403,7 @@ public final class ExplorationBeta {
                         return;
                     }
                     plan(mc);
-                    if (!route.isEmpty()) return;
+                    if (!route.isEmpty() || walkingSearch != null) return;
                     if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
                         && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
                         digging = true;
@@ -343,7 +435,7 @@ public final class ExplorationBeta {
             if (digging) {
                 digging = false;
                 plan(mc);
-                if (!route.isEmpty()) return;
+                if (!route.isEmpty() || walkingSearch != null) return;
             }
             stop(mc, "Arrived beside LootGame");
             return;
@@ -365,7 +457,7 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
             if (!digging && mc.thePlayer.onGround && safe(mc.theWorld, px, py, pz)) {
                 plan(mc);
-                if (!route.isEmpty()) {
+                if (!route.isEmpty() || walkingSearch != null) {
                     lastDistance = Double.MAX_VALUE;
                     stalled = 0;
                     status = "Rerouted around obstruction";
@@ -460,6 +552,9 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        walkingSearch = null;
+        continuationSearch = null;
+        pausedForControl = false;
         approachPlan = null;
         approachAnchor = null;
         cameraActive = false;
@@ -564,7 +659,7 @@ public final class ExplorationBeta {
             target.zCoord = z + (int) Math.round(dz / length * step);
             if (!mc.theWorld.blockExists(target.xCoord, y, target.zCoord)) continue;
             plan(mc);
-            if (route.isEmpty()) continue;
+            if (route.isEmpty() && walkingSearch == null) continue;
             searching = true;
             digging = false;
             stalled = 0;
@@ -595,31 +690,38 @@ public final class ExplorationBeta {
 
     private void extendRoute(Minecraft mc) {
         int[] tail = route.get(route.size() - 1);
-        if (tail == extendedFrom) return;
+        if (tail == extendedFrom && continuationSearch == null) return;
         int gx = searching ? searchGoalX : target.xCoord;
         int gz = searching ? searchGoalZ : target.zCoord;
-        if (Math.abs(tail[0] - gx) + Math.abs(tail[2] - gz) <= 2) {
+        if ((tail != extendedFrom || continuationSearch == null)
+            && Math.abs(tail[0] - gx) + Math.abs(tail[2] - gz) <= 2) {
             if (!searching || search == null) return;
             int[] goal = search.next();
             if (goal == null) return;
             gx = goal[0];
             gz = goal[1];
         }
-        extendedFrom = tail;
-        List<int[]> continuation = new GroundPathfinder().find(
-            walkingTerrain(mc.theWorld),
-            tail[0],
-            tail[1],
-            tail[2],
-            gx,
-            gz,
-            LootGameSolverConfig.explorationRange,
-            3_000_000L);
+        if (tail != extendedFrom || continuationSearch == null) {
+            extendedFrom = tail;
+            continuationX = gx;
+            continuationZ = gz;
+            continuationSearch = new GroundPathfinder.Search(
+                walkingTerrain(mc.theWorld),
+                tail[0],
+                tail[1],
+                tail[2],
+                gx,
+                gz,
+                LootGameSolverConfig.explorationRange);
+        }
+        if (!continuationSearch.advance(3_000_000L)) return;
+        List<int[]> continuation = continuationSearch.path();
+        continuationSearch = null;
         if (continuation.isEmpty()) return;
         route.addAll(continuation);
         if (searching) {
-            searchGoalX = gx;
-            searchGoalZ = gz;
+            searchGoalX = continuationX;
+            searchGoalZ = continuationZ;
             int[] end = route.get(route.size() - 1);
             target.xCoord = end[0];
             target.yCoord = end[1];
@@ -628,19 +730,24 @@ public final class ExplorationBeta {
     }
 
     private void plan(final Minecraft mc) {
+        walkingPlanFailed = false;
         route.clear();
         extendedFrom = null;
+        continuationSearch = null;
         segmentX = mc.thePlayer.posX;
         segmentZ = mc.thePlayer.posZ;
-        route.addAll(
-            new GroundPathfinder().find(
-                walkingTerrain(mc.theWorld),
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ),
-                target.xCoord,
-                target.zCoord,
-                LootGameSolverConfig.explorationRange));
+        walkingSearch = new GroundPathfinder.Search(
+            walkingTerrain(mc.theWorld),
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            target.xCoord,
+            target.zCoord,
+            LootGameSolverConfig.explorationRange);
+        if (walkingSearch.advance(3_000_000L)) {
+            route.addAll(walkingSearch.path());
+            walkingSearch = null;
+        }
     }
 
     private static boolean passable(World world, int x, int y, int z) {
@@ -778,6 +885,10 @@ public final class ExplorationBeta {
                     if (dryShore(w, gx, gy, gz) && safe(w, gx, gy, gz))
                         entranceCandidates.add(new int[] { gx, gy, gz });
                 }
+            final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
+            final int tx = target.xCoord, tz = target.zCoord;
+            entranceCandidates
+                .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
         }
         // Continue across ticks instead of abandoning all later shores after a few failed candidates.
         for (int attempts = 0; attempts < 1 && entranceCandidate < entranceCandidates.size(); attempts++) {
@@ -813,6 +924,12 @@ public final class ExplorationBeta {
         }
         entranceCandidates.clear();
         return false;
+    }
+
+    private static double entranceScore(int[] candidate, double x, double z, int tx, int tz) {
+        double travel = Math.hypot(candidate[0] + 0.5D - x, candidate[2] + 0.5D - z);
+        double approach = Math.hypot(candidate[0] - tx, candidate[2] - tz);
+        return travel + 0.5D * approach;
     }
 
     private boolean attemptStairStep(Minecraft mc, int destinationY) {

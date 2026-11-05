@@ -71,7 +71,7 @@ public final class WorldOverlayRenderer {
         tessellator.draw();
     }
 
-    private static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc) {
+    static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc) {
         FontRenderer font = mc.fontRenderer;
         RenderManager rm = RenderManager.instance;
         float scale = 0.025F;

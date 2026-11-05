@@ -3,6 +3,10 @@ package com.kyroxova.lootgamesolver.client;
 /** A staircase descends beside the player; at board height it becomes a level approach. */
 final class ExcavationPolicy {
 
+    static boolean shouldApproach(double x, double footY, double z, int targetX, int targetY, int targetZ) {
+        return targetY < footY - 2 && Math.abs(x - targetX) + Math.abs(z - targetZ) <= 32;
+    }
+
     static int destinationY(int footY, int boardY) {
         return footY > boardY + 1 ? footY - 1 : footY;
     }

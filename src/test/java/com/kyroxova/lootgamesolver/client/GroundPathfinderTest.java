@@ -10,6 +10,39 @@ import org.junit.Test;
 public class GroundPathfinderTest {
 
     @Test
+    public void expiredTimeSlicePreservesSearchInsteadOfDeclaringFailure() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 && !(x == 2 && Math.abs(z) < 3);
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        GroundPathfinder.Search search = new GroundPathfinder.Search(terrain, 0, 0, 0, 6, 0, 12);
+        assertFalse(search.advance(0));
+        boolean complete = false;
+        for (int tick = 0; tick < 10000 && !complete; tick++) complete = search.advance(100_000L);
+        assertTrue(complete);
+        assertFalse(
+            search.path()
+                .isEmpty());
+        assertTrue(
+            search.path()
+                .stream()
+                .anyMatch(step -> Math.abs(step[2]) >= 3));
+    }
+
+    private static List<int[]> completedRoute(GroundPathfinder.Terrain terrain, int x, int y, int z, int gx, int gz,
+        int radius) {
+        GroundPathfinder.Search search = new GroundPathfinder.Search(terrain, x, y, z, gx, gz, radius);
+        for (int tick = 0; tick < 10000; tick++) if (search.advance(1_000_000L)) return search.path();
+        throw new AssertionError("Search did not complete within its node bound");
+    }
+
+    @Test
     public void diagonalDoesNotCutThroughBlockedCorner() {
         GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
 
@@ -21,9 +54,7 @@ public class GroundPathfinderTest {
                 return true;
             }
         };
-        assertTrue(
-            new GroundPathfinder().find(terrain, 0, 0, 0, 6, 6, 12)
-                .isEmpty());
+        assertTrue(completedRoute(terrain, 0, 0, 0, 6, 6, 12).isEmpty());
     }
 
     @Test
@@ -38,7 +69,7 @@ public class GroundPathfinderTest {
                 return true;
             }
         };
-        List<int[]> route = new GroundPathfinder().find(terrain, 0, 0, 0, 6, 6, 12);
+        List<int[]> route = completedRoute(terrain, 0, 0, 0, 6, 6, 12);
         assertFalse(route.isEmpty());
         for (int[] step : route) assertTrue(step[0] == step[2]);
     }
@@ -57,7 +88,7 @@ public class GroundPathfinderTest {
         };
         int x = 0;
         for (int i = 0; i < 5 && x < 49; i++) {
-            List<int[]> route = new GroundPathfinder().find(terrain, x, 0, 0, 50, 0, 12);
+            List<int[]> route = completedRoute(terrain, x, 0, 0, 50, 0, 12);
             assertFalse(route.isEmpty());
             assertTrue(route.get(0)[0] == x + 1);
             x = route.get(route.size() - 1)[0];
@@ -67,7 +98,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void openDiagonalApproachDoesNotZigzagEveryBlock() {
-        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return y == 0;
@@ -93,7 +124,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void surfaceWaterRouteCanClimbOntoBank() {
-        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return z == 0 && y == (x < 3 ? 63 : 64);
@@ -110,7 +141,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void prefersDryDetourOverShortWaterCrossing() {
-        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return y == 0;
@@ -130,7 +161,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void detoursAroundWall() {
-        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return y == 0 && !(x == 2 && Math.abs(z) < 3);
@@ -151,7 +182,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void climbsAndApproachesDistantGoal() {
-        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return z == 0 && y == (x < 2 ? 0 : 1);
@@ -168,7 +199,7 @@ public class GroundPathfinderTest {
 
     @Test
     public void rejectsLargeDrop() {
-        assertTrue(new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+        assertTrue(completedRoute(new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return (x == 0 && y == 0) || (x > 0 && y == -4);
@@ -177,7 +208,6 @@ public class GroundPathfinderTest {
             public boolean clear(int x, int y, int z) {
                 return true;
             }
-        }, 0, 0, 0, 10, 0, 12)
-            .isEmpty());
+        }, 0, 0, 0, 10, 0, 12).isEmpty());
     }
 }

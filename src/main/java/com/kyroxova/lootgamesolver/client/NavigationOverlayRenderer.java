@@ -32,10 +32,8 @@ final class NavigationOverlayRenderer {
             double[] start = { mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ };
             if (waypoint != null) {
                 t.setColorRGBA_F(0.15F, 0.55F, 1F, 0.8F);
-                t.addVertex(start[0], start[1] + 0.5D, start[2]);
-                t.addVertex(waypoint[0] + 0.5D, waypoint[1] + 1D, waypoint[2] + 0.5D);
                 t.addVertex(waypoint[0] + 0.5D, waypoint[1] + 0.1D, waypoint[2] + 0.5D);
-                t.addVertex(waypoint[0] + 0.5D, Math.max(waypoint[1] + 8D, start[1] + 8D), waypoint[2] + 0.5D);
+                t.addVertex(waypoint[0] + 0.5D, Math.min(255D, waypoint[1] + 64D), waypoint[2] + 0.5D);
             }
             if (exploration.navigating()) {
                 double[] end = draw(t, exploration.navigationRoute(), start, false);
@@ -47,6 +45,17 @@ final class NavigationOverlayRenderer {
                 }
             }
             t.draw();
+            if (waypoint != null) {
+                int distance = (int) Math.ceil(
+                    Math.sqrt(mc.thePlayer.getDistanceSq(waypoint[0] + 0.5D, waypoint[1] + 0.5D, waypoint[2] + 0.5D)));
+                WorldOverlayRenderer.drawFloatingText(
+                    "LootGame | " + distance + " blocks away",
+                    waypoint[0] + 0.5D,
+                    Math.max(waypoint[1] + 3D, start[1] + 3D),
+                    waypoint[2] + 0.5D,
+                    0x5599FF,
+                    mc);
+            }
         } finally {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
