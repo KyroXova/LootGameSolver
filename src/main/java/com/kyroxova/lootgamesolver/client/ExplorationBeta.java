@@ -23,6 +23,7 @@ public final class ExplorationBeta {
     public static final boolean ENABLED = true;
     private final List<int[]> route = new ArrayList<int[]>();
     private World world;
+    private SavedStructureFinder savedFinder;
     private TileEntity target;
     private int ticks;
     private int stalled;
@@ -57,10 +58,21 @@ public final class ExplorationBeta {
 
     public void tick(Minecraft mc, boolean solverActive) {
         if (world != mc.theWorld) {
+            if (savedFinder != null) savedFinder.cancel();
+            savedFinder = null;
             world = mc.theWorld;
             target = null;
             walking = false;
             route.clear();
+            if (world != null && mc.isSingleplayer() && mc.getIntegratedServer() != null) {
+                java.io.File save = new java.io.File(
+                    new java.io.File(mc.mcDataDir, "saves"),
+                    mc.getIntegratedServer()
+                        .getFolderName());
+                String dimension = world.provider.getSaveFolder();
+                if (dimension != null) save = new java.io.File(save, dimension);
+                savedFinder = new SavedStructureFinder(new java.io.File(save, "region"));
+            }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (++ticks % 100 == 0 && !walking) scan(mc);
@@ -164,6 +176,22 @@ public final class ExplorationBeta {
         target = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
         double nearest = Double.MAX_VALUE;
+        if (savedFinder != null) {
+            for (int[] position : savedFinder.positions()) {
+                double distance = mc.thePlayer
+                    .getDistanceSq(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
+                if (distance < nearest) {
+                    if (mc.theWorld.blockExists(position[0], position[1], position[2])
+                        && !(mc.theWorld.getTileEntity(position[0], position[1], position[2]) instanceof TileEntity))
+                        continue;
+                    nearest = distance;
+                    target = new TileEntity();
+                    target.xCoord = position[0];
+                    target.yCoord = position[1];
+                    target.zCoord = position[2];
+                }
+            }
+        }
         for (Object entry : mc.theWorld.loadedTileEntityList) {
             if (!(entry instanceof TileEntity)) continue;
             TileEntity tile = (TileEntity) entry;
