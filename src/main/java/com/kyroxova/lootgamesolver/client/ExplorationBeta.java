@@ -133,11 +133,13 @@ public final class ExplorationBeta {
                 digging = true;
                 savedSlot = mc.thePlayer.inventory.currentItem;
             }
-            if ((digging || target.yCoord < mc.thePlayer.boundingBox.minY - 2) && !dryShore(
-                mc.theWorld,
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ))) {
+            if ((digging || (!searching && target.yCoord < mc.thePlayer.boundingBox.minY - 2
+                && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 6))
+                && !dryShore(
+                    mc.theWorld,
+                    (int) Math.floor(mc.thePlayer.posX),
+                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                    (int) Math.floor(mc.thePlayer.posZ))) {
                 digging = false;
                 if (!findDryEntrance(mc)) stop(mc, "No verified dry entrance near the water; digging stopped");
                 return;
@@ -213,20 +215,25 @@ public final class ExplorationBeta {
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
-        if (distance < 0.30D && (!mc.thePlayer.onGround && !mc.thePlayer.isInWater())) {
-            mc.thePlayer.setSprinting(false);
-            mc.thePlayer.motionX *= 0.4D;
-            mc.thePlayer.motionZ *= 0.4D;
-            return;
-        }
-        if (distance < (route.size() > 1 ? 0.35D : 0.18D)
-            && (py == next[1] || (mc.thePlayer.isInWater() && Math.abs(py - next[1]) <= 1))
-            && (mc.thePlayer.onGround || mc.thePlayer.isInWater())) {
+        if (NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1)) {
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
-            if (!route.isEmpty() && navigationInput != null) navigationInput.forward = 0.7F;
-            return;
+            if (route.isEmpty()) {
+                if (mc.thePlayer.onGround) {
+                    mc.thePlayer.motionX *= 0.3D;
+                    mc.thePlayer.motionZ *= 0.3D;
+                }
+                return;
+            }
+            next = route.get(0);
+            if (!safe(mc.theWorld, next[0], next[1], next[2]) || Math.abs(py - next[1]) > 1) {
+                stop(mc, "Next route segment is no longer safe");
+                return;
+            }
+            dx = next[0] + 0.5D - mc.thePlayer.posX;
+            dz = next[2] + 0.5D - mc.thePlayer.posZ;
+            distance = Math.sqrt(dx * dx + dz * dz);
         }
         if (distance >= lastDistance - 0.005D) stalled++;
         else stalled = 0;
@@ -239,8 +246,8 @@ public final class ExplorationBeta {
             ? (float) (Math.atan2(stairZ, stairX) * 180D / Math.PI) - 90F
             : (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        if (!digging && next[1] == py) mc.thePlayer.rotationYaw = net.minecraft.util.MathHelper
-            .wrapAngleTo180_float(mc.thePlayer.rotationYaw + Math.max(-12F, Math.min(12F, turn)));
+        if (!digging && distance > 0.20D)
+            mc.thePlayer.rotationYaw = NavigationSteering.turn(mc.thePlayer.rotationYaw, desired, 8F);
         boolean straight = route.size() >= 3 && !digging
             && !mc.thePlayer.isInWater()
             && next[1] == py
@@ -257,8 +264,8 @@ public final class ExplorationBeta {
         if (navigationInput != null) {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 ? (float) Math.min(0.65D, distance * 1.5D) : 1F;
-            navigationInput.hop = next[1] > py || mc.thePlayer.isInWater();
-            if ((digging || next[1] != py) && distance > 0.02D) {
+            navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
+            if (digging && distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
                 double speed = Math.min(0.5D, distance);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
@@ -379,6 +386,11 @@ public final class ExplorationBeta {
             public boolean clear(int x, int y, int z) {
                 return passable(mc.theWorld, x, y, z);
             }
+
+            public int extraCost(int x, int y, int z) {
+                return mc.theWorld.getBlock(x, y, z)
+                    .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
+            }
         },
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
@@ -423,16 +435,16 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int attempts = 0;
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-        for (int radius = 3; radius <= 12; radius += 3)
-            for (int[] direction : directions) for (int dy = 0; dy <= 1; dy++) {
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
+        for (int radius = 4; radius <= 16; radius += 4)
+            for (int[] direction : directions) for (int dy = -1; dy <= 4; dy++) {
                 int gx = x + direction[0] * radius, gy = y + dy, gz = z + direction[1] * radius;
                 if (!dryShore(w, gx, gy, gz) || !safe(w, gx, gy, gz)
                     || !passable(w, gx, gy, gz)
                     || !w.getBlock(gx, gy - 1, gz)
                         .isNormalCube())
                     continue;
-                if (++attempts > 4) return false;
+                if (++attempts > 8) return false;
                 List<int[]> candidate = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 
                     public boolean stand(int a, int b, int c) {
@@ -556,6 +568,11 @@ public final class ExplorationBeta {
                     || block == Blocks.portal) return false;
             }
         }
+        if (!world
+            .func_147461_a(
+                net.minecraft.util.AxisAlignedBB
+                    .getBoundingBox(x + 0.19D, y + 0.01D, z + 0.19D, x + 0.81D, y + 1.81D, z + 0.81D))
+            .isEmpty()) return false;
         if (world.getBlock(x, y, z)
             .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y + 1, z)
             && passable(world, x, y + 2, z)) return true;

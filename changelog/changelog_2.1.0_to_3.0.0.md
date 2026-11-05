@@ -36,6 +36,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Preserve staircase heading while centering with sideways movement, and seek a dry supported entrance before digging from water.
 - Keep the camera unchanged while digging and traversing vertical steps; require a three-block liquid buffer around staircase entrances.
 - Tolerate surface bobbing when completing swimming waypoints.
+- Keep yaw continuous across the camera angle boundary to prevent full-turn render interpolation.
+- Advance reached waypoints without forced airborne braking or stale forward input toward the previous segment.
+- Check player-width body clearance, prefer dry detours to water crossings, and search more shoreline entrance directions and elevations.
 - Cache terrain checks within each route search and bound route-search time to reduce work on the client thread.
 - Attempt alternative staircase directions, select suitable hotbar tools, and restore the previous hotbar slot when stopped.
 - Dig without tools in creative mode; select modded survival tools using Forge harvesting and digging-speed hooks.

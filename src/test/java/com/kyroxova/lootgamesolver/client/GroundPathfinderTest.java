@@ -10,6 +10,26 @@ import org.junit.Test;
 public class GroundPathfinderTest {
 
     @Test
+    public void prefersDryDetourOverShortWaterCrossing() {
+        List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+
+            public int extraCost(int x, int y, int z) {
+                return x == 2 && z == 0 ? 12 : 0;
+            }
+        }, 0, 0, 0, 6, 0, 12);
+        assertFalse(route.isEmpty());
+        for (int[] point : route) assertFalse(point[0] == 2 && point[2] == 0);
+    }
+
+    @Test
     public void detoursAroundWall() {
         List<int[]> route = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 

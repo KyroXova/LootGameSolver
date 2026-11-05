@@ -17,6 +17,10 @@ public final class GroundPathfinder {
         boolean stand(int x, int y, int z);
 
         boolean clear(int x, int y, int z);
+
+        default int extraCost(int x, int y, int z) {
+            return 0;
+        }
     }
 
     private static final class Node implements Comparable<Node> {
@@ -70,7 +74,8 @@ public final class GroundPathfinder {
                 if (!canStand) continue;
                 if (dy > 0 && !terrain.clear(node.x, node.y + 2, node.z)) continue;
                 if (dy < 0 && !terrain.clear(nx, node.y + 1, nz)) continue;
-                open.add(new Node(nx, ny, nz, node.cost + 1 + Math.abs(dy), gx, gz, node));
+                open.add(
+                    new Node(nx, ny, nz, node.cost + 1 + Math.abs(dy) + terrain.extraCost(nx, ny, nz), gx, gz, node));
             }
         }
         if (best.remaining >= start.remaining) return result;
