@@ -121,8 +121,13 @@ final class AccessTrail {
     }
 
     static boolean validPoint(int[] point) {
-        return point != null && point.length >= 3 && point[0] >= -30_000_000 && point[0] <= 30_000_000
-            && point[2] >= -30_000_000 && point[2] <= 30_000_000 && point[1] >= -64 && point[1] <= 512;
+        return point != null && point.length >= 3
+            && point[0] >= -30_000_000
+            && point[0] <= 30_000_000
+            && point[2] >= -30_000_000
+            && point[2] <= 30_000_000
+            && point[1] >= -64
+            && point[1] <= 512;
     }
 
     static boolean adjacent(int[] point, int x, int y, int z) {

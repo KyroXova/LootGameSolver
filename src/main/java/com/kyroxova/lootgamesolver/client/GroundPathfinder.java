@@ -167,8 +167,7 @@ public final class GroundPathfinder {
         }
 
         private boolean reachesGoal(Node node) {
-            return gy == ANY_GOAL_Y ? node.remaining <= 10D
-                : node.x == gx && node.y == gy && node.z == gz;
+            return gy == ANY_GOAL_Y ? node.remaining <= 10D : node.x == gx && node.y == gy && node.z == gz;
         }
     }
 

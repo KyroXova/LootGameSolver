@@ -112,7 +112,10 @@ public class MinesweeperSolverTest {
         board.set(0, 0, MinesweeperCell.revealed(1));
         board.set(2, 0, MinesweeperCell.revealed(1));
 
-        assertEquals(SolveResult.Status.INVALID, new MinesweeperSolver().solve(board).getStatus());
+        assertEquals(
+            SolveResult.Status.INVALID,
+            new MinesweeperSolver().solve(board)
+                .getStatus());
     }
 
     @Test

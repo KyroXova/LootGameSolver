@@ -44,8 +44,7 @@ final class AccessTrailStore {
         List<int[]> copy = new ArrayList<int[]>();
         if (saved == null) return copy;
         for (int[] p : saved) {
-            if (!AccessTrail.validPoint(p)
-                || !copy.isEmpty() && AccessTrail.same(copy.get(copy.size() - 1), p)
+            if (!AccessTrail.validPoint(p) || !copy.isEmpty() && AccessTrail.same(copy.get(copy.size() - 1), p)
                 || !copy.isEmpty() && !AccessTrail.adjacent(copy.get(copy.size() - 1), p[0], p[1], p[2])) break;
             if (copy.size() >= MAX_POINTS_PER_ROUTE) break;
             copy.add(new int[] { p[0], p[1], p[2] });
@@ -60,7 +59,8 @@ final class AccessTrailStore {
         for (int[] p : points) {
             if (!AccessTrail.validPoint(p)
                 || previous != null && (previous[0] == p[0] && previous[1] == p[1] && previous[2] == p[2]
-                    || !AccessTrail.adjacent(previous, p[0], p[1], p[2]))) return;
+                    || !AccessTrail.adjacent(previous, p[0], p[1], p[2])))
+                return;
             safeCopy.add(new int[] { p[0], p[1], p[2] });
             previous = p;
         }

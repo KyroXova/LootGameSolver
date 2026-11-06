@@ -229,9 +229,8 @@ public final class ClientHooks {
                 centerClickAttempts = 0;
                 minesweeperOpeningClickSent = false;
                 lastCenterClickTick = -40;
-                if (exploration != null) exploration.setAutomationStatus(nextLevel
-                    ? "Opening Minesweeper stage " + level
-                    : "Reopening Minesweeper attempt");
+                if (exploration != null) exploration.setAutomationStatus(
+                    nextLevel ? "Opening Minesweeper stage " + level : "Reopening Minesweeper attempt");
             }
         }
 

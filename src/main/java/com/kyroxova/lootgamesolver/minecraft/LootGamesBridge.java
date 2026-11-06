@@ -666,7 +666,10 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     /** True when a Minesweeper attempt is ready to generate its board after a reset. */
     public boolean canOpenMinesweeperBoard(Object game) {
-        if (game == null || !MS_GAME.equals(game.getClass().getName())) return false;
+        if (game == null || !MS_GAME.equals(
+            game.getClass()
+                .getName()))
+            return false;
         try {
             if (bool(game, "isBoardGenerated")) return false;
             Object stage = invoke(game, "getStage");
@@ -679,7 +682,9 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public int[] gameCenter(Object game) {
         try {
-            if (game != null && MS_GAME.equals(game.getClass().getName())) {
+            if (game != null && MS_GAME.equals(
+                game.getClass()
+                    .getName())) {
                 Object board = invoke(game, "getBoard");
                 int size = number(invoke(board, "size"));
                 if (size > 0) {
@@ -712,10 +717,8 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public void recordSubmittedAction(DetectedGame snapshot) {
         if (snapshot.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT && !golActionPending
-            && (!golActionRejected || snapshot.gol == null
-                || !golRejectedStageId.equals(snapshot.gol.getStageId()))) {
-            if (golActionRejected && snapshot.gol != null
-                && !golRejectedStageId.equals(snapshot.gol.getStageId())) {
+            && (!golActionRejected || snapshot.gol == null || !golRejectedStageId.equals(snapshot.gol.getStageId()))) {
+            if (golActionRejected && snapshot.gol != null && !golRejectedStageId.equals(snapshot.gol.getStageId())) {
                 golActionRejected = false;
                 golRejectedStageId = null;
             }
@@ -756,8 +759,8 @@ public final class LootGamesBridge implements MiniGameDetector {
                 golAcceptedAwaitingRefresh = false;
                 return true;
             }
-            if (golActionRejected && golRejectedStageId != null
-                && golRejectedStageId.equals(current.gol.getStageId())) return false;
+            if (golActionRejected && golRejectedStageId != null && golRejectedStageId.equals(current.gol.getStageId()))
+                return false;
             if (!golActionPending) return true;
             if (golActionRejected) return false;
             if (!GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId())) return false;

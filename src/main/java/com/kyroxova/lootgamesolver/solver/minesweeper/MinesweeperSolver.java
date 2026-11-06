@@ -124,7 +124,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         List<CellPosition> candidates = new ArrayList<CellPosition>(global.mineProbabilities.keySet());
         Collections.sort(candidates);
         for (CellPosition position : candidates) {
-            double pMine = global.mineProbabilities.get(position).doubleValue();
+            double pMine = global.mineProbabilities.get(position)
+                .doubleValue();
             if (pMine < lowestMineProb) {
                 lowestMineProb = pMine;
                 bestPos = position;

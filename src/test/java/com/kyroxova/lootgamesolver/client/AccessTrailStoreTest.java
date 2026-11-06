@@ -60,15 +60,11 @@ public class AccessTrailStoreTest {
     public void saveRejectsDiscontinuousRouteInsteadOfPersistingAJump() throws Exception {
         File path = new File(temporary.getRoot(), "access-trails.json");
         AccessTrailStore store = new AccessTrailStore(path);
-        store.save(
-            "save:world",
-            0,
-            20,
-            30,
-            40,
-            Arrays.asList(new int[] { 4, 70, 9 }, new int[] { 12, 70, 9 }));
+        store.save("save:world", 0, 20, 30, 40, Arrays.asList(new int[] { 4, 70, 9 }, new int[] { 12, 70, 9 }));
 
-        assertTrue(store.load("save:world", 0, 20, 30, 40).isEmpty());
+        assertTrue(
+            store.load("save:world", 0, 20, 30, 40)
+                .isEmpty());
     }
 
     @Test
@@ -77,6 +73,9 @@ public class AccessTrailStoreTest {
         String json = "{\"trails\":{\"save:world|0:20:30:40\":[[4,70,9],[5,70,9],[5,70,9],[6,70,9]]}}";
         Files.write(path.toPath(), json.getBytes(StandardCharsets.UTF_8));
 
-        assertEquals(2, new AccessTrailStore(path).load("save:world", 0, 20, 30, 40).size());
+        assertEquals(
+            2,
+            new AccessTrailStore(path).load("save:world", 0, 20, 30, 40)
+                .size());
     }
 }

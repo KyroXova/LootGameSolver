@@ -23,7 +23,8 @@ public class GameOfLightAcknowledgementTest {
         }
     }
 
-    private static final class FakeStage {}
+    private static final class FakeStage {
+    }
 
     private static final class FakeAppearance {
 
