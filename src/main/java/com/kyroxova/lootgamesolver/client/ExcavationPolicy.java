@@ -3,8 +3,11 @@ package com.kyroxova.lootgamesolver.client;
 /** A staircase descends beside the player; at board height it becomes a level approach. */
 final class ExcavationPolicy {
 
-    static final double MIN_ENTRANCE_RADIUS = 12.0D;
-    static final double MAX_ENTRANCE_RADIUS = 16.0D;
+    // Radius is measured from the LootGames center. The dungeon footprint itself
+    // occupies much of that radius, so the opening must be farther out to begin
+    // mining close to the nearest outer wall rather than deep inside the room.
+    static final double MIN_ENTRANCE_RADIUS = 13.0D;
+    static final double MAX_ENTRANCE_RADIUS = 24.0D;
 
     static boolean shouldApproach(double x, double footY, double z, int targetX, int targetY, int targetZ) {
         return targetY < footY - 2 && Math.abs(x - targetX) + Math.abs(z - targetZ) <= 32;

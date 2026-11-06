@@ -21,6 +21,7 @@ public class DigToolSelectorTest {
     @Test
     public void prefersHotbarOnEqualSpeedAndRejectsMissingTools() {
         assertEquals(0, DigToolSelector.bestSlot(new float[] { 4F, 4F }, new boolean[] { true, true }));
-        assertEquals(-1, DigToolSelector.bestSlot(new float[] { 1F, 20F }, new boolean[] { true, false }));
+        assertEquals(0, DigToolSelector.bestSlot(new float[] { 1F, 20F }, new boolean[] { true, false }));
+        assertEquals(-1, DigToolSelector.bestSlot(new float[] { 1F, 20F }, new boolean[] { false, false }));
     }
 }

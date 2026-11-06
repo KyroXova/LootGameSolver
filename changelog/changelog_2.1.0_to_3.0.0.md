@@ -132,3 +132,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Prefer the saved tunnel mouth when selecting a room exit, and keep attempted doorways marked so return routing cannot restart the same corner loop.
 - Use dense room-wall boundaries so tunnel walls do not expand the detected room and confuse inside/outside checks.
 - Clear foliage by mining its support only when it blocks a planned excavation step; keep return scaffolding placement limited to the immediately needed adjacent step.
+- Continue a saved-tunnel connection after partial route checkpoints before attempting room-wall exits, and search excavation mouths beyond the dungeon footprint.

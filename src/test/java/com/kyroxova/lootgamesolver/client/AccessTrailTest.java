@@ -63,16 +63,15 @@ public class AccessTrailTest {
     }
 
     @Test
-    public void smallCheckpointGapsDoNotEraseTheSavedEntrance() {
+    public void checkpointGapDoesNotInventAnUnsafeReturnCorridor() {
         AccessTrail trail = new AccessTrail();
         trail.record(0, 64, 0);
         trail.record(1, 64, 0);
         trail.record(4, 64, 0);
-        assertEquals(5, trail.size());
-        assertArrayEquals(
-            new int[] { 0, 64, 0 },
-            trail.reverse(4, 64, 0)
-                .get(3));
-        assertTrue(trail.nearTerminal(4, 64, 0, 1));
+        assertEquals(2, trail.size());
+        assertTrue(trail.reverse(4, 64, 0).isEmpty());
+        assertEquals(1, trail.nearestIndex(4, 64, 0, 4));
+        List<int[]> savedReturn = trail.reverseFrom(1);
+        assertArrayEquals(new int[] { 0, 64, 0 }, savedReturn.get(savedReturn.size() - 1));
     }
 }

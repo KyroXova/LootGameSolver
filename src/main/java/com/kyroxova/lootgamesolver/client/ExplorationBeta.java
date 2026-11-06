@@ -1521,16 +1521,12 @@ public final class ExplorationBeta {
                     continueProgressiveSearch(mc, true);
                     return;
                 }
-                if (insideDungeonRoom(mc)) {
-                    // Do not reset the tried doorway list when a return route
-                    // reaches an empty checkpoint. Resetting here made the
-                    // navigator repeat the same corner-to-corner search forever.
-                    if (roomExitCandidates == null && startRoomExitSearch(mc)) return;
-                    if (digTowardSavedExit(mc)) return;
-                    stop(mc, "Still inside room");
-                    return;
-                }
-                if (rejoiningSavedTrail && returnTrailRoute != null) {
+                // A partial link search is an intermediate checkpoint, not a
+                // doorway. Continue the same search before considering room
+                // walls, or the player is sent around the room toward corners.
+                if (ReturnRoutePolicy.shouldContinueSavedTrailJoin(
+                    rejoiningSavedTrail,
+                    returnTrailRoute)) {
                     returnJoinSearch = new GroundPathfinder.Search(
                         walkingTerrain(mc.theWorld),
                         (int) Math.floor(mc.thePlayer.posX),
@@ -1539,7 +1535,16 @@ public final class ExplorationBeta {
                         returnJoinX,
                         returnJoinZ,
                         Math.max(16, LootGameSolverConfig.explorationRange));
-                    status = "Continuing route search from the last safe checkpoint";
+                    status = "Continuing route to saved tunnel";
+                    return;
+                }
+                if (insideDungeonRoom(mc)) {
+                    // Do not reset the tried doorway list when a return route
+                    // reaches an empty checkpoint. Resetting here made the
+                    // navigator repeat the same corner-to-corner search forever.
+                    if (roomExitCandidates == null && startRoomExitSearch(mc)) return;
+                    if (digTowardSavedExit(mc)) return;
+                    stop(mc, "Still inside room");
                     return;
                 }
                 returning = false;
