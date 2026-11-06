@@ -26,6 +26,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
     private static final int MAX_COMPONENT_VARIABLES = 60;
     private static final int MAX_SOLUTIONS_PER_COMPONENT = 100000;
+    private static final int MAX_SEARCH_NODES_PER_COMPONENT = 250000;
 
     @Override
     public boolean canSolve(MinesweeperBoard board) {
@@ -56,8 +57,13 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         List<SolverAction> guaranteed = new ArrayList<SolverAction>();
         Map<CellPosition, Double> frontierMineProbabilities = new HashMap<CellPosition, Double>();
         double expectedFrontierMines = 0.0D;
+        boolean incompleteEnumeration = false;
 
         for (Enumeration summary : components) {
+            if (!summary.complete) {
+                incompleteEnumeration = true;
+                continue;
+            }
             if (summary.solutionCount == 0) {
                 return SolveResult.none(SolveResult.Status.INVALID, "Board constraints are contradictory");
             }
@@ -78,6 +84,10 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
         if (!guaranteed.isEmpty()) {
             return deterministicResult(guaranteed, "Constraint enumeration");
+        }
+
+        if (incompleteEnumeration) {
+            return SolveResult.none(SolveResult.Status.NO_MOVE, "Frontier too large for exact probability");
         }
 
         // Phase 3: Global Probability Calculation (when no deterministic move exists)
@@ -425,8 +435,9 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
         if (all.isEmpty()) return Enumeration.empty();
         if (all.size() > MAX_COMPONENT_VARIABLES) {
-            // Capped component: return empty so probabilistic solver can handle
-            return Enumeration.empty();
+            Enumeration incomplete = new Enumeration(new ArrayList<CellPosition>(all));
+            incomplete.complete = false;
+            return incomplete;
         }
 
         // Variable ordering: Most Restricted Variable (MRV) first (order by constraint involvement count)
@@ -477,7 +488,15 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     private void backtrack(int varIndex, boolean[] assignment, boolean[] assigned, int[][] terms, int[] required,
         int[] currentMineCounts, int[] unsetCounts, Enumeration out) {
 
-        if (out.solutionCount >= MAX_SOLUTIONS_PER_COMPONENT) return;
+        if (!out.complete) return;
+        if (out.solutionCount >= MAX_SOLUTIONS_PER_COMPONENT) {
+            out.complete = false;
+            return;
+        }
+        if (++out.searchNodes > MAX_SEARCH_NODES_PER_COMPONENT) {
+            out.complete = false;
+            return;
+        }
 
         if (varIndex == assignment.length) {
             out.solutionCount++;
@@ -613,6 +632,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         final List<CellPosition> variables;
         final Map<CellPosition, Integer> mineOccurrences = new HashMap<CellPosition, Integer>();
         int solutionCount;
+        int searchNodes;
+        boolean complete = true;
 
         Enumeration(List<CellPosition> variables) {
             this.variables = variables;

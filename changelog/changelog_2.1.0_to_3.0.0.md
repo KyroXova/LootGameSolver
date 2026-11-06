@@ -140,3 +140,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Score vertical steps and liquid-adjacent footing separately so route choices better reflect movement difficulty while retaining bounded search work.
 - Cache body-clearance and terrain-penalty lookups across incremental route-search slices to reduce repeated world reads.
 - Honor the probability-move toggle and minimum safety threshold in every solver mode, and reject invalid probability values.
+- Stop with a clear no-move result when Minesweeper frontier enumeration exceeds its exactness or work limits instead of guessing from partial counts.

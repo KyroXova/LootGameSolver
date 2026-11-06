@@ -78,9 +78,27 @@ public class MinesweeperSolverTest {
         board.set(1, 1, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
         assertEquals(SolveResult.Status.PROBABILISTIC, result.getStatus());
-        assertEquals(1, result.getActions().size());
-        assertEquals(SolverAction.Type.REVEAL, result.getActions().get(0).type);
+        assertEquals(
+            1,
+            result.getActions()
+                .size());
+        assertEquals(
+            SolverAction.Type.REVEAL,
+            result.getActions()
+                .get(0).type);
         assertEquals(0.75D, result.getBestSafetyProbability(), 0.000001D);
+    }
+
+    @Test
+    public void doesNotTreatOversizedFrontierAsUnconstrainedForGuessing() {
+        MinesweeperBoard board = new MinesweeperBoard(20, 20, 100);
+        for (int y = 2; y <= 16; y += 2) for (int x = 2; x <= 16; x += 2) board.set(x, y, MinesweeperCell.revealed(2));
+
+        SolveResult result = new MinesweeperSolver().solve(board);
+        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
+        assertTrue(
+            result.getActions()
+                .isEmpty());
     }
 
     @Test
