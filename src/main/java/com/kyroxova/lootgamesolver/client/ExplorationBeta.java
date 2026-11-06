@@ -1,5 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,7 +68,14 @@ public final class ExplorationBeta {
     private int miningSlot = -1;
     private int aimTicks;
     private final AccessTrail accessTrail = new AccessTrail();
+    private final AccessTrailStore accessTrailStore = new AccessTrailStore(
+        new File(new File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"), "access-trails.json"));
     private int[] trailTarget;
+    private String trailWorldId;
+    private int trailDimension;
+    private int lastTrailSaveTick;
+    private boolean trailDirty;
+    private boolean trailExcavating;
     private boolean returning, returnAvailable;
     private int returnReplans;
     private int cameraPitchDirection;
@@ -281,6 +289,7 @@ public final class ExplorationBeta {
     }
 
     void finishPuzzle(Minecraft mc, boolean solved) {
+        persistAccessTrail(true);
         if (solved && knownStructure != null && mc.theWorld != null) {
             try {
                 solvedStructures
@@ -322,12 +331,51 @@ public final class ExplorationBeta {
     private void beginAccessTrail(Minecraft mc) {
         if (knownStructure == null || mc.thePlayer == null) return;
         if (trailTarget == null || !samePosition(trailTarget, knownStructure)) {
+            persistAccessTrail(true);
             accessTrail.clear();
             trailTarget = knownStructure.clone();
-            accessTrail.record(
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ));
+            trailWorldId = worldIdentity(mc);
+            trailDimension = mc.theWorld.provider.dimensionId;
+            accessTrail.replace(
+                accessTrailStore.load(trailWorldId, trailDimension, trailTarget[0], trailTarget[1], trailTarget[2]));
+            trailDirty = false;
+            trailExcavating = accessTrail.size() > 1;
+        }
+    }
+
+    private void recordAccessPoint(int x, int y, int z) {
+        if (!trailExcavating) return;
+        if (accessTrail.record(x, y, z)) {
+            trailDirty = true;
+            persistAccessTrail(false);
+        }
+    }
+
+    private void persistAccessTrail(boolean force) {
+        if (!trailDirty || trailTarget == null || trailWorldId == null || accessTrail.size() < 2) return;
+        if (!force && ticks - lastTrailSaveTick < 10) return;
+        try {
+            accessTrailStore.save(
+                trailWorldId,
+                trailDimension,
+                trailTarget[0],
+                trailTarget[1],
+                trailTarget[2],
+                accessTrail.snapshot());
+            trailDirty = false;
+            lastTrailSaveTick = ticks;
+        } catch (java.io.IOException e) {
+            status = "Could not save the structure return route";
+        }
+    }
+
+    private void removePersistedTrail() {
+        if (trailTarget == null || trailWorldId == null) return;
+        try {
+            accessTrailStore.remove(trailWorldId, trailDimension, trailTarget[0], trailTarget[1], trailTarget[2]);
+            trailDirty = false;
+        } catch (java.io.IOException e) {
+            status = "Returned; could not clear the saved route";
         }
     }
 
@@ -542,11 +590,11 @@ public final class ExplorationBeta {
             return;
         }
         if (returnAvailable) {
-            if (startSavedReturn(mc, false, 32)) return;
+            if (startSavedReturn(mc, true, 64)) return;
         }
         // A stopped or interrupted solve may leave the player inside the room while the exact
         // return toggle was never armed. Prefer the approach trail before scanning a new target.
-        if (trailTarget != null && startSavedReturn(mc, false, 32)) {
+        if (trailTarget != null && startSavedReturn(mc, true, 64)) {
             return;
         }
         returnAvailable = false;
@@ -576,6 +624,13 @@ public final class ExplorationBeta {
             return;
         }
         beginAccessTrail(mc);
+        // Inside the structure, the safest shortest path is the exact checked trail we used
+        // to enter. Do not ask a fresh path search to choose a nearby wall or corner.
+        if (accessTrail.nearTerminal(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            24) && startSavedReturn(mc, true, 64)) return;
         boolean underground = LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
             && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 40;
         if (underground) {
@@ -620,6 +675,7 @@ public final class ExplorationBeta {
             navigationInput.hop = false;
         }
         if (world != mc.theWorld) {
+            persistAccessTrail(true);
             if (navigationInput != null) stop(mc, "World changed");
             if (savedFinder != null) savedFinder.cancel();
             savedFinder = null;
@@ -675,6 +731,14 @@ public final class ExplorationBeta {
             }
         }
         if (++ticks % 100 == 0 && !walking) scan(mc);
+        if (!walking && target != null) {
+            beginAccessTrail(mc);
+            if (!returnAvailable && accessTrail.nearTerminal(
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ),
+                24)) returnAvailable = true;
+        }
         if (walking && searching && ticks % 40 == 0) {
             TileEntity previous = target;
             scan(mc);
@@ -764,7 +828,7 @@ public final class ExplorationBeta {
             return;
         }
         if (!movingToPuzzleCenter && !returnDigging && reachableBoard(mc)) {
-            if (mc.thePlayer.onGround && trailTarget != null) accessTrail.record(
+            if (mc.thePlayer.onGround && trailTarget != null) recordAccessPoint(
                 (int) Math.floor(mc.thePlayer.posX),
                 (int) Math.floor(mc.thePlayer.boundingBox.minY),
                 (int) Math.floor(mc.thePlayer.posZ));
@@ -839,6 +903,8 @@ public final class ExplorationBeta {
             if (returning) {
                 returning = false;
                 returnAvailable = false;
+                removePersistedTrail();
+                trailExcavating = false;
                 if (resumeSearchAfterReturn) {
                     continueProgressiveSearch(mc, true);
                 } else {
@@ -982,7 +1048,7 @@ public final class ExplorationBeta {
             || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1))) {
             segmentX = next[0] + 0.5D;
             segmentZ = next[2] + 0.5D;
-            if (!returning && trailTarget != null) accessTrail.record(next[0], next[1], next[2]);
+            if (!returning && trailTarget != null) recordAccessPoint(next[0], next[1], next[2]);
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
@@ -1065,6 +1131,7 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        persistAccessTrail(true);
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
         puzzleMasterTarget = null;
         movingToPuzzleCenter = false;
@@ -1367,10 +1434,25 @@ public final class ExplorationBeta {
             if (trailTarget == null || trailTarget[0] != target.xCoord
                 || trailTarget[1] != target.yCoord
                 || trailTarget[2] != target.zCoord) {
+                persistAccessTrail(true);
                 accessTrail.clear();
                 trailTarget = new int[] { target.xCoord, target.yCoord, target.zCoord };
+                trailWorldId = worldIdentity(mc);
+                trailDimension = mc.theWorld.provider.dimensionId;
+                accessTrail.replace(
+                    accessTrailStore
+                        .load(trailWorldId, trailDimension, trailTarget[0], trailTarget[1], trailTarget[2]));
+                trailDirty = false;
+                trailExcavating = accessTrail.size() > 1;
             }
-            accessTrail.record(x, y, z);
+            if (!trailExcavating) {
+                // The surface walk is only an approach. Save a compact trail from the
+                // actual excavation mouth so return never walks back to the old start.
+                accessTrail.clear();
+                trailDirty = false;
+                trailExcavating = true;
+            }
+            recordAccessPoint(x, y, z);
         }
         if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
             singleStep(mc, x, y, z, true);

@@ -61,4 +61,18 @@ public class AccessTrailTest {
         assertArrayEquals(new int[] { 0, 64, 0 }, back.get(2));
         assertEquals(-1, trail.nearestIndex(20, 20, 20, 8));
     }
+
+    @Test
+    public void smallCheckpointGapsDoNotEraseTheSavedEntrance() {
+        AccessTrail trail = new AccessTrail();
+        trail.record(0, 64, 0);
+        trail.record(1, 64, 0);
+        trail.record(4, 64, 0);
+        assertEquals(5, trail.size());
+        assertArrayEquals(
+            new int[] { 0, 64, 0 },
+            trail.reverse(4, 64, 0)
+                .get(3));
+        assertTrue(trail.nearTerminal(4, 64, 0, 1));
+    }
 }

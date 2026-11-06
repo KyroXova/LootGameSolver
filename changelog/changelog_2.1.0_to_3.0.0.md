@@ -96,6 +96,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Cycle backward from Sudoku zero with a single sneaking click when that is the shorter route.
 - Retry aimed master and board-center interactions when the board state has not arrived yet, and continue from the authoritative server win message.
 - Rejoin the saved approach trail when resuming from inside a structure, even when the Return action was not armed.
+- Persist the checked dig entrance route per world, dimension, and structure so it survives client restarts.
+- Return through the excavation entrance instead of retracing the surface approach to the player's old starting point.
+- Clear the temporary entrance route after exiting, then resume searching from the surface entrance.
+- Avoid non-water liquid hazards, including oil, when checking movement routes.
 - Hold the camera at a steady up or down angle through stair runs, and keep it level while swimming.
 
 ## Build and releases

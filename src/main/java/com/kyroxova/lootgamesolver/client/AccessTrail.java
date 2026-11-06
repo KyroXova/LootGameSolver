@@ -12,13 +12,47 @@ final class AccessTrail {
         points.clear();
     }
 
-    void record(int x, int y, int z) {
+    boolean record(int x, int y, int z) {
         if (!points.isEmpty()) {
             int[] last = points.get(points.size() - 1);
-            if (last[0] == x && last[1] == y && last[2] == z) return;
-            if (!adjacent(last, x, y, z)) points.clear();
+            if (last[0] == x && last[1] == y && last[2] == z) return false;
+            int distance = Math.abs(last[0] - x) + Math.abs(last[1] - y) + Math.abs(last[2] - z);
+            if (!adjacent(last, x, y, z)) {
+                if (distance > 8) points.clear();
+                else appendCardinalBridge(last, x, y, z);
+            }
         }
         points.add(new int[] { x, y, z });
+        return true;
+    }
+
+    void replace(List<int[]> saved) {
+        points.clear();
+        if (saved == null) return;
+        for (int[] p : saved) {
+            if (p == null || p.length < 3
+                || Math.abs(p[0]) > 30_000_000
+                || Math.abs(p[2]) > 30_000_000
+                || p[1] < -64
+                || p[1] > 512) continue;
+            if (points.size() >= 16_000) break;
+            points.add(new int[] { p[0], p[1], p[2] });
+        }
+    }
+
+    List<int[]> snapshot() {
+        List<int[]> copy = new ArrayList<int[]>(points.size());
+        for (int[] p : points) copy.add(p.clone());
+        return copy;
+    }
+
+    int size() {
+        return points.size();
+    }
+
+    boolean nearTerminal(int x, int y, int z, int maxDistance) {
+        int nearest = nearestIndex(x, y, z, maxDistance);
+        return points.size() >= 2 && nearest >= Math.max(1, (int) (points.size() * 0.6D));
     }
 
     List<int[]> reverse(int x, int y, int z) {
@@ -27,7 +61,7 @@ final class AccessTrail {
         for (int i = 0; i < points.size(); i++) {
             int[] p = points.get(i);
             int distance = Math.abs(p[0] - x) + Math.abs(p[1] - y) + Math.abs(p[2] - z);
-            if (adjacent(p, x, y, z) && distance < closest) {
+            if (adjacent(p, x, y, z) && (distance < closest || (distance == closest && i > start))) {
                 start = i;
                 closest = distance;
             }
@@ -41,7 +75,7 @@ final class AccessTrail {
         for (int i = 0; i < points.size(); i++) {
             int[] p = points.get(i);
             int distance = Math.abs(p[0] - x) + Math.abs(p[1] - y) + Math.abs(p[2] - z);
-            if (distance < closest) {
+            if (distance < closest || (distance == closest && i > index)) {
                 index = i;
                 closest = distance;
             }
@@ -72,5 +106,21 @@ final class AccessTrail {
     private static boolean adjacent(int[] point, int x, int y, int z) {
         int dx = Math.abs(point[0] - x), dy = Math.abs(point[1] - y), dz = Math.abs(point[2] - z);
         return dx <= 1 && dy <= 1 && dz <= 1 && (dy == 0 || dx + dz <= 1);
+    }
+
+    private void appendCardinalBridge(int[] start, int x, int y, int z) {
+        int cx = start[0], cy = start[1], cz = start[2];
+        while (cx != x) {
+            cx += Integer.signum(x - cx);
+            if (cx != x || cy != y || cz != z) points.add(new int[] { cx, cy, cz });
+        }
+        while (cz != z) {
+            cz += Integer.signum(z - cz);
+            if (cx != x || cy != y || cz != z) points.add(new int[] { cx, cy, cz });
+        }
+        while (cy != y) {
+            cy += Integer.signum(y - cy);
+            if (cx != x || cy != y || cz != z) points.add(new int[] { cx, cy, cz });
+        }
     }
 }
