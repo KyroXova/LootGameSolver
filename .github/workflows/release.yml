@@ -153,9 +153,24 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Check public feature gate
+      - name: Disable beta finder for public build
+        shell: bash
         run: |
-          grep -q 'public static final boolean ENABLED = false;' src/main/java/com/kyroxova/lootgamesolver/client/ExplorationBeta.java || { echo "Disable exploration beta before publishing"; exit 1; }
+          set -euo pipefail
+          SOURCE=src/main/java/com/kyroxova/lootgamesolver/client/ExplorationBeta.java
+          python3 - "$SOURCE" <<'PY'
+          from pathlib import Path
+          import sys
+
+          source = Path(sys.argv[1])
+          text = source.read_text()
+          enabled = "public static final boolean ENABLED = true;"
+          disabled = "public static final boolean ENABLED = false;"
+          if text.count(enabled) != 1:
+              raise SystemExit("Expected exactly one enabled local beta gate")
+          source.write_text(text.replace(enabled, disabled, 1))
+          PY
+          grep -q 'public static final boolean ENABLED = false;' "$SOURCE"
 
       - name: Setup workspace
         run: ./gradlew setupCIWorkspace
