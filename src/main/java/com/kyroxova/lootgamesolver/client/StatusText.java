@@ -99,6 +99,7 @@ final class StatusText {
         if (text.contains("disabled")) return "Disabled";
         if (text.contains("no supported") || text.contains("no board")) return "No Board";
         if (text.contains("guess") || text.contains("probabilistic")) return "Waiting: Guess";
+        if (text.contains("timed out") || text.contains("no acknowledgement")) return "Stop: No Ack";
         if (text.contains("waiting")) return "Waiting";
         return shorten(detail);
     }

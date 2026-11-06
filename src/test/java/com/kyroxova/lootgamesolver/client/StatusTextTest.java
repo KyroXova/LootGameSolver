@@ -25,6 +25,7 @@ public class StatusTextTest {
         assertEquals("Solve: Flag", StatusText.solver("Flagging (4 remaining)"));
         assertEquals("Stage: Watch", StatusText.solver("Watching sequence playback..."));
         assertEquals("Stage Complete", StatusText.solver("All Sudoku numbers confirmed. Waiting for next stage..."));
+        assertEquals("Stop: No Ack", StatusText.solver("Action timed out; solver stopped"));
     }
 
     @Test

@@ -142,6 +142,7 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Honor the probability-move toggle and minimum safety threshold in every solver mode, and reject invalid probability values.
 - Stop with a clear no-move result when Minesweeper frontier enumeration exceeds its exactness or work limits instead of guessing from partial counts.
 - Advance Game of Light input only after LootGames sends an accepted mark; hold on denied or delayed clicks instead of replaying them.
+- Stop Minesweeper and Sudoku automation after unacknowledged clicks instead of repeating them; continue number cycles only after a visible digit update.
 - Calculate Minesweeper risks by combining complete frontier solutions with the board-wide mine total, including deductions across separate frontiers.
 - Require saved-tunnel joins, room doorways, and board-center approaches to reach the correct floor height before connecting or crossing routes.
 - Validate persisted entrance paths as contiguous adjacent steps and stop loading at the first corrupt checkpoint instead of bridging gaps.

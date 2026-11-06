@@ -34,7 +34,6 @@ public final class SolverSession {
     private List<SolverAction> cachedRenderActions;
     private DetectedGame currentSnapshot;
     private String lastSnapshotSignature;
-    private String beforeActionSignature;
     private String sudokuPuzzleSignature;
     private int sudokuValueBeforeClick = -1;
     private long lastActionAt;
@@ -43,6 +42,7 @@ public final class SolverSession {
     private int queued;
     private int remainingClicksForActiveAction = 0;
     private boolean sudokuReverseClick;
+    private boolean interactionPending;
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
@@ -95,8 +95,9 @@ public final class SolverSession {
             String signature = puzzle.toString();
             if (!signature.equals(sudokuPuzzleSignature)) {
                 activeAction = null;
-                beforeActionSignature = null;
                 sudokuValueBeforeClick = -1;
+                interactionPending = false;
+                lastActionAt = 0L;
                 sudokuPuzzleSignature = signature;
             }
         }
@@ -113,6 +114,7 @@ public final class SolverSession {
         if (now - lastActionAt < LootGameSolverConfig.clickDelayMs) return;
 
         if (activeAction == null || isActionComplete(currentSnapshot)) {
+            interactionPending = false;
             advanceAuto(currentSnapshot);
         } else {
             send(currentSnapshot);
@@ -256,21 +258,38 @@ public final class SolverSession {
             status = "Waiting: GoL";
             return;
         }
-        if (activeAction.type == SolverAction.Type.SET_VALUE && sudokuValueBeforeClick >= 0
-            && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] == sudokuValueBeforeClick
-            && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {
-            status = "Waiting for Sudoku board update...";
-            return;
+        if (interactionPending) {
+            boolean sudokuProgress = activeAction.type == SolverAction.Type.SET_VALUE && sudokuValueBeforeClick >= 0
+                && snapshot.sudokuPlayerValues != null
+                && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
+                    != sudokuValueBeforeClick;
+            ActionAckWatchdog.Decision decision = ActionAckWatchdog.decide(
+                interactionPending,
+                sudokuProgress,
+                lastActionAt,
+                System.currentTimeMillis(),
+                LootGameSolverConfig.boardUpdateTimeoutMs);
+            if (decision == ActionAckWatchdog.Decision.SEND) {
+                // A visible digit change acknowledges one click in the multi-click
+                // number cycle. Continue only after that progress is visible.
+                interactionPending = false;
+            } else if (decision == ActionAckWatchdog.Decision.WAIT) {
+                status = "Waiting: Board";
+                return;
+            } else {
+                cancel("Action timed out; solver stopped");
+                return;
+            }
         }
         if (!bridge.interact(snapshot, activeAction, sudokuReverseClick)) {
             status = "Navigating to " + activeAction.position;
             return;
         }
         bridge.recordSubmittedAction(snapshot);
+        interactionPending = snapshot.type != MiniGame.GAME_OF_LIGHT;
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
             sudokuValueBeforeClick = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
         }
-        beforeActionSignature = snapshot.signature;
         lastActionAt = System.currentTimeMillis();
     }
 
@@ -286,12 +305,13 @@ public final class SolverSession {
     public void cancel(String reason) {
         bridge.releaseSneak();
         bridge.resetGameOfLightPendingAction();
+        interactionPending = false;
+        lastActionAt = 0L;
         mode = null;
         activeAction = null;
         activeActions = null;
         cachedRenderActions = null;
         lastSnapshotSignature = null;
-        beforeActionSignature = null;
         sudokuPuzzleSignature = null;
         sudokuValueBeforeClick = -1;
         queued = 0;
