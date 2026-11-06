@@ -1,5 +1,8 @@
 package com.kyroxova.lootgamesolver.solver.minesweeper;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -55,8 +58,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         // Phase 2: Connected Component Decomposition & Backtracking
         List<Enumeration> components = enumerateComponents(reducedConstraints);
         List<SolverAction> guaranteed = new ArrayList<SolverAction>();
-        Map<CellPosition, Double> frontierMineProbabilities = new HashMap<CellPosition, Double>();
-        double expectedFrontierMines = 0.0D;
         boolean incompleteEnumeration = false;
 
         for (Enumeration summary : components) {
@@ -67,16 +68,12 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             if (summary.solutionCount == 0) {
                 return SolveResult.none(SolveResult.Status.INVALID, "Board constraints are contradictory");
             }
-            double compTotalSolutions = summary.solutionCount;
-            for (Map.Entry<CellPosition, Integer> entry : summary.mineOccurrences.entrySet()) {
-                double mineProb = entry.getValue()
-                    .doubleValue() / compTotalSolutions;
-                frontierMineProbabilities.put(entry.getKey(), mineProb);
-                expectedFrontierMines += mineProb;
-
-                if (mineProb <= 0.000001D) {
+            for (Map.Entry<CellPosition, int[]> entry : summary.mineOccurrencesByMineCount.entrySet()) {
+                int mineAssignments = 0;
+                for (int count : entry.getValue()) mineAssignments += count;
+                if (mineAssignments == 0) {
                     guaranteed.add(new SolverAction(SolverAction.Type.REVEAL, entry.getKey()));
-                } else if (mineProb >= 0.999999D) {
+                } else if (mineAssignments == summary.solutionCount) {
                     guaranteed.add(new SolverAction(SolverAction.Type.FLAG, entry.getKey()));
                 }
             }
@@ -90,75 +87,49 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             return SolveResult.none(SolveResult.Status.NO_MOVE, "Frontier too large for exact probability");
         }
 
-        // Phase 3: Global Probability Calculation (when no deterministic move exists)
-        if (hasUnknownCells(board)) {
-            CandidateSelection bestCandidate = findSafestCandidate(
-                board,
-                frontierMineProbabilities,
-                expectedFrontierMines);
-            if (bestCandidate != null) {
-                List<SolverAction> action = Collections.singletonList(
-                    new SolverAction(
-                        SolverAction.Type.REVEAL,
-                        bestCandidate.position,
-                        0,
-                        bestCandidate.safetyProbability));
-                return new SolveResult(
-                    SolveResult.Status.PROBABILISTIC,
-                    action,
-                    bestCandidate.safetyProbability,
-                    bestCandidate.description);
+        // Phase 3: Weight all complete frontier assignments against the global mine count.
+        GlobalProbability global = calculateGlobalProbabilities(board, components);
+        if (global.contradictory) {
+            return SolveResult.none(SolveResult.Status.INVALID, "Mine count conflicts with board constraints");
+        }
+        for (Map.Entry<CellPosition, Double> entry : global.mineProbabilities.entrySet()) {
+            if (entry.getValue() <= 0.000001D) {
+                guaranteed.add(new SolverAction(SolverAction.Type.REVEAL, entry.getKey()));
+            } else if (entry.getValue() >= 0.999999D) {
+                guaranteed.add(new SolverAction(SolverAction.Type.FLAG, entry.getKey()));
             }
+        }
+        if (!guaranteed.isEmpty()) return deterministicResult(guaranteed, "Global mine count");
+
+        CandidateSelection bestCandidate = findSafestCandidate(global);
+        if (bestCandidate != null) {
+            List<SolverAction> action = Collections.singletonList(
+                new SolverAction(SolverAction.Type.REVEAL, bestCandidate.position, 0, bestCandidate.safetyProbability));
+            return new SolveResult(
+                SolveResult.Status.PROBABILISTIC,
+                action,
+                bestCandidate.safetyProbability,
+                bestCandidate.description);
         }
 
         return SolveResult.none(SolveResult.Status.SOLVED, "Board solved");
     }
 
-    private CandidateSelection findSafestCandidate(MinesweeperBoard board,
-        Map<CellPosition, Double> frontierProbabilities, double expectedFrontierMines) {
+    private CandidateSelection findSafestCandidate(GlobalProbability global) {
 
         CellPosition bestPos = null;
         double lowestMineProb = 1.1D;
         String reason = "";
 
-        // Check constrained frontier cells first
-        for (Map.Entry<CellPosition, Double> entry : frontierProbabilities.entrySet()) {
-            double pMine = entry.getValue();
+        List<CellPosition> candidates = new ArrayList<CellPosition>(global.mineProbabilities.keySet());
+        Collections.sort(candidates);
+        for (CellPosition position : candidates) {
+            double pMine = global.mineProbabilities.get(position).doubleValue();
             if (pMine < lowestMineProb) {
                 lowestMineProb = pMine;
-                bestPos = entry.getKey();
-                reason = "Safest frontier cell (risk: " + String.format("%.1f%%", pMine * 100.0) + ")";
-            }
-        }
-
-        // Count unconstrained unknown cells (unknown cells not part of any constraint)
-        List<CellPosition> unconstrained = new ArrayList<CellPosition>();
-        int totalFlags = 0;
-        for (CellPosition p : board.positions()) {
-            MinesweeperCell cell = board.get(p);
-            if (cell.getState() == CellState.FLAGGED) {
-                totalFlags++;
-            } else if (cell.getState() == CellState.UNKNOWN) {
-                if (!frontierProbabilities.containsKey(p)) {
-                    unconstrained.add(p);
-                }
-            }
-        }
-
-        if (!unconstrained.isEmpty()) {
-            int remainingTotalMines = Math.max(0, board.getMineCount() - totalFlags);
-            double remainingUnconstrainedMines = Math.max(0.0D, remainingTotalMines - expectedFrontierMines);
-            double unconstrainedMineProb = Math
-                .min(1.0D, Math.max(0.0D, remainingUnconstrainedMines / unconstrained.size()));
-
-            if (unconstrainedMineProb < lowestMineProb) {
-                // Prefer corners or edges of unconstrained cells
-                CellPosition bestUnconstrained = pickBestUnconstrainedPosition(board, unconstrained);
-                lowestMineProb = unconstrainedMineProb;
-                bestPos = bestUnconstrained;
-                reason = "Unconstrained field cell (estimated risk: "
-                    + String.format("%.1f%%", unconstrainedMineProb * 100.0)
-                    + ")";
+                bestPos = position;
+                reason = (global.unconstrained.contains(position) ? "Safest field cell (risk: "
+                    : "Safest frontier cell (risk: ") + String.format("%.1f%%", pMine * 100.0) + ")";
             }
         }
 
@@ -170,32 +141,177 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         return null;
     }
 
-    private CellPosition pickBestUnconstrainedPosition(MinesweeperBoard board, List<CellPosition> unconstrained) {
-        int w = board.getWidth();
-        int h = board.getHeight();
-
-        // Check four board corners first
-        CellPosition[] corners = new CellPosition[] { new CellPosition(0, 0), new CellPosition(w - 1, 0),
-            new CellPosition(0, h - 1), new CellPosition(w - 1, h - 1) };
-        for (CellPosition c : corners) {
-            if (unconstrained.contains(c)) return c;
-        }
-
-        // Otherwise return the position closest to board center
-        int cx = w / 2;
-        int cy = h / 2;
-        CellPosition best = unconstrained.get(0);
-        int bestDistSq = Integer.MAX_VALUE;
-        for (CellPosition p : unconstrained) {
-            int dx = p.x - cx;
-            int dy = p.y - cy;
-            int d = dx * dx + dy * dy;
-            if (d < bestDistSq) {
-                bestDistSq = d;
-                best = p;
+    private GlobalProbability calculateGlobalProbabilities(MinesweeperBoard board, List<Enumeration> components) {
+        int flags = 0;
+        List<CellPosition> unknown = new ArrayList<CellPosition>();
+        Set<CellPosition> frontier = new HashSet<CellPosition>();
+        for (Enumeration component : components) frontier.addAll(component.variables);
+        List<CellPosition> unconstrained = new ArrayList<CellPosition>();
+        for (CellPosition position : board.positions()) {
+            CellState state = board.get(position)
+                .getState();
+            if (state == CellState.FLAGGED) flags++;
+            else if (state == CellState.UNKNOWN) {
+                unknown.add(position);
+                if (!frontier.contains(position)) unconstrained.add(position);
             }
         }
-        return best;
+
+        int remainingMines = board.getMineCount() - flags;
+        if (remainingMines < 0 || remainingMines > unknown.size()) return GlobalProbability.contradictory();
+        int maxMines = remainingMines;
+        int count = components.size();
+        BigInteger[][] prefix = new BigInteger[count + 1][];
+        BigInteger[][] suffix = new BigInteger[count + 1][];
+        prefix[0] = unitDistribution(maxMines);
+        for (int i = 0; i < count; i++) {
+            prefix[i + 1] = convolve(prefix[i], components.get(i).solutionsByMineCount, maxMines);
+        }
+        suffix[count] = unitDistribution(maxMines);
+        for (int i = count - 1; i >= 0; i--) {
+            suffix[i] = convolve(suffix[i + 1], components.get(i).solutionsByMineCount, maxMines);
+        }
+
+        BinomialCache binomial = new BinomialCache();
+        BigInteger totalWorlds = BigInteger.ZERO;
+        for (int frontierMines = 0; frontierMines <= maxMines; frontierMines++) {
+            int freeMines = remainingMines - frontierMines;
+            if (freeMines >= 0 && freeMines <= unconstrained.size()) {
+                totalWorlds = totalWorlds
+                    .add(prefix[count][frontierMines].multiply(binomial.choose(unconstrained.size(), freeMines)));
+            }
+        }
+        if (totalWorlds.signum() == 0) return GlobalProbability.contradictory();
+
+        Map<CellPosition, Double> probabilities = new HashMap<CellPosition, Double>();
+        for (int i = 0; i < count; i++) {
+            Enumeration component = components.get(i);
+            BigInteger[] otherComponents = convolve(prefix[i], suffix[i + 1], maxMines);
+            for (CellPosition variable : component.variables) {
+                BigInteger safeWorlds = BigInteger.ZERO;
+                int[] occurrences = component.mineOccurrencesByMineCount.get(variable);
+                for (int componentMines = 0; componentMines < component.solutionsByMineCount.length
+                    && componentMines <= maxMines; componentMines++) {
+                    int safeAssignments = component.solutionsByMineCount[componentMines] - occurrences[componentMines];
+                    if (safeAssignments <= 0) continue;
+                    for (int otherMines = 0; otherMines + componentMines <= maxMines; otherMines++) {
+                        int freeMines = remainingMines - componentMines - otherMines;
+                        if (freeMines >= 0 && freeMines <= unconstrained.size()) {
+                            BigInteger layouts = otherComponents[otherMines]
+                                .multiply(binomial.choose(unconstrained.size(), freeMines));
+                            safeWorlds = safeWorlds.add(layouts.multiply(BigInteger.valueOf(safeAssignments)));
+                        }
+                    }
+                }
+                probabilities.put(variable, Double.valueOf(probabilityMine(safeWorlds, totalWorlds)));
+            }
+        }
+
+        if (!unconstrained.isEmpty()) {
+            BigInteger mineWorlds = BigInteger.ZERO;
+            for (int frontierMines = 0; frontierMines <= maxMines; frontierMines++) {
+                int freeMines = remainingMines - frontierMines - 1;
+                if (freeMines >= 0 && freeMines < unconstrained.size()) {
+                    mineWorlds = mineWorlds.add(
+                        prefix[count][frontierMines].multiply(binomial.choose(unconstrained.size() - 1, freeMines)));
+                }
+            }
+            double probability = ratio(mineWorlds, totalWorlds);
+            for (CellPosition position : unconstrained) probabilities.put(position, Double.valueOf(probability));
+        }
+        return new GlobalProbability(probabilities, unconstrained, false);
+    }
+
+    private static double probabilityMine(BigInteger safeWorlds, BigInteger totalWorlds) {
+        return Math.max(0D, Math.min(1D, 1D - ratio(safeWorlds, totalWorlds)));
+    }
+
+    private static double ratio(BigInteger numerator, BigInteger denominator) {
+        if (numerator.signum() == 0) return 0D;
+        return Math.max(
+            0D,
+            Math.min(
+                1D,
+                new BigDecimal(numerator).divide(new BigDecimal(denominator), MathContext.DECIMAL64)
+                    .doubleValue()));
+    }
+
+    private static BigInteger[] unitDistribution(int maxMines) {
+        BigInteger[] values = new BigInteger[maxMines + 1];
+        for (int i = 0; i <= maxMines; i++) values[i] = BigInteger.ZERO;
+        values[0] = BigInteger.ONE;
+        return values;
+    }
+
+    private static BigInteger[] convolve(BigInteger[] left, int[] right, int maxMines) {
+        BigInteger[] result = new BigInteger[maxMines + 1];
+        for (int i = 0; i <= maxMines; i++) result[i] = BigInteger.ZERO;
+        for (int leftMines = 0; leftMines < left.length; leftMines++) {
+            if (left[leftMines].signum() == 0) continue;
+            for (int rightMines = 0; rightMines < right.length && leftMines + rightMines <= maxMines; rightMines++) {
+                if (right[rightMines] != 0) {
+                    result[leftMines + rightMines] = result[leftMines + rightMines]
+                        .add(left[leftMines].multiply(BigInteger.valueOf(right[rightMines])));
+                }
+            }
+        }
+        return result;
+    }
+
+    private static final class BinomialCache {
+
+        private final Map<Long, BigInteger> values = new HashMap<Long, BigInteger>();
+
+        BigInteger choose(int n, int k) {
+            if (k < 0 || k > n) return BigInteger.ZERO;
+            int reducedK = Math.min(k, n - k);
+            long key = ((long) n << 32) | (reducedK & 0xffffffffL);
+            BigInteger cached = values.get(Long.valueOf(key));
+            if (cached != null) return cached;
+            BigInteger result = BigInteger.ONE;
+            for (int i = 1; i <= reducedK; i++) {
+                result = result.multiply(BigInteger.valueOf(n - reducedK + i))
+                    .divide(BigInteger.valueOf(i));
+            }
+            values.put(Long.valueOf(key), result);
+            return result;
+        }
+    }
+
+    private static final class GlobalProbability {
+
+        final Map<CellPosition, Double> mineProbabilities;
+        final List<CellPosition> unconstrained;
+        final boolean contradictory;
+
+        GlobalProbability(Map<CellPosition, Double> mineProbabilities, List<CellPosition> unconstrained,
+            boolean contradictory) {
+            this.mineProbabilities = mineProbabilities;
+            this.unconstrained = unconstrained;
+            this.contradictory = contradictory;
+        }
+
+        static GlobalProbability contradictory() {
+            return new GlobalProbability(
+                Collections.<CellPosition, Double>emptyMap(),
+                Collections.<CellPosition>emptyList(),
+                true);
+        }
+    }
+
+    private static BigInteger[] convolve(BigInteger[] left, BigInteger[] right, int maxMines) {
+        BigInteger[] result = new BigInteger[maxMines + 1];
+        for (int i = 0; i <= maxMines; i++) result[i] = BigInteger.ZERO;
+        for (int leftMines = 0; leftMines < left.length; leftMines++) {
+            if (left[leftMines].signum() == 0) continue;
+            for (int rightMines = 0; rightMines < right.length && leftMines + rightMines <= maxMines; rightMines++) {
+                if (right[rightMines].signum() != 0) {
+                    result[leftMines + rightMines] = result[leftMines + rightMines]
+                        .add(left[leftMines].multiply(right[rightMines]));
+                }
+            }
+        }
+        return result;
     }
 
     private SolveResult deterministicResult(List<SolverAction> actions, String message) {
@@ -500,14 +616,13 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
         if (varIndex == assignment.length) {
             out.solutionCount++;
+            int mines = 0;
+            for (boolean isMine : assignment) if (isMine) mines++;
+            out.solutionsByMineCount[mines]++;
             for (int i = 0; i < assignment.length; i++) {
                 if (assignment[i]) {
                     CellPosition p = out.variables.get(i);
-                    out.mineOccurrences.put(
-                        p,
-                        Integer.valueOf(
-                            out.mineOccurrences.get(p)
-                                .intValue() + 1));
+                    out.mineOccurrencesByMineCount.get(p)[mines]++;
                 }
             }
             return;
@@ -581,14 +696,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
     }
 
-    private boolean hasUnknownCells(MinesweeperBoard board) {
-        for (CellPosition p : board.positions()) {
-            if (board.get(p)
-                .getState() == CellState.UNKNOWN) return true;
-        }
-        return false;
-    }
-
     private static final class CandidateSelection {
 
         final CellPosition position;
@@ -630,14 +737,18 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     private static final class Enumeration {
 
         final List<CellPosition> variables;
-        final Map<CellPosition, Integer> mineOccurrences = new HashMap<CellPosition, Integer>();
+        final Map<CellPosition, int[]> mineOccurrencesByMineCount = new HashMap<CellPosition, int[]>();
+        final int[] solutionsByMineCount;
         int solutionCount;
         int searchNodes;
         boolean complete = true;
 
         Enumeration(List<CellPosition> variables) {
             this.variables = variables;
-            for (CellPosition p : variables) mineOccurrences.put(p, Integer.valueOf(0));
+            this.solutionsByMineCount = new int[variables.size() + 1];
+            for (CellPosition p : variables) {
+                mineOccurrencesByMineCount.put(p, new int[variables.size() + 1]);
+            }
         }
 
         static Enumeration empty() {

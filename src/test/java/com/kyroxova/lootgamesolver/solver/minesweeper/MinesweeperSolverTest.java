@@ -90,6 +90,32 @@ public class MinesweeperSolverTest {
     }
 
     @Test
+    public void usesGlobalMineCountToResolveDisconnectedChoicePatterns() {
+        // The two clues permit either (safe, mine, safe) or (mine, safe, mine).
+        // One adjacent flag and the total mine count allow only the first pattern.
+        MinesweeperBoard board = new MinesweeperBoard(3, 2, 2);
+        board.set(0, 0, MinesweeperCell.revealed(2));
+        board.set(1, 0, MinesweeperCell.flagged());
+        board.set(2, 0, MinesweeperCell.revealed(2));
+
+        SolveResult result = new MinesweeperSolver().solve(board);
+
+        assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
+        assertTrue(has(result, SolverAction.Type.REVEAL, 0, 1));
+        assertTrue(has(result, SolverAction.Type.FLAG, 1, 1));
+        assertTrue(has(result, SolverAction.Type.REVEAL, 2, 1));
+    }
+
+    @Test
+    public void rejectsFrontierSolutionsThatConflictWithTheGlobalMineCount() {
+        MinesweeperBoard board = new MinesweeperBoard(3, 2, 0);
+        board.set(0, 0, MinesweeperCell.revealed(1));
+        board.set(2, 0, MinesweeperCell.revealed(1));
+
+        assertEquals(SolveResult.Status.INVALID, new MinesweeperSolver().solve(board).getStatus());
+    }
+
+    @Test
     public void doesNotTreatOversizedFrontierAsUnconstrainedForGuessing() {
         MinesweeperBoard board = new MinesweeperBoard(20, 20, 100);
         for (int y = 2; y <= 16; y += 2) for (int x = 2; x <= 16; x += 2) board.set(x, y, MinesweeperCell.revealed(2));
