@@ -647,6 +647,13 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public int[] gameCenter(Object game) {
         try {
+            if (game != null && MS_GAME.equals(game.getClass().getName())) {
+                Object board = invoke(game, "getBoard");
+                int size = number(invoke(board, "size"));
+                if (size > 0) {
+                    return boardBlock(game, new CellPosition(size / 2, size / 2));
+                }
+            }
             Object center = invoke(game, "getGameCenter");
             int x = number(invoke(center, "getX"));
             int y = number(invoke(center, "getY"));

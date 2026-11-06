@@ -38,10 +38,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         if (error != null) return SolveResult.none(SolveResult.Status.INVALID, error);
 
         List<Constraint> rawConstraints = extractConstraints(board);
-        if (rawConstraints.isEmpty()) {
-            return hasUnknownCells(board) ? SolveResult.none(SolveResult.Status.NO_MOVE, "No revealed constraints")
-                : SolveResult.none(SolveResult.Status.SOLVED, "Board solved");
-        }
 
         // Phase 1: Iterative Direct Deduction & Subset Reduction (Tank Algorithm)
         ReductionResult reduction = reduceConstraints(rawConstraints);
@@ -54,10 +50,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
 
         List<Constraint> reducedConstraints = reduction.remainingConstraints;
-        if (reducedConstraints.isEmpty()) {
-            return hasUnknownCells(board) ? SolveResult.none(SolveResult.Status.NO_MOVE, "No revealed constraints")
-                : SolveResult.none(SolveResult.Status.SOLVED, "Board solved");
-        }
 
         // Phase 2: Connected Component Decomposition & Backtracking
         List<Enumeration> components = enumerateComponents(reducedConstraints);
