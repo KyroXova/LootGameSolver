@@ -91,7 +91,7 @@ public final class GroundPathfinder {
             final long deadline = System.nanoTime() + budget;
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
                 { -1, -1 } };
-            while (!open.isEmpty() && visited.size() < 2048 && System.nanoTime() < deadline) {
+            while (!open.isEmpty() && visited.size() < 8192 && System.nanoTime() < deadline) {
                 Node node = open.remove();
                 if (!visited.add(key(node.x, node.y, node.z))) continue;
                 if (node.remaining < best.remaining) best = node;
@@ -127,7 +127,7 @@ public final class GroundPathfinder {
                             node));
                 }
             }
-            done = done || open.isEmpty() || visited.size() >= 2048;
+            done = done || open.isEmpty() || visited.size() >= 8192;
             return done;
         }
 
