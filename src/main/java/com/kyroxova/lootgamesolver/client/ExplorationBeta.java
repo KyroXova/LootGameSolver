@@ -96,6 +96,8 @@ public final class ExplorationBeta {
     private boolean roomExitPlanning;
     private boolean roomExitNeedsResume;
     private boolean roomExitCrossing;
+    private boolean walkingSearchNeedsResume;
+    private boolean roomEntrySearchNeedsResume;
     private List<int[]> roomEntryCandidates;
     private int roomEntryCandidateIndex;
     private int[] activeRoomEntry;
@@ -184,7 +186,8 @@ public final class ExplorationBeta {
     }
 
     private void chooseApproachDuringWalking(Minecraft mc) {
-        if (digging || seekingDryEntrance || movingToPuzzleCenter || route.isEmpty() || !undergroundNearby(mc)) return;
+        if (digging || seekingDryEntrance || movingToPuzzleCenter || roomEntryPlanning || roomEntrySearchNeedsResume
+            || roomEntryCrossing || route.isEmpty() || !undergroundNearby(mc)) return;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
@@ -207,7 +210,8 @@ public final class ExplorationBeta {
     }
 
     private void inspectUpcomingRoute(Minecraft mc) {
-        if (digging || seekingDryEntrance || route.size() < 2 || ticks % 10 != 0) return;
+        if (digging || seekingDryEntrance || roomEntryPlanning || roomEntrySearchNeedsResume || roomEntryCrossing
+            || route.size() < 2 || ticks % 10 != 0) return;
         int[] previous = { (int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ) };
         for (int i = 0; i < Math.min(6, route.size()); i++) {
@@ -231,6 +235,9 @@ public final class ExplorationBeta {
     private void prepareApproach(Minecraft mc) {
         if (returning || digging
             || seekingDryEntrance
+            || roomEntryPlanning
+            || roomEntrySearchNeedsResume
+            || roomEntryCrossing
             || searching
             || route.isEmpty()
             || route.size() > 8
@@ -459,6 +466,8 @@ public final class ExplorationBeta {
         activeRoomEntry = null;
         roomEntryPlanning = false;
         roomEntryCrossing = false;
+        roomEntrySearchNeedsResume = false;
+        walkingSearchNeedsResume = false;
         rejoiningSavedTrail = false;
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
@@ -590,6 +599,8 @@ public final class ExplorationBeta {
         activeRoomEntry = null;
         roomEntryPlanning = false;
         roomEntryCrossing = false;
+        roomEntrySearchNeedsResume = false;
+        walkingSearchNeedsResume = false;
         if (!back.isEmpty()) {
             route.clear();
             route.addAll(back);
@@ -724,6 +735,7 @@ public final class ExplorationBeta {
             activeRoomEntry[5],
             LootGameSolverConfig.explorationRange);
         roomEntryPlanning = true;
+        roomEntrySearchNeedsResume = false;
         walking = true;
         searching = false;
         digging = false;
@@ -970,24 +982,7 @@ public final class ExplorationBeta {
     }
 
     private static String compactStatus(String message) {
-        if (message == null || message.isEmpty()) return "Idle";
-        if (message.startsWith("Checking existing route:"))
-            return "Open path " + message.substring("Checking existing route: ".length());
-        if (message.startsWith("Planning access:")) return "Plan access " + message.substring("Planning access: ".length());
-        if (message.startsWith("Planning a checked exit link to saved checkpoint "))
-            return "Dig exit " + message.substring("Planning a checked exit link to saved checkpoint ".length());
-        if (message.startsWith("Opening Minesweeper stage "))
-            return "Open MS " + message.substring("Opening Minesweeper stage ".length());
-        if (message.equals("Following saved access route out")) return "Exiting via saved path";
-        if (message.equals("Following saved entrance route")) return "Using saved entrance";
-        if (message.equals("Following safe existing entrance")) return "Using open entrance";
-        if (message.equals("Finding a clear way back to the saved tunnel")) return "Linking exit";
-        if (message.equals("Following safe checkpoint toward the saved exit")) return "Linking exit";
-        if (message.equals("Could not place a safe return step; add cobblestone or dirt")) return "Need dirt/cobble to climb";
-        if (message.equals("No safe route after alternate paths were checked")) return "No safe route";
-        if (message.equals("Opened puzzle could not be located; explorer held")) return "Puzzle missing";
-        if (message.length() <= 32) return message;
-        return message.substring(0, 29) + "...";
+        return StatusText.explorer(message);
     }
 
     public void renderCamera(Minecraft mc) {
@@ -1171,6 +1166,8 @@ public final class ExplorationBeta {
             activeRoomEntry = null;
             roomEntryPlanning = false;
             roomEntryCrossing = false;
+            roomEntrySearchNeedsResume = false;
+            walkingSearchNeedsResume = false;
             structureTools.clear();
             walking = false;
             route.clear();
@@ -1324,7 +1321,19 @@ public final class ExplorationBeta {
         }
         if (returnJoinSearch != null) {
             if (!returnJoinSearch.advance(3_000_000L)) {
-                status = "Finding a safe link to saved access route";
+                List<int[]> partial = returnJoinSearch.path();
+                if (partial.isEmpty()) {
+                    status = "Finding a safe link to saved access route";
+                    return;
+                }
+                route.clear();
+                route.addAll(partial);
+                returnJoinSearch = null;
+                if (roomExitPlanning) {
+                    roomExitPlanning = false;
+                    roomExitNeedsResume = true;
+                }
+                status = "Following a safe exit checkpoint";
                 return;
             }
             List<int[]> join = returnJoinSearch.path();
@@ -1408,42 +1417,63 @@ public final class ExplorationBeta {
         chooseApproachDuringWalking(mc);
         if (walkingSearch != null) {
             if (!walkingSearch.advance(3_000_000L)) {
-                status = "Continuing route search";
-                return;
-            }
-            if (roomEntryPlanning) {
-                boolean reachedEntry = walkingSearch.reachedGoal();
-                List<int[]> entryPath = walkingSearch.path();
-                walkingSearch = null;
-                roomEntryPlanning = false;
-                if (reachedEntry) {
-                    route.clear();
-                    route.addAll(entryPath);
-                    appendRoomExitWaypoint(activeRoomEntry, 3);
-                    appendRoomExitWaypoint(activeRoomEntry, 0);
-                    roomEntryCrossing = true;
-                    segmentX = mc.thePlayer.posX;
-                    segmentZ = mc.thePlayer.posZ;
-                    status = "Walking through room entrance";
-                } else {
-                    roomEntryCandidateIndex++;
-                    if (startNextRoomEntrySearch(mc)) return;
-                    roomEntryCandidates = null;
-                    stop(mc, "No walkable room entrance");
+                List<int[]> partial = walkingSearch.path();
+                if (partial.isEmpty()) {
+                    status = "Continuing route search";
                     return;
                 }
+                route.clear();
+                route.addAll(partial);
+                walkingSearch = null;
+                if (roomEntryPlanning) {
+                    roomEntryPlanning = false;
+                    roomEntrySearchNeedsResume = true;
+                } else if (!movingToPuzzleCenter) {
+                    walkingSearchNeedsResume = true;
+                }
+                segmentX = mc.thePlayer.posX;
+                segmentZ = mc.thePlayer.posZ;
+                status = "Following safe checkpoint";
             } else {
-            boolean reachedCenter = movingToPuzzleCenter && walkingSearch.reachedGoal();
-            route.addAll(walkingSearch.path());
-            walkingSearch = null;
-            if (movingToPuzzleCenter && reachedCenter && target != null)
-                appendPuzzleCenterWaypoint(new int[] { target.xCoord, target.yCoord, target.zCoord });
-            walkingPlanFailed = route.isEmpty();
+                if (roomEntryPlanning) {
+                    boolean reachedEntry = walkingSearch.reachedGoal();
+                    List<int[]> entryPath = walkingSearch.path();
+                    walkingSearch = null;
+                    roomEntryPlanning = false;
+                    roomEntrySearchNeedsResume = false;
+                    if (reachedEntry) {
+                        route.clear();
+                        route.addAll(entryPath);
+                        appendRoomExitWaypoint(activeRoomEntry, 3);
+                        appendRoomExitWaypoint(activeRoomEntry, 0);
+                        roomEntryCrossing = true;
+                        segmentX = mc.thePlayer.posX;
+                        segmentZ = mc.thePlayer.posZ;
+                        status = "Walking through room entrance";
+                    } else {
+                        roomEntryCandidateIndex++;
+                        if (startNextRoomEntrySearch(mc)) return;
+                        roomEntryCandidates = null;
+                        stop(mc, "No walkable room entrance");
+                        return;
+                    }
+                } else {
+                    boolean reachedCenter = movingToPuzzleCenter && walkingSearch.reachedGoal();
+                    route.addAll(walkingSearch.path());
+                    walkingSearch = null;
+                    walkingSearchNeedsResume = false;
+                    if (movingToPuzzleCenter && reachedCenter && target != null)
+                        appendPuzzleCenterWaypoint(new int[] { target.xCoord, target.yCoord, target.zCoord });
+                    walkingPlanFailed = route.isEmpty();
+                }
             }
         }
         if (!returning && !digging
             && !seekingDryEntrance
             && !movingToPuzzleCenter
+            && !roomEntryPlanning
+            && !roomEntrySearchNeedsResume
+            && !roomEntryCrossing
             && route.size() >= 1
             && route.size() <= 8
             && ticks % 5 == 0) extendRoute(mc);
@@ -1473,6 +1503,25 @@ public final class ExplorationBeta {
                 }
                 stop(mc, "No safe route to room center");
                 return;
+            }
+            if (!returning && roomEntrySearchNeedsResume && activeRoomEntry != null) {
+                roomEntrySearchNeedsResume = false;
+                roomEntryPlanning = true;
+                walkingSearch = new GroundPathfinder.Search(
+                    walkingTerrain(mc.theWorld),
+                    (int) Math.floor(mc.thePlayer.posX),
+                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                    (int) Math.floor(mc.thePlayer.posZ),
+                    activeRoomEntry[3],
+                    activeRoomEntry[5],
+                    LootGameSolverConfig.explorationRange);
+                status = "Finding room entrance";
+                return;
+            }
+            if (!returning && walkingSearchNeedsResume) {
+                walkingSearchNeedsResume = false;
+                plan(mc);
+                if (!route.isEmpty() || walkingSearch != null) return;
             }
             if (returnDigging) {
                 int horizontal = Math.abs((int) Math.floor(mc.thePlayer.posX) - target.xCoord)
@@ -1946,6 +1995,8 @@ public final class ExplorationBeta {
         activeRoomEntry = null;
         roomEntryPlanning = false;
         roomEntryCrossing = false;
+        roomEntrySearchNeedsResume = false;
+        walkingSearchNeedsResume = false;
         roomExitCandidates = null;
         activeRoomExit = null;
         roomExitPlanning = false;
@@ -2176,6 +2227,7 @@ public final class ExplorationBeta {
 
     private void plan(final Minecraft mc) {
         walkingPlanFailed = false;
+        walkingSearchNeedsResume = false;
         route.clear();
         extendedFrom = null;
         continuationSearch = null;
@@ -2806,7 +2858,7 @@ public final class ExplorationBeta {
     }
 
     public String hud(Minecraft mc) {
-        if (target == null) return "Searching nearby";
+        if (target == null) return "Next Structure";
         int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
         return target.xCoord + ", " + target.yCoord + ", " + target.zCoord + " (" + distance + "m)";
     }

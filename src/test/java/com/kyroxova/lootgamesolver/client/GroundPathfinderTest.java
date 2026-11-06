@@ -97,6 +97,31 @@ public class GroundPathfinderTest {
     }
 
     @Test
+    public void incompleteSearchExposesAnImprovingCheckpointForMovement() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        GroundPathfinder.Search search = new GroundPathfinder.Search(terrain, 0, 0, 0, 10_000, 0, 12_000);
+        List<int[]> partial = java.util.Collections.emptyList();
+        boolean complete = false;
+        for (int i = 0; i < 100 && partial.isEmpty() && !complete; i++) {
+            complete = search.advance(100_000L);
+            partial = search.path();
+        }
+        assertFalse(complete);
+        assertFalse(partial.isEmpty());
+        int[] checkpoint = partial.get(partial.size() - 1);
+        assertTrue(Math.abs(10_000 - checkpoint[0]) + Math.abs(checkpoint[2]) < 10_000);
+    }
+
+    @Test
     public void openDiagonalApproachDoesNotZigzagEveryBlock() {
         List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 

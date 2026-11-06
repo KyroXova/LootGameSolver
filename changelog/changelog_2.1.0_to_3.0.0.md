@@ -133,3 +133,5 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Use dense room-wall boundaries so tunnel walls do not expand the detected room and confuse inside/outside checks.
 - Clear foliage by mining its support only when it blocks a planned excavation step; keep return scaffolding placement limited to the immediately needed adjacent step.
 - Continue a saved-tunnel connection after partial route checkpoints before attempting room-wall exits, and search excavation mouths beyond the dungeon footprint.
+- Follow safe partial walking and exit routes while searches continue, then replan from each reached checkpoint instead of standing still for the full search.
+- Use consistent compact HUD states for walking, rerouting, puzzle stages, tools, and blocked routes.

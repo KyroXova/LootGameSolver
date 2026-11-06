@@ -575,8 +575,6 @@ public final class ClientHooks {
     }
 
     private static String compactStatus(String text) {
-        if (text == null || text.isEmpty()) return "Ready";
-        if (text.length() <= 28) return text;
-        return text.substring(0, 25) + "...";
+        return StatusText.solver(text);
     }
 }
