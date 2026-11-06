@@ -74,4 +74,24 @@ public class AccessTrailTest {
         List<int[]> savedReturn = trail.reverseFrom(1);
         assertArrayEquals(new int[] { 0, 64, 0 }, savedReturn.get(savedReturn.size() - 1));
     }
+
+    @Test
+    public void restoringTrailStopsAtFirstInvalidOrDisconnectedCheckpoint() {
+        AccessTrail trail = new AccessTrail();
+        trail.replace(java.util.Arrays.asList(
+            new int[] { 0, 64, 0 },
+            new int[] { 1, 64, 0 },
+            new int[] { 8, 64, 0 },
+            new int[] { 9, 64, 0 }));
+
+        assertEquals(2, trail.size());
+        assertTrue(trail.reverse(8, 64, 0).isEmpty());
+
+        trail.replace(java.util.Arrays.asList(
+            new int[] { 0, 64, 0 },
+            new int[] { 1, 64, 0 },
+            new int[] { 1, 64, 0 },
+            new int[] { 2, 64, 0 }));
+        assertEquals(2, trail.size());
+    }
 }

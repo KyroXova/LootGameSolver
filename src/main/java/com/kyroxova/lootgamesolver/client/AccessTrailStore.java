@@ -44,11 +44,9 @@ final class AccessTrailStore {
         List<int[]> copy = new ArrayList<int[]>();
         if (saved == null) return copy;
         for (int[] p : saved) {
-            if (p == null || p.length < 3
-                || Math.abs(p[0]) > 30_000_000
-                || Math.abs(p[2]) > 30_000_000
-                || p[1] < -64
-                || p[1] > 512) continue;
+            if (!AccessTrail.validPoint(p)
+                || !copy.isEmpty() && AccessTrail.same(copy.get(copy.size() - 1), p)
+                || !copy.isEmpty() && !AccessTrail.adjacent(copy.get(copy.size() - 1), p[0], p[1], p[2])) break;
             if (copy.size() >= MAX_POINTS_PER_ROUTE) break;
             copy.add(new int[] { p[0], p[1], p[2] });
         }
@@ -58,13 +56,13 @@ final class AccessTrailStore {
     void save(String world, int dimension, int x, int y, int z, List<int[]> points) throws IOException {
         if (points == null || points.size() < 2 || points.size() > MAX_POINTS_PER_ROUTE) return;
         List<int[]> safeCopy = new ArrayList<int[]>(points.size());
+        int[] previous = null;
         for (int[] p : points) {
-            if (p == null || p.length < 3
-                || Math.abs(p[0]) > 30_000_000
-                || Math.abs(p[2]) > 30_000_000
-                || p[1] < -64
-                || p[1] > 512) return;
+            if (!AccessTrail.validPoint(p)
+                || previous != null && (previous[0] == p[0] && previous[1] == p[1] && previous[2] == p[2]
+                    || !AccessTrail.adjacent(previous, p[0], p[1], p[2]))) return;
             safeCopy.add(new int[] { p[0], p[1], p[2] });
+            previous = p;
         }
         data.trails.put(key(world, dimension, x, y, z), safeCopy);
         write();

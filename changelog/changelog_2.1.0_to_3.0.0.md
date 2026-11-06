@@ -144,3 +144,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Wait for the server to acknowledge each Game of Light symbol before sending the next input, preventing delayed updates from replaying clicks.
 - Calculate Minesweeper risks by combining complete frontier solutions with the board-wide mine total, including deductions across separate frontiers.
 - Require saved-tunnel joins, room doorways, and board-center approaches to reach the correct floor height before connecting or crossing routes.
+- Validate persisted entrance paths as contiguous adjacent steps and stop loading at the first corrupt checkpoint instead of bridging gaps.

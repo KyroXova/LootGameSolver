@@ -5,6 +5,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 
@@ -39,5 +41,42 @@ public class AccessTrailStoreTest {
         assertTrue(
             new AccessTrailStore(path).load("save:world", 0, 20, 30, 40)
                 .isEmpty());
+    }
+
+    @Test
+    public void loadingCorruptRouteKeepsOnlyItsContiguousSafePrefix() throws Exception {
+        File path = new File(temporary.getRoot(), "access-trails.json");
+        String json = "{\"trails\":{\"save:world|0:20:30:40\":[[4,70,9],[5,70,9],[40,70,9],[41,70,9]]}}";
+        Files.write(path.toPath(), json.getBytes(StandardCharsets.UTF_8));
+
+        List<int[]> loaded = new AccessTrailStore(path).load("save:world", 0, 20, 30, 40);
+
+        assertEquals(2, loaded.size());
+        assertArrayEquals(new int[] { 4, 70, 9 }, loaded.get(0));
+        assertArrayEquals(new int[] { 5, 70, 9 }, loaded.get(1));
+    }
+
+    @Test
+    public void saveRejectsDiscontinuousRouteInsteadOfPersistingAJump() throws Exception {
+        File path = new File(temporary.getRoot(), "access-trails.json");
+        AccessTrailStore store = new AccessTrailStore(path);
+        store.save(
+            "save:world",
+            0,
+            20,
+            30,
+            40,
+            Arrays.asList(new int[] { 4, 70, 9 }, new int[] { 12, 70, 9 }));
+
+        assertTrue(store.load("save:world", 0, 20, 30, 40).isEmpty());
+    }
+
+    @Test
+    public void loadingDuplicateCheckpointsStopsTheRoute() throws Exception {
+        File path = new File(temporary.getRoot(), "access-trails.json");
+        String json = "{\"trails\":{\"save:world|0:20:30:40\":[[4,70,9],[5,70,9],[5,70,9],[6,70,9]]}}";
+        Files.write(path.toPath(), json.getBytes(StandardCharsets.UTF_8));
+
+        assertEquals(2, new AccessTrailStore(path).load("save:world", 0, 20, 30, 40).size());
     }
 }

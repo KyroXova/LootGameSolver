@@ -28,11 +28,8 @@ final class AccessTrail {
         points.clear();
         if (saved == null) return;
         for (int[] p : saved) {
-            if (p == null || p.length < 3
-                || Math.abs(p[0]) > 30_000_000
-                || Math.abs(p[2]) > 30_000_000
-                || p[1] < -64
-                || p[1] > 512) continue;
+            if (!validPoint(p) || !points.isEmpty() && (same(points.get(points.size() - 1), p)
+                || !adjacent(points.get(points.size() - 1), p[0], p[1], p[2]))) break;
             if (points.size() >= 16_000) break;
             points.add(new int[] { p[0], p[1], p[2] });
         }
@@ -123,9 +120,18 @@ final class AccessTrail {
         return route;
     }
 
-    private static boolean adjacent(int[] point, int x, int y, int z) {
+    static boolean validPoint(int[] point) {
+        return point != null && point.length >= 3 && point[0] >= -30_000_000 && point[0] <= 30_000_000
+            && point[2] >= -30_000_000 && point[2] <= 30_000_000 && point[1] >= -64 && point[1] <= 512;
+    }
+
+    static boolean adjacent(int[] point, int x, int y, int z) {
         int dx = Math.abs(point[0] - x), dy = Math.abs(point[1] - y), dz = Math.abs(point[2] - z);
         return dx <= 1 && dy <= 1 && dz <= 1 && (dy == 0 || dx + dz <= 1);
+    }
+
+    static boolean same(int[] first, int[] second) {
+        return first[0] == second[0] && first[1] == second[1] && first[2] == second[2];
     }
 
 }
