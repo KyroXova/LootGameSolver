@@ -28,6 +28,7 @@ public final class SolverSession {
     private final GameOfLightSolver golSolver = new GameOfLightSolver();
     private final ActionPlanner planner = new ActionPlanner();
     private final int[][] optimisticSudokuValues = new int[9][9];
+    private final PuzzleSessionIdentity puzzleIdentity = new PuzzleSessionIdentity();
     private ActionPlanner.Mode mode;
     private SolverAction activeAction;
     private List<SolverAction> activeActions;
@@ -77,7 +78,18 @@ public final class SolverSession {
 
     public void tick() {
         bridge.tick();
-        currentSnapshot = bridge.detect(mode != null);
+        DetectedGame detected = bridge.detect(mode != null);
+        if (mode != null && detected != null) {
+            PuzzleSessionIdentity.Change change = puzzleIdentity
+                .update(detected.type, detected.game, minesweeperRound(detected));
+            if (change == PuzzleSessionIdentity.Change.GAME) {
+                currentSnapshot = detected;
+                cancel("Puzzle changed; solver stopped");
+                return;
+            }
+            if (change == PuzzleSessionIdentity.Change.ROUND) resetForNewRound();
+        }
+        currentSnapshot = detected;
         if (currentSnapshot == null) {
             cachedRenderActions = null;
             lastSnapshotSignature = null;
@@ -124,7 +136,24 @@ public final class SolverSession {
     private void advance() {
         DetectedGame detected = bridge.detect(true);
         currentSnapshot = detected;
+        if (detected != null) puzzleIdentity.update(detected.type, detected.game, minesweeperRound(detected));
         advanceAuto(detected);
+    }
+
+    private int minesweeperRound(DetectedGame snapshot) {
+        return snapshot.type == MiniGame.MINESWEEPER ? bridge.currentMinesweeperLevel(snapshot.game) : -1;
+    }
+
+    private void resetForNewRound() {
+        activeAction = null;
+        activeActions = null;
+        cachedRenderActions = null;
+        lastSnapshotSignature = null;
+        sudokuValueBeforeClick = -1;
+        interactionPending = false;
+        lastActionAt = 0L;
+        remainingClicksForActiveAction = 0;
+        sudokuReverseClick = false;
     }
 
     private void advanceAuto(DetectedGame snapshot) {
@@ -305,6 +334,7 @@ public final class SolverSession {
     public void cancel(String reason) {
         bridge.releaseSneak();
         bridge.resetGameOfLightPendingAction();
+        puzzleIdentity.clear();
         interactionPending = false;
         lastActionAt = 0L;
         mode = null;

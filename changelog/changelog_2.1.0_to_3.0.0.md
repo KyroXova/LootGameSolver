@@ -146,3 +146,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Calculate Minesweeper risks by combining complete frontier solutions with the board-wide mine total, including deductions across separate frontiers.
 - Require saved-tunnel joins, room doorways, and board-center approaches to reach the correct floor height before connecting or crossing routes.
 - Validate persisted entrance paths as contiguous adjacent steps and stop loading at the first corrupt checkpoint instead of bridging gaps.
+- Reset cached solver actions when Minesweeper advances a round, and stop safely if the active puzzle is replaced.
