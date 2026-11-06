@@ -17,6 +17,14 @@ public class ExcavationPolicyTest {
     }
 
     @Test
+    public void choosesDigMouthTenToFifteenBlocksBeyondTheNearWall() {
+        assertTrue(ExcavationPolicy.preferredEntrance(0, 0, 20, 0));
+        assertTrue(ExcavationPolicy.preferredEntrance(0, 0, 0, 24));
+        assertFalse(ExcavationPolicy.preferredEntrance(0, 0, 30, 0));
+        assertFalse(ExcavationPolicy.preferredEntrance(0, 0, 12, 0));
+    }
+
+    @Test
     public void alternateTunnelDirectionsAlwaysApproachTheStructure() {
         for (int[] direction : ExcavationPolicy.approachDirections(10, 20, 5, 17)) {
             assertEquals(1, Math.abs(direction[0]) + Math.abs(direction[1]));

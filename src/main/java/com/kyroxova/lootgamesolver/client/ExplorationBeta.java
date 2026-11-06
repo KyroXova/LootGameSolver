@@ -84,6 +84,9 @@ public final class ExplorationBeta {
     private List<int[]> returnAfterDig;
     private boolean returnDigResumeSearch;
     private String excavationMode = "Access route";
+    private int[] pendingReturnPlacement;
+    private int returnPlacementTicks;
+    private int returnPlacementSlot = -1;
 
     String explorationAction() {
         return returnAvailable ? "Return" : returning ? "Stop" : "Explore";
@@ -163,7 +166,9 @@ public final class ExplorationBeta {
         if (digging || seekingDryEntrance || route.isEmpty() || !undergroundNearby(mc)) return;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (mc.thePlayer.onGround && dryShore(mc.theWorld, x, y, z) && safe(mc.theWorld, x, y, z)) {
+        if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
+            && dryShore(mc.theWorld, x, y, z)
+            && safe(mc.theWorld, x, y, z)) {
             route.clear();
             extendedFrom = null;
             approachPlan = null;
@@ -204,6 +209,7 @@ public final class ExplorationBeta {
 
     private void prepareApproach(Minecraft mc) {
         if (returning || digging
+            || seekingDryEntrance
             || searching
             || route.isEmpty()
             || route.size() > 8
@@ -267,7 +273,7 @@ public final class ExplorationBeta {
         walking = walkingSearch != null || !route.isEmpty();
         if (!walking) {
             double distance = mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
-            if (distance > 4.2D) {
+            if (distance > 2.8D) {
                 target = puzzleMasterTarget;
                 puzzleMasterTarget = null;
                 movingToPuzzleCenter = false;
@@ -649,8 +655,7 @@ public final class ExplorationBeta {
             walking = walkingSearch != null || !route.isEmpty();
             if (!walking && LootGameSolverConfig.staircaseEnabled
                 && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
-                digging = true;
-                walking = true;
+                walking = selectDigEntrance(mc);
             }
         }
         if (digging) savedSlot = mc.thePlayer.inventory.currentItem;
@@ -714,6 +719,26 @@ public final class ExplorationBeta {
             status = "Moving tool using inventory screen";
             if (!toolTransfer.tick(mc)) stop(mc, "Inventory transfer interrupted; inspect the tool slots");
             return;
+        }
+        if (pendingReturnPlacement != null) {
+            int px = pendingReturnPlacement[0], py = pendingReturnPlacement[1], pz = pendingReturnPlacement[2];
+            if (mc.theWorld.getBlock(px, py, pz) != Blocks.air && mc.theWorld.getBlock(px, py, pz)
+                .getMaterial()
+                .isSolid()) {
+                if (returnPlacementSlot >= 0) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
+                mc.playerController.updateController();
+                pendingReturnPlacement = null;
+                returnPlacementSlot = -1;
+            } else if (++returnPlacementTicks > 30) {
+                if (returnPlacementSlot >= 0) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
+                pendingReturnPlacement = null;
+                returnPlacementSlot = -1;
+                stop(mc, "Could not place a safe return step; add cobblestone or dirt");
+                return;
+            } else {
+                status = "Waiting for return step placement";
+                return;
+            }
         }
         if (ticks % 20 == 0) structureTools.clear();
         int[] head = route.isEmpty() ? null : route.get(0);
@@ -795,8 +820,9 @@ public final class ExplorationBeta {
                 } else {
                     plan(mc);
                     if (walkingSearch == null && route.isEmpty()) {
-                        digging = true;
-                        status = "No open route; planning a safe dig entrance";
+                        if (!selectDigEntrance(mc)) stop(mc, "No safe surface dig entrance in range");
+                        else status = digging ? "No open route; planning a safe dig entrance"
+                            : "Walking to the selected dig entrance";
                     } else status = "Walking to the nearest safe entrance";
                 }
             }
@@ -938,18 +964,15 @@ public final class ExplorationBeta {
                 if (horizontal > 32 || (horizontal > 3 && target.yCoord >= mc.thePlayer.boundingBox.minY - 2)) {
                     if (!walkingPlanFailed) plan(mc);
                     if (!route.isEmpty() || walkingSearch != null) return;
-                    if (LootGameSolverConfig.staircaseEnabled && horizontal <= 32 && !mc.thePlayer.isInWater()) {
-                        digging = true;
-                        entranceSelected = true;
-                        savedSlot = mc.thePlayer.inventory.currentItem;
+                    if (LootGameSolverConfig.staircaseEnabled && horizontal <= 40 && !mc.thePlayer.isInWater()) {
+                        if (!selectDigEntrance(mc)) stop(mc, "No safe surface dig entrance in range");
                     } else stop(mc, "No verified route around the obstruction");
                     return;
                 }
                 if (LootGameSolverConfig.staircaseEnabled
                     && Math.abs(target.yCoord + 1 - mc.thePlayer.boundingBox.minY) > 1) {
-                    digging = true;
-                    entranceSelected = true;
-                    savedSlot = mc.thePlayer.inventory.currentItem;
+                    if (!selectDigEntrance(mc)) stop(mc, "No safe surface dig entrance in range");
+                    return;
                 }
             }
             if (searching) {
@@ -966,8 +989,8 @@ public final class ExplorationBeta {
                     if (!route.isEmpty() || walkingSearch != null) return;
                     if (LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
                         && mc.theWorld.blockExists(target.xCoord, target.yCoord, target.zCoord)) {
-                        digging = true;
-                        savedSlot = mc.thePlayer.inventory.currentItem;
+                        if (!selectDigEntrance(mc) && !nextSearchLeg(mc))
+                            stop(mc, "No safe dig entrance near the structure");
                         return;
                     }
                 }
@@ -1019,6 +1042,7 @@ public final class ExplorationBeta {
 
         ) {
             if (returning) {
+                if (next[1] > py && tryPlaceReturnStep(mc, next)) return;
                 if (rerouteSavedReturn(mc)) return;
                 stop(mc, "Saved return path is no longer safe");
                 return;
@@ -1063,6 +1087,7 @@ public final class ExplorationBeta {
             centering = next.length > 3 && next[3] == 2;
             if (!safe(mc.theWorld, next[0], next[1], next[2])
                 || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
+                if (returning && next[1] > py && tryPlaceReturnStep(mc, next)) return;
                 if (returning && rerouteSavedReturn(mc)) return;
                 stop(mc, "Next route segment is no longer safe");
                 return;
@@ -1130,6 +1155,74 @@ public final class ExplorationBeta {
         }
     }
 
+    private boolean tryPlaceReturnStep(Minecraft mc, int[] next) {
+        int x = next[0], y = next[1] - 1, z = next[2];
+        net.minecraft.block.Block targetBlock = mc.theWorld.getBlock(x, y, z);
+        if (pendingReturnPlacement != null) return true;
+        if (!targetBlock.isReplaceable(mc.theWorld, x, y, z)) return false;
+        int slot = findPlaceableBlock(mc, true);
+        if (slot < 0) {
+            int inventorySlot = findPlaceableBlock(mc, false);
+            if (inventorySlot >= 9 && toolTransfer.start(mc, inventorySlot)) {
+                if (returnPlacementSlot < 0) returnPlacementSlot = mc.thePlayer.inventory.currentItem;
+                status = "Opening inventory to prepare a return step block";
+                return true;
+            }
+            status = "Return step needs cobblestone or dirt";
+            return false;
+        }
+        if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z))
+            return false;
+        int[][] adjacent = { { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 }, { x, y, z + 1, 2 } };
+        for (int[] side : adjacent) {
+            net.minecraft.block.Block support = mc.theWorld.getBlock(side[0], side[1], side[2]);
+            if (support == Blocks.air || !support.getMaterial()
+                .isSolid() || mc.theWorld.getTileEntity(side[0], side[1], side[2]) != null) continue;
+            int previousSlot = mc.thePlayer.inventory.currentItem;
+            mc.thePlayer.inventory.currentItem = slot;
+            mc.playerController.updateController();
+            net.minecraft.util.Vec3 hit = net.minecraft.util.Vec3
+                .createVectorHelper(side[0] + 0.5D, side[1] + 0.5D, side[2] + 0.5D);
+            if (mc.playerController.onPlayerRightClick(
+                mc.thePlayer,
+                mc.theWorld,
+                mc.thePlayer.getHeldItem(),
+                side[0],
+                side[1],
+                side[2],
+                side[3],
+                hit)) {
+                pendingReturnPlacement = new int[] { x, y, z };
+                returnPlacementTicks = 0;
+                if (returnPlacementSlot < 0) returnPlacementSlot = previousSlot;
+                status = "Placing a checked block for the return step";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int findPlaceableBlock(Minecraft mc, boolean hotbarOnly) {
+        int limit = hotbarOnly ? 9 : mc.thePlayer.inventory.mainInventory.length;
+        int fallback = -1;
+        for (int i = hotbarOnly ? 0 : 9; i < limit; i++) {
+            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack == null || !(stack.getItem() instanceof net.minecraft.item.ItemBlock)) continue;
+            net.minecraft.block.Block block = ((net.minecraft.item.ItemBlock) stack.getItem()).field_150939_a;
+            if (block == null || block instanceof net.minecraft.block.BlockFalling
+                || block.getMaterial()
+                    .isLiquid()
+                || block.hasTileEntity(0)
+                || !block.getMaterial()
+                    .isSolid())
+                continue;
+            if (block == Blocks.cobblestone) return i;
+            if (block == Blocks.dirt) return i;
+            if (fallback < 0) fallback = i;
+        }
+        return fallback;
+    }
+
     private void stop(Minecraft mc, String message) {
         persistAccessTrail(true);
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
@@ -1148,6 +1241,9 @@ public final class ExplorationBeta {
         returnTrailRoute = null;
         releaseMiningInput(mc);
         toolTransfer.cancel(mc);
+        if (returnPlacementSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
+        pendingReturnPlacement = null;
+        returnPlacementSlot = -1;
         miningTarget = Long.MIN_VALUE;
         miningSlot = -1;
         walkingSearch = null;
@@ -1607,6 +1703,36 @@ public final class ExplorationBeta {
         return true;
     }
 
+    private boolean selectDigEntrance(Minecraft mc) {
+        if (mc.thePlayer == null || mc.theWorld == null || target == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
+            && dryShore(mc.theWorld, x, y, z)
+            && safe(mc.theWorld, x, y, z)) {
+            route.clear();
+            extendedFrom = null;
+            approachPlan = null;
+            walkingSearch = null;
+            continuationSearch = null;
+            excavationSearch = null;
+            excavationRoute.clear();
+            digging = true;
+            seekingDryEntrance = false;
+            entranceSelected = true;
+            savedSlot = mc.thePlayer.inventory.currentItem;
+            status = "Planning access from the nearest safe structure wall";
+            return true;
+        }
+        digging = false;
+        if (findDryEntrance(mc)) {
+            walking = true;
+            return true;
+        }
+        return false;
+    }
+
     private boolean findDryEntrance(final Minecraft mc) {
         final World w = mc.theWorld;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -1615,9 +1741,12 @@ public final class ExplorationBeta {
             entranceCandidate = 0;
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
                 { -1, -1 } };
-            for (int radius = 4; radius <= 24; radius += 4)
+            for (int radius = 18; radius <= 24; radius += 3)
                 for (int[] direction : directions) for (int dy = -1; dy <= 6; dy++) {
-                    int gx = x + direction[0] * radius, gy = y + dy, gz = z + direction[1] * radius;
+                    double norm = Math.hypot(direction[0], direction[1]);
+                    int gx = target.xCoord + (int) Math.round(direction[0] * radius / norm), gy = y + dy;
+                    int gz = target.zCoord + (int) Math.round(direction[1] * radius / norm);
+                    if (!ExcavationPolicy.preferredEntrance(gx, gz, target.xCoord, target.zCoord)) continue;
                     if (dryShore(w, gx, gy, gz) && safe(w, gx, gy, gz))
                         entranceCandidates.add(new int[] { gx, gy, gz });
                 }
@@ -1629,6 +1758,17 @@ public final class ExplorationBeta {
         // Continue across ticks instead of abandoning all later shores after a few failed candidates.
         for (int attempts = 0; attempts < 1 && entranceCandidate < entranceCandidates.size(); attempts++) {
             int[] goal = entranceCandidates.get(entranceCandidate++);
+            if (Math.abs(goal[0] - x) + Math.abs(goal[2] - z) <= 1 && Math.abs(goal[1] - y) <= 1) {
+                if (mc.thePlayer.onGround && dryShore(w, x, y, z) && safe(w, x, y, z)) {
+                    digging = true;
+                    seekingDryEntrance = false;
+                    entranceSelected = true;
+                    savedSlot = mc.thePlayer.inventory.currentItem;
+                    entranceCandidates.clear();
+                    status = "Planning access from the nearest safe structure wall";
+                    return true;
+                }
+            }
             List<int[]> candidate = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 
                 public boolean stand(int a, int b, int c) {
@@ -1638,7 +1778,7 @@ public final class ExplorationBeta {
                 public boolean clear(int a, int b, int c) {
                     return passable(w, a, b, c);
                 }
-            }, x, y, z, goal[0], goal[2], 32);
+            }, x, y, z, goal[0], goal[2], 48);
             if (candidate.isEmpty()) continue;
             int[] last = candidate.get(candidate.size() - 1);
             if (last[1] != goal[1] || Math.abs(last[0] - goal[0]) + Math.abs(last[2] - goal[2]) > 1
@@ -1667,7 +1807,7 @@ public final class ExplorationBeta {
     private static double entranceScore(int[] candidate, double x, double z, int tx, int tz) {
         double travel = Math.hypot(candidate[0] + 0.5D - x, candidate[2] + 0.5D - z);
         double approach = Math.hypot(candidate[0] - tx, candidate[2] - tz);
-        return travel + 0.5D * approach;
+        return travel + 2D * Math.abs(approach - 21D);
     }
 
     private boolean attemptStairStep(Minecraft mc, int destinationY) {
@@ -1877,20 +2017,35 @@ public final class ExplorationBeta {
                     || block == Blocks.portal) return false;
             }
         }
-        if (!world
-            .func_147461_a(
-                net.minecraft.util.AxisAlignedBB
-                    .getBoundingBox(x + 0.19D, y + 0.01D, z + 0.19D, x + 0.81D, y + 1.81D, z + 0.81D))
-            .isEmpty()) return false;
         if (world.getBlock(x, y, z)
             .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y + 1, z)
             && passable(world, x, y + 2, z)) return true;
         if (world.getBlock(x, y - 1, z)
             .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y, z)
             && passable(world, x, y + 1, z)) return true;
-        return world.getBlock(x, y - 1, z)
-            .isNormalCube() && passable(world, x, y, z)
-            && passable(world, x, y + 1, z);
+        double surfaceY = walkSurfaceY(world, x, y, z);
+        if (surfaceY < y) return false;
+        return world
+            .func_147461_a(
+                net.minecraft.util.AxisAlignedBB
+                    .getBoundingBox(x + 0.19D, surfaceY + 0.01D, z + 0.19D, x + 0.81D, surfaceY + 1.81D, z + 0.81D))
+            .isEmpty();
+    }
+
+    private static double walkSurfaceY(World world, int x, int y, int z) {
+        net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
+        if (below.isNormalCube()) return y;
+        net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
+        if (belowBox != null && belowBox.maxY >= y
+            && belowBox.minX < x + 0.5D
+            && belowBox.maxX > x + 0.5D
+            && belowBox.minZ < z + 0.5D
+            && belowBox.maxZ > z + 0.5D) return y;
+        net.minecraft.block.Block at = world.getBlock(x, y, z);
+        net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
+        if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
+        if (box == null || box.maxY <= y || box.maxY >= y + 1D) return -1D;
+        return box.maxY;
     }
 
     public String hud(Minecraft mc) {

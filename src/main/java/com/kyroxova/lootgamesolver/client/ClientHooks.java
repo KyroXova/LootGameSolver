@@ -46,6 +46,7 @@ public final class ClientHooks {
         OPENING,
         POSITIONING,
         REVEALING,
+        REVEALING_NEXT_STAGE,
         SOLVING,
         FAILED
     }
@@ -55,6 +56,8 @@ public final class ClientHooks {
     private int puzzleWaitTicks;
     private int masterClickAttempts;
     private int centerClickAttempts;
+    private boolean minesweeperOpeningClickSent;
+    private int activeMinesweeperLevel = -1;
     private int lastMasterClickTick = -40;
     private int lastCenterClickTick = -40;
     private net.minecraft.world.World puzzleWorld;
@@ -207,9 +210,25 @@ public final class ClientHooks {
             puzzleWaitTicks = 0;
             masterClickAttempts = 0;
             centerClickAttempts = 0;
+            minesweeperOpeningClickSent = false;
             lastMasterClickTick = -40;
             lastCenterClickTick = -40;
             puzzleCompletion.begin();
+        }
+
+        if (autoPuzzleState == AutoPuzzleState.SOLVING) {
+            Object game = puzzleBridge.nearbyGame(true);
+            int level = puzzleBridge.currentMinesweeperLevel(game);
+            if (activeMinesweeperLevel >= 1 && level > activeMinesweeperLevel && level <= 4) {
+                session.cancel("Minesweeper stage advanced");
+                activeMinesweeperLevel = level;
+                autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
+                puzzleWaitTicks = 0;
+                centerClickAttempts = 0;
+                minesweeperOpeningClickSent = false;
+                lastCenterClickTick = -40;
+                if (exploration != null) exploration.setAutomationStatus("Opening Minesweeper stage " + level);
+            }
         }
 
         // Poll board detection every 20 ticks (1s) when dormant (using smart movement gate), or every tick when
@@ -230,10 +249,6 @@ public final class ClientHooks {
         if (autoPuzzleState == AutoPuzzleState.OPENING) {
             puzzleWaitTicks++;
             DetectedGame opened = puzzleBridge.detect(true);
-            if (opened != null) {
-                startPuzzleSolver();
-                return;
-            }
             Object game = puzzleBridge.nearbyGame(true);
             if (game != null) {
                 int[] center = puzzleBridge.gameCenter(game);
@@ -275,11 +290,31 @@ public final class ClientHooks {
         if (autoPuzzleState == AutoPuzzleState.REVEALING) {
             puzzleWaitTicks++;
             DetectedGame revealed = puzzleBridge.detect(true);
+            Object game = puzzleBridge.nearbyGame(true);
             if (revealed != null) {
+                if (centerClickAttempts == 0) {
+                    if (game != null && puzzleWaitTicks - lastCenterClickTick >= 20
+                        && puzzleBridge.activateBoardCenter(game)) {
+                        centerClickAttempts++;
+                        lastCenterClickTick = puzzleWaitTicks;
+                        if (exploration != null)
+                            exploration.setAutomationStatus("Board revealed; checking puzzle state");
+                    }
+                    return;
+                }
+                if (puzzleWaitTicks - lastCenterClickTick < 20) return;
+                if (puzzleBridge.requiresMinesweeperOpeningClick(revealed) && !minesweeperOpeningClickSent) {
+                    if (game != null && puzzleBridge.activateBoardCenter(game)) {
+                        minesweeperOpeningClickSent = true;
+                        lastCenterClickTick = puzzleWaitTicks;
+                        if (exploration != null) exploration.setAutomationStatus("Opening Minesweeper starting flag");
+                    }
+                    return;
+                }
+                if (minesweeperOpeningClickSent && puzzleWaitTicks - lastCenterClickTick < 20) return;
                 startPuzzleSolver();
                 return;
             }
-            Object game = puzzleBridge.nearbyGame(true);
             if (game != null && centerClickAttempts < 4
                 && puzzleWaitTicks - lastCenterClickTick >= 20
                 && puzzleBridge.activateBoardCenter(game)) {
@@ -289,6 +324,29 @@ public final class ClientHooks {
             if (puzzleWaitTicks > 200) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Board did not reveal; explorer held");
+            }
+            return;
+        }
+        if (autoPuzzleState == AutoPuzzleState.REVEALING_NEXT_STAGE) {
+            puzzleWaitTicks++;
+            Object game = puzzleBridge.nearbyGame(true);
+            DetectedGame board = puzzleBridge.detect(true);
+            if (centerClickAttempts > 0 && board != null && puzzleWaitTicks - lastCenterClickTick >= 20) {
+                startPuzzleSolver();
+                return;
+            }
+            if (game != null && centerClickAttempts < 5
+                && puzzleWaitTicks - lastCenterClickTick >= 20
+                && puzzleBridge.activateBoardCenter(game)) {
+                centerClickAttempts++;
+                lastCenterClickTick = puzzleWaitTicks;
+                if (exploration != null)
+                    exploration.setAutomationStatus("Revealing Minesweeper stage " + activeMinesweeperLevel);
+            }
+            if (puzzleWaitTicks > 200) {
+                autoPuzzleState = AutoPuzzleState.FAILED;
+                if (exploration != null)
+                    exploration.setAutomationStatus("Minesweeper stage did not open; explorer held");
             }
             return;
         }
@@ -310,6 +368,11 @@ public final class ClientHooks {
     }
 
     private void startPuzzleSolver() {
+        if (autoPuzzleState != AutoPuzzleState.REVEALING_NEXT_STAGE) {
+            Object game = puzzleBridge.nearbyGame(true);
+            int level = puzzleBridge.currentMinesweeperLevel(game);
+            if (level >= 1) activeMinesweeperLevel = level;
+        }
         session.start(ActionPlanner.Mode.SOLVE);
         if (session.isActive()) autoPuzzleState = AutoPuzzleState.SOLVING;
         else autoPuzzleState = AutoPuzzleState.FAILED;

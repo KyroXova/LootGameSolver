@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 
 import org.lwjgl.opengl.GL11;
@@ -28,6 +29,13 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
  * are completely unaffected.
  */
 public final class WorldOverlayRenderer {
+
+    private static final ResourceLocation RED_FLAG = new ResourceLocation(
+        "lootgamesolver",
+        "textures/minesweeper/red_flag.png");
+    private static final ResourceLocation SAFE_FLAG = new ResourceLocation(
+        "lootgamesolver",
+        "textures/minesweeper/safe_flag.png");
 
     private final SolverSession session;
     private final ExplorationBeta exploration;
@@ -93,6 +101,29 @@ public final class WorldOverlayRenderer {
         GL11.glPopMatrix();
     }
 
+    private static void drawFlag(ResourceLocation texture, double x, double y, double z, Minecraft mc) {
+        RenderManager manager = RenderManager.instance;
+        mc.getTextureManager()
+            .bindTexture(texture);
+        GL11.glPushMatrix();
+        GL11.glTranslated(x, y, z);
+        GL11.glRotatef(-manager.playerViewY, 0.0F, 1.0F, 0.0F);
+        GL11.glRotatef(manager.playerViewX, 1.0F, 0.0F, 0.0F);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1F, 1F, 1F, 1F);
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        tessellator.addVertexWithUV(-0.36D, -0.36D, 0D, 0D, 1D);
+        tessellator.addVertexWithUV(0.36D, -0.36D, 0D, 1D, 1D);
+        tessellator.addVertexWithUV(0.36D, 0.36D, 0D, 1D, 0D);
+        tessellator.addVertexWithUV(-0.36D, 0.36D, 0D, 0D, 0D);
+        tessellator.draw();
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glPopMatrix();
+    }
+
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
@@ -142,10 +173,10 @@ public final class WorldOverlayRenderer {
                 if (current.type == MiniGame.MINESWEEPER) {
                     if (action.type == SolverAction.Type.FLAG) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
-                        drawFloatingText("FLAG", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFF4444, mc);
+                        drawFlag(RED_FLAG, minX + 0.5D, minY + 1.35D, minZ + 0.5D, mc);
                     } else if (action.type == SolverAction.Type.REVEAL) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                        drawFloatingText("SAFE", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x44FF44, mc);
+                        drawFlag(SAFE_FLAG, minX + 0.5D, minY + 1.35D, minZ + 0.5D, mc);
                     }
                 } else if (current.type == MiniGame.SUDOKU) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);

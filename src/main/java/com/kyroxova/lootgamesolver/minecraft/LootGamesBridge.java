@@ -580,7 +580,7 @@ public final class LootGamesBridge implements MiniGameDetector {
         return findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
     }
 
-    /** Clicks the floor cell LootGames uses to generate and reveal a new board. */
+    /** Right-clicks the floor-center cell used to reveal or advance a newly opened board. */
     public boolean activateBoardCenter(Object game) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
@@ -596,11 +596,37 @@ public final class LootGamesBridge implements MiniGameDetector {
                 || hit.blockY != y
                 || hit.blockZ != z) return false;
             mc.thePlayer.swingItem();
-            mc.playerController.clickBlock(x, y, z, hit.sideHit);
-            return true;
+            return mc.playerController.onPlayerRightClick(
+                mc.thePlayer,
+                mc.theWorld,
+                mc.thePlayer.getHeldItem(),
+                x,
+                y,
+                z,
+                hit.sideHit,
+                hit.hitVec);
         } catch (Exception e) {
             LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);
             return false;
+        }
+    }
+
+    public boolean requiresMinesweeperOpeningClick(DetectedGame detected) {
+        return detected != null && detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER;
+    }
+
+    /** Reads the current Minesweeper round before a cleared board is discarded by solver detection. */
+    public int currentMinesweeperLevel(Object game) {
+        if (game == null || !MS_GAME.equals(
+            game.getClass()
+                .getName()))
+            return -1;
+        try {
+            Field level = getFieldRecursive(game.getClass(), "currentLevel");
+            return level == null ? -1 : level.getInt(game);
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the Minesweeper stage", e);
+            return -1;
         }
     }
 

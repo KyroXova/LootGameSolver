@@ -3,12 +3,20 @@ package com.kyroxova.lootgamesolver.client;
 /** A staircase descends beside the player; at board height it becomes a level approach. */
 final class ExcavationPolicy {
 
+    static final double MIN_ENTRANCE_RADIUS = 18.0D;
+    static final double MAX_ENTRANCE_RADIUS = 24.0D;
+
     static boolean shouldApproach(double x, double footY, double z, int targetX, int targetY, int targetZ) {
         return targetY < footY - 2 && Math.abs(x - targetX) + Math.abs(z - targetZ) <= 32;
     }
 
     static int destinationY(int footY, int boardY) {
         return footY > boardY + 1 ? footY - 1 : footY;
+    }
+
+    static boolean preferredEntrance(double x, double z, int targetX, int targetZ) {
+        double distance = Math.hypot(x - targetX, z - targetZ);
+        return distance >= MIN_ENTRANCE_RADIUS && distance <= MAX_ENTRANCE_RADIUS;
     }
 
     static boolean beside(int x, int z, int nx, int nz) {

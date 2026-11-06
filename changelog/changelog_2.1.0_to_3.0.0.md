@@ -106,3 +106,7 @@ local testing builds can enable it. Navigation is experimental and does not guar
 
 - Package this version's changelog inside the mod JAR and use the same file for release notes.
 - Run build checks before publishing and report CurseForge upload failures instead of silently ignoring them.
+- Start excavation near the closest safe structure wall, keep the entry about 10–15 blocks beyond the footprint, and move closer to the board center before interaction.
+- Right-click the board floor to reveal it, then handle Minesweeper opening flags again at each subsequent stage before resuming the solver.
+- Reuse nearby checked paths and place a safe solid block from the hotbar or inventory when an upward return step is missing.
+- Render Minesweeper safe and red flags with the bundled flag textures, and allow supported slab, snow, and stair surfaces in walking routes.
