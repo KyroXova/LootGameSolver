@@ -41,6 +41,8 @@ public final class LootGamesBridge implements MiniGameDetector {
     private Object golStage;
     private Object golPendingStage;
     private Object golPendingAppearance;
+    private String golPendingAppearanceState;
+    private int golPendingSymbol;
     private boolean golActionPending;
     private boolean golActionRejected;
     private boolean golAcceptedAwaitingRefresh;
@@ -153,6 +155,8 @@ public final class LootGamesBridge implements MiniGameDetector {
         golAcceptedAwaitingRefresh = false;
         golPendingStage = null;
         golPendingAppearance = null;
+        golPendingAppearanceState = null;
+        golPendingSymbol = 0;
         golRejectedStageId = null;
     }
 
@@ -392,6 +396,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             golActionRejected = false;
             golAcceptedAwaitingRefresh = false;
             golRejectedStageId = null;
+            golPendingStage = null;
+            golPendingAppearance = null;
+            golPendingAppearanceState = null;
+            golPendingSymbol = 0;
         }
         golGame = game;
         golStage = stage;
@@ -447,6 +455,11 @@ public final class LootGamesBridge implements MiniGameDetector {
         } else if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && sequence.isEmpty()) {
             sequence = new ArrayList<CellPosition>(golSequence);
             currentSymbol = golSubmitted;
+        }
+        if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+            // LootGames can leave its reflected counter behind while the mark
+            // animation is the only acknowledgement available to the client.
+            currentSymbol = Math.max(currentSymbol, golSubmitted);
         }
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && currentSymbol > 0
             && currentSymbol <= sequence.size()) {
@@ -728,6 +741,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             golPendingStage = readGameStage(snapshot.game);
             golPendingAppearance = readMarkAppearance(snapshot.game);
+            golPendingAppearanceState = readMarkStateName(golPendingAppearance);
+            golPendingSymbol = snapshot.gol != null ? snapshot.gol.getCurrentSymbol() : golSubmitted;
             golActionPending = true;
         }
     }
@@ -752,15 +767,13 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (current.gol == null) return false;
             Object liveStage = readGameStage(current.game);
             if (liveStage != null && golPendingStage != null && liveStage != golPendingStage) {
-                golActionPending = false;
-                golActionRejected = false;
-                golAcceptedAwaitingRefresh = false;
-                golRejectedStageId = null;
+                clearGameOfLightAction();
                 return true;
             }
-            if (golAcceptedAwaitingRefresh) {
-                if (current.gol.getCurrentSymbol() < golSubmitted) return false;
-                golAcceptedAwaitingRefresh = false;
+            int currentSymbol = current.gol.getCurrentSymbol();
+            if (currentSymbol > golPendingSymbol) {
+                golSubmitted = Math.max(golSubmitted, currentSymbol);
+                clearGameOfLightAction();
                 return true;
             }
             if (golActionRejected && golRejectedStageId != null && golRejectedStageId.equals(current.gol.getStageId()))
@@ -770,16 +783,16 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (!GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId())) return false;
 
             Object appearance = readMarkAppearance(current.game);
-            if (appearance == null || appearance == golPendingAppearance) return false;
-            Object state = readMarkState(appearance);
-            String stateName = state != null ? String.valueOf(state) : "";
-            if ("ACCEPTED".equalsIgnoreCase(stateName)) {
-                golSubmitted++;
-                golActionPending = false;
-                golAcceptedAwaitingRefresh = true;
+            String stateName = readMarkStateName(appearance);
+            boolean appearanceChanged = appearance != golPendingAppearance
+                || !java.util.Objects.equals(stateName, golPendingAppearanceState);
+            if (appearanceChanged && "ACCEPTED".equalsIgnoreCase(stateName)) {
+                golSubmitted = Math.max(golSubmitted + 1, golPendingSymbol + 1);
+                clearGameOfLightAction();
+                golSubmitted = Math.max(golSubmitted, currentSymbol);
                 return false;
             }
-            if ("DENIED".equalsIgnoreCase(stateName)) {
+            if (appearanceChanged && "DENIED".equalsIgnoreCase(stateName)) {
                 // A rejected symbol must not advance the local sequence index or be resent.
                 golActionPending = false;
                 golActionRejected = true;
@@ -817,6 +830,22 @@ public final class LootGamesBridge implements MiniGameDetector {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static String readMarkStateName(Object appearance) {
+        Object state = readMarkState(appearance);
+        return state != null ? String.valueOf(state) : null;
+    }
+
+    private void clearGameOfLightAction() {
+        golActionPending = false;
+        golActionRejected = false;
+        golAcceptedAwaitingRefresh = false;
+        golPendingStage = null;
+        golPendingAppearance = null;
+        golPendingAppearanceState = null;
+        golPendingSymbol = 0;
+        golRejectedStageId = null;
     }
 
     public void submitSudokuCheck(DetectedGame snapshot) {

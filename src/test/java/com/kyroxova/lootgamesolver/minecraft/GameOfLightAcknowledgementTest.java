@@ -28,7 +28,7 @@ public class GameOfLightAcknowledgementTest {
 
     private static final class FakeAppearance {
 
-        private final String state;
+        private String state;
 
         private FakeAppearance(String state) {
             this.state = state;
@@ -66,7 +66,7 @@ public class GameOfLightAcknowledgementTest {
         assertFalse(bridge.actionComplete(beforeClick, action));
         game.specialMarkAppearance = new FakeAppearance("ACCEPTED");
         assertFalse(bridge.actionComplete(beforeClick, action));
-        assertTrue(bridge.isGameOfLightActionPending());
+        assertFalse(bridge.isGameOfLightActionPending());
         DetectedGame afterFirst = snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 1);
         assertTrue(bridge.actionComplete(afterFirst, action));
         assertFalse(bridge.isGameOfLightActionPending());
@@ -108,5 +108,24 @@ public class GameOfLightAcknowledgementTest {
         bridge.recordSubmittedAction(waiting);
         game.stage = new FakeStage();
         assertTrue(bridge.actionComplete(snapshot(game, GameOfLightBoard.STAGE_SHOW_SEQUENCE, 0), action));
+    }
+
+    @Test
+    public void acceptsStateChangeOnReusedMarkWithoutWaitingForCounter() {
+        LootGamesBridge bridge = new LootGamesBridge();
+        SolverAction action = new SolverAction(SolverAction.Type.REVEAL, new CellPosition(1, 1), 0, 1D);
+        FakeGame game = new FakeGame();
+        FakeAppearance mark = new FakeAppearance("SHOWING");
+        game.specialMarkAppearance = mark;
+        DetectedGame waiting = snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 0);
+
+        bridge.recordSubmittedAction(waiting);
+        mark.state = "ACCEPTED";
+
+        // Real LootGames versions may mutate and reuse their mark instance,
+        // while the reflected symbol counter remains unchanged for a tick.
+        assertFalse(bridge.actionComplete(waiting, action));
+        assertFalse(bridge.isGameOfLightActionPending());
+        assertTrue(bridge.actionComplete(waiting, action));
     }
 }
