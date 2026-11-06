@@ -185,6 +185,42 @@ public class GroundPathfinderTest {
     }
 
     @Test
+    public void usesCheaperPredecessorWhenNodeIsReachedAgain() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 && Math.abs(x) <= 5 && Math.abs(z) <= 5;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+
+            public int extraCost(int x, int y, int z) {
+                return z == 0 && x >= 1 && x <= 4 ? 20 : 0;
+            }
+        };
+        List<int[]> route = completedRoute(terrain, 0, 0, 0, 5, 0, 8);
+        assertFalse(route.isEmpty());
+        for (int[] point : route) assertFalse(point[1] == 0 && point[2] == 0 && point[0] > 0 && point[0] < 5);
+    }
+
+    @Test
+    public void diagonalNeedsHeadClearanceAtBothSideCells() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 && x == z;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return !(x == 1 && y == 1 && z == 0) && !(x == 0 && y == 1 && z == 1);
+            }
+        };
+        assertTrue(completedRoute(terrain, 0, 0, 0, 6, 6, 12).isEmpty());
+    }
+
+    @Test
     public void detoursAroundWall() {
         List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 

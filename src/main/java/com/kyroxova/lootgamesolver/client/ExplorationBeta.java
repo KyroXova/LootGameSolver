@@ -2170,6 +2170,12 @@ public final class ExplorationBeta {
                 return terrainWorld.getBlock(x, y, z)
                     .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
             }
+
+            public int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
+                int cost = Math.abs(ny - y) == 1 ? 4 : 0;
+                if (terrainWorld.getBlock(nx, ny - 1, nz).getMaterial().isLiquid()) cost += 8;
+                return cost;
+            }
         };
     }
 

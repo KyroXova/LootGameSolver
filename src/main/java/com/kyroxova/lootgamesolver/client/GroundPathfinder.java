@@ -21,7 +21,15 @@ public final class GroundPathfinder {
         default int extraCost(int x, int y, int z) {
             return 0;
         }
+
+        /** Additional cost for entering this node from its predecessor, in tenths of a block. */
+        default int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
+            return 0;
+        }
     }
+
+    private static final int[][] DIRECTIONS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 },
+        { -1, 1 }, { -1, -1 } };
 
     private static final class Node implements Comparable<Node> {
 
@@ -66,6 +74,7 @@ public final class GroundPathfinder {
         private final Terrain terrain;
         private final int x, y, z, gx, gz, radius;
         private final PriorityQueue<Node> open = new PriorityQueue<Node>();
+        private final Map<Long, Integer> bestCosts = new HashMap<Long, Integer>();
         private final Set<Long> visited = new HashSet<Long>();
         private final Map<Long, Boolean> standable = new HashMap<Long, Boolean>();
         private final Node start;
@@ -83,31 +92,33 @@ public final class GroundPathfinder {
             start = new Node(x, y, z, 0, gx, gz, null);
             best = start;
             done = !terrain.stand(x, y, z);
-            if (!done) open.add(start);
+            if (!done) {
+                open.add(start);
+                bestCosts.put(key(x, y, z), 0);
+            }
         }
 
         boolean advance(long budget) {
             if (done) return true;
             final long deadline = System.nanoTime() + budget;
-            int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
-                { -1, -1 } };
             while (!open.isEmpty() && visited.size() < 8192 && System.nanoTime() < deadline) {
                 Node node = open.remove();
-                if (!visited.add(key(node.x, node.y, node.z))) continue;
+                long nodeKey = key(node.x, node.y, node.z);
+                Integer bestCost = bestCosts.get(nodeKey);
+                if (bestCost == null || node.cost != bestCost.intValue() || !visited.add(nodeKey)) continue;
                 if (node.remaining < best.remaining) best = node;
                 if (node.remaining <= 10) {
                     best = node;
                     done = true;
                     break;
                 }
-                for (int[] direction : directions) for (int dy = -1; dy <= 1; dy++) {
+                for (int[] direction : DIRECTIONS) for (int dy = -1; dy <= 1; dy++) {
                     int nx = node.x + direction[0], ny = node.y + dy, nz = node.z + direction[1];
                     boolean diagonal = direction[0] != 0 && direction[1] != 0;
                     if (diagonal && (dy != 0 || !stand(terrain, standable, nx, node.y, node.z)
                         || !stand(terrain, standable, node.x, node.y, nz))) continue;
                     if (Math.abs(nx - x) > radius || Math.abs(nz - z) > radius || Math.abs(ny - y) > 12) continue;
                     long position = key(nx, ny, nz);
-                    if (visited.contains(position)) continue;
                     Boolean canStand = standable.get(position);
                     if (canStand == null) {
                         canStand = terrain.stand(nx, ny, nz);
@@ -116,15 +127,17 @@ public final class GroundPathfinder {
                     if (!canStand) continue;
                     if (dy > 0 && !terrain.clear(node.x, node.y + 2, node.z)) continue;
                     if (dy < 0 && !terrain.clear(nx, node.y + 1, nz)) continue;
-                    open.add(
-                        new Node(
-                            nx,
-                            ny,
-                            nz,
-                            node.cost + (diagonal ? 14 : 10) + 10 * Math.abs(dy) + 10 * terrain.extraCost(nx, ny, nz),
-                            gx,
-                            gz,
-                            node));
+                    if (diagonal && (!terrain.clear(nx, node.y + 1, node.z) || !terrain.clear(node.x, node.y + 1, nz)))
+                        continue;
+                    int stepCost = (diagonal ? 14 : 10) + 10 * Math.abs(dy)
+                        + 10 * Math.max(0, terrain.extraCost(nx, ny, nz))
+                        + Math.max(0, terrain.transitionCost(node.x, node.y, node.z, nx, ny, nz));
+                    int nextCost = node.cost + stepCost;
+                    Integer priorCost = bestCosts.get(position);
+                    if (priorCost != null && priorCost.intValue() <= nextCost) continue;
+                    if (visited.contains(position)) continue;
+                    bestCosts.put(position, nextCost);
+                    open.add(new Node(nx, ny, nz, nextCost, gx, gz, node));
                 }
             }
             done = done || open.isEmpty() || visited.size() >= 8192;
