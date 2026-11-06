@@ -249,7 +249,8 @@ public final class ClientHooks {
         if (autoPuzzleState == AutoPuzzleState.OPENING) {
             puzzleWaitTicks++;
             DetectedGame opened = puzzleBridge.detect(true);
-            Object game = puzzleBridge.nearbyGame(true);
+            Object game = puzzleBridge.gameAtMaster(autoPuzzlePosition);
+            if (game == null) game = puzzleBridge.nearbyGame(true);
             boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
             if ((opened != null || masterInteractionSettled) && game != null) {
                 int[] center = puzzleBridge.gameCenter(game);
@@ -270,6 +271,8 @@ public final class ClientHooks {
                 lastMasterClickTick = puzzleWaitTicks;
                 if (exploration != null) exploration.setAutomationStatus("Opening LootGames master");
             }
+            if (game == null && masterInteractionSettled && puzzleWaitTicks <= 200 && exploration != null)
+                exploration.setAutomationStatus("Waiting for LootGames to create the puzzle");
             if (puzzleWaitTicks > 200) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus(

@@ -555,6 +555,10 @@ public final class LootGamesBridge implements MiniGameDetector {
     public boolean activateMaster(int x, int y, int z) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+        net.minecraft.block.Block master = mc.theWorld.getBlock(x, y, z);
+        if (master == null || !master.getClass()
+            .getName()
+            .endsWith(".PuzzleMasterBlock")) return false;
         if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
@@ -578,6 +582,17 @@ public final class LootGamesBridge implements MiniGameDetector {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.currentScreen != null) return null;
         return findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
+    }
+
+    /** Direct fallback for the just-activated master, before its tile is picked up by the nearby scan. */
+    public Object gameAtMaster(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || position.length < 3
+            || mc.theWorld == null
+            || !mc.theWorld.blockExists(position[0], position[1], position[2])) return null;
+        TileEntity tile = mc.theWorld.getTileEntity(position[0], position[1], position[2]);
+        return tile == null || tile.isInvalid() ? null
+            : extractGameFromTile(mc.theWorld, tile, position[0], position[1], position[2]);
     }
 
     /** Right-clicks the floor-center cell used to reveal or advance a newly opened board. */
@@ -633,8 +648,23 @@ public final class LootGamesBridge implements MiniGameDetector {
     public int[] gameCenter(Object game) {
         try {
             Object center = invoke(game, "getGameCenter");
-            return new int[] { number(invoke(center, "getX")), number(invoke(center, "getY")),
-                number(invoke(center, "getZ")) };
+            int x = number(invoke(center, "getX"));
+            int y = number(invoke(center, "getY"));
+            int z = number(invoke(center, "getZ"));
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.theWorld != null) {
+                // LootGames exposes its logical center at the master height. In dungeon rooms
+                // that can be above the clickable floor cell, so resolve the solid block below.
+                for (int floorY = y; floorY >= y - 5; floorY--) {
+                    if (!mc.theWorld.blockExists(x, floorY, z)) break;
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(x, floorY, z);
+                    if (block != null && block != net.minecraft.init.Blocks.air
+                        && block.getMaterial()
+                            .isSolid())
+                        return new int[] { x, floorY, z };
+                }
+            }
+            return new int[] { x, y, z };
         } catch (Exception e) {
             LootGameSolver.LOG.debug("Could not read the LootGames board center", e);
             return null;

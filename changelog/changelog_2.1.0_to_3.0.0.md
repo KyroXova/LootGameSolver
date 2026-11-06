@@ -113,4 +113,9 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Trigger automatic puzzle opening only after the explorer reaches verified interaction range of the master block.
 - Wait for the master interaction to settle before navigating to the game center, then confirm the floor click before starting the solver.
 - Retry opening when the master click succeeds but the game object is not yet available to the client.
+- Resolve board interactions to the solid floor cell below LootGames' logical center, avoiding clicks at an empty height.
+- Look up the just-opened game directly from its master tile before falling back to the nearby-game scan.
+- When a saved exit segment is blocked, try a short checked reroute and then plan a safe dig link back to the saved tunnel.
+- Keep only real, adjacent player positions in saved exit trails so checkpoint overshoots cannot create guessed corner routes.
+- Start a fresh entrance trail outside a structure instead of reusing a stale entrance saved from an earlier run.
 - Hold exploration when no verified return trail exists after solving instead of choosing an arbitrary route inside the structure.

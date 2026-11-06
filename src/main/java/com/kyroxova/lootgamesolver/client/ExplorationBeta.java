@@ -478,12 +478,12 @@ public final class ExplorationBeta {
     }
 
     private boolean rerouteSavedReturn(Minecraft mc) {
-        if (!returning || returnJoinSearch != null || route.size() < 2 || returnReplans >= 6) return false;
+        if (!returning || returnJoinSearch != null || route.size() < 2 || returnReplans >= 2) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int first = Math.min(1 + returnReplans++, route.size() - 1);
-        for (int i = first; i < Math.min(route.size(), first + 4); i++) {
+        for (int i = first; i < Math.min(route.size(), first + 5); i++) {
             int[] join = route.get(i);
             if (!safe(mc.theWorld, join[0], join[1], join[2])) continue;
             returnTrailRoute = new ArrayList<int[]>();
@@ -505,6 +505,23 @@ public final class ExplorationBeta {
             return true;
         }
         return false;
+    }
+
+    /** A blocked saved route gets a checked excavation link to a later checkpoint, never a new in-room search. */
+    private boolean digTowardSavedExit(Minecraft mc) {
+        if (!returning || returnDigging || mc.thePlayer == null) return false;
+        List<int[]> savedRoute = new ArrayList<int[]>(route.size());
+        for (int[] point : route) savedRoute.add(point.clone());
+        if (savedRoute.size() < 2 && accessTrail.size() >= 2) {
+            int nearest = accessTrail.nearestIndex(
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ),
+                128);
+            savedRoute = accessTrail.reverseFrom(nearest);
+        }
+        if (savedRoute.size() < 2) return false;
+        return startReturnDig(mc, savedRoute);
     }
 
     private boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
@@ -686,6 +703,16 @@ public final class ExplorationBeta {
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
             24) && startSavedReturn(mc, true, 64)) return;
+        // A persisted trail is useful after a restart only when we are actually inside
+        // its structure. Starting a fresh approach from outside must never inherit an
+        // old entrance and later return to the wrong surface point.
+        if (trailTarget != null && accessTrail.size() > 0) {
+            accessTrail.clear();
+            trailTarget = knownStructure == null ? null : knownStructure.clone();
+            trailExcavating = false;
+            trailDirty = false;
+            removePersistedTrail();
+        }
         boolean underground = LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
             && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 40;
         if (underground) {
@@ -1075,10 +1102,12 @@ public final class ExplorationBeta {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
+        if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (returning) {
                 if (rerouteSavedReturn(mc)) return;
+                if (digTowardSavedExit(mc)) return;
                 stop(mc, "Saved return path clearance changed");
                 return;
             }
@@ -1092,6 +1121,7 @@ public final class ExplorationBeta {
             if (returning) {
                 if (next[1] > py && tryPlaceReturnStep(mc, next)) return;
                 if (rerouteSavedReturn(mc)) return;
+                if (digTowardSavedExit(mc)) return;
                 stop(mc, "Saved return path is no longer safe");
                 return;
             }
@@ -1120,7 +1150,7 @@ public final class ExplorationBeta {
             || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), route.size() > 1))) {
             segmentX = next[0] + 0.5D;
             segmentZ = next[2] + 0.5D;
-            if (!returning && trailTarget != null) recordAccessPoint(next[0], next[1], next[2]);
+            if (!returning && trailTarget != null) recordAccessPoint(px, py, pz);
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
@@ -1137,6 +1167,7 @@ public final class ExplorationBeta {
                 || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
                 if (returning && next[1] > py && tryPlaceReturnStep(mc, next)) return;
                 if (returning && rerouteSavedReturn(mc)) return;
+                if (returning && digTowardSavedExit(mc)) return;
                 stop(mc, "Next route segment is no longer safe");
                 return;
             }
