@@ -252,7 +252,7 @@ public final class SolverSession {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
-        if (snapshot.type == MiniGame.GAME_OF_LIGHT && lastActionAt > 0) {
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT && bridge.isGameOfLightActionPending()) {
             status = "Waiting: GoL";
             return;
         }

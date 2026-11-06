@@ -57,6 +57,7 @@ public class GameOfLightAcknowledgementTest {
         DetectedGame beforeClick = snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 0);
 
         bridge.recordSubmittedAction(beforeClick);
+        assertTrue(bridge.isGameOfLightActionPending());
         assertFalse(bridge.actionComplete(beforeClick, action));
         bridge.recordSubmittedAction(beforeClick);
         assertFalse(bridge.actionComplete(beforeClick, action));
@@ -65,7 +66,16 @@ public class GameOfLightAcknowledgementTest {
         assertFalse(bridge.actionComplete(beforeClick, action));
         game.specialMarkAppearance = new FakeAppearance("ACCEPTED");
         assertFalse(bridge.actionComplete(beforeClick, action));
-        assertTrue(bridge.actionComplete(snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 1), action));
+        assertTrue(bridge.isGameOfLightActionPending());
+        DetectedGame afterFirst = snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 1);
+        assertTrue(bridge.actionComplete(afterFirst, action));
+        assertFalse(bridge.isGameOfLightActionPending());
+
+        bridge.recordSubmittedAction(afterFirst);
+        assertTrue(bridge.isGameOfLightActionPending());
+        game.specialMarkAppearance = new FakeAppearance("ACCEPTED");
+        assertFalse(bridge.actionComplete(afterFirst, action));
+        assertTrue(bridge.actionComplete(snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 2), action));
     }
 
     @Test
@@ -78,12 +88,14 @@ public class GameOfLightAcknowledgementTest {
         bridge.recordSubmittedAction(waiting);
         game.specialMarkAppearance = new FakeAppearance("DENIED");
         assertFalse(bridge.actionComplete(waiting, action));
+        assertTrue(bridge.isGameOfLightActionPending());
         bridge.recordSubmittedAction(waiting);
         game.specialMarkAppearance = new FakeAppearance("ACCEPTED");
         assertFalse(bridge.actionComplete(waiting, action));
 
         game.stage = new FakeStage();
         assertTrue(bridge.actionComplete(snapshot(game, GameOfLightBoard.STAGE_SHOW_SEQUENCE, 0), action));
+        assertFalse(bridge.isGameOfLightActionPending());
     }
 
     @Test

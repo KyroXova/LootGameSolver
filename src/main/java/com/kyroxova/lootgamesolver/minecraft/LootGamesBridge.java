@@ -156,6 +156,10 @@ public final class LootGamesBridge implements MiniGameDetector {
         golRejectedStageId = null;
     }
 
+    public boolean isGameOfLightActionPending() {
+        return golActionPending || golActionRejected || golAcceptedAwaitingRefresh;
+    }
+
     public DetectedGame detect() {
         return detect(false);
     }
