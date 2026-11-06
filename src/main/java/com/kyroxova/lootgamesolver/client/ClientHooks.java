@@ -341,14 +341,27 @@ public final class ClientHooks {
             Object game = puzzleBridge.nearbyGame(true);
             DetectedGame board = puzzleBridge.detect(true);
             if (centerClickAttempts > 0) {
-                if (board != null && puzzleWaitTicks - lastCenterClickTick >= 20) {
-                    startPuzzleSolver();
-                    return;
+                if (puzzleWaitTicks - lastCenterClickTick >= 20) {
+                    if (!minesweeperOpeningClickSent) {
+                        if (board != null && game != null && puzzleBridge.activateBoardCenter(game)) {
+                            minesweeperOpeningClickSent = true;
+                            lastCenterClickTick = puzzleWaitTicks;
+                            if (exploration != null)
+                                exploration.setAutomationStatus("Opening Minesweeper stage " + activeMinesweeperLevel);
+                        }
+                        return;
+                    }
+                    if (board != null) {
+                        startPuzzleSolver();
+                        return;
+                    }
                 }
                 if (puzzleWaitTicks > lastCenterClickTick + 60) {
                     autoPuzzleState = AutoPuzzleState.FAILED;
                     if (exploration != null)
-                        exploration.setAutomationStatus("Minesweeper stage reveal was not confirmed; explorer held");
+                        exploration.setAutomationStatus(minesweeperOpeningClickSent
+                            ? "Minesweeper stage opening was not confirmed; explorer held"
+                            : "Minesweeper stage reveal was not confirmed; explorer held");
                 }
                 return;
             }
