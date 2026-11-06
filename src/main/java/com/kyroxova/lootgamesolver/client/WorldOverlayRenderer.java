@@ -115,10 +115,10 @@ public final class WorldOverlayRenderer {
         GL11.glColor4f(1F, 1F, 1F, 1F);
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        tessellator.addVertexWithUV(-0.6D, -0.6D, 0D, 0D, 1D);
-        tessellator.addVertexWithUV(0.6D, -0.6D, 0D, 1D, 1D);
-        tessellator.addVertexWithUV(0.6D, 0.6D, 0D, 1D, 0D);
-        tessellator.addVertexWithUV(-0.6D, 0.6D, 0D, 0D, 0D);
+        tessellator.addVertexWithUV(-0.36D, -0.36D, 0D, 0D, 1D);
+        tessellator.addVertexWithUV(0.36D, -0.36D, 0D, 1D, 1D);
+        tessellator.addVertexWithUV(0.36D, 0.36D, 0D, 1D, 0D);
+        tessellator.addVertexWithUV(-0.36D, 0.36D, 0D, 0D, 0D);
         tessellator.draw();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_TEXTURE_2D);
