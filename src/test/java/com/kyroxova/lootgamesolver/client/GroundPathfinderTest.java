@@ -221,6 +221,36 @@ public class GroundPathfinderTest {
     }
 
     @Test
+    public void cachesRepeatedWorldClearanceAndTerrainCostQueries() {
+        final java.util.Set<String> clearCells = new java.util.HashSet<String>();
+        final java.util.Set<String> costCells = new java.util.HashSet<String>();
+        final int[] repeatedClear = { 0 }, repeatedCost = { 0 };
+        GroundPathfinder.Search search = new GroundPathfinder.Search(new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                String cell = x + ":" + y + ":" + z;
+                if (!clearCells.add(cell)) repeatedClear[0]++;
+                return true;
+            }
+
+            public int extraCost(int x, int y, int z) {
+                String cell = x + ":" + y + ":" + z;
+                if (!costCells.add(cell)) repeatedCost[0]++;
+                return 0;
+            }
+        }, 0, 0, 0, 6, 5, 12);
+        for (int i = 0; i < 100 && !search.advance(1_000_000L); i++) {}
+        assertTrue(clearCells.size() > 0);
+        assertTrue(costCells.size() > 0);
+        assertTrue(repeatedClear[0] == 0);
+        assertTrue(repeatedCost[0] == 0);
+    }
+
+    @Test
     public void detoursAroundWall() {
         List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 

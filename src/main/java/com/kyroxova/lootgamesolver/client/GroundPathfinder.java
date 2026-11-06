@@ -77,6 +77,8 @@ public final class GroundPathfinder {
         private final Map<Long, Integer> bestCosts = new HashMap<Long, Integer>();
         private final Set<Long> visited = new HashSet<Long>();
         private final Map<Long, Boolean> standable = new HashMap<Long, Boolean>();
+        private final Map<Long, Boolean> clearable = new HashMap<Long, Boolean>();
+        private final Map<Long, Integer> terrainCosts = new HashMap<Long, Integer>();
         private final Node start;
         private Node best;
         private boolean done;
@@ -125,12 +127,12 @@ public final class GroundPathfinder {
                         standable.put(position, canStand);
                     }
                     if (!canStand) continue;
-                    if (dy > 0 && !terrain.clear(node.x, node.y + 2, node.z)) continue;
-                    if (dy < 0 && !terrain.clear(nx, node.y + 1, nz)) continue;
-                    if (diagonal && (!terrain.clear(nx, node.y + 1, node.z) || !terrain.clear(node.x, node.y + 1, nz)))
-                        continue;
+                    if (dy > 0 && !clear(terrain, clearable, node.x, node.y + 2, node.z)) continue;
+                    if (dy < 0 && !clear(terrain, clearable, nx, node.y + 1, nz)) continue;
+                    if (diagonal && (!clear(terrain, clearable, nx, node.y + 1, node.z)
+                        || !clear(terrain, clearable, node.x, node.y + 1, nz))) continue;
                     int stepCost = (diagonal ? 14 : 10) + 10 * Math.abs(dy)
-                        + 10 * Math.max(0, terrain.extraCost(nx, ny, nz))
+                        + 10 * Math.max(0, terrainCost(terrain, terrainCosts, nx, ny, nz))
                         + Math.max(0, terrain.transitionCost(node.x, node.y, node.z, nx, ny, nz));
                     int nextCost = node.cost + stepCost;
                     Integer priorCost = bestCosts.get(position);
@@ -167,6 +169,26 @@ public final class GroundPathfinder {
         Boolean value = cache.get(key);
         if (value == null) {
             value = terrain.stand(x, y, z);
+            cache.put(key, value);
+        }
+        return value;
+    }
+
+    private static boolean clear(Terrain terrain, Map<Long, Boolean> cache, int x, int y, int z) {
+        long key = key(x, y, z);
+        Boolean value = cache.get(key);
+        if (value == null) {
+            value = terrain.clear(x, y, z);
+            cache.put(key, value);
+        }
+        return value;
+    }
+
+    private static int terrainCost(Terrain terrain, Map<Long, Integer> cache, int x, int y, int z) {
+        long key = key(x, y, z);
+        Integer value = cache.get(key);
+        if (value == null) {
+            value = Math.max(0, terrain.extraCost(x, y, z));
             cache.put(key, value);
         }
         return value;

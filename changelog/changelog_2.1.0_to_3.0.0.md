@@ -138,3 +138,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Keep the best discovered path cost per position so a later cheaper route can replace a costly candidate.
 - Reject diagonal movement unless both shoulder cells have full body clearance, and reuse the direction table across incremental search slices.
 - Score vertical steps and liquid-adjacent footing separately so route choices better reflect movement difficulty while retaining bounded search work.
+- Cache body-clearance and terrain-penalty lookups across incremental route-search slices to reduce repeated world reads.
