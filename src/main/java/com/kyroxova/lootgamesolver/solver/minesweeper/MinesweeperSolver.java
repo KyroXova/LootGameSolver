@@ -50,6 +50,9 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
 
         if (!reduction.deducedActions.isEmpty()) {
+            if (!globalMineCountAllows(board, reduction.deducedActions)) {
+                return SolveResult.none(SolveResult.Status.INVALID, "Mine count conflicts with board constraints");
+            }
             return deterministicResult(reduction.deducedActions, "Subset deduction");
         }
 
@@ -344,6 +347,26 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         }
         if (flags > board.getMineCount()) return "More flags than total mines";
         return null;
+    }
+
+    private boolean globalMineCountAllows(MinesweeperBoard board, List<SolverAction> deductions) {
+        int flags = 0;
+        int unknown = 0;
+        for (CellPosition position : board.positions()) {
+            CellState state = board.get(position)
+                .getState();
+            if (state == CellState.FLAGGED) flags++;
+            else if (state == CellState.UNKNOWN) unknown++;
+        }
+        Set<CellPosition> resolved = new HashSet<CellPosition>();
+        for (SolverAction action : deductions) {
+            if (board.get(action.position)
+                .getState() != CellState.UNKNOWN || !resolved.add(action.position)) continue;
+            unknown--;
+            if (action.type == SolverAction.Type.FLAG) flags++;
+        }
+        int remainingMines = board.getMineCount() - flags;
+        return remainingMines >= 0 && remainingMines <= unknown;
     }
 
     private List<Constraint> extractConstraints(MinesweeperBoard board) {

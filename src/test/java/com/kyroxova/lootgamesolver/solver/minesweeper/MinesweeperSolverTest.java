@@ -47,7 +47,7 @@ public class MinesweeperSolverTest {
 
     @Test
     public void enumeratesOverlappingConstraints() {
-        MinesweeperBoard board = new MinesweeperBoard(3, 2, 2);
+        MinesweeperBoard board = new MinesweeperBoard(3, 3, 2);
         board.set(0, 0, MinesweeperCell.revealed(1));
         board.set(1, 0, MinesweeperCell.revealed(1));
         board.set(2, 0, MinesweeperCell.revealed(1));
@@ -74,6 +74,18 @@ public class MinesweeperSolverTest {
     public void rejectsContradictoryBoard() {
         MinesweeperBoard board = new MinesweeperBoard(2, 1, 1);
         board.set(0, 0, MinesweeperCell.revealed(2));
+        assertEquals(
+            SolveResult.Status.INVALID,
+            new MinesweeperSolver().solve(board)
+                .getStatus());
+    }
+
+    @Test
+    public void rejectsLocalFlagDeductionThatExceedsGlobalMineCount() {
+        MinesweeperBoard board = new MinesweeperBoard(2, 1, 0);
+        board.set(0, 0, MinesweeperCell.revealed(1));
+        board.set(1, 0, MinesweeperCell.unknown());
+
         assertEquals(
             SolveResult.Status.INVALID,
             new MinesweeperSolver().solve(board)
@@ -170,7 +182,7 @@ public class MinesweeperSolverTest {
     public void solvesLargeConnectedFrontier() {
         // Test a large connected board with consistent 1-1-1 repeating frontier (mines at 0, 3, 6, 9, 12)
         int size = 13;
-        MinesweeperBoard board = new MinesweeperBoard(size, 3, 10);
+        MinesweeperBoard board = new MinesweeperBoard(size, 4, 10);
         for (int x = 0; x < size; x++) {
             board.set(x, 0, MinesweeperCell.revealed(0));
             board.set(x, 1, MinesweeperCell.revealed(1));
