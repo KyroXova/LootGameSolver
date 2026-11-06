@@ -80,7 +80,6 @@ public final class ExplorationBeta {
     private boolean trailDirty;
     private boolean trailExcavating;
     private boolean returning, returnAvailable;
-    private int returnReplans;
     private int cameraPitchDirection;
     private boolean returnDigging;
     private TileEntity returnOriginalTarget;
@@ -223,14 +222,18 @@ public final class ExplorationBeta {
             || ticks % 10 != 0) return;
         int[] previous = { (int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ) };
-        for (int i = 0; i < Math.min(6, route.size()); i++) {
+        for (int i = 0; i < Math.min(12, route.size()); i++) {
             int[] step = route.get(i);
             boolean diagonal = step[0] != previous[0] && step[2] != previous[2] && step[1] == previous[1];
             if (!safe(mc.theWorld, step[0], step[1], step[2])
                 || (diagonal && (!safe(mc.theWorld, step[0], step[1], previous[2])
                     || !safe(mc.theWorld, previous[0], step[1], step[2])))) {
                 if (returning) {
-                    stop(mc, "Saved return path is obstructed");
+                    if (rerouteSavedReturn(mc, i + 1) || digTowardSavedExit(mc)) {
+                        status = "Rerouting saved exit";
+                        return;
+                    }
+                    stop(mc, "Saved exit blocked");
                     return;
                 }
                 plan(mc);
@@ -643,7 +646,6 @@ public final class ExplorationBeta {
         cameraPitchDirection = 0;
         returning = true;
         returnAvailable = false;
-        returnReplans = 0;
         resumeSearchAfterReturn = resumeSearch;
         walking = true;
         searching = false;
@@ -859,39 +861,37 @@ public final class ExplorationBeta {
         return bounds != null && x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3];
     }
 
-    private boolean rerouteSavedReturn(Minecraft mc) {
-        if (!returning || returnJoinSearch != null || route.size() < 2 || returnReplans >= 2) return false;
+    private boolean rerouteSavedReturn(Minecraft mc, int firstCheckpoint) {
+        if (!returning || returnJoinSearch != null || route.size() < 2) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        int first = Math.min(1 + returnReplans++, route.size() - 1);
-        for (int i = first; i < Math.min(route.size(), first + 5); i++) {
-            int[] join = route.get(i);
-            if (!safe(mc.theWorld, join[0], join[1], join[2])) continue;
-            returnTrailRoute = new ArrayList<int[]>();
-            for (int p = i; p < route.size(); p++) returnTrailRoute.add(
-                route.get(p)
-                    .clone());
-            returnJoinSearch = new GroundPathfinder.Search(
-                walkingTerrain(mc.theWorld),
-                x,
-                y,
-                z,
-                join[0],
-                join[1],
-                join[2],
-                Math.max(16, LootGameSolverConfig.explorationRange));
-            returnJoinX = join[0];
-            returnJoinY = join[1];
-            returnJoinZ = join[2];
-            rejoiningSavedTrail = true;
-            route.clear();
-            segmentX = mc.thePlayer.posX;
-            segmentZ = mc.thePlayer.posZ;
-            status = "Finding a clear way back to the saved tunnel";
-            return true;
-        }
-        return false;
+        int checkpointIndex = ReturnRoutePolicy
+            .nextSafeCheckpoint(route, firstCheckpoint, point -> safe(mc.theWorld, point[0], point[1], point[2]));
+        if (checkpointIndex < 0) return false;
+        int[] join = route.get(checkpointIndex);
+        returnTrailRoute = new ArrayList<int[]>();
+        for (int p = checkpointIndex; p < route.size(); p++) returnTrailRoute.add(
+            route.get(p)
+                .clone());
+        returnJoinSearch = new GroundPathfinder.Search(
+            walkingTerrain(mc.theWorld),
+            x,
+            y,
+            z,
+            join[0],
+            join[1],
+            join[2],
+            Math.max(16, LootGameSolverConfig.explorationRange));
+        returnJoinX = join[0];
+        returnJoinY = join[1];
+        returnJoinZ = join[2];
+        rejoiningSavedTrail = true;
+        route.clear();
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        status = "Finding a clear way back to the saved tunnel";
+        return true;
     }
 
     /** A blocked saved route gets a checked excavation link to a later checkpoint, never a new in-room search. */
@@ -1747,7 +1747,7 @@ public final class ExplorationBeta {
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (returning) {
-                if (rerouteSavedReturn(mc)) return;
+                if (rerouteSavedReturn(mc, 1)) return;
                 if (digTowardSavedExit(mc)) return;
                 stop(mc, "Saved return path clearance changed");
                 return;
@@ -1761,7 +1761,7 @@ public final class ExplorationBeta {
         ) {
             if (returning) {
                 if (next[1] > py && tryPlaceReturnStep(mc, next)) return;
-                if (rerouteSavedReturn(mc)) return;
+                if (rerouteSavedReturn(mc, 1)) return;
                 if (digTowardSavedExit(mc)) return;
                 stop(mc, "Saved return path is no longer safe");
                 return;
@@ -1808,7 +1808,7 @@ public final class ExplorationBeta {
             if (!safe(mc.theWorld, next[0], next[1], next[2])
                 || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
                 if (returning && next[1] > py && tryPlaceReturnStep(mc, next)) return;
-                if (returning && rerouteSavedReturn(mc)) return;
+                if (returning && rerouteSavedReturn(mc, 1)) return;
                 if (returning && digTowardSavedExit(mc)) return;
                 stop(mc, "Next route segment is no longer safe");
                 return;
@@ -1850,7 +1850,7 @@ public final class ExplorationBeta {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
             if (returning) {
-                if (rerouteSavedReturn(mc) || digTowardSavedExit(mc)) {
+                if (rerouteSavedReturn(mc, 1) || digTowardSavedExit(mc)) {
                     status = "Recovering along the saved exit route";
                     return;
                 }

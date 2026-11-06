@@ -151,3 +151,5 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Handle missing Minesweeper board snapshots as invalid input instead of throwing.
 - Check forced Minesweeper moves against the total mine count before sending them.
 - Pause explorer steering when the player manually presses jump.
+- Replan saved exits before reaching an upcoming blocked step, searching later safe checkpoints along the saved tunnel route.
+- Check more of the remaining route ahead and replan around obstacles while walking so the player can take an earlier branch.
