@@ -250,7 +250,8 @@ public final class ClientHooks {
             puzzleWaitTicks++;
             DetectedGame opened = puzzleBridge.detect(true);
             Object game = puzzleBridge.nearbyGame(true);
-            if (game != null) {
+            boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
+            if ((opened != null || masterInteractionSettled) && game != null) {
                 int[] center = puzzleBridge.gameCenter(game);
                 if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
                     autoPuzzleState = AutoPuzzleState.POSITIONING;
@@ -267,10 +268,13 @@ public final class ClientHooks {
                 && puzzleBridge.activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])) {
                 masterClickAttempts++;
                 lastMasterClickTick = puzzleWaitTicks;
+                if (exploration != null) exploration.setAutomationStatus("Opening LootGames master");
             }
             if (puzzleWaitTicks > 200) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
-                if (exploration != null) exploration.setAutomationStatus("Puzzle did not open; explorer held");
+                if (exploration != null) exploration.setAutomationStatus(
+                    game == null ? "Opened puzzle could not be located; explorer held"
+                        : "Puzzle did not open; explorer held");
             }
             return;
         }
@@ -315,15 +319,17 @@ public final class ClientHooks {
                 startPuzzleSolver();
                 return;
             }
-            if (game != null && centerClickAttempts < 4
+            if (centerClickAttempts == 0 && game != null
                 && puzzleWaitTicks - lastCenterClickTick >= 20
                 && puzzleBridge.activateBoardCenter(game)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
+                if (exploration != null) exploration.setAutomationStatus("Revealing puzzle board");
             }
-            if (puzzleWaitTicks > 200) {
+            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 60 : 200)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
-                if (exploration != null) exploration.setAutomationStatus("Board did not reveal; explorer held");
+                if (exploration != null)
+                    exploration.setAutomationStatus("Board reveal was not confirmed; explorer held");
             }
             return;
         }
@@ -331,13 +337,19 @@ public final class ClientHooks {
             puzzleWaitTicks++;
             Object game = puzzleBridge.nearbyGame(true);
             DetectedGame board = puzzleBridge.detect(true);
-            if (centerClickAttempts > 0 && board != null && puzzleWaitTicks - lastCenterClickTick >= 20) {
-                startPuzzleSolver();
+            if (centerClickAttempts > 0) {
+                if (board != null && puzzleWaitTicks - lastCenterClickTick >= 20) {
+                    startPuzzleSolver();
+                    return;
+                }
+                if (puzzleWaitTicks > lastCenterClickTick + 60) {
+                    autoPuzzleState = AutoPuzzleState.FAILED;
+                    if (exploration != null)
+                        exploration.setAutomationStatus("Minesweeper stage reveal was not confirmed; explorer held");
+                }
                 return;
             }
-            if (game != null && centerClickAttempts < 5
-                && puzzleWaitTicks - lastCenterClickTick >= 20
-                && puzzleBridge.activateBoardCenter(game)) {
+            if (game != null && puzzleWaitTicks - lastCenterClickTick >= 20 && puzzleBridge.activateBoardCenter(game)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
                 if (exploration != null)
@@ -496,9 +508,7 @@ public final class ClientHooks {
     public void overlay(RenderGameOverlayEvent.Text event) {
         if (!LootGameSolverConfig.enabled) return;
         DetectedGame cur = session.getCurrentDetectedGame();
-        if (cur == null
-            && (!LootGameSolverConfig.showOverlay || exploration == null || !LootGameSolverConfig.explorationEnabled))
-            return;
+        if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return;

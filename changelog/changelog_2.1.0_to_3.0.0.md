@@ -110,3 +110,7 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Right-click the board floor to reveal it, then handle Minesweeper opening flags again at each subsequent stage before resuming the solver.
 - Reuse nearby checked paths and place a safe solid block from the hotbar or inventory when an upward return step is missing.
 - Render Minesweeper safe and red flags with the bundled flag textures, and allow supported slab, snow, and stair surfaces in walking routes.
+- Trigger automatic puzzle opening only after the explorer reaches verified interaction range of the master block.
+- Wait for the master interaction to settle before navigating to the game center, then confirm the floor click before starting the solver.
+- Retry opening when the master click succeeds but the game object is not yet available to the client.
+- Hold exploration when no verified return trail exists after solving instead of choosing an arbitrary route inside the structure.

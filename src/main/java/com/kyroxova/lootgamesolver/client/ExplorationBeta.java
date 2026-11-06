@@ -163,7 +163,7 @@ public final class ExplorationBeta {
     }
 
     private void chooseApproachDuringWalking(Minecraft mc) {
-        if (digging || seekingDryEntrance || route.isEmpty() || !undergroundNearby(mc)) return;
+        if (digging || seekingDryEntrance || movingToPuzzleCenter || route.isEmpty() || !undergroundNearby(mc)) return;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
@@ -263,6 +263,8 @@ public final class ExplorationBeta {
         puzzleCenterArrivalPending = false;
         cameraPitchDirection = 0;
         route.clear();
+        entranceCandidates.clear();
+        entranceCandidate = 0;
         digging = false;
         searching = false;
         walkingSearch = null;
@@ -274,9 +276,12 @@ public final class ExplorationBeta {
         if (!walking) {
             double distance = mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
             if (distance > 2.8D) {
-                target = puzzleMasterTarget;
-                puzzleMasterTarget = null;
-                movingToPuzzleCenter = false;
+                if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+                    walking = true;
+                    status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
+                    return true;
+                }
+                abandonPuzzleCenterMove(mc);
                 return false;
             }
             movingToPuzzleCenter = false;
@@ -286,6 +291,47 @@ public final class ExplorationBeta {
         }
         status = "Moving to board center";
         return true;
+    }
+
+    private boolean reachPuzzleCenter(Minecraft mc) {
+        int[] center = target == null ? null : new int[] { target.xCoord, target.yCoord, target.zCoord };
+        double distance = center == null ? Double.MAX_VALUE
+            : mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
+        if (distance <= 2.8D) {
+            target = puzzleMasterTarget;
+            puzzleMasterTarget = null;
+            movingToPuzzleCenter = false;
+            stop(mc, "At LootGames board center");
+            puzzleCenterArrivalPending = true;
+            return true;
+        }
+        if (seekingDryEntrance) {
+            seekingDryEntrance = false;
+            digging = true;
+            entranceSelected = true;
+            savedSlot = mc.thePlayer.inventory.currentItem;
+        }
+        if (digging) {
+            if (stairStep(mc)) return true;
+            digging = false;
+            entranceSelected = false;
+            excavationRoute.clear();
+            excavationSearch = null;
+        }
+        if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+            walking = true;
+            status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
+            return true;
+        }
+        abandonPuzzleCenterMove(mc);
+        return true;
+    }
+
+    private void abandonPuzzleCenterMove(Minecraft mc) {
+        if (puzzleMasterTarget != null) target = puzzleMasterTarget;
+        puzzleMasterTarget = null;
+        movingToPuzzleCenter = false;
+        stop(mc, "Board center has no verified safe route; explorer held");
     }
 
     boolean consumePuzzleCenterArrival() {
@@ -308,8 +354,11 @@ public final class ExplorationBeta {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
-        if (startSavedReturn(mc, true, 32)) return;
-        continueProgressiveSearch(mc, solved);
+        if (startSavedReturn(mc, true, 128)) return;
+        stop(
+            mc,
+            solved ? "Puzzle solved; no saved entrance route, explorer held"
+                : "Puzzle ended; no saved entrance route, explorer held");
     }
 
     private void continueProgressiveSearch(Minecraft mc, boolean solved) {
@@ -798,6 +847,32 @@ public final class ExplorationBeta {
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return;
         }
+        // Reaching interaction range is the hand-off point: first open the master, then
+        // move to the floor center and reveal the board. Without this signal automation
+        // never leaves IDLE after the route ends at the structure.
+        if (!returning && !searching && !movingToPuzzleCenter && target != null && reachableBoard(mc)) {
+            if (mc.thePlayer.onGround && trailTarget != null) recordAccessPoint(
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ));
+            returnAvailable = trailTarget != null && trailTarget[0] == target.xCoord
+                && trailTarget[1] == target.yCoord
+                && trailTarget[2] == target.zCoord
+                && (!accessTrail
+                    .reverse(
+                        (int) Math.floor(mc.thePlayer.posX),
+                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                        (int) Math.floor(mc.thePlayer.posZ))
+                    .isEmpty()
+                    || accessTrail.nearestIndex(
+                        (int) Math.floor(mc.thePlayer.posX),
+                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                        (int) Math.floor(mc.thePlayer.posZ),
+                        32) >= 0);
+            stop(mc, "Arrived at LootGame; opening puzzle");
+            puzzleArrivalPending = true;
+            return;
+        }
         if (!returning && (target == null || target.isInvalid())) {
             stop(mc, "Target no longer loaded");
             return;
@@ -853,29 +928,6 @@ public final class ExplorationBeta {
             } else status = "Following saved access route out";
             return;
         }
-        if (!movingToPuzzleCenter && !returnDigging && reachableBoard(mc)) {
-            if (mc.thePlayer.onGround && trailTarget != null) recordAccessPoint(
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ));
-            returnAvailable = trailTarget != null && trailTarget[0] == target.xCoord
-                && trailTarget[1] == target.yCoord
-                && trailTarget[2] == target.zCoord
-                && (!accessTrail
-                    .reverse(
-                        (int) Math.floor(mc.thePlayer.posX),
-                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                        (int) Math.floor(mc.thePlayer.posZ))
-                    .isEmpty()
-                    || accessTrail.nearestIndex(
-                        (int) Math.floor(mc.thePlayer.posX),
-                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                        (int) Math.floor(mc.thePlayer.posZ),
-                        32) >= 0);
-            stop(mc, "Arrived at LootGame; opening puzzle");
-            puzzleArrivalPending = true;
-            return;
-        }
         if (pausedForControl) {
             pausedForControl = false;
             excavationRoute.clear();
@@ -908,11 +960,7 @@ public final class ExplorationBeta {
         prepareApproach(mc);
         if (route.isEmpty()) {
             if (movingToPuzzleCenter) {
-                target = puzzleMasterTarget;
-                puzzleMasterTarget = null;
-                movingToPuzzleCenter = false;
-                stop(mc, "At LootGames board center");
-                puzzleCenterArrivalPending = true;
+                reachPuzzleCenter(mc);
                 return;
             }
             if (returnDigging) {
@@ -1357,8 +1405,8 @@ public final class ExplorationBeta {
 
     private boolean nextSearchLeg(Minecraft mc) {
         if (search == null) return false;
-        // Bound pathfinding work per decision; stop rather than spin on unreachable goals.
-        for (int attempt = 0; attempt < 4; attempt++) {
+        // Keep checking new headings over successive ticks instead of stopping after a few blocked legs.
+        for (int attempt = 0; attempt < 8; attempt++) {
             int[] goal = search.next();
             if (goal == null) return false;
             int x = (int) Math.floor(mc.thePlayer.posX), z = (int) Math.floor(mc.thePlayer.posZ);
@@ -1368,22 +1416,26 @@ public final class ExplorationBeta {
             if (length < 4) continue;
             searchGoalX = goal[0];
             searchGoalZ = goal[1];
-            double step = Math.min(16D, length);
+            double step = Math.min(8D, length);
             target = new TileEntity();
             target.xCoord = x + (int) Math.round(dx / length * step);
             target.yCoord = y;
             target.zCoord = z + (int) Math.round(dz / length * step);
             if (!mc.theWorld.blockExists(target.xCoord, y, target.zCoord)) continue;
             plan(mc);
-            if (route.isEmpty() && walkingSearch == null) continue;
             searching = true;
             digging = false;
+            walking = true;
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
-            status = "Exploring outward";
+            status = route.isEmpty() && walkingSearch == null ? "Checking another safe exploration direction"
+                : "Exploring outward";
             return true;
         }
-        return false;
+        searching = true;
+        walking = true;
+        status = "Waiting for more loaded terrain to continue exploration";
+        return true;
     }
 
     private GroundPathfinder.Terrain walkingTerrain(final World terrainWorld) {
@@ -1486,10 +1538,9 @@ public final class ExplorationBeta {
 
     private List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
         int goalY = target.yCoord + 1;
-        int horizontal = Math.abs(target.xCoord - x) + Math.abs(target.zCoord - z);
         ExcavationPathfinder.Terrain terrain = (a, b, c, nx, ny,
             nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz);
-        if (goalY == y || horizontal >= Math.abs(goalY - y) + 2) {
+        if (goalY == y) {
             List<int[]> proposal = ExcavationPatterns.straight(x, y, z, target.xCoord, goalY, target.zCoord);
             List<int[]> checked = ExcavationPatterns
                 .checked(proposal.subList(0, Math.min(16, proposal.size())), terrain, x, y, z);
