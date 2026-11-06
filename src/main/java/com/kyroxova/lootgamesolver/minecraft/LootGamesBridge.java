@@ -39,6 +39,12 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private Object golGame;
     private Object golStage;
+    private Object golPendingStage;
+    private Object golPendingAppearance;
+    private boolean golActionPending;
+    private boolean golActionRejected;
+    private boolean golAcceptedAwaitingRefresh;
+    private String golRejectedStageId;
     private List<CellPosition> golSequence = new ArrayList<CellPosition>();
     private int golSubmitted;
 
@@ -139,6 +145,15 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public void invalidateDormantCache() {
         // Kept for backward compatibility
+    }
+
+    public void resetGameOfLightPendingAction() {
+        golActionPending = false;
+        golActionRejected = false;
+        golAcceptedAwaitingRefresh = false;
+        golPendingStage = null;
+        golPendingAppearance = null;
+        golRejectedStageId = null;
     }
 
     public DetectedGame detect() {
@@ -369,6 +384,10 @@ public final class LootGamesBridge implements MiniGameDetector {
         if (golGame != game || (golStage != stage && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
             golSequence.clear();
             golSubmitted = 0;
+            golActionPending = false;
+            golActionRejected = false;
+            golAcceptedAwaitingRefresh = false;
+            golRejectedStageId = null;
         }
         golGame = game;
         golStage = stage;
@@ -692,9 +711,17 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     public void recordSubmittedAction(DetectedGame snapshot) {
-        if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
-            int submittedThrough = snapshot.gol.getCurrentSymbol() + 1;
-            if (submittedThrough > golSubmitted) golSubmitted = submittedThrough;
+        if (snapshot.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT && !golActionPending
+            && (!golActionRejected || snapshot.gol == null
+                || !golRejectedStageId.equals(snapshot.gol.getStageId()))) {
+            if (golActionRejected && snapshot.gol != null
+                && !golRejectedStageId.equals(snapshot.gol.getStageId())) {
+                golActionRejected = false;
+                golRejectedStageId = null;
+            }
+            golPendingStage = readGameStage(snapshot.game);
+            golPendingAppearance = readMarkAppearance(snapshot.game);
+            golActionPending = true;
         }
     }
 
@@ -715,14 +742,74 @@ public final class LootGamesBridge implements MiniGameDetector {
             return true;
         }
         if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
-            // LootGames advances currentSymbol only after accepting the click. Treat that
-            // server-side index as the acknowledgement so a delayed packet cannot cause
-            // the same symbol to be submitted repeatedly.
-            if (current.gol == null || !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId()))
+            if (current.gol == null) return false;
+            Object liveStage = readGameStage(current.game);
+            if (liveStage != null && golPendingStage != null && liveStage != golPendingStage) {
+                golActionPending = false;
+                golActionRejected = false;
+                golAcceptedAwaitingRefresh = false;
+                golRejectedStageId = null;
                 return true;
-            return current.gol.getCurrentSymbol() >= golSubmitted;
+            }
+            if (golAcceptedAwaitingRefresh) {
+                if (current.gol.getCurrentSymbol() < golSubmitted) return false;
+                golAcceptedAwaitingRefresh = false;
+                return true;
+            }
+            if (golActionRejected && golRejectedStageId != null
+                && golRejectedStageId.equals(current.gol.getStageId())) return false;
+            if (!golActionPending) return true;
+            if (golActionRejected) return false;
+            if (!GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId())) return false;
+
+            Object appearance = readMarkAppearance(current.game);
+            if (appearance == null || appearance == golPendingAppearance) return false;
+            Object state = readMarkState(appearance);
+            String stateName = state != null ? String.valueOf(state) : "";
+            if ("ACCEPTED".equalsIgnoreCase(stateName)) {
+                golSubmitted++;
+                golActionPending = false;
+                golAcceptedAwaitingRefresh = true;
+                return false;
+            }
+            if ("DENIED".equalsIgnoreCase(stateName)) {
+                // A rejected symbol must not advance the local sequence index or be resent.
+                golActionPending = false;
+                golActionRejected = true;
+                golRejectedStageId = current.gol.getStageId();
+                return false;
+            }
+            return false;
         }
         return false;
+    }
+
+    private static Object readGameStage(Object game) {
+        if (game == null) return null;
+        try {
+            return invoke(game, "getStage");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object readMarkAppearance(Object game) {
+        if (game == null) return null;
+        try {
+            Field field = getFieldRecursive(game.getClass(), "specialMarkAppearance");
+            return field != null ? field.get(game) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object readMarkState(Object appearance) {
+        if (appearance == null) return null;
+        try {
+            return invoke(appearance, "getState");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void submitSudokuCheck(DetectedGame snapshot) {

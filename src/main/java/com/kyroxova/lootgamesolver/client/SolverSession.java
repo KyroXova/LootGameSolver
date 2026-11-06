@@ -252,8 +252,7 @@ public final class SolverSession {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
-        if (snapshot.type == MiniGame.GAME_OF_LIGHT && lastActionAt > 0
-            && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT && lastActionAt > 0) {
             status = "Waiting: GoL";
             return;
         }
@@ -286,6 +285,7 @@ public final class SolverSession {
 
     public void cancel(String reason) {
         bridge.releaseSneak();
+        bridge.resetGameOfLightPendingAction();
         mode = null;
         activeAction = null;
         activeActions = null;
