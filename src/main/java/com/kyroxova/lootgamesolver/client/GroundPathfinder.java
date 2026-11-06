@@ -30,6 +30,7 @@ public final class GroundPathfinder {
 
     private static final int[][] DIRECTIONS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 },
         { -1, 1 }, { -1, -1 } };
+    private static final int ANY_GOAL_Y = Integer.MIN_VALUE;
 
     private static final class Node implements Comparable<Node> {
 
@@ -38,7 +39,7 @@ public final class GroundPathfinder {
         final double remaining;
         final Node parent;
 
-        Node(int x, int y, int z, int cost, int gx, int gz, Node parent) {
+        Node(int x, int y, int z, int cost, int gx, int gy, int gz, Node parent) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -49,7 +50,8 @@ public final class GroundPathfinder {
                     && (x - parent.x != parent.x - parent.parent.x || z - parent.z != parent.z - parent.parent.z) ? 1
                         : 0);
             int dx = Math.abs(x - gx), dz = Math.abs(z - gz);
-            remaining = 10 * Math.max(dx, dz) + 4 * Math.min(dx, dz);
+            int dy = gy == ANY_GOAL_Y ? 0 : Math.abs(y - gy);
+            remaining = 10 * Math.max(dx, dz) + 4 * Math.min(dx, dz) + 10 * dy;
         }
 
         public int compareTo(Node other) {
@@ -72,7 +74,7 @@ public final class GroundPathfinder {
     static final class Search {
 
         private final Terrain terrain;
-        private final int x, y, z, gx, gz, radius;
+        private final int x, y, z, gx, gy, gz, radius;
         private final PriorityQueue<Node> open = new PriorityQueue<Node>();
         private final Map<Long, Integer> bestCosts = new HashMap<Long, Integer>();
         private final Set<Long> visited = new HashSet<Long>();
@@ -84,14 +86,19 @@ public final class GroundPathfinder {
         private boolean done;
 
         Search(Terrain terrain, int x, int y, int z, int gx, int gz, int radius) {
+            this(terrain, x, y, z, gx, ANY_GOAL_Y, gz, radius);
+        }
+
+        Search(Terrain terrain, int x, int y, int z, int gx, int gy, int gz, int radius) {
             this.terrain = terrain;
             this.x = x;
             this.y = y;
             this.z = z;
             this.gx = gx;
             this.gz = gz;
+            this.gy = gy;
             this.radius = radius;
-            start = new Node(x, y, z, 0, gx, gz, null);
+            start = new Node(x, y, z, 0, gx, gy, gz, null);
             best = start;
             done = !terrain.stand(x, y, z);
             if (!done) {
@@ -109,7 +116,7 @@ public final class GroundPathfinder {
                 Integer bestCost = bestCosts.get(nodeKey);
                 if (bestCost == null || node.cost != bestCost.intValue() || !visited.add(nodeKey)) continue;
                 if (node.remaining < best.remaining) best = node;
-                if (node.remaining <= 10) {
+                if (reachesGoal(node)) {
                     best = node;
                     done = true;
                     break;
@@ -139,7 +146,7 @@ public final class GroundPathfinder {
                     if (priorCost != null && priorCost.intValue() <= nextCost) continue;
                     if (visited.contains(position)) continue;
                     bestCosts.put(position, nextCost);
-                    open.add(new Node(nx, ny, nz, nextCost, gx, gz, node));
+                    open.add(new Node(nx, ny, nz, nextCost, gx, gy, gz, node));
                 }
             }
             done = done || open.isEmpty() || visited.size() >= 8192;
@@ -156,7 +163,12 @@ public final class GroundPathfinder {
         }
 
         boolean reachedGoal() {
-            return best.remaining <= 10D;
+            return reachesGoal(best);
+        }
+
+        private boolean reachesGoal(Node node) {
+            return gy == ANY_GOAL_Y ? node.remaining <= 10D
+                : node.x == gx && node.y == gy && node.z == gz;
         }
     }
 

@@ -165,6 +165,46 @@ public class GroundPathfinderTest {
     }
 
     @Test
+    public void exactHeightGoalDoesNotFinishOnTheWrongFloor() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0 || y == 1;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        GroundPathfinder.Search search = new GroundPathfinder.Search(terrain, 0, 0, 0, 3, 1, 0, 8);
+        for (int i = 0; i < 100 && !search.advance(1_000_000L); i++) {}
+
+        assertTrue(search.reachedGoal());
+        List<int[]> route = search.path();
+        assertFalse(route.isEmpty());
+        int[] end = route.get(route.size() - 1);
+        assertTrue(end[0] == 3 && end[1] == 1 && end[2] == 0);
+    }
+
+    @Test
+    public void exactHeightGoalFailsWhenOnlyTheHorizontalCellIsReachable() {
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
+            public boolean stand(int x, int y, int z) {
+                return y == 0;
+            }
+
+            public boolean clear(int x, int y, int z) {
+                return true;
+            }
+        };
+        GroundPathfinder.Search search = new GroundPathfinder.Search(terrain, 0, 0, 0, 3, 1, 0, 8);
+        for (int i = 0; i < 100 && !search.advance(1_000_000L); i++) {}
+
+        assertFalse(search.reachedGoal());
+    }
+
+    @Test
     public void prefersDryDetourOverShortWaterCrossing() {
         List<int[]> route = completedRoute(new GroundPathfinder.Terrain() {
 

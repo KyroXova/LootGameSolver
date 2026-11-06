@@ -143,3 +143,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Stop with a clear no-move result when Minesweeper frontier enumeration exceeds its exactness or work limits instead of guessing from partial counts.
 - Wait for the server to acknowledge each Game of Light symbol before sending the next input, preventing delayed updates from replaying clicks.
 - Calculate Minesweeper risks by combining complete frontier solutions with the board-wide mine total, including deductions across separate frontiers.
+- Require saved-tunnel joins, room doorways, and board-center approaches to reach the correct floor height before connecting or crossing routes.

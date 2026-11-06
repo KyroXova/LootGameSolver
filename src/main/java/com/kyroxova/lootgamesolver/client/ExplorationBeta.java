@@ -87,7 +87,7 @@ public final class ExplorationBeta {
     private List<int[]> returnAfterDig;
     private boolean returnDigResumeSearch;
     private boolean rejoiningSavedTrail;
-    private int returnJoinX, returnJoinZ;
+    private int returnJoinX, returnJoinY, returnJoinZ;
     private List<int[]> returnDigSource;
     private int returnDigAnchorIndex;
     private List<int[]> roomExitCandidates;
@@ -305,6 +305,7 @@ public final class ExplorationBeta {
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
             center[0],
+            center[1] + 1,
             center[2],
             LootGameSolverConfig.explorationRange);
         if (walkingSearch.advance(3_000_000L)) {
@@ -612,6 +613,7 @@ public final class ExplorationBeta {
             if (join == null || saved.size() < 2) return false;
             returnTrailRoute = saved;
             returnJoinX = join[0];
+            returnJoinY = join[1];
             returnJoinZ = join[2];
             rejoiningSavedTrail = true;
             returnJoinSearch = new GroundPathfinder.Search(
@@ -620,6 +622,7 @@ public final class ExplorationBeta {
                 y,
                 z,
                 join[0],
+                join[1],
                 join[2],
                 Math.max(maxJoinDistance, LootGameSolverConfig.explorationRange));
             route.clear();
@@ -680,6 +683,7 @@ public final class ExplorationBeta {
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
             activeRoomExit[0],
+            activeRoomExit[1],
             activeRoomExit[2],
             LootGameSolverConfig.explorationRange);
         roomExitPlanning = true;
@@ -732,6 +736,7 @@ public final class ExplorationBeta {
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
             activeRoomEntry[3],
+            activeRoomEntry[4],
             activeRoomEntry[5],
             LootGameSolverConfig.explorationRange);
         roomEntryPlanning = true;
@@ -862,9 +867,11 @@ public final class ExplorationBeta {
                 y,
                 z,
                 join[0],
+                join[1],
                 join[2],
                 Math.max(16, LootGameSolverConfig.explorationRange));
             returnJoinX = join[0];
+            returnJoinY = join[1];
             returnJoinZ = join[2];
             rejoiningSavedTrail = true;
             route.clear();
@@ -1390,6 +1397,7 @@ public final class ExplorationBeta {
                         (int) Math.floor(mc.thePlayer.boundingBox.minY),
                         (int) Math.floor(mc.thePlayer.posZ),
                         returnJoinX,
+                        returnJoinY,
                         returnJoinZ,
                         Math.max(16, LootGameSolverConfig.explorationRange));
                     return;
@@ -1546,6 +1554,7 @@ public final class ExplorationBeta {
                         (int) Math.floor(mc.thePlayer.boundingBox.minY),
                         (int) Math.floor(mc.thePlayer.posZ),
                         activeRoomExit[0],
+                        activeRoomExit[1],
                         activeRoomExit[2],
                         LootGameSolverConfig.explorationRange);
                     roomExitPlanning = true;
@@ -1582,6 +1591,7 @@ public final class ExplorationBeta {
                         (int) Math.floor(mc.thePlayer.boundingBox.minY),
                         (int) Math.floor(mc.thePlayer.posZ),
                         returnJoinX,
+                        returnJoinY,
                         returnJoinZ,
                         Math.max(16, LootGameSolverConfig.explorationRange));
                     status = "Continuing route to saved tunnel";
