@@ -645,6 +645,19 @@ public final class LootGamesBridge implements MiniGameDetector {
         }
     }
 
+    /** True when a Minesweeper attempt is ready to generate its board after a reset. */
+    public boolean canOpenMinesweeperBoard(Object game) {
+        if (game == null || !MS_GAME.equals(game.getClass().getName())) return false;
+        try {
+            if (bool(game, "isBoardGenerated")) return false;
+            Object stage = invoke(game, "getStage");
+            return "waiting".equals(String.valueOf(invoke(stage, "getID")));
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the Minesweeper attempt state", e);
+            return false;
+        }
+    }
+
     public int[] gameCenter(Object game) {
         try {
             if (game != null && MS_GAME.equals(game.getClass().getName())) {

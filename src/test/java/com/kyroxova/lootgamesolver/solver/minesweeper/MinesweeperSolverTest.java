@@ -70,14 +70,17 @@ public class MinesweeperSolverTest {
     }
 
     @Test
-    public void handlesNoDeterministicMoveWithoutProbability() {
+    public void selectsSafestUnconstrainedCellWhenNoCluesRemain() {
         MinesweeperBoard board = new MinesweeperBoard(2, 2, 1);
         board.set(0, 0, MinesweeperCell.unknown());
         board.set(1, 0, MinesweeperCell.unknown());
         board.set(0, 1, MinesweeperCell.unknown());
         board.set(1, 1, MinesweeperCell.unknown());
         SolveResult result = new MinesweeperSolver().solve(board);
-        assertEquals(SolveResult.Status.NO_MOVE, result.getStatus());
+        assertEquals(SolveResult.Status.PROBABILISTIC, result.getStatus());
+        assertEquals(1, result.getActions().size());
+        assertEquals(SolverAction.Type.REVEAL, result.getActions().get(0).type);
+        assertEquals(0.75D, result.getBestSafetyProbability(), 0.000001D);
     }
 
     @Test

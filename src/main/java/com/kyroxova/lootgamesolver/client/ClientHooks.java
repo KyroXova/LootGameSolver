@@ -219,15 +219,19 @@ public final class ClientHooks {
         if (autoPuzzleState == AutoPuzzleState.SOLVING) {
             Object game = puzzleBridge.nearbyGame(true);
             int level = puzzleBridge.currentMinesweeperLevel(game);
-            if (activeMinesweeperLevel >= 1 && level > activeMinesweeperLevel && level <= 4) {
-                session.cancel("Minesweeper stage advanced");
-                activeMinesweeperLevel = level;
+            boolean nextLevel = activeMinesweeperLevel >= 1 && level > activeMinesweeperLevel && level <= 4;
+            boolean retryReady = level == activeMinesweeperLevel && puzzleBridge.canOpenMinesweeperBoard(game);
+            if (nextLevel || retryReady) {
+                session.cancel(nextLevel ? "Minesweeper stage advanced" : "Minesweeper attempt reset");
+                if (nextLevel) activeMinesweeperLevel = level;
                 autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
                 puzzleWaitTicks = 0;
                 centerClickAttempts = 0;
                 minesweeperOpeningClickSent = false;
                 lastCenterClickTick = -40;
-                if (exploration != null) exploration.setAutomationStatus("Opening Minesweeper stage " + level);
+                if (exploration != null) exploration.setAutomationStatus(nextLevel
+                    ? "Opening Minesweeper stage " + level
+                    : "Reopening Minesweeper attempt");
             }
         }
 
@@ -333,28 +337,17 @@ public final class ClientHooks {
             Object game = puzzleBridge.nearbyGame(true);
             DetectedGame board = puzzleBridge.detect(true);
             Object activeGame = game != null ? game : board == null ? null : board.game;
-            if (board != null && centerClickAttempts > 0) {
+            if (centerClickAttempts > 0 && board != null) {
                 if (puzzleWaitTicks - lastCenterClickTick < 20) return;
-                if (!minesweeperOpeningClickSent) {
-                    if (activeGame != null && puzzleBridge.activateBoardCenter(activeGame)) {
-                        minesweeperOpeningClickSent = true;
-                        lastCenterClickTick = puzzleWaitTicks;
-                        if (exploration != null) exploration.setAutomationStatus("Opening flag");
-                    } else if (puzzleWaitTicks > lastCenterClickTick + 100) {
-                        autoPuzzleState = AutoPuzzleState.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Flag click failed");
-                    }
-                    return;
-                }
                 startPuzzleSolver();
                 return;
             }
-            if (centerClickAttempts < 4 && activeGame != null
+            if (centerClickAttempts == 0 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
                 && puzzleWaitTicks - lastCenterClickTick >= 20
                 && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
-                if (exploration != null) exploration.setAutomationStatus("Revealing stage");
+                if (exploration != null) exploration.setAutomationStatus("Revealing Minesweeper board");
             }
             if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 200)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
