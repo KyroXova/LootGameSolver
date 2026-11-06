@@ -298,41 +298,33 @@ public final class ClientHooks {
             puzzleWaitTicks++;
             DetectedGame revealed = puzzleBridge.detect(true);
             Object game = puzzleBridge.nearbyGame(true);
-            if (revealed != null) {
-                if (centerClickAttempts == 0) {
-                    if (game != null && puzzleWaitTicks - lastCenterClickTick >= 20
-                        && puzzleBridge.activateBoardCenter(game)) {
-                        centerClickAttempts++;
-                        lastCenterClickTick = puzzleWaitTicks;
-                        if (exploration != null)
-                            exploration.setAutomationStatus("Board revealed; checking puzzle state");
-                    }
-                    return;
-                }
+            Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
+            if (revealed != null && centerClickAttempts > 0) {
                 if (puzzleWaitTicks - lastCenterClickTick < 20) return;
                 if (puzzleBridge.requiresMinesweeperOpeningClick(revealed) && !minesweeperOpeningClickSent) {
-                    if (game != null && puzzleBridge.activateBoardCenter(game)) {
+                    if (activeGame != null && puzzleBridge.activateBoardCenter(activeGame)) {
                         minesweeperOpeningClickSent = true;
                         lastCenterClickTick = puzzleWaitTicks;
-                        if (exploration != null) exploration.setAutomationStatus("Opening Minesweeper starting flag");
+                        if (exploration != null) exploration.setAutomationStatus("Opening flag");
+                    } else if (puzzleWaitTicks > lastCenterClickTick + 100) {
+                        autoPuzzleState = AutoPuzzleState.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Flag click failed");
                     }
                     return;
                 }
-                if (minesweeperOpeningClickSent && puzzleWaitTicks - lastCenterClickTick < 20) return;
                 startPuzzleSolver();
                 return;
             }
-            if (centerClickAttempts == 0 && game != null
+            if (centerClickAttempts < 4 && activeGame != null
                 && puzzleWaitTicks - lastCenterClickTick >= 20
-                && puzzleBridge.activateBoardCenter(game)) {
+                && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
-                if (exploration != null) exploration.setAutomationStatus("Revealing puzzle board");
+                if (exploration != null) exploration.setAutomationStatus("Revealing board");
             }
-            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 60 : 200)) {
+            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 200)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
-                if (exploration != null)
-                    exploration.setAutomationStatus("Board reveal was not confirmed; explorer held");
+                if (exploration != null) exploration.setAutomationStatus("Board reveal failed");
             }
             return;
         }
@@ -340,41 +332,33 @@ public final class ClientHooks {
             puzzleWaitTicks++;
             Object game = puzzleBridge.nearbyGame(true);
             DetectedGame board = puzzleBridge.detect(true);
-            if (centerClickAttempts > 0) {
-                if (puzzleWaitTicks - lastCenterClickTick >= 20) {
-                    if (!minesweeperOpeningClickSent) {
-                        if (board != null && game != null && puzzleBridge.activateBoardCenter(game)) {
-                            minesweeperOpeningClickSent = true;
-                            lastCenterClickTick = puzzleWaitTicks;
-                            if (exploration != null)
-                                exploration.setAutomationStatus("Opening Minesweeper stage " + activeMinesweeperLevel);
-                        }
-                        return;
+            Object activeGame = game != null ? game : board == null ? null : board.game;
+            if (board != null && centerClickAttempts > 0) {
+                if (puzzleWaitTicks - lastCenterClickTick < 20) return;
+                if (!minesweeperOpeningClickSent) {
+                    if (activeGame != null && puzzleBridge.activateBoardCenter(activeGame)) {
+                        minesweeperOpeningClickSent = true;
+                        lastCenterClickTick = puzzleWaitTicks;
+                        if (exploration != null) exploration.setAutomationStatus("Opening flag");
+                    } else if (puzzleWaitTicks > lastCenterClickTick + 100) {
+                        autoPuzzleState = AutoPuzzleState.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Flag click failed");
                     }
-                    if (board != null) {
-                        startPuzzleSolver();
-                        return;
-                    }
+                    return;
                 }
-                if (puzzleWaitTicks > lastCenterClickTick + 60) {
-                    autoPuzzleState = AutoPuzzleState.FAILED;
-                    if (exploration != null)
-                        exploration.setAutomationStatus(minesweeperOpeningClickSent
-                            ? "Minesweeper stage opening was not confirmed; explorer held"
-                            : "Minesweeper stage reveal was not confirmed; explorer held");
-                }
+                startPuzzleSolver();
                 return;
             }
-            if (game != null && puzzleWaitTicks - lastCenterClickTick >= 20 && puzzleBridge.activateBoardCenter(game)) {
+            if (centerClickAttempts < 4 && activeGame != null
+                && puzzleWaitTicks - lastCenterClickTick >= 20
+                && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
-                if (exploration != null)
-                    exploration.setAutomationStatus("Revealing Minesweeper stage " + activeMinesweeperLevel);
+                if (exploration != null) exploration.setAutomationStatus("Revealing stage");
             }
-            if (puzzleWaitTicks > 200) {
+            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 200)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
-                if (exploration != null)
-                    exploration.setAutomationStatus("Minesweeper stage did not open; explorer held");
+                if (exploration != null) exploration.setAutomationStatus("Stage reveal failed");
             }
             return;
         }
@@ -542,7 +526,8 @@ public final class ClientHooks {
                     : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
                         : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
-            String statusStr = cur == null ? exploration.hud(mc) : session.isActive() ? session.getStatus() : "Ready";
+            String statusStr = cur == null ? exploration.hud(mc)
+                : session.isActive() ? compactStatus(session.getStatus()) : "Ready";
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
@@ -594,5 +579,11 @@ public final class ClientHooks {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
+    }
+
+    private static String compactStatus(String text) {
+        if (text == null || text.isEmpty()) return "Ready";
+        if (text.length() <= 28) return text;
+        return text.substring(0, 25) + "...";
     }
 }

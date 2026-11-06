@@ -139,6 +139,10 @@ public final class GroundPathfinder {
             Collections.reverse(result);
             return result;
         }
+
+        boolean reachedGoal() {
+            return best.remaining <= 10D;
+        }
     }
 
     private static long key(int x, int y, int z) {

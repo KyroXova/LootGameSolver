@@ -122,5 +122,10 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Do not treat restarting exploration inside an unfinished structure as a request to return along the entrance trail.
 - Accept valid tools even when their reported dig speed is exactly 1, and reserve Return for an interrupted return operation.
 - Hold exploration when no verified return trail exists after solving instead of choosing an arbitrary route inside the structure.
+- Follow partial exit searches only to their verified endpoint, continue the search from there, and connect to the saved trail only after reaching its checkpoint.
+- Retry checked exit excavation toward successive saved checkpoints, place return steps against floor supports, and prefer full solid blocks for scaffolding.
+- Choose excavation entrances closer to the structure and clear only soft foliage in the next walking column instead of breaking unrelated plants.
+- Retry board reveal clicks with bounded waits, use the detected board object when nearby scanning misses it, and keep puzzle automation from waiting forever on a missing interaction.
+- Shorten explorer and solver HUD status text to keep the panel compact.
 - Resume a nearby saved entrance trail before considering a new excavation, and let existing-route searches follow spiral and switchback tunnels.
 - Recover from stalled walking checkpoints by avoiding the failed node and checking alternate routes before excavation; bound retries to prevent endless replanning loops.

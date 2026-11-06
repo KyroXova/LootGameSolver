@@ -86,6 +86,10 @@ public final class ExplorationBeta {
     private TileEntity returnOriginalTarget;
     private List<int[]> returnAfterDig;
     private boolean returnDigResumeSearch;
+    private boolean rejoiningSavedTrail;
+    private int returnJoinX, returnJoinZ;
+    private List<int[]> returnDigSource;
+    private int returnDigAnchorIndex;
     private String excavationMode = "Access route";
     private int[] pendingReturnPlacement;
     private int returnPlacementTicks;
@@ -374,6 +378,7 @@ public final class ExplorationBeta {
         resumeSearchAfterReturn = false;
         returnJoinSearch = null;
         returnTrailRoute = null;
+        rejoiningSavedTrail = false;
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
@@ -503,12 +508,16 @@ public final class ExplorationBeta {
         if (!back.isEmpty()) {
             route.clear();
             route.addAll(back);
+            rejoiningSavedTrail = false;
         } else {
             int nearest = accessTrail.nearestIndex(x, y, z, maxJoinDistance);
             int[] join = accessTrail.pointAt(nearest);
             List<int[]> saved = accessTrail.reverseFrom(nearest);
             if (join == null || saved.size() < 2) return false;
             returnTrailRoute = saved;
+            returnJoinX = join[0];
+            returnJoinZ = join[2];
+            rejoiningSavedTrail = true;
             returnJoinSearch = new GroundPathfinder.Search(
                 walkingTerrain(mc.theWorld),
                 x,
@@ -556,6 +565,9 @@ public final class ExplorationBeta {
                 join[0],
                 join[2],
                 Math.max(16, LootGameSolverConfig.explorationRange));
+            returnJoinX = join[0];
+            returnJoinZ = join[2];
+            rejoiningSavedTrail = true;
             route.clear();
             segmentX = mc.thePlayer.posX;
             segmentZ = mc.thePlayer.posZ;
@@ -584,24 +596,39 @@ public final class ExplorationBeta {
 
     private boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
         if (mc.thePlayer == null || mc.theWorld == null || savedRoute == null || savedRoute.size() < 2) return false;
-        int anchorIndex = Math.min(6, savedRoute.size() - 1);
-        int[] anchor = savedRoute.get(anchorIndex);
+        returnDigSource = new ArrayList<int[]>(savedRoute.size());
+        for (int[] point : savedRoute) returnDigSource.add(point.clone());
+        returnDigAnchorIndex = Math.min(3, returnDigSource.size() - 1);
+        return planReturnDigToAnchor(mc, returnDigAnchorIndex);
+    }
+
+    private boolean planReturnDigToAnchor(Minecraft mc, int anchorIndex) {
+        if (mc.thePlayer == null || mc.theWorld == null || returnDigSource == null
+            || anchorIndex < 1 || anchorIndex >= returnDigSource.size()) return false;
+        int[] anchor = returnDigSource.get(anchorIndex);
         TileEntity digGoal = new TileEntity();
         digGoal.xCoord = anchor[0];
         digGoal.yCoord = anchor[1];
         digGoal.zCoord = anchor[2];
-        returnOriginalTarget = target;
+        if (!returnDigging) returnOriginalTarget = target;
+        if (savedSlot < 0) savedSlot = mc.thePlayer.inventory.currentItem;
         target = digGoal;
         returnAfterDig = new ArrayList<int[]>();
-        for (int i = anchorIndex; i < savedRoute.size(); i++) returnAfterDig.add(
-            savedRoute.get(i)
-                .clone());
+        for (int i = anchorIndex; i < returnDigSource.size(); i++) returnAfterDig.add(returnDigSource.get(i).clone());
+        returnDigAnchorIndex = anchorIndex;
         returnDigResumeSearch = resumeSearchAfterReturn;
         returnDigging = true;
         returnJoinSearch = null;
         returnTrailRoute = null;
+        rejoiningSavedTrail = false;
         route.clear();
         excavationRoute.clear();
+        excavationReplans = 0;
+        approachPlan = null;
+        approachAnchor = null;
+        stairX = 0;
+        stairZ = 0;
+        settlingTicks = 0;
         excavationSearch = new ExcavationPathfinder(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
@@ -614,8 +641,14 @@ public final class ExplorationBeta {
         searching = false;
         entranceSelected = true;
         walking = true;
-        status = "Planning a checked exit link to the saved tunnel";
+        status = "Planning a checked exit link to saved checkpoint " + (anchorIndex + 1);
         return true;
+    }
+
+    private boolean tryNextReturnDigAnchor(Minecraft mc) {
+        if (returnDigSource == null) return false;
+        int next = Math.min(returnDigSource.size() - 1, returnDigAnchorIndex + 3);
+        return next > returnDigAnchorIndex && planReturnDigToAnchor(mc, next);
     }
 
     private void resumeSavedReturnAfterDig() {
@@ -624,6 +657,8 @@ public final class ExplorationBeta {
         route.clear();
         if (returnAfterDig != null) route.addAll(returnAfterDig);
         returnAfterDig = null;
+        returnDigSource = null;
+        returnDigSource = null;
         returnDigging = false;
         digging = false;
         returning = true;
@@ -639,11 +674,32 @@ public final class ExplorationBeta {
     }
 
     String navigationStatus() {
-        return status;
+        return compactStatus(status);
     }
 
     void setAutomationStatus(String message) {
-        status = message;
+        status = compactStatus(message);
+    }
+
+    private static String compactStatus(String message) {
+        if (message == null || message.isEmpty()) return "Idle";
+        if (message.startsWith("Checking existing route:"))
+            return "Open path " + message.substring("Checking existing route: ".length());
+        if (message.startsWith("Planning access:")) return "Plan access " + message.substring("Planning access: ".length());
+        if (message.startsWith("Planning a checked exit link to saved checkpoint "))
+            return "Dig exit " + message.substring("Planning a checked exit link to saved checkpoint ".length());
+        if (message.startsWith("Opening Minesweeper stage "))
+            return "Open MS " + message.substring("Opening Minesweeper stage ".length());
+        if (message.equals("Following saved access route out")) return "Exiting via saved path";
+        if (message.equals("Following saved entrance route")) return "Using saved entrance";
+        if (message.equals("Following safe existing entrance")) return "Using open entrance";
+        if (message.equals("Finding a clear way back to the saved tunnel")) return "Linking exit";
+        if (message.equals("Following safe checkpoint toward the saved exit")) return "Linking exit";
+        if (message.equals("Could not place a safe return step; add cobblestone or dirt")) return "Need dirt/cobble to climb";
+        if (message.equals("No safe route after alternate paths were checked")) return "No safe route";
+        if (message.equals("Opened puzzle could not be located; explorer held")) return "Puzzle missing";
+        if (message.length() <= 32) return message;
+        return message.substring(0, 29) + "...";
     }
 
     public void renderCamera(Minecraft mc) {
@@ -973,20 +1029,37 @@ public final class ExplorationBeta {
                 return;
             }
             List<int[]> join = returnJoinSearch.path();
+            boolean reachedJoin = returnJoinSearch.reachedGoal();
             returnJoinSearch = null;
-            if (join.isEmpty() && returnTrailRoute != null) {
-                int[] first = returnTrailRoute.get(0);
-                int px = (int) Math.floor(mc.thePlayer.posX), py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-                int pz = (int) Math.floor(mc.thePlayer.posZ);
-                if ((Math.abs(first[0] - px) + Math.abs(first[2] - pz) > 1 || Math.abs(first[1] - py) > 1)
-                    && startReturnDig(mc, returnTrailRoute)) return;
+            if (returnTrailRoute != null && reachedJoin) {
+                route.addAll(join);
                 route.addAll(returnTrailRoute);
+                returnTrailRoute = null;
+                rejoiningSavedTrail = false;
+            } else if (returnTrailRoute != null && !join.isEmpty()) {
+                // A partial search path is only a safe intermediate checkpoint. Walk
+                // it, then continue searching from there; never jump to the saved trail.
+                route.addAll(join);
+                status = "Following safe checkpoint toward the saved exit";
+            } else if (returnTrailRoute != null) {
+                if (digTowardSavedExit(mc)) return;
+                stop(mc, "No walkable or breakable link to the saved exit");
+                return;
             } else {
                 route.addAll(join);
-                if (returnTrailRoute != null) route.addAll(returnTrailRoute);
             }
-            returnTrailRoute = null;
             if (route.isEmpty()) {
+                if (rejoiningSavedTrail && returnTrailRoute != null) {
+                    returnJoinSearch = new GroundPathfinder.Search(
+                        walkingTerrain(mc.theWorld),
+                        (int) Math.floor(mc.thePlayer.posX),
+                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                        (int) Math.floor(mc.thePlayer.posZ),
+                        returnJoinX,
+                        returnJoinZ,
+                        Math.max(16, LootGameSolverConfig.explorationRange));
+                    return;
+                }
                 returning = false;
                 continueProgressiveSearch(mc, true);
             } else status = "Following saved access route out";
@@ -1037,10 +1110,25 @@ public final class ExplorationBeta {
                     resumeSavedReturnAfterDig();
                     return;
                 }
-                if (!stairStep(mc)) stop(mc, "No safe breakable link to the saved tunnel");
+                if (!stairStep(mc)) {
+                    if (tryNextReturnDigAnchor(mc)) return;
+                    stop(mc, "No safe breakable link to the saved tunnel");
+                }
                 return;
             }
             if (returning) {
+                if (rejoiningSavedTrail && returnTrailRoute != null) {
+                    returnJoinSearch = new GroundPathfinder.Search(
+                        walkingTerrain(mc.theWorld),
+                        (int) Math.floor(mc.thePlayer.posX),
+                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                        (int) Math.floor(mc.thePlayer.posZ),
+                        returnJoinX,
+                        returnJoinZ,
+                        Math.max(16, LootGameSolverConfig.explorationRange));
+                    status = "Continuing route search from the last safe checkpoint";
+                    return;
+                }
                 returning = false;
                 returnAvailable = false;
                 removePersistedTrail();
@@ -1144,6 +1232,7 @@ public final class ExplorationBeta {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
+        if (!returning && !digging && !searching && clearFoliageOnRoute(mc, next, px, py, pz)) return;
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (returning) {
@@ -1331,7 +1420,14 @@ public final class ExplorationBeta {
         }
         if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z))
             return false;
-        int[][] adjacent = { { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 }, { x, y, z + 1, 2 } };
+        // Prefer a block directly below the placement target. This is the usual
+        // staircase-up case and was previously skipped, so no click could succeed.
+        int[][] adjacent = {
+            { x, y - 1, z, 1 },
+            { x - 1, y, z, 5 },
+            { x + 1, y, z, 4 },
+            { x, y, z - 1, 3 },
+            { x, y, z + 1, 2 } };
         for (int[] side : adjacent) {
             net.minecraft.block.Block support = mc.theWorld.getBlock(side[0], side[1], side[2]);
             if (support == Blocks.air || !support.getMaterial()
@@ -1360,6 +1456,36 @@ public final class ExplorationBeta {
         return false;
     }
 
+    /** Clear only soft foliage occupying the next two-block player column. */
+    private boolean clearFoliageOnRoute(Minecraft mc, int[] next, int playerX, int footY, int playerZ) {
+        for (int y = next[1]; y <= next[1] + 1; y++) {
+            net.minecraft.block.Block block = mc.theWorld.getBlock(next[0], y, next[2]);
+            net.minecraft.block.material.Material material = block.getMaterial();
+            boolean plant = block instanceof net.minecraft.block.BlockBush
+                || material == net.minecraft.block.material.Material.plants
+                || material == net.minecraft.block.material.Material.vine
+                || material == net.minecraft.block.material.Material.leaves;
+            if (!FoliagePolicy.canClear(
+                plant,
+                mc.theWorld.getTileEntity(next[0], y, next[2]) != null,
+                block.getBlockHardness(mc.theWorld, next[0], y, next[2]),
+                next[0],
+                y,
+                next[2],
+                playerX,
+                footY,
+                playerZ,
+                next[0],
+                next[2])) continue;
+            if (minePlannedBlock(mc, next[0], y, next[2], next[1])) return true;
+            blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
+            plan(mc);
+            status = "Foliage blocked the step; checking a clear route around it";
+            return true;
+        }
+        return false;
+    }
+
     private int findPlaceableBlock(Minecraft mc, boolean hotbarOnly) {
         int limit = hotbarOnly ? 9 : mc.thePlayer.inventory.mainInventory.length;
         int fallback = -1;
@@ -1371,8 +1497,8 @@ public final class ExplorationBeta {
                 || block.getMaterial()
                     .isLiquid()
                 || block.hasTileEntity(0)
-                || !block.getMaterial()
-                    .isSolid())
+                || !block.getMaterial().isSolid()
+                || !block.isNormalCube())
                 continue;
             if (block == Blocks.cobblestone) return i;
             if (block == Blocks.dirt) return i;
@@ -1393,6 +1519,8 @@ public final class ExplorationBeta {
             returnDigging = false;
             returnAvailable = true;
         }
+        returnDigSource = null;
+        rejoiningSavedTrail = false;
         if (returning) returnAvailable = true;
         returning = false;
         returnJoinSearch = null;
@@ -1442,8 +1570,9 @@ public final class ExplorationBeta {
         walking = false;
         searching = false;
         route.clear();
-        status = message;
-        if (mc.thePlayer != null) mc.thePlayer.addChatMessage(new ChatComponentText("[LootGames Beta] " + message));
+        status = compactStatus(message);
+        if (mc.thePlayer != null)
+            mc.thePlayer.addChatMessage(new ChatComponentText("[LootGames Beta] " + compactStatus(message)));
     }
 
     private void scan(Minecraft mc) {
@@ -1904,7 +2033,9 @@ public final class ExplorationBeta {
             entranceCandidate = 0;
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
                 { -1, -1 } };
-            for (int radius = 18; radius <= 24; radius += 3)
+            for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS;
+                radius <= ExcavationPolicy.MAX_ENTRANCE_RADIUS;
+                radius += 2)
                 for (int[] direction : directions) for (int dy = -1; dy <= 6; dy++) {
                     double norm = Math.hypot(direction[0], direction[1]);
                     int gx = target.xCoord + (int) Math.round(direction[0] * radius / norm), gy = y + dy;
@@ -1970,7 +2101,8 @@ public final class ExplorationBeta {
     private static double entranceScore(int[] candidate, double x, double z, int tx, int tz) {
         double travel = Math.hypot(candidate[0] + 0.5D - x, candidate[2] + 0.5D - z);
         double approach = Math.hypot(candidate[0] - tx, candidate[2] - tz);
-        return travel + 2D * Math.abs(approach - 21D);
+        double preferred = (ExcavationPolicy.MIN_ENTRANCE_RADIUS + ExcavationPolicy.MAX_ENTRANCE_RADIUS) / 2D;
+        return travel + 2D * Math.abs(approach - preferred);
     }
 
     private boolean attemptStairStep(Minecraft mc, int destinationY) {
