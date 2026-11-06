@@ -175,11 +175,9 @@ public final class WorldOverlayRenderer {
                     if (action.type == SolverAction.Type.FLAG) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
                         drawFlag(RED_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
-                        drawFloatingText("FLAG", minX + 0.5D, minY + 1.8D, minZ + 0.5D, 0xFF5555, mc);
                     } else if (action.type == SolverAction.Type.REVEAL) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
                         drawFlag(SAFE_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
-                        drawFloatingText("SAFE", minX + 0.5D, minY + 1.8D, minZ + 0.5D, 0x55FF55, mc);
                     }
                 } else if (current.type == MiniGame.SUDOKU) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
