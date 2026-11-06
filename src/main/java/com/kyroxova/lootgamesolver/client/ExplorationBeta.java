@@ -1266,11 +1266,13 @@ public final class ExplorationBeta {
                         : "Stopped: low air underwater");
             return;
         }
-        boolean manual = GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindRight)
-            || GameSettings.isKeyDown(mc.gameSettings.keyBindSneak);
+        boolean manual = NavigationControlPolicy.hasManualMovement(
+            GameSettings.isKeyDown(mc.gameSettings.keyBindForward),
+            GameSettings.isKeyDown(mc.gameSettings.keyBindBack),
+            GameSettings.isKeyDown(mc.gameSettings.keyBindLeft),
+            GameSettings.isKeyDown(mc.gameSettings.keyBindRight),
+            GameSettings.isKeyDown(mc.gameSettings.keyBindSneak),
+            GameSettings.isKeyDown(mc.gameSettings.keyBindJump));
         if (manual || mc.currentScreen != null || mc.thePlayer.hurtTime > 0 || mc.thePlayer.capabilities.isFlying) {
             pausedForControl = true;
             mc.thePlayer.setSprinting(false);

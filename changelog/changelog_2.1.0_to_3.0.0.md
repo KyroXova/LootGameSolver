@@ -150,3 +150,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Handle missing Minesweeper board snapshots as invalid input instead of throwing.
 - Check forced Minesweeper moves against the total mine count before sending them.
 - Check forced Minesweeper moves against the total mine count before sending them.
+- Pause explorer steering when the player manually presses jump.
