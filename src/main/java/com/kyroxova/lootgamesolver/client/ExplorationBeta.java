@@ -90,6 +90,14 @@ public final class ExplorationBeta {
     private int returnJoinX, returnJoinZ;
     private List<int[]> returnDigSource;
     private int returnDigAnchorIndex;
+    private List<int[]> roomExitCandidates;
+    private int roomExitCandidateIndex;
+    private int[] activeRoomExit;
+    private boolean roomExitPlanning;
+    private boolean roomExitNeedsResume;
+    private boolean roomExitCrossing;
+    private int[] cachedRoomBounds;
+    private int roomBoundsCacheX, roomBoundsCacheZ, roomBoundsCacheTick = -1000;
     private String excavationMode = "Access route";
     private int[] pendingReturnPlacement;
     private int returnPlacementTicks;
@@ -110,7 +118,7 @@ public final class ExplorationBeta {
     }
 
     private boolean reachableBoard(Minecraft mc) {
-        if (returning || searching || knownStructure == null) return false;
+        if (returning || searching || movingToPuzzleCenter || knownStructure == null) return false;
         net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         net.minecraft.util.Vec3 goal = net.minecraft.util.Vec3
@@ -279,11 +287,36 @@ public final class ExplorationBeta {
         continuationSearch = null;
         segmentX = mc.thePlayer.posX;
         segmentZ = mc.thePlayer.posZ;
-        plan(mc);
+        walkingSearch = new GroundPathfinder.Search(
+            walkingTerrain(mc.theWorld),
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            center[0],
+            center[2],
+            LootGameSolverConfig.explorationRange);
+        if (walkingSearch.advance(3_000_000L)) {
+            boolean reachedCenter = walkingSearch.reachedGoal();
+            route.addAll(walkingSearch.path());
+            walkingSearch = null;
+            if (reachedCenter) appendPuzzleCenterWaypoint(center);
+        }
+        if (walkingSearch == null && route.isEmpty()) {
+            double distance = Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
+            if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
+                if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+                    walking = true;
+                    status = digging ? "Planning board entry" : "Moving to board entrance";
+                    return true;
+                }
+                abandonPuzzleCenterMove(mc);
+                return false;
+            }
+        }
         walking = walkingSearch != null || !route.isEmpty();
         if (!walking) {
-            double distance = mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
-            if (distance > 2.8D) {
+            double distance = Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
+            if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
                 if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
                     walking = true;
                     status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
@@ -301,16 +334,54 @@ public final class ExplorationBeta {
         return true;
     }
 
+    private void appendPuzzleCenterWaypoint(int[] center) {
+        int[] stand = new int[] { center[0], center[1] + 1, center[2], 2 };
+        if (route.isEmpty() || !samePosition(route.get(route.size() - 1), stand)) route.add(stand);
+        else route.set(route.size() - 1, stand);
+    }
+
     private boolean reachPuzzleCenter(Minecraft mc) {
         int[] center = target == null ? null : new int[] { target.xCoord, target.yCoord, target.zCoord };
+        if (center == null) {
+            abandonPuzzleCenterMove(mc);
+            return true;
+        }
         double distance = center == null ? Double.MAX_VALUE
-            : mc.thePlayer.getDistance(center[0] + 0.5D, center[1] + 1.0D, center[2] + 0.5D);
-        if (distance <= 2.8D) {
+            : Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
+        boolean atFloor = center != null && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) < 0.01D;
+        if (distance <= 0.35D && atFloor && mc.thePlayer.onGround) {
             target = puzzleMasterTarget;
             puzzleMasterTarget = null;
             movingToPuzzleCenter = false;
             stop(mc, "At LootGames board center");
             puzzleCenterArrivalPending = true;
+            return true;
+        }
+        walkingSearch = new GroundPathfinder.Search(
+            walkingTerrain(mc.theWorld),
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            center[0],
+            center[2],
+            LootGameSolverConfig.explorationRange);
+        if (walkingSearch.advance(3_000_000L)) {
+            boolean reachedCenter = walkingSearch.reachedGoal();
+            route.clear();
+            route.addAll(walkingSearch.path());
+            walkingSearch = null;
+            if (reachedCenter) appendPuzzleCenterWaypoint(center);
+            if (!route.isEmpty()) {
+                walking = true;
+                segmentX = mc.thePlayer.posX;
+                segmentZ = mc.thePlayer.posZ;
+                status = "Moving to board center";
+                return true;
+            }
+        } else {
+            route.clear();
+            walking = true;
+            status = "Checking route to board center";
             return true;
         }
         if (seekingDryEntrance) {
@@ -363,6 +434,7 @@ public final class ExplorationBeta {
         puzzleArrivalPending = false;
         returnAvailable = false;
         if (startSavedReturn(mc, true, 128)) return;
+        if (startRoomExitSearch(mc)) return;
         stop(
             mc,
             solved ? "Puzzle solved; no saved entrance route, explorer held"
@@ -544,6 +616,139 @@ public final class ExplorationBeta {
         return true;
     }
 
+    private boolean startRoomExitSearch(Minecraft mc) {
+        if (mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
+        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
+        roomExitCandidates = findRoomExitCandidates(mc, bounds);
+        roomExitCandidateIndex = 0;
+        roomExitPlanning = false;
+        roomExitNeedsResume = false;
+        roomExitCrossing = false;
+        return startNextRoomExitSearch(mc);
+    }
+
+    private boolean startNextRoomExitSearch(Minecraft mc) {
+        if (roomExitCandidates == null || roomExitCandidateIndex >= roomExitCandidates.size()) return false;
+        activeRoomExit = roomExitCandidates.get(roomExitCandidateIndex);
+        returnJoinSearch = new GroundPathfinder.Search(
+            walkingTerrain(mc.theWorld),
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            activeRoomExit[0],
+            activeRoomExit[2],
+            LootGameSolverConfig.explorationRange);
+        roomExitPlanning = true;
+        roomExitNeedsResume = false;
+        returning = true;
+        returnAvailable = false;
+        resumeSearchAfterReturn = true;
+        walking = true;
+        searching = false;
+        digging = false;
+        route.clear();
+        status = "Finding room exit";
+        return true;
+    }
+
+    private void appendRoomExitWaypoint(int[] exit, int offset) {
+        int[] point = new int[] { exit[offset], exit[offset + 1], exit[offset + 2] };
+        if (route.isEmpty() || !samePosition(route.get(route.size() - 1), point)) route.add(point);
+    }
+
+    private List<int[]> findRoomExitCandidates(Minecraft mc, int[] bounds) {
+        List<int[]> found = new ArrayList<int[]>();
+        int[][] sides = {
+            { bounds[0], -1, 0 },
+            { bounds[1], 1, 0 },
+            { bounds[2], 0, -1 },
+            { bounds[3], 0, 1 } };
+        for (int dy = -3; dy <= 4; dy++) {
+            int floorY = (int) Math.floor(mc.thePlayer.boundingBox.minY) + dy;
+            for (int[] side : sides) {
+                boolean xSide = side[1] != 0;
+                int wallX = xSide ? side[0] : 0;
+                int wallZ = xSide ? 0 : side[0];
+                int alongMin = xSide ? bounds[2] + 1 : bounds[0] + 1;
+                int alongMax = xSide ? bounds[3] - 1 : bounds[1] - 1;
+                for (int along = alongMin; along <= alongMax; along++) {
+                    int inX = xSide ? wallX - side[1] : along;
+                    int inZ = xSide ? along : wallZ - side[2];
+                    int outX = xSide ? wallX + side[1] : along;
+                    int outZ = xSide ? along : wallZ + side[2];
+                    if (!passable(mc.theWorld, wallX, floorY, wallZ)
+                        || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
+                        || !safe(mc.theWorld, inX, floorY, inZ)
+                        || !safe(mc.theWorld, outX, floorY, outZ)) continue;
+                    boolean sideWallA = isDungeonWall(mc.theWorld, xSide ? wallX : along - 1, floorY, xSide ? along - 1 : wallZ)
+                        || isDungeonWall(
+                            mc.theWorld,
+                            xSide ? wallX : along - 1,
+                            floorY + 1,
+                            xSide ? along - 1 : wallZ);
+                    boolean sideWallB = isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY, xSide ? along + 1 : wallZ)
+                        || isDungeonWall(
+                            mc.theWorld,
+                            xSide ? wallX : along + 1,
+                            floorY + 1,
+                            xSide ? along + 1 : wallZ);
+                    if (!sideWallA && !sideWallB) continue;
+                    found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
+                }
+            }
+        }
+        final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
+        found.sort((first, second) -> Double.compare(
+            Math.hypot(first[0] + 0.5D - px, first[2] + 0.5D - pz),
+            Math.hypot(second[0] + 0.5D - px, second[2] + 0.5D - pz)));
+        return found;
+    }
+
+    private int[] dungeonRoomBounds(World world, int x, int y, int z) {
+        if (cachedRoomBounds != null && ticks - roomBoundsCacheTick < 200
+            && Math.abs(x - roomBoundsCacheX) <= 32 && Math.abs(z - roomBoundsCacheZ) <= 32) return cachedRoomBounds;
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (int dx = -32; dx <= 32; dx++) for (int dz = -32; dz <= 32; dz++) {
+            for (int dy = -3; dy <= 4; dy++) {
+                int bx = x + dx, by = y + dy, bz = z + dz;
+                if (!world.blockExists(bx, by, bz) || !isDungeonWall(world, bx, by, bz)) continue;
+                minX = Math.min(minX, bx);
+                maxX = Math.max(maxX, bx);
+                minZ = Math.min(minZ, bz);
+                maxZ = Math.max(maxZ, bz);
+            }
+        }
+        roomBoundsCacheX = x;
+        roomBoundsCacheZ = z;
+        roomBoundsCacheTick = ticks;
+        cachedRoomBounds = minX == Integer.MAX_VALUE || maxX - minX < 8 || maxZ - minZ < 8
+            || minX <= x - 31 || maxX >= x + 31 || minZ <= z - 31 || maxZ >= z + 31
+                ? null
+                : new int[] { minX, maxX, minZ, maxZ };
+        return cachedRoomBounds;
+    }
+
+    private static boolean isDungeonWall(World world, int x, int y, int z) {
+        if (!world.blockExists(x, y, z)) return false;
+        String name = world.getBlock(x, y, z).getClass().getName();
+        return name.endsWith(".DungeonBrick") || name.endsWith(".DungeonLightSource")
+            || name.endsWith(".DungeonWall");
+    }
+
+    private boolean insideDungeonRoom(Minecraft mc) {
+        if (mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
+        return bounds != null && x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3];
+    }
+
     private boolean rerouteSavedReturn(Minecraft mc) {
         if (!returning || returnJoinSearch != null || route.size() < 2 || returnReplans >= 2) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
@@ -580,6 +785,7 @@ public final class ExplorationBeta {
     /** A blocked saved route gets a checked excavation link to a later checkpoint, never a new in-room search. */
     private boolean digTowardSavedExit(Minecraft mc) {
         if (!returning || returnDigging || mc.thePlayer == null) return false;
+        if (insideDungeonRoom(mc) && roomExitCandidates == null && startRoomExitSearch(mc)) return true;
         List<int[]> savedRoute = new ArrayList<int[]>(route.size());
         for (int[] point : route) savedRoute.add(point.clone());
         if (savedRoute.size() < 2 && accessTrail.size() >= 2) {
@@ -778,6 +984,7 @@ public final class ExplorationBeta {
         if (returnAvailable) {
             if (startSavedReturn(mc, true, 64)) return;
         }
+        if (startRoomExitSearch(mc)) return;
         returnAvailable = false;
         puzzleArrivalPending = false;
         planningExistingAccess = false;
@@ -876,6 +1083,8 @@ public final class ExplorationBeta {
             returning = false;
             returnAvailable = false;
             returnSupports.clear();
+            cachedRoomBounds = null;
+            roomBoundsCacheTick = -1000;
             structureTools.clear();
             walking = false;
             route.clear();
@@ -1031,7 +1240,29 @@ public final class ExplorationBeta {
             List<int[]> join = returnJoinSearch.path();
             boolean reachedJoin = returnJoinSearch.reachedGoal();
             returnJoinSearch = null;
-            if (returnTrailRoute != null && reachedJoin) {
+            if (roomExitPlanning) {
+                roomExitPlanning = false;
+                if (reachedJoin && !join.isEmpty()) {
+                    route.clear();
+                    route.addAll(join);
+                    appendRoomExitWaypoint(activeRoomExit, 0);
+                    appendRoomExitWaypoint(activeRoomExit, 3);
+                    roomExitCrossing = true;
+                    roomExitNeedsResume = false;
+                    status = "Walking to room exit";
+                } else if (!join.isEmpty()) {
+                    route.clear();
+                    route.addAll(join);
+                    roomExitNeedsResume = true;
+                    status = "Following exit route";
+                } else {
+                    roomExitCandidateIndex++;
+                    if (startNextRoomExitSearch(mc)) return;
+                    if (digTowardSavedExit(mc)) return;
+                    stop(mc, "No open room exit");
+                    return;
+                }
+            } else if (returnTrailRoute != null && reachedJoin) {
                 route.addAll(join);
                 route.addAll(returnTrailRoute);
                 returnTrailRoute = null;
@@ -1086,8 +1317,11 @@ public final class ExplorationBeta {
                 status = "Continuing route search";
                 return;
             }
+            boolean reachedCenter = movingToPuzzleCenter && walkingSearch.reachedGoal();
             route.addAll(walkingSearch.path());
             walkingSearch = null;
+            if (movingToPuzzleCenter && reachedCenter && target != null)
+                appendPuzzleCenterWaypoint(new int[] { target.xCoord, target.yCoord, target.zCoord });
             walkingPlanFailed = route.isEmpty();
         }
         if (!returning && !digging
@@ -1117,6 +1351,45 @@ public final class ExplorationBeta {
                 return;
             }
             if (returning) {
+                if (roomExitNeedsResume && activeRoomExit != null) {
+                    roomExitNeedsResume = false;
+                    returnJoinSearch = new GroundPathfinder.Search(
+                        walkingTerrain(mc.theWorld),
+                        (int) Math.floor(mc.thePlayer.posX),
+                        (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                        (int) Math.floor(mc.thePlayer.posZ),
+                        activeRoomExit[0],
+                        activeRoomExit[2],
+                        LootGameSolverConfig.explorationRange);
+                    roomExitPlanning = true;
+                    status = "Continuing exit route";
+                    return;
+                }
+                if (roomExitCrossing) {
+                    roomExitCrossing = false;
+                    if (insideDungeonRoom(mc)) {
+                        roomExitCandidateIndex++;
+                        if (startNextRoomExitSearch(mc)) return;
+                        if (startRoomExitSearch(mc)) return;
+                        if (digTowardSavedExit(mc)) return;
+                        stop(mc, "Exit blocked");
+                        return;
+                    }
+                    roomExitCandidates = null;
+                    activeRoomExit = null;
+                    returning = false;
+                    returnAvailable = false;
+                    removePersistedTrail();
+                    trailExcavating = false;
+                    continueProgressiveSearch(mc, true);
+                    return;
+                }
+                if (insideDungeonRoom(mc)) {
+                    if (startRoomExitSearch(mc)) return;
+                    if (digTowardSavedExit(mc)) return;
+                    stop(mc, "Still inside room");
+                    return;
+                }
                 if (rejoiningSavedTrail && returnTrailRoute != null) {
                     returnJoinSearch = new GroundPathfinder.Search(
                         walkingTerrain(mc.theWorld),
@@ -1232,7 +1505,6 @@ public final class ExplorationBeta {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
-        if (!returning && !digging && !searching && clearFoliageOnRoute(mc, next, px, py, pz)) return;
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (returning) {
@@ -1378,7 +1650,7 @@ public final class ExplorationBeta {
         }
         boolean straight = !digging && !mc.thePlayer.isInWater()
             && next[1] == py
-            && (route.size() == 1 && distance > 0.35D || route.size() >= 3 && !mc.thePlayer.isInWater()
+            && (movingToPuzzleCenter || route.size() == 1 && distance > 0.35D || route.size() >= 3 && !mc.thePlayer.isInWater()
                 && route.get(1)[1] == py
                 && route.get(2)[1] == py
                 && route.get(2)[0] - next[0] == 2 * (route.get(1)[0] - next[0])
@@ -1391,11 +1663,12 @@ public final class ExplorationBeta {
                     .getFoodLevel() > 6);
         if (navigationInput != null) {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
-                : route.size() == 1 ? (float) Math.min(1D, distance * 1.5D) : 1F;
+                : route.size() == 1 && !movingToPuzzleCenter ? (float) Math.min(1D, distance * 1.5D) : 1F;
             navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
-                double speed = Math.min(centering ? 0.4D : straight ? 1D : 0.95D, distance * 1.5D);
+                double speed = Math.min(centering ? (movingToPuzzleCenter ? 0.75D : 0.4D) : straight ? 1D : 0.95D,
+                    distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
@@ -1452,36 +1725,6 @@ public final class ExplorationBeta {
                 status = "Placing a checked block for the return step";
                 return true;
             }
-        }
-        return false;
-    }
-
-    /** Clear only soft foliage occupying the next two-block player column. */
-    private boolean clearFoliageOnRoute(Minecraft mc, int[] next, int playerX, int footY, int playerZ) {
-        for (int y = next[1]; y <= next[1] + 1; y++) {
-            net.minecraft.block.Block block = mc.theWorld.getBlock(next[0], y, next[2]);
-            net.minecraft.block.material.Material material = block.getMaterial();
-            boolean plant = block instanceof net.minecraft.block.BlockBush
-                || material == net.minecraft.block.material.Material.plants
-                || material == net.minecraft.block.material.Material.vine
-                || material == net.minecraft.block.material.Material.leaves;
-            if (!FoliagePolicy.canClear(
-                plant,
-                mc.theWorld.getTileEntity(next[0], y, next[2]) != null,
-                block.getBlockHardness(mc.theWorld, next[0], y, next[2]),
-                next[0],
-                y,
-                next[2],
-                playerX,
-                footY,
-                playerZ,
-                next[0],
-                next[2])) continue;
-            if (minePlannedBlock(mc, next[0], y, next[2], next[1])) return true;
-            blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
-            plan(mc);
-            status = "Foliage blocked the step; checking a clear route around it";
-            return true;
         }
         return false;
     }
