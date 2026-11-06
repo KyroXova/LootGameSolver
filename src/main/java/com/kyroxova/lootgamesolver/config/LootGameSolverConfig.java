@@ -73,7 +73,7 @@ public final class LootGameSolverConfig {
             "allowProbabilityMoves",
             "solver",
             allowProbabilityMoves,
-            "Allow guesses. Disabled by default.");
+            "Allow probabilistic moves when their safety meets the configured threshold.");
         probabilityThreshold = cfg.getFloat(
             "probabilityThreshold",
             "solver",

@@ -212,8 +212,12 @@ public final class SolverSession {
                     mode = null;
                 }
                 activeAction = null;
-                status = result.getMessage()
-                    + (result.getStatus() == SolveResult.Status.PROBABILISTIC ? " (guess disabled)" : "");
+                if (result.getStatus() == SolveResult.Status.PROBABILISTIC) {
+                    status = !LootGameSolverConfig.allowProbabilityMoves ? "Guess: Disabled"
+                        : "Guess: Below safety threshold";
+                } else {
+                    status = result.getMessage();
+                }
                 return;
             }
         }
