@@ -693,7 +693,8 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public void recordSubmittedAction(DetectedGame snapshot) {
         if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
-            golSubmitted++;
+            int submittedThrough = snapshot.gol.getCurrentSymbol() + 1;
+            if (submittedThrough > golSubmitted) golSubmitted = submittedThrough;
         }
     }
 
@@ -713,7 +714,14 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             return true;
         }
-        if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) return true;
+        if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+            // LootGames advances currentSymbol only after accepting the click. Treat that
+            // server-side index as the acknowledgement so a delayed packet cannot cause
+            // the same symbol to be submitted repeatedly.
+            if (current.gol == null || !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId()))
+                return true;
+            return current.gol.getCurrentSymbol() >= golSubmitted;
+        }
         return false;
     }
 

@@ -252,6 +252,11 @@ public final class SolverSession {
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT && lastActionAt > 0
+            && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {
+            status = "Waiting: GoL";
+            return;
+        }
         if (activeAction.type == SolverAction.Type.SET_VALUE && sudokuValueBeforeClick >= 0
             && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] == sudokuValueBeforeClick
             && System.currentTimeMillis() - lastActionAt < LootGameSolverConfig.boardUpdateTimeoutMs) {

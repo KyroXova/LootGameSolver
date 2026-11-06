@@ -141,3 +141,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Cache body-clearance and terrain-penalty lookups across incremental route-search slices to reduce repeated world reads.
 - Honor the probability-move toggle and minimum safety threshold in every solver mode, and reject invalid probability values.
 - Stop with a clear no-move result when Minesweeper frontier enumeration exceeds its exactness or work limits instead of guessing from partial counts.
+- Wait for the server to acknowledge each Game of Light symbol before sending the next input, preventing delayed updates from replaying clicks.
