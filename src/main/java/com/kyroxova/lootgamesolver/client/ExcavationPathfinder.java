@@ -101,7 +101,9 @@ final class ExcavationPathfinder {
                         break;
                     }
                 }
-                if (cutsReturnStair) continue;
+                // Existing tunnels may revisit an X/Z column at another height.
+                // Keep the anti-cut rule for newly excavated stairs only.
+                if (horizon && cutsReturnStair) continue;
                 long key = key(nx, ny, nz);
                 if (visited.contains(key)) continue;
                 int edge = terrain.cost(node.x, node.y, node.z, nx, ny, nz);

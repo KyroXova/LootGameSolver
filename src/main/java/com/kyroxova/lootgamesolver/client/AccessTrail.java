@@ -81,6 +81,28 @@ final class AccessTrail {
         return closest <= maxDistance ? index : -1;
     }
 
+    int nearestForwardIndex(int x, int y, int z, int maxDistance) {
+        int index = -1, closest = Integer.MAX_VALUE;
+        for (int i = 0; i < points.size(); i++) {
+            int[] p = points.get(i);
+            int distance = Math.abs(p[0] - x) + Math.abs(p[1] - y) + Math.abs(p[2] - z);
+            if (distance < closest || (distance == closest && i < index)) {
+                index = i;
+                closest = distance;
+            }
+        }
+        return closest <= maxDistance ? index : -1;
+    }
+
+    List<int[]> forwardFrom(int index) {
+        List<int[]> route = new ArrayList<int[]>();
+        if (index < 0 || index >= points.size()) return route;
+        for (int i = index; i < points.size(); i++) route.add(
+            points.get(i)
+                .clone());
+        return route;
+    }
+
     int[] pointAt(int index) {
         return index < 0 || index >= points.size() ? null
             : points.get(index)

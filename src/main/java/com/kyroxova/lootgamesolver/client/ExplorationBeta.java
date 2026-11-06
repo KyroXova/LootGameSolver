@@ -24,6 +24,8 @@ public final class ExplorationBeta {
     private TileEntity target;
     private int ticks;
     private int stalled;
+    private int stallRecoveries;
+    private final java.util.Set<Long> blockedWalkNodes = new java.util.HashSet<Long>();
     private double lastDistance = Double.MAX_VALUE;
     private boolean walking;
     private boolean digging;
@@ -143,6 +145,7 @@ public final class ExplorationBeta {
     private boolean puzzleArrivalPending;
     private ExcavationPathfinder existingAccessPlan;
     private boolean planningExistingAccess;
+    private boolean existingAccessChecked;
     private boolean movingToPuzzleCenter;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
@@ -388,6 +391,9 @@ public final class ExplorationBeta {
         if (knownStructure == null || mc.thePlayer == null) return;
         if (trailTarget == null || !samePosition(trailTarget, knownStructure)) {
             persistAccessTrail(true);
+            existingAccessChecked = false;
+            blockedWalkNodes.clear();
+            stallRecoveries = 0;
             accessTrail.clear();
             trailTarget = knownStructure.clone();
             trailWorldId = worldIdentity(mc);
@@ -397,6 +403,57 @@ public final class ExplorationBeta {
             trailDirty = false;
             trailExcavating = accessTrail.size() > 1;
         }
+    }
+
+    private boolean reuseSavedAccessPath(Minecraft mc) {
+        if (mc.thePlayer == null || target == null || accessTrail.size() < 2) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int index = accessTrail.nearestForwardIndex(x, y, z, 2);
+        if (index < 0 || index >= accessTrail.size() - 1) return false;
+        List<int[]> saved = accessTrail.forwardFrom(index);
+        if (saved.size() < 2) return false;
+        route.clear();
+        route.addAll(saved);
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        walkingSearch = null;
+        continuationSearch = null;
+        extendedFrom = null;
+        existingAccessChecked = true;
+        planningExistingAccess = false;
+        existingAccessPlan = null;
+        digging = false;
+        returning = false;
+        searching = false;
+        walking = true;
+        status = "Following saved entrance route";
+        return true;
+    }
+
+    private boolean beginExistingAccessSearch(Minecraft mc) {
+        if (!LootGameSolverConfig.staircaseEnabled || mc.thePlayer == null
+            || mc.theWorld == null
+            || target == null
+            || target.yCoord >= mc.thePlayer.boundingBox.minY - 2
+            || Math.max(
+                Math.abs((int) Math.floor(mc.thePlayer.posX) - target.xCoord),
+                Math.abs((int) Math.floor(mc.thePlayer.posZ) - target.zCoord)) > 40
+            || existingAccessChecked) return false;
+        existingAccessChecked = true;
+        existingAccessPlan = new ExcavationPathfinder(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ),
+            target.xCoord,
+            target.yCoord + 1,
+            target.zCoord);
+        planningExistingAccess = true;
+        walking = true;
+        digging = false;
+        status = "Checking for a safe existing entrance";
+        return true;
     }
 
     private void recordAccessPoint(int x, int y, int z) {
@@ -669,6 +726,9 @@ public final class ExplorationBeta {
         puzzleArrivalPending = false;
         planningExistingAccess = false;
         existingAccessPlan = null;
+        existingAccessChecked = false;
+        stallRecoveries = 0;
+        blockedWalkNodes.clear();
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
@@ -694,34 +754,23 @@ public final class ExplorationBeta {
         beginAccessTrail(mc);
         // Keep the saved entrance when we are inside; a stop/restart here is a resume,
         // not an implicit request to return through the structure.
-        boolean nearSavedStructureEnd = accessTrail.nearTerminal(
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.boundingBox.minY),
-            (int) Math.floor(mc.thePlayer.posZ),
-            24);
-        // A persisted trail is useful after a restart only when we are actually inside
-        // its structure. Starting a fresh approach from outside must never inherit an
-        // old entrance and later return to the wrong surface point.
-        if (!nearSavedStructureEnd && trailTarget != null && accessTrail.size() > 0) {
+        int playerX = (int) Math.floor(mc.thePlayer.posX);
+        int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int playerZ = (int) Math.floor(mc.thePlayer.posZ);
+        int nearbyTrailIndex = accessTrail.nearestIndex(playerX, playerY, playerZ, 24);
+        // Preserve a persisted trail only while near any of its real checkpoints.
+        // Starting a fresh approach elsewhere must not inherit a stale entrance.
+        if (nearbyTrailIndex < 0 && trailTarget != null && accessTrail.size() > 0) {
             accessTrail.clear();
             trailTarget = knownStructure == null ? null : knownStructure.clone();
             trailExcavating = false;
             trailDirty = false;
             removePersistedTrail();
         }
-        boolean underground = LootGameSolverConfig.staircaseEnabled && target.yCoord < mc.thePlayer.boundingBox.minY - 2
-            && Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) <= 40;
-        if (underground) {
-            existingAccessPlan = new ExcavationPathfinder(
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ),
-                target.xCoord,
-                target.yCoord + 1,
-                target.zCoord);
-            planningExistingAccess = true;
-            walking = true;
-            status = "Checking for a safe existing entrance";
+        if (reuseSavedAccessPath(mc)) {
+            // Continue along the validated route into the structure before digging.
+        } else if (beginExistingAccessSearch(mc)) {
+            // Search existing walkable space before selecting a new dig entrance.
         } else {
             plan(mc);
             walking = walkingSearch != null || !route.isEmpty();
@@ -1029,6 +1078,7 @@ public final class ExplorationBeta {
                 if (horizontal > 32 || (horizontal > 3 && target.yCoord >= mc.thePlayer.boundingBox.minY - 2)) {
                     if (!walkingPlanFailed) plan(mc);
                     if (!route.isEmpty() || walkingSearch != null) return;
+                    if (beginExistingAccessSearch(mc)) return;
                     if (LootGameSolverConfig.staircaseEnabled && horizontal <= 40 && !mc.thePlayer.isInWater()) {
                         if (!selectDigEntrance(mc)) stop(mc, "No safe surface dig entrance in range");
                     } else stop(mc, "No verified route around the obstruction");
@@ -1036,6 +1086,7 @@ public final class ExplorationBeta {
                 }
                 if (LootGameSolverConfig.staircaseEnabled
                     && Math.abs(target.yCoord + 1 - mc.thePlayer.boundingBox.minY) > 1) {
+                    if (beginExistingAccessSearch(mc)) return;
                     if (!selectDigEntrance(mc)) stop(mc, "No safe surface dig entrance in range");
                     return;
                 }
@@ -1144,6 +1195,7 @@ public final class ExplorationBeta {
             route.remove(0);
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
+            stallRecoveries = 0;
             if (route.isEmpty()) {
                 if (mc.thePlayer.onGround) {
                     mc.thePlayer.motionX *= 0.3D;
@@ -1195,7 +1247,44 @@ public final class ExplorationBeta {
         else stalled = 0;
         lastDistance = distance;
         if (stalled > 40) {
-            stop(mc, "Walk stopped: no progress");
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            if (returning) {
+                if (rerouteSavedReturn(mc) || digTowardSavedExit(mc)) {
+                    status = "Recovering along the saved exit route";
+                    return;
+                }
+                stop(mc, "Saved exit route is blocked; navigation held safely");
+                return;
+            }
+            if (!route.isEmpty() && blockedWalkNodes.size() < 64) {
+                int[] failed = route.get(0);
+                blockedWalkNodes.add(supportKey(failed[0], failed[1], failed[2]));
+            }
+            if (++stallRecoveries <= 5) {
+                route.clear();
+                walkingSearch = null;
+                continuationSearch = null;
+                extendedFrom = null;
+                if (searching) {
+                    if (nextSearchLeg(mc)) {
+                        status = "Stalled checkpoint skipped; trying another exploration leg";
+                        return;
+                    }
+                } else {
+                    if (beginExistingAccessSearch(mc)) return;
+                    plan(mc);
+                    if (!route.isEmpty() || walkingSearch != null) {
+                        status = "Stalled checkpoint avoided; following alternate route";
+                        return;
+                    }
+                    if (LootGameSolverConfig.staircaseEnabled && !mc.thePlayer.isInWater() && selectDigEntrance(mc)) {
+                        status = "Walking route blocked; checking a safe dig entrance";
+                        return;
+                    }
+                }
+            }
+            stop(mc, "No safe route after alternate paths were checked");
             return;
         }
         boolean straight = !digging && !mc.thePlayer.isInWater()
@@ -1464,7 +1553,7 @@ public final class ExplorationBeta {
         return new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
-                return safe(terrainWorld, x, y, z);
+                return !blockedWalkNodes.contains(supportKey(x, y, z)) && safe(terrainWorld, x, y, z);
             }
 
             public boolean clear(int x, int y, int z) {
@@ -1480,6 +1569,7 @@ public final class ExplorationBeta {
 
     private int existingWalkCost(World w, int x, int y, int z, int nx, int ny, int nz) {
         if (Math.abs(nx - x) + Math.abs(nz - z) > 1 || Math.abs(ny - y) > 1) return -1;
+        if (blockedWalkNodes.contains(supportKey(nx, ny, nz))) return -1;
         if (!safe(w, nx, ny, nz) || w.getBlock(nx, ny, nz)
             .getMaterial()
             .isLiquid()) return -1;
