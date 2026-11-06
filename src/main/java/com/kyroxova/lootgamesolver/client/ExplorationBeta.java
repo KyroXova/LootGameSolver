@@ -30,6 +30,7 @@ public final class ExplorationBeta {
     private int savedSlot = -1;
     private int digTicks;
     private int toolWaitTicks;
+    private boolean waitingForTool;
     private String status = "Scanning loaded terrain";
     private ProgressiveSearch search;
     private boolean searching;
@@ -664,11 +665,6 @@ public final class ExplorationBeta {
         if (returnAvailable) {
             if (startSavedReturn(mc, true, 64)) return;
         }
-        // A stopped or interrupted solve may leave the player inside the room while the exact
-        // return toggle was never armed. Prefer the approach trail before scanning a new target.
-        if (trailTarget != null && startSavedReturn(mc, true, 64)) {
-            return;
-        }
         returnAvailable = false;
         puzzleArrivalPending = false;
         planningExistingAccess = false;
@@ -696,17 +692,17 @@ public final class ExplorationBeta {
             return;
         }
         beginAccessTrail(mc);
-        // Inside the structure, the safest shortest path is the exact checked trail we used
-        // to enter. Do not ask a fresh path search to choose a nearby wall or corner.
-        if (accessTrail.nearTerminal(
+        // Keep the saved entrance when we are inside; a stop/restart here is a resume,
+        // not an implicit request to return through the structure.
+        boolean nearSavedStructureEnd = accessTrail.nearTerminal(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
-            24) && startSavedReturn(mc, true, 64)) return;
+            24);
         // A persisted trail is useful after a restart only when we are actually inside
         // its structure. Starting a fresh approach from outside must never inherit an
         // old entrance and later return to the wrong surface point.
-        if (trailTarget != null && accessTrail.size() > 0) {
+        if (!nearSavedStructureEnd && trailTarget != null && accessTrail.size() > 0) {
             accessTrail.clear();
             trailTarget = knownStructure == null ? null : knownStructure.clone();
             trailExcavating = false;
@@ -832,14 +828,6 @@ public final class ExplorationBeta {
             }
         }
         if (++ticks % 100 == 0 && !walking) scan(mc);
-        if (!walking && target != null) {
-            beginAccessTrail(mc);
-            if (!returnAvailable && accessTrail.nearTerminal(
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ),
-                24)) returnAvailable = true;
-        }
         if (walking && searching && ticks % 40 == 0) {
             TileEntity previous = target;
             scan(mc);
@@ -957,14 +945,16 @@ public final class ExplorationBeta {
         }
         if (pausedForControl) {
             pausedForControl = false;
-            excavationRoute.clear();
-            excavationSearch = null;
-            approachPlan = null;
-            approachAnchor = null;
-            digging = false;
-            seekingDryEntrance = false;
-            entranceSelected = false;
-            if (!returning) plan(mc);
+            if (!waitingForTool) {
+                excavationRoute.clear();
+                excavationSearch = null;
+                approachPlan = null;
+                approachAnchor = null;
+                digging = false;
+                seekingDryEntrance = false;
+                entranceSelected = false;
+                if (!returning) plan(mc);
+            }
         }
         inspectUpcomingRoute(mc);
         if (!walking) return;
@@ -1346,6 +1336,7 @@ public final class ExplorationBeta {
         if (digging && mc.playerController != null) mc.playerController.resetBlockRemoving();
         if (savedSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = savedSlot;
         savedSlot = -1;
+        waitingForTool = false;
         digging = false;
         stairX = 0;
         stairZ = 0;
@@ -2017,11 +2008,15 @@ public final class ExplorationBeta {
         }
         toolWaitTicks = 0;
         if (slot < 0) {
-            stop(
-                mc,
-                "\u00A7eAuto-dig paused: \u00A7fKeep a usable \u00A7bpickaxe\u00A7f and \u00A7bshovel\u00A7f in your inventory. Check tool durability and harvest level.");
+            waitingForTool = true;
+            miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+            mc.playerController.resetBlockRemoving();
+            digTicks = 0;
+            miningAim.reset();
+            status = "Mining paused: no usable tool for " + b.getLocalizedName();
             return true;
         }
+        waitingForTool = false;
         long targetKey = supportKey(mineX, mineY, mineZ);
         if (targetKey != miningTarget || slot != miningSlot) {
             miningTarget = targetKey;

@@ -22,7 +22,7 @@ final class DigToolSelector {
 
     static int bestSlot(float[] speeds, boolean[] usable) {
         int best = -1;
-        float speed = 1F;
+        float speed = 0F;
         for (int i = 0; i < speeds.length; i++) {
             if (usable[i] && speeds[i] > speed) {
                 best = i;

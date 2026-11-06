@@ -118,4 +118,7 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - When a saved exit segment is blocked, try a short checked reroute and then plan a safe dig link back to the saved tunnel.
 - Keep only real, adjacent player positions in saved exit trails so checkpoint overshoots cannot create guessed corner routes.
 - Start a fresh entrance trail outside a structure instead of reusing a stale entrance saved from an earlier run.
+- Keep the excavation plan active while waiting for a harvestable tool, and resume it after inventory interaction.
+- Do not treat restarting exploration inside an unfinished structure as a request to return along the entrance trail.
+- Accept valid tools even when their reported dig speed is exactly 1, and reserve Return for an interrupted return operation.
 - Hold exploration when no verified return trail exists after solving instead of choosing an arbitrary route inside the structure.
