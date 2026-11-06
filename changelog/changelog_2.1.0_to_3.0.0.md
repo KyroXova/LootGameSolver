@@ -147,3 +147,4 @@ local testing builds can enable it. Navigation is experimental and does not guar
 - Require saved-tunnel joins, room doorways, and board-center approaches to reach the correct floor height before connecting or crossing routes.
 - Validate persisted entrance paths as contiguous adjacent steps and stop loading at the first corrupt checkpoint instead of bridging gaps.
 - Reset cached solver actions when Minesweeper advances a round, and stop safely if the active puzzle is replaced.
+- Handle missing Minesweeper board snapshots as invalid input instead of throwing.

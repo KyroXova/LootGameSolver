@@ -332,6 +332,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private String validate(MinesweeperBoard board) {
+        if (board == null) return "Board is missing";
         int flags = 0;
         for (CellPosition p : board.positions()) {
             MinesweeperCell cell = board.get(p);

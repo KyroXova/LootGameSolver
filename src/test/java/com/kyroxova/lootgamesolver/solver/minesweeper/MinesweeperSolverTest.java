@@ -12,6 +12,17 @@ import com.kyroxova.lootgamesolver.core.SolverAction;
 public class MinesweeperSolverTest {
 
     @Test
+    public void missingBoardIsReportedWithoutThrowing() {
+        MinesweeperSolver solver = new MinesweeperSolver();
+
+        assertEquals(false, solver.canSolve(null));
+        assertEquals(
+            SolveResult.Status.INVALID,
+            solver.solve(null)
+                .getStatus());
+    }
+
+    @Test
     public void identifiesMineWhenAllUnknownNeighborsAreRequired() {
         MinesweeperBoard board = new MinesweeperBoard(2, 2, 1);
         board.set(0, 0, MinesweeperCell.revealed(1));
