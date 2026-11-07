@@ -1580,13 +1580,12 @@ public final class ExplorationBeta {
             continueProgressiveSearch(mc, true);
             return;
         }
-        if (!accessTrail.removeLast()) {
-            status = "No saved checkpoint to clear";
-            return;
+        boolean removed = accessTrail.removeLast();
+        if (removed) {
+            trailDirty = true;
+            if (accessTrail.size() >= 2) persistAccessTrail(true);
+            else removePersistedTrail();
         }
-        trailDirty = true;
-        if (accessTrail.size() >= 2) persistAccessTrail(true);
-        else removePersistedTrail();
         if (returning || returnAvailable) {
             boolean resumeSearch = resumeSearchAfterReturn;
             route.clear();
@@ -1596,7 +1595,18 @@ public final class ExplorationBeta {
             if (!startChestPitReturn(mc, resumeSearch) && !startSavedReturn(mc, resumeSearch, 128)) {
                 retryExitLater(mc);
             }
-        } else status = "Last saved checkpoint cleared";
+        } else if (walking && target != null) {
+            route.clear();
+            walkingSearch = null;
+            continuationSearch = null;
+            extendedFrom = null;
+            excavationSearch = null;
+            excavationRoute.clear();
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            if (!digging) plan(mc);
+            status = "Checkpoint cleared; replanning";
+        } else status = removed ? "Last saved checkpoint cleared" : "No checkpoint to clear";
     }
 
     boolean inventoryCleanupSafe(Minecraft mc) {
