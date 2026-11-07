@@ -246,6 +246,7 @@ public final class ExplorationBeta {
             || roomEntryPlanning
             || roomEntrySearchNeedsResume
             || roomEntryCrossing
+            || roomExitCrossing
             || route.size() < 2
             || ticks % 10 != 0) return;
         int[] previous = { (int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.boundingBox.minY),
