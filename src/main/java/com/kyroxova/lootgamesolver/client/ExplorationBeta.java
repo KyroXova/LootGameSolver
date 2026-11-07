@@ -2257,6 +2257,18 @@ public final class ExplorationBeta {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
+        if (mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
+            for (int by = py; by <= py + 1; by++) {
+                net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
+                if (FoliagePolicy.canClear(isFoliage(plant),
+                    mc.theWorld.getTileEntity(next[0], by, next[2]) != null,
+                    plant.getBlockHardness(mc.theWorld, next[0], by, next[2]),
+                    next[0], by, next[2], px, py, pz, next[0], next[2], plant == Blocks.snow_layer)) {
+                    minePlannedBlock(mc, next[0], by, next[2], next[1]);
+                    return;
+                }
+            }
+        }
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (returning) {
@@ -2472,8 +2484,8 @@ public final class ExplorationBeta {
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
-            mc.thePlayer.setSprinting(straight && !centering && !digging && !mc.thePlayer.isInWater()
-                && mc.thePlayer.onGround && Math.abs(turn) < 16F && distance > 1.25D);
+            mc.thePlayer.setSprinting(!centering && !digging && !returning && !mc.thePlayer.isInWater()
+                && Math.abs(turn) < 35F && navigationInput.forward > 0.8F);
         }
     }
 
@@ -2551,8 +2563,23 @@ public final class ExplorationBeta {
             int previousSlot = mc.thePlayer.inventory.currentItem;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
-            net.minecraft.util.Vec3 hit = net.minecraft.util.Vec3
-                .createVectorHelper(side[0] + 0.5D, side[1] + 0.5D, side[2] + 0.5D);
+            if (returnPlacementSlot < 0) returnPlacementSlot = previousSlot;
+            double hx = side[0] + 0.5D + (x - side[0]) * 0.5D;
+            double hy = side[1] + 0.5D + (y - side[1]) * 0.5D;
+            double hz = side[2] + 0.5D + (z - side[2]) * 0.5D;
+            net.minecraft.util.Vec3 hit = net.minecraft.util.Vec3.createVectorHelper(hx, hy, hz);
+            double dx = hx - mc.thePlayer.posX, dz = hz - mc.thePlayer.posZ;
+            double dy = hy - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            float yaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
+            float pitch = (float) (-Math.atan2(dy, Math.hypot(dx, dz)) * 180D / Math.PI);
+            look(yaw, pitch);
+            net.minecraft.util.MovingObjectPosition aimed = mc.objectMouseOver;
+            if (aimed == null || aimed.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+                || aimed.blockX != side[0] || aimed.blockY != side[1] || aimed.blockZ != side[2]
+                || aimed.sideHit != side[3]) {
+                status = "Aiming at return step support";
+                return true;
+            }
             if (mc.playerController.onPlayerRightClick(
                 mc.thePlayer,
                 mc.theWorld,
@@ -2565,7 +2592,6 @@ public final class ExplorationBeta {
                 pendingReturnPlacement = new int[] { x, y, z };
                 pendingReturnWaypoint = needsIntermediateStep ? new int[] { next[0], playerY + 1, next[2] } : null;
                 returnPlacementTicks = 0;
-                if (returnPlacementSlot < 0) returnPlacementSlot = previousSlot;
                 status = "Placing a checked block for the return step";
                 return true;
             }

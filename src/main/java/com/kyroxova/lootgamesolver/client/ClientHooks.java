@@ -179,6 +179,8 @@ public final class ClientHooks {
     private void capturePuzzleMessage(IChatComponent message) {
         if (message instanceof ChatComponentTranslation)
             puzzleCompletion.message(((ChatComponentTranslation) message).getKey());
+        else if (net.minecraft.util.StatCollector.translateToLocal("msg.lootgames.win")
+            .equals(message.getUnformattedText())) puzzleCompletion.message("msg.lootgames.win");
         for (IChatComponent sibling : message.getSiblings()) capturePuzzleMessage(sibling);
     }
 
@@ -250,7 +252,7 @@ public final class ClientHooks {
             puzzleCompletion.begin();
         }
 
-        if (autoPuzzleState == AutoPuzzleState.SOLVING) {
+        if (autoPuzzleState == AutoPuzzleState.SOLVING && !puzzleCompletion.won(mc.theWorld != null)) {
             Object game = puzzleBridge.nearbyGame(true);
             int level = puzzleBridge.currentMinesweeperLevel(game);
             boolean nextLevel = activeMinesweeperLevel >= 1 && level > activeMinesweeperLevel && level <= 4;
