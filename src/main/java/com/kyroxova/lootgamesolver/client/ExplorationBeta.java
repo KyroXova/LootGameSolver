@@ -520,8 +520,18 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        int index = accessTrail.nearestForwardIndex(x, y, z, 2);
-        if (index < 0 || index >= accessTrail.size() - 1) return false;
+        int index = accessTrail.nearestIndex(x, y, z, 1);
+        if (index < 0) return false;
+        if (index == accessTrail.size() - 1 && safe(mc.theWorld, x, y, z)) {
+            route.clear();
+            digging = true;
+            walking = true;
+            searching = false;
+            returning = false;
+            entranceSelected = true;
+            status = "Continuing excavation from saved tunnel";
+            return true;
+        }
         List<int[]> saved = accessTrail.forwardFrom(index);
         if (saved.size() < 2) return false;
         route.clear();
@@ -1797,7 +1807,7 @@ public final class ExplorationBeta {
             stalled = 0;
             stallRecoveries = 0;
             if (route.isEmpty()) {
-                if (mc.thePlayer.onGround) {
+                if (mc.thePlayer.onGround && !digging) {
                     mc.thePlayer.motionX *= 0.3D;
                     mc.thePlayer.motionZ *= 0.3D;
                 }
@@ -1872,6 +1882,12 @@ public final class ExplorationBeta {
                         return;
                     }
                 } else {
+                    if (digging) {
+                        excavationRoute.clear();
+                        excavationSearch = null;
+                        status = "Planning another route from the tunnel";
+                        return;
+                    }
                     if (beginExistingAccessSearch(mc)) return;
                     plan(mc);
                     if (!route.isEmpty() || walkingSearch != null) {
@@ -2426,6 +2442,7 @@ public final class ExplorationBeta {
             return ++excavationReplans <= 3;
         }
         if (attemptStairStep(mc, next[1])) return true;
+        blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         excavationRoute.clear();
         miningAim.reset();
         aimTicks = 0;
