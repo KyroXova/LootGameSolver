@@ -51,6 +51,27 @@ final class AccessTrailStore {
         return copy;
     }
 
+    int[] nearestStructure(String world, int dimension, int x, int y, int z, int range) {
+        String prefix = (world == null ? "unknown" : world) + "|" + dimension + ":";
+        int[] best = null;
+        long bestDistance = (long) range * range + 1;
+        for (String name : data.trails.keySet()) {
+            if (!name.startsWith(prefix)) continue;
+            String[] coords = name.substring(prefix.length()).split(":");
+            if (coords.length != 3) continue;
+            try {
+                int sx = Integer.parseInt(coords[0]), sy = Integer.parseInt(coords[1]), sz = Integer.parseInt(coords[2]);
+                long dx = (long) sx - x, dy = (long) sy - y, dz = (long) sz - z;
+                long distance = dx * dx + dy * dy + dz * dz;
+                if (distance < bestDistance && load(world, dimension, sx, sy, sz).size() >= 2) {
+                    bestDistance = distance;
+                    best = new int[] { sx, sy, sz };
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        return best;
+    }
+
     void save(String world, int dimension, int x, int y, int z, List<int[]> points) throws IOException {
         if (points == null || points.size() < 2 || points.size() > MAX_POINTS_PER_ROUTE) return;
         List<int[]> safeCopy = new ArrayList<int[]>(points.size());

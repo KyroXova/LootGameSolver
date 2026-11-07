@@ -446,6 +446,7 @@ public final class ClientHooks {
                 puzzleCompletion.clear();
                 autoPuzzleState = AutoPuzzleState.IDLE;
                 if (exploration != null) {
+                    exploration.prepareRewardCollection(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition);
                     rewardLooter.start(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition, completedGame);
                     rewardReturnPending = true;
                 }
@@ -503,21 +504,21 @@ public final class ClientHooks {
             session.cancel("Exploration selected");
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
-            int[] center = puzzleBridge.nearbyFloorActivator();
-            if (center == null) {
-                Object nearby = puzzleBridge.nearbyGame(true);
-                if (nearby != null) center = puzzleBridge.gameCenter(nearby);
-            }
-            if (center == null && exploration.inDungeonRoom(mc)) {
+            if (exploration.inDungeonRoom(mc)) {
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
-                    if (exploration.navigating()) exploration.toggle(mc);
+                    exploration.prepareRewardCollection(mc, rewards);
                     rewardCenter = rewards;
                     rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
                     rewardReturnPending = true;
                     exploration.setAutomationStatus("Collecting reward chests");
                     return;
                 }
+            }
+            int[] center = puzzleBridge.nearbyFloorActivator();
+            if (center == null) {
+                Object nearby = puzzleBridge.nearbyGame(true);
+                if (nearby != null) center = puzzleBridge.gameCenter(nearby);
             }
             if (!exploration.resumePuzzleInCurrentRoom(mc, center)) exploration.toggle(mc);
         }

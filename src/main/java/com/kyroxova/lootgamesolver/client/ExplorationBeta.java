@@ -1404,6 +1404,20 @@ public final class ExplorationBeta {
         return mc != null && mc.thePlayer != null && mc.theWorld != null && insideDungeonRoom(mc);
     }
 
+    void prepareRewardCollection(Minecraft mc, int[] center) {
+        if (walking) stop(mc, "Reward collection started");
+        if (mc == null || mc.theWorld == null || center == null) return;
+        if (accessTrail.size() < 2) {
+            int[] saved = accessTrailStore.nearestStructure(worldIdentity(mc), mc.theWorld.provider.dimensionId,
+                center[0], center[1], center[2], 24);
+            if (saved != null) {
+                knownStructure = saved;
+                trailTarget = null;
+                beginAccessTrail(mc);
+            }
+        }
+    }
+
     void clearLastCheckpoint(Minecraft mc) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
         if (!accessTrail.removeLast()) {
