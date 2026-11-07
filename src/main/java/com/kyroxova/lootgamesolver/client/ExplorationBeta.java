@@ -1640,8 +1640,7 @@ public final class ExplorationBeta {
             && !roomEntrySearchNeedsResume
             && !roomEntryCrossing
             && route.size() >= 1
-            && route.size() <= 8
-            && ticks % 5 == 0) extendRoute(mc);
+            && route.size() <= 16) extendRoute(mc);
         prepareApproach(mc);
         if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
             int[] end = route.get(route.size() - 1);
@@ -2081,10 +2080,7 @@ public final class ExplorationBeta {
                     && route.get(2)[2] - next[2] == 2 * (route.get(1)[2] - next[2])
                     && safe(mc.theWorld, route.get(1)[0], py, route.get(1)[2])
                     && safe(mc.theWorld, route.get(2)[0], py, route.get(2)[2]));
-        mc.thePlayer.setSprinting(
-            straight && Math.abs(turn) < 10F
-                && mc.thePlayer.getFoodStats()
-                    .getFoodLevel() > 6);
+        mc.thePlayer.setSprinting(false);
         if (navigationInput != null) {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 && !movingToPuzzleCenter ? (float) Math.min(1D, distance * 1.5D) : 1F;
@@ -2649,9 +2645,9 @@ public final class ExplorationBeta {
             miningAim.reset();
             return ++excavationReplans <= 3;
         }
-        blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         if (attemptStairStep(mc, next[1])) return true;
         excavationRoute.clear();
+        blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         miningAim.reset();
         aimTicks = 0;
         return ++excavationReplans <= 3;
