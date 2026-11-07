@@ -1397,9 +1397,9 @@ public final class ExplorationBeta {
                     public boolean stand(int x, int y, int z) { return ground.stand(x, y, z); }
                     public boolean clear(int x, int y, int z) { return ground.clear(x, y, z); }
                     public boolean exit(int x, int y, int z) {
-                        if (exitWorld.canBlockSeeTheSky(x, y, z)) return true;
                         int index = accessTrail.nearestIndex(x, y, z, 0);
-                        return index >= 0 && index < accessTrail.size() - 1;
+                        if (accessTrail.size() >= 2) return index >= 0 && index < accessTrail.size() - 1;
+                        return exitWorld.canBlockSeeTheSky(x, y, z);
                     }
                 }, sx, sy, sz);
             }
