@@ -1499,12 +1499,13 @@ public final class ExplorationBeta {
                     }
                 } else {
                     boolean reachedCenter = movingToPuzzleCenter && walkingSearch.reachedGoal();
+                    boolean reachedGoal = walkingSearch.reachedGoal();
                     route.addAll(walkingSearch.path());
                     walkingSearch = null;
-                    walkingSearchNeedsResume = false;
+                    walkingSearchNeedsResume = !movingToPuzzleCenter && !reachedGoal && !route.isEmpty();
                     if (movingToPuzzleCenter && reachedCenter && target != null)
                         appendPuzzleCenterWaypoint(new int[] { target.xCoord, target.yCoord, target.zCoord });
-                    walkingPlanFailed = route.isEmpty();
+                    walkingPlanFailed = !reachedGoal;
                 }
             }
         }
@@ -1698,6 +1699,7 @@ public final class ExplorationBeta {
                 if (horizontal > 32 || (horizontal > 3 && target.yCoord >= mc.thePlayer.boundingBox.minY - 2)) {
                     if (!walkingPlanFailed) plan(mc);
                     if (!route.isEmpty() || walkingSearch != null) return;
+                    if (horizontal <= 40 && beginDiggingAtCurrentPosition(mc)) return;
                     if (startRoomEntrySearch(mc)) return;
                     if (beginExistingAccessSearch(mc)) return;
                     if (LootGameSolverConfig.staircaseEnabled && horizontal <= 40 && !mc.thePlayer.isInWater()) {
@@ -1763,6 +1765,18 @@ public final class ExplorationBeta {
             stop(mc, "Arrived beside LootGame");
             puzzleArrivalPending = true;
             return;
+        }
+        if (!returning && route.size() >= 2) {
+            int[] first = route.get(0), second = route.get(1);
+            int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int cz = (int) Math.floor(mc.thePlayer.posZ);
+            if ((first.length < 4 || first[3] == 0) && (second.length < 4 || second[3] == 0)
+                && first[1] == cy && second[1] == cy
+                && Math.abs(second[0] - cx) == 1 && Math.abs(second[2] - cz) == 1
+                && safe(mc.theWorld, second[0], cy, cz) && safe(mc.theWorld, cx, cy, second[2])
+                && safe(mc.theWorld, second[0], cy, second[2])) {
+                route.remove(0);
+            }
         }
         int[] next = route.get(0);
         int px = (int) Math.floor(mc.thePlayer.posX);
@@ -2312,8 +2326,29 @@ public final class ExplorationBeta {
             LootGameSolverConfig.explorationRange);
         if (walkingSearch.advance(3_000_000L)) {
             route.addAll(walkingSearch.path());
+            walkingPlanFailed = !walkingSearch.reachedGoal();
+            walkingSearchNeedsResume = walkingPlanFailed && !route.isEmpty();
             walkingSearch = null;
         }
+    }
+
+    private boolean beginDiggingAtCurrentPosition(Minecraft mc) {
+        if (!LootGameSolverConfig.staircaseEnabled || mc.thePlayer.isInWater() || !mc.thePlayer.onGround) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (!safe(mc.theWorld, x, y, z) || !dryShore(mc.theWorld, x, y, z)) return false;
+        route.clear();
+        walkingSearch = null;
+        continuationSearch = null;
+        excavationSearch = null;
+        excavationRoute.clear();
+        digging = true;
+        entranceSelected = true;
+        seekingDryEntrance = false;
+        savedSlot = mc.thePlayer.inventory.currentItem;
+        status = "Planning a safe tunnel from the current checkpoint";
+        return true;
     }
 
     private static boolean passable(World world, int x, int y, int z) {
