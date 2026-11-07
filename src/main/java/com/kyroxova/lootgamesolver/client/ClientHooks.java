@@ -504,6 +504,10 @@ public final class ClientHooks {
             session.cancel("Exploration selected");
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
+            if (!exploration.navigating() && exploration.hasPendingReturn()) {
+                exploration.toggle(mc);
+                return;
+            }
             if (exploration.inDungeonRoom(mc)) {
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {

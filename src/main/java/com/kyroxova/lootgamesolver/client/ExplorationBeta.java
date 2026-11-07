@@ -1410,6 +1410,10 @@ public final class ExplorationBeta {
         return walking;
     }
 
+    boolean hasPendingReturn() {
+        return returning || returnAvailable;
+    }
+
     boolean inDungeonRoom(Minecraft mc) {
         return mc != null && mc.thePlayer != null && mc.theWorld != null && insideDungeonRoom(mc);
     }
@@ -1472,8 +1476,17 @@ public final class ExplorationBeta {
             return;
         }
         if (returnAvailable) {
+            blockedWalkNodes.clear();
             if (startChestPitReturn(mc, true)) return;
             if (startSavedReturn(mc, true, 64)) return;
+            if (accessTrail.size() >= 2) {
+                returning = true;
+                walking = true;
+                resumeSearchAfterReturn = true;
+                if (digTowardSavedExit(mc)) return;
+                retryExitLater(mc);
+                return;
+            }
         }
         // Resume the current destination before starting a new exit search.
         if (target != null && !target.isInvalid()) {
@@ -2150,6 +2163,15 @@ public final class ExplorationBeta {
                     // Keep the tried-doorway list to prevent repeating failed routes.
                     if (roomExitCandidates == null && startRoomExitSearch(mc)) return;
                     if (digTowardSavedExit(mc)) return;
+                    retryExitLater(mc);
+                    return;
+                }
+                int exitX = (int) Math.floor(mc.thePlayer.posX);
+                int exitY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int exitZ = (int) Math.floor(mc.thePlayer.posZ);
+                if (!mc.theWorld.canBlockSeeTheSky(exitX, exitY, exitZ)) {
+                    blockedWalkNodes.clear();
+                    if (startSavedReturn(mc, resumeSearchAfterReturn, 128) || digTowardSavedExit(mc)) return;
                     retryExitLater(mc);
                     return;
                 }
