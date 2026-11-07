@@ -49,6 +49,7 @@ public final class ExplorationBeta {
     private final MiningAimGate miningAim = new MiningAimGate();
     private int settlingTicks;
     private ExcavationPathfinder excavationSearch;
+    private int[] roofEscapeGoal;
     private final List<int[]> excavationRoute = new ArrayList<int[]>();
     private final List<int[]> rejectedSteps = new ArrayList<int[]>();
     private final List<int[]> navigationPreview = new ArrayList<int[]>();
@@ -735,7 +736,8 @@ public final class ExplorationBeta {
             || target.xCoord >= bounds[1]
             || target.zCoord <= bounds[2]
             || target.zCoord >= bounds[3]
-            || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3])) return false;
+            || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3]
+                && y <= target.yCoord + 3)) return false;
         roomEntryCandidates = findRoomExitCandidates(mc, bounds);
         roomEntryCandidateIndex = 0;
         final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
@@ -868,7 +870,32 @@ public final class ExplorationBeta {
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
-        return bounds != null && x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3];
+        return bounds != null && target != null && y <= target.yCoord + 3
+            && x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3];
+    }
+
+    private boolean planRoofEscape(Minecraft mc) {
+        if (target == null || knownStructure == null || returnDigging || returning) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (y <= target.yCoord + 3 || !isDungeonWall(mc.theWorld, x, y - 1, z)) return false;
+        int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
+        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
+        int[][] exits = { { bounds[0] - 3, y, z }, { bounds[1] + 3, y, z },
+            { x, y, bounds[2] - 3 }, { x, y, bounds[3] + 3 } };
+        int[] best = exits[0];
+        for (int[] exit : exits) {
+            if (Math.abs(exit[0] - x) + Math.abs(exit[2] - z)
+                < Math.abs(best[0] - x) + Math.abs(best[2] - z)) best = exit;
+        }
+        roofEscapeGoal = best;
+        excavationRoute.clear();
+        excavationSearch = null;
+        excavationReplans = 0;
+        digging = true;
+        entranceSelected = true;
+        status = "Planning a safe route off the roof to a side wall";
+        return true;
     }
 
     private boolean rerouteSavedReturn(Minecraft mc, int firstCheckpoint) {
@@ -1522,8 +1549,10 @@ public final class ExplorationBeta {
         if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
             int[] end = route.get(route.size() - 1);
             if (excavationSearch == null) {
-                excavationSearch = new ExcavationPathfinder(end[0], end[1], end[2], target.xCoord,
-                    target.yCoord + 1, target.zCoord, true);
+                excavationSearch = new ExcavationPathfinder(end[0], end[1], end[2],
+                    roofEscapeGoal == null ? target.xCoord : roofEscapeGoal[0],
+                    roofEscapeGoal == null ? target.yCoord + 1 : roofEscapeGoal[1],
+                    roofEscapeGoal == null ? target.zCoord : roofEscapeGoal[2], true);
             }
             if (excavationSearch.advance(
                 (a, b, c, nx, ny, nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
@@ -2095,6 +2124,7 @@ public final class ExplorationBeta {
         excavationSearch = null;
         excavationRoute.clear();
         rejectedSteps.clear();
+        roofEscapeGoal = null;
         miningAim.reset();
         settlingTicks = 0;
         if (navigationInput != null && mc.thePlayer != null) {
@@ -2399,6 +2429,13 @@ public final class ExplorationBeta {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
         settlingTicks = 0;
+        if (roofEscapeGoal != null && Math.abs(x - roofEscapeGoal[0]) + Math.abs(z - roofEscapeGoal[2]) <= 2) {
+            roofEscapeGoal = null;
+            excavationRoute.clear();
+            excavationSearch = null;
+            status = "Reached roof edge; planning side access";
+        }
+        if (roofEscapeGoal == null) planRoofEscape(mc);
         returnSupports.add(supportKey(x, y - 1, z));
         if (!returnDigging) {
             if (trailTarget == null || trailTarget[0] != target.xCoord
@@ -2428,7 +2465,7 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
-        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1) {
+        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1 && roofEscapeGoal == null) {
             excavationRoute.addAll(patternedAccess(mc, x, y, z));
             if (!excavationRoute.isEmpty()) {
                 approachPlan = null;
@@ -2449,14 +2486,16 @@ public final class ExplorationBeta {
                     x,
                     y,
                     z,
-                    target.xCoord,
-                    target.yCoord + 1,
-                    target.zCoord,
+                    roofEscapeGoal == null ? target.xCoord : roofEscapeGoal[0],
+                    roofEscapeGoal == null ? target.yCoord + 1 : roofEscapeGoal[1],
+                    roofEscapeGoal == null ? target.zCoord : roofEscapeGoal[2],
                     true);
                 rejectedSteps.clear();
             }
             boolean complete = excavationSearch.advance(
-                (a, b, c, nx, ny, nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
+                (a, b, c, nx, ny, nz) -> a == x && b == y && c == z
+                    && blockedWalkNodes.contains(supportKey(nx, ny, nz)) ? -1
+                        : excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
                 24,
                 System.nanoTime() + 3_000_000L);
             rejectedSteps.clear();
