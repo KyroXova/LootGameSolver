@@ -2069,7 +2069,7 @@ public final class ExplorationBeta {
             && !roomEntrySearchNeedsResume
             && !roomEntryCrossing
             && route.size() >= 1
-            && route.size() <= 16) extendRoute(mc);
+            && route.size() <= 32) extendRoute(mc);
         prepareApproach(mc);
         if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
             int[] end = route.get(route.size() - 1);
@@ -2087,6 +2087,11 @@ public final class ExplorationBeta {
             }
         }
         if (route.isEmpty()) {
+            if (continuationSearch != null && !returning && !digging && !movingToPuzzleCenter) {
+                extendRoute(mc);
+                if (!route.isEmpty()) return;
+                if (continuationSearch != null) { status = "Planning next route"; return; }
+            }
             if (followingOpenExit) {
                 followingOpenExit = false;
                 int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -3166,7 +3171,8 @@ public final class ExplorationBeta {
     }
 
     private void extendRoute(Minecraft mc) {
-        int[] tail = route.get(route.size() - 1);
+        int[] tail = route.isEmpty() ? extendedFrom : route.get(route.size() - 1);
+        if (tail == null) return;
         if (tail == extendedFrom && continuationSearch == null) return;
         int gx = searching ? searchGoalX : target.xCoord;
         int gz = searching ? searchGoalZ : target.zCoord;
@@ -3191,11 +3197,17 @@ public final class ExplorationBeta {
                 gz,
                 LootGameSolverConfig.explorationRange);
         }
-        if (!continuationSearch.advance(3_000_000L)) return;
+        boolean finished = continuationSearch.advance(3_000_000L);
         List<int[]> continuation = continuationSearch.path();
+        if (!finished && continuation.size() < 3) return;
         continuationSearch = null;
-        if (continuation.isEmpty()) return;
-        NavigationSteering.appendWithoutLoops(route, continuation);
+        if (continuation.isEmpty()) {
+            extendedFrom = null;
+            return;
+        }
+        boolean joined = shortcutToContinuation(mc, continuation);
+        if (!joined) NavigationSteering.appendWithoutLoops(route, continuation);
+        walkingSearchNeedsResume = !finished;
         if (searching) {
             searchGoalX = continuationX;
             searchGoalZ = continuationZ;
@@ -3204,6 +3216,31 @@ public final class ExplorationBeta {
             target.yCoord = end[1];
             target.zCoord = end[2];
         }
+    }
+
+    private boolean shortcutToContinuation(Minecraft mc, List<int[]> continuation) {
+        if (!mc.thePlayer.onGround || route.size() < 2) return false;
+        for (int[] step : route) if (step.length > 3 && step[3] != 0) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        for (int i = continuation.size() - 1; i >= 0; i--) {
+            int[] step = continuation.get(i);
+            int dx = Math.abs(step[0] - x), dz = Math.abs(step[2] - z);
+            if (step[1] != y || dx > 1 || dz > 1 || dx + dz == 0
+                || !safe(mc.theWorld, step[0], y, step[2])
+                || dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], y, z)
+                    || !safe(mc.theWorld, x, y, step[2]))) continue;
+            if (route.size() + i < 3) return false;
+            route.clear();
+            route.addAll(continuation.subList(i, continuation.size()));
+            segmentX = mc.thePlayer.posX;
+            segmentZ = mc.thePlayer.posZ;
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            status = "Taking shorter route";
+            return true;
+        }
+        return false;
     }
 
     private void plan(final Minecraft mc) {
