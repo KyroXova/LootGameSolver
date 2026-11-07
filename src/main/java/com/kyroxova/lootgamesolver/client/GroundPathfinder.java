@@ -141,6 +141,9 @@ public final class GroundPathfinder {
                     int stepCost = (diagonal ? 14 : 10) + 10 * Math.abs(dy)
                         + 10 * Math.max(0, terrainCost(terrain, terrainCosts, nx, ny, nz))
                         + Math.max(0, terrain.transitionCost(node.x, node.y, node.z, nx, ny, nz));
+                    if (node.parent != null
+                        && (nx - node.x != node.x - node.parent.x || nz - node.z != node.z - node.parent.z))
+                        stepCost += 6;
                     int nextCost = node.cost + stepCost;
                     Integer priorCost = bestCosts.get(position);
                     if (priorCost != null && priorCost.intValue() <= nextCost) continue;

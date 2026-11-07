@@ -17,6 +17,7 @@ import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemTool;
 import net.minecraft.item.ItemSword;
 import net.minecraft.item.ItemArmor;
+import net.minecraft.item.Item;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.util.Vec3;
@@ -41,6 +42,7 @@ final class RewardChestLooter {
     private int packPendingSlot = -1, packPendingCount;
     private float backpackOldYaw, backpackOldPitch;
     private boolean active, opened, collecting, packing, packOpening, packMoved, packingExisting;
+    private boolean existingInventoryPackRequested;
     private boolean backpackAimSaved;
     private String status = "";
 
@@ -58,6 +60,7 @@ final class RewardChestLooter {
         packOpening = false;
         packMoved = false;
         packingExisting = false;
+        existingInventoryPackRequested = false;
         queueIndex = 0;
         backpackSlot = -1;
         oldSlot = -1;
@@ -105,9 +108,16 @@ final class RewardChestLooter {
                 if (!(obj instanceof TileEntityChest)) continue;
                 TileEntity tile = (TileEntity) obj;
                 int dx = tile.xCoord - center[0], dz = tile.zCoord - center[2];
-                if (Math.abs(dx) + Math.abs(dz) == 1 && Math.abs(tile.yCoord - center[1]) <= 5)
+                // The active board center can be reported on its ground support or
+                // one adjacent board block depending on game stage. Include the small
+                // surrounding chest cluster, then keep the four nearest reward chests.
+                if (Math.abs(dx) + Math.abs(dz) <= 3 && Math.abs(tile.yCoord - center[1]) <= 5)
                     chests.add(new int[] { tile.xCoord, tile.yCoord, tile.zCoord });
             }
+            chests.sort((a, b) -> Integer.compare(
+                Math.abs(a[0] - center[0]) + Math.abs(a[2] - center[2]),
+                Math.abs(b[0] - center[0]) + Math.abs(b[2] - center[2])));
+            while (chests.size() > 4) chests.remove(chests.size() - 1);
             if (chests.isEmpty()) {
                 status = "Waiting for reward chests";
                 return;
@@ -124,6 +134,16 @@ final class RewardChestLooter {
             if (queueIndex >= queue.size()) {
                 if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
                 opened = false;
+                if (!existingInventoryPackRequested && hasSafeExistingItems(mc)) {
+                    existingInventoryPackRequested = true;
+                    packing = true;
+                    packOpening = false;
+                    packMoved = false;
+                    backpackSlot = -1;
+                    for (int i = 0; i < backpackTried.length; i++) backpackTried[i] = false;
+                    status = "Packing leftover inventory items";
+                    return;
+                }
                 status = "Reward chests collected";
                 active = false;
                 return;
@@ -254,16 +274,9 @@ final class RewardChestLooter {
                 if (remaining == null || remaining.stackSize < packPendingCount) {
                     packMoved = true;
                     if (packingExisting) {
-                        mc.thePlayer.closeScreen();
-                        packOpening = false;
-                        if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-                        oldSlot = -1;
-                        packing = false;
                         packingExisting = false;
                         packPendingSlot = -1;
-                        waiting = 5;
-                        openWait = 0;
-                        return;
+                        waiting = 3;
                     }
                 }
                 else {
@@ -275,7 +288,7 @@ final class RewardChestLooter {
                     backpackSlot = -1;
                     packPendingSlot = -1;
                     packingExisting = false;
-                    if (packMoved) { packing = false; waiting = 5; openWait = 0; }
+                    if (packMoved) { waiting = 5; openWait = 0; }
                     return;
                 }
                 packPendingSlot = -1;
@@ -294,12 +307,12 @@ final class RewardChestLooter {
             }
             // An already-full inventory may contain no newly collected stacks. Move one
             // ordinary main-inventory stack to make room, keeping hotbar and equipment safe.
-            if (!packMoved) for (Object obj : container.inventorySlots) {
+            for (Object obj : container.inventorySlots) {
                 Slot slot = (Slot) obj;
                 int playerSlot = slot.getSlotIndex();
                 ItemStack stack = slot.getStack();
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 9 || playerSlot >= 36
-                    || !initiallyOccupied[playerSlot] || !safeToStore(stack)
+                    || !safeToStore(stack) || isReservedBuildingStack(mc, playerSlot, stack)
                     || !slot.canTakeStack(mc.thePlayer)) continue;
                 packingExisting = true;
                 packPendingSlot = slot.slotNumber;
@@ -313,7 +326,8 @@ final class RewardChestLooter {
             if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
             oldSlot = -1;
             if (packMoved) {
-                packing = false;
+                if (backpackSlot >= 0 && backpackSlot < backpackTried.length) backpackTried[backpackSlot] = true;
+                backpackSlot = -1;
                 waiting = 5;
                 openWait = 0;
                 return;
@@ -326,8 +340,11 @@ final class RewardChestLooter {
                 restoreBackpackAim(mc);
                 if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
                 oldSlot = -1;
-                status = "Could not open backpack; rewards remain in chest";
-                active = false;
+                if (backpackSlot >= 0 && backpackSlot < backpackTried.length) backpackTried[backpackSlot] = true;
+                backpackSlot = -1;
+                packOpening = false;
+                openWait = 0;
+                waiting = 5;
             }
             return;
         }
@@ -339,12 +356,18 @@ final class RewardChestLooter {
                 break;
             }
         }
-        if (backpackSlot < 0) { status = "Inventory and backpacks full; rewards remain in chest"; active = false; return; }
-        if (backpackSlot >= 9) {
-            backpackTried[backpackSlot] = true;
-            if (backpackTransfer.start(mc, backpackSlot)) { backpackSlot = -1; return; }
-            status = "Could not prepare backpack";
+        if (backpackSlot < 0) {
+            if (collecting && queueIndex >= queue.size()) status = "Reward chests collected";
+            else status = "Inventory and backpacks full; rewards remain in chest";
             active = false;
+            return;
+        }
+        if (backpackSlot >= 9) {
+            int selected = backpackSlot;
+            backpackTried[selected] = true;
+            backpackSlot = -1;
+            if (backpackTransfer.start(mc, selected)) return;
+            waiting = 2;
             return;
         }
         if (oldSlot < 0) oldSlot = mc.thePlayer.inventory.currentItem;
@@ -384,6 +407,32 @@ final class RewardChestLooter {
         return stack != null && !isBackpack(stack) && !stack.isItemStackDamageable()
             && !(stack.getItem() instanceof ItemFood) && !(stack.getItem() instanceof ItemTool)
             && !(stack.getItem() instanceof ItemSword) && !(stack.getItem() instanceof ItemArmor);
+    }
+
+    private static boolean hasSafeExistingItems(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return false;
+        for (int i = 9; i < 36; i++) {
+            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (safeToStore(stack) && !isReservedBuildingStack(mc, i, stack)) return true;
+        }
+        return false;
+    }
+
+    private static boolean isReservedBuildingStack(Minecraft mc, int slot, ItemStack stack) {
+        if (mc == null || stack == null) return false;
+        String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
+        if (!TrashPolicy.buildingReserve(id)) return false;
+        int largest = -1, largestSize = -1;
+        for (int i = 0; i < 36; i++) {
+            ItemStack candidate = mc.thePlayer.inventory.getStackInSlot(i);
+            if (candidate == null) continue;
+            String candidateId = (String) Item.itemRegistry.getNameForObject(candidate.getItem());
+            if (TrashPolicy.buildingReserve(candidateId) && candidate.stackSize > largestSize) {
+                largest = i;
+                largestSize = candidate.stackSize;
+            }
+        }
+        return slot == largest;
     }
 
     private static long slotKey(int chest, int slot) {

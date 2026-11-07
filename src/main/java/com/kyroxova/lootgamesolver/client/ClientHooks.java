@@ -47,6 +47,7 @@ public final class ClientHooks {
     private boolean exploreKeyHeld;
     private boolean exploreHoldActionDone;
     private int exploreHoldTicks;
+    private int checkpointClearDoneTicks;
 
     private enum AutoPuzzleState {
         IDLE,
@@ -170,7 +171,7 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void onKeyInput(cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent event) {
-        checkKeyToggles();
+        // Key state and held duration are sampled once per client tick below.
     }
 
     @SubscribeEvent
@@ -203,6 +204,8 @@ public final class ClientHooks {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
+        checkKeyToggles();
+        if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
             trashCleanup.reset();
             rewardLooter.cancel(mc);
@@ -486,8 +489,10 @@ public final class ClientHooks {
         } else if (exploreDown) {
             if (!exploreKeyHeld) exploreHoldTicks = 0;
             exploreKeyHeld = true;
-            if (++exploreHoldTicks >= 20 && !exploreHoldActionDone) {
+            exploreHoldTicks++;
+            if (exploreHoldTicks >= 20 && !exploreHoldActionDone) {
                 exploreHoldActionDone = true;
+                checkpointClearDoneTicks = 12;
                 if (exploration != null && mc.thePlayer != null && mc.theWorld != null)
                     exploration.clearLastCheckpoint(mc);
             }
@@ -668,14 +673,15 @@ public final class ClientHooks {
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
+            boolean explorerActive = cur == null && exploration != null && exploration.navigating();
 
             String autoColor = autoActive ? "\u00A7c" : "\u00A77";
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
 
             String line1 = "\u00A7b\u00A7lLoot Game Solver";
-            String line2 = "\u00A7f" + gameTitle
+            String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
                 + " \u00A78|\u00A7"
-                + (session.isActive() ? "a" : "e")
+                + (session.isActive() || explorerActive ? "a" : "e")
                 + " "
                 + statusStr;
             String line3 = autoColor + "["
@@ -688,10 +694,12 @@ public final class ClientHooks {
             String navigationLine = cur == null && exploration != null ? "\u00A77" + exploration.navigationStatus()
                 : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
-                line3 += " \u00A78|\u00A77 [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+                line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77") + " ["
+                    + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] "
                     + exploration.explorationAction();
             }
+            if (explorerActive && navigationLine != null) navigationLine = "\u00A7a" + exploration.navigationStatus();
             int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
             int width3 = mc.fontRenderer.getStringWidth(line3);
@@ -700,7 +708,8 @@ public final class ClientHooks {
             maxWidth = Math.max(maxWidth, navigationWidth);
 
             int panelWidth = maxWidth + 32;
-            int panelHeight = navigationLine == null ? 44 : 54;
+            boolean showCheckpointProgress = exploreKeyHeld || checkpointClearDoneTicks > 0;
+            int panelHeight = (navigationLine == null ? 44 : 54) + (showCheckpointProgress ? 10 : 0);
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -711,6 +720,11 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
             if (navigationLine != null) mc.fontRenderer
                 .drawStringWithShadow(navigationLine, x + (panelWidth - navigationWidth) / 2, y + 37, 0xFFFFFF);
+            if (showCheckpointProgress) {
+                float progress = checkpointClearDoneTicks > 0 ? 1F : Math.min(1F, exploreHoldTicks / 20F);
+                int barX = x + 14, barY = y + panelHeight - 8, barWidth = panelWidth - 28;
+                drawCheckpointProgressBar(barX, barY, barWidth, 3, progress);
+            }
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();
@@ -720,5 +734,37 @@ public final class ClientHooks {
 
     private static String compactStatus(String text) {
         return StatusText.solver(text);
+    }
+
+    private static void drawCheckpointProgressBar(int x, int y, int width, int height, float progress) {
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glColor4f(0.12F, 0.12F, 0.12F, 0.9F);
+        GL11.glBegin(GL11.GL_QUADS);
+        GL11.glVertex2f(x, y);
+        GL11.glVertex2f(x + width, y);
+        GL11.glVertex2f(x + width, y + height);
+        GL11.glVertex2f(x, y + height);
+        GL11.glEnd();
+        int fill = Math.max(1, Math.round(width * Math.max(0F, Math.min(1F, progress))));
+        float leftGreen = Math.min(1F, progress * 0.75F);
+        float rightGreen = Math.min(1F, progress + 0.25F);
+        GL11.glBegin(GL11.GL_QUADS);
+        setProgressColor(1F - leftGreen, leftGreen, 0.05F, 1F);
+        GL11.glVertex2f(x, y);
+        setProgressColor(1F - rightGreen, rightGreen, 0.05F, 1F);
+        GL11.glVertex2f(x + fill, y);
+        setProgressColor(1F - rightGreen, rightGreen, 0.05F, 1F);
+        GL11.glVertex2f(x + fill, y + height);
+        setProgressColor(1F - leftGreen, leftGreen, 0.05F, 1F);
+        GL11.glVertex2f(x, y + height);
+        GL11.glEnd();
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1F, 1F, 1F, 1F);
+    }
+
+    private static void setProgressColor(float red, float green, float blue, float alpha) {
+        GL11.glColor4f(red, green, blue, alpha);
     }
 }
