@@ -2397,10 +2397,22 @@ public final class ExplorationBeta {
     }
 
     private GroundPathfinder.Terrain walkingTerrain(final World terrainWorld) {
+        Minecraft mc = Minecraft.getMinecraft();
+        int px = mc.thePlayer == null ? 0 : (int) Math.floor(mc.thePlayer.posX);
+        int py = mc.thePlayer == null ? 0 : (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int pz = mc.thePlayer == null ? 0 : (int) Math.floor(mc.thePlayer.posZ);
+        final boolean surfaceStart = mc.thePlayer != null && terrainWorld.blockExists(px, py, pz)
+            && terrainWorld.getHeightValue(px, pz) - py <= 6;
+        final boolean protectedJourney = returning || digging || movingToPuzzleCenter || roomEntryPlanning
+            || roomEntryCrossing || roomExitPlanning || roomExitCrossing;
+        final boolean structureApproach = knownStructure != null && !searching;
+        final int gx = target == null ? px : target.xCoord, gz = target == null ? pz : target.zCoord;
         return new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
-                return !blockedWalkNodes.contains(supportKey(x, y, z)) && safe(terrainWorld, x, y, z);
+                return !blockedWalkNodes.contains(supportKey(x, y, z)) && terrainWorld.blockExists(x, y, z)
+                    && NavigationSurfacePolicy.allow(surfaceStart, protectedJourney, structureApproach,
+                        terrainWorld.getHeightValue(x, z), y, x, z, gx, gz) && safe(terrainWorld, x, y, z);
             }
 
             public boolean clear(int x, int y, int z) {
@@ -2671,9 +2683,9 @@ public final class ExplorationBeta {
         if (attemptStairStep(mc, next[1])) return true;
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         excavationRoute.clear();
-        aimTicks = 0;
         miningAim.reset();
         return ++excavationReplans <= 3;
+        aimTicks = 0;
     }
 
     private boolean excavatable(World w, int x, int y, int z) {
@@ -2792,6 +2804,7 @@ public final class ExplorationBeta {
     private boolean findDryEntrance(final Minecraft mc) {
         final World w = mc.theWorld;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        final GroundPathfinder.Terrain approachTerrain = walkingTerrain(w);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (entranceCandidates.isEmpty()) {
             entranceCandidate = 0;
@@ -2830,7 +2843,7 @@ public final class ExplorationBeta {
             List<int[]> candidate = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
 
                 public boolean stand(int a, int b, int c) {
-                    return safe(w, a, b, c);
+                    return approachTerrain.stand(a, b, c);
                 }
 
                 public boolean clear(int a, int b, int c) {
