@@ -1830,19 +1830,7 @@ public final class ExplorationBeta {
         }
         if (returnJoinSearch != null) {
             if (!returnJoinSearch.advance(3_000_000L)) {
-                List<int[]> partial = returnJoinSearch.path();
-                if (partial.isEmpty()) {
-                    status = "Finding a safe link to saved access route";
-                    return;
-                }
-                route.clear();
-                route.addAll(partial);
-                returnJoinSearch = null;
-                if (roomExitPlanning) {
-                    roomExitPlanning = false;
-                    roomExitNeedsResume = true;
-                }
-                status = "Following a safe exit checkpoint";
+                status = "Finding a safe link to saved access route";
                 return;
             }
             List<int[]> join = returnJoinSearch.path();
@@ -1922,6 +1910,7 @@ public final class ExplorationBeta {
             }
         }
         inspectUpcomingRoute(mc);
+        if (returnJoinSearch != null) return;
         if (!walking) return;
         if (routeRetryTicks > 0) {
             if (--routeRetryTicks > 0) return;

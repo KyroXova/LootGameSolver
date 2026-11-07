@@ -160,7 +160,11 @@ final class RewardChestLooter {
             ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
             IInventory chest = container.getLowerChestInventory();
             if (chest.getSizeInventory() != 27
-                || !(mc.theWorld.getTileEntity(pos[0], pos[1], pos[2]) instanceof TileEntityChest)) {
+                || chest != mc.theWorld.getTileEntity(pos[0], pos[1], pos[2])) {
+                mc.thePlayer.closeScreen();
+                opened = false;
+                openWait = 0;
+                waiting = 5;
                 status = "Unexpected chest screen; looting paused";
                 return;
             }
@@ -239,6 +243,10 @@ final class RewardChestLooter {
         }
         mc.thePlayer.rotationYaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         mc.thePlayer.rotationPitch = (float) (-Math.atan2(dy, horizontal) * 180D / Math.PI);
+        if (mc.thePlayer.isSneaking()) {
+            status = "Release sneak to open reward chest";
+            return;
+        }
         mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(),
             pos[0], pos[1], pos[2], 1, Vec3.createVectorHelper(pos[0] + 0.5D, pos[1] + 1D, pos[2] + 0.5D));
         opened = true;
