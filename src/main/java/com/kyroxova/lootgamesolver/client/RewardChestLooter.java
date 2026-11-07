@@ -46,6 +46,9 @@ final class RewardChestLooter {
     private boolean active, opened, collecting, packing, packOpening, packMoved, packingExisting;
     private boolean existingInventoryPackRequested;
     private boolean backpackAimSaved;
+    private boolean temporaryBag, temporaryBagUsed, restoringBag;
+    private int bagSource, bagHotbar;
+    private ItemStack bagDisplaced;
     private String status = "";
 
     void start(Minecraft mc, int[] position, MiniGame type) {
@@ -71,6 +74,10 @@ final class RewardChestLooter {
         oldSlot = -1;
         packPendingSlot = -1;
         backpackAimSaved = false;
+        temporaryBag = false;
+        temporaryBagUsed = false;
+        restoringBag = false;
+        bagDisplaced = null;
         discovered.clear();
         queue.clear();
         rewardTypes.clear();
@@ -115,6 +122,22 @@ final class RewardChestLooter {
         if (exploration != null) exploration.consumePuzzleCenterArrival();
         if (backpackTransfer.active()) {
             if (!backpackTransfer.tick(mc)) { status = "Backpack transfer interrupted"; active = false; }
+            else if (!backpackTransfer.active() && restoringBag) {
+                temporaryBag = false;
+                temporaryBagUsed = false;
+                restoringBag = false;
+                backpackSlot = -1;
+            }
+            return;
+        }
+        if (temporaryBag && temporaryBagUsed && !packOpening && mc.currentScreen == null) {
+            if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
+                restoringBag = true;
+                status = "Restoring hotbar";
+            } else {
+                status = "Hotbar changed; bag kept";
+                active = false;
+            }
             return;
         }
         if (center == null) { status = "Reward center unavailable"; active = false; return; }
@@ -150,6 +173,7 @@ final class RewardChestLooter {
             if (queueIndex >= queue.size()) {
                 if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
                 opened = false;
+                if (compactBackpackHotbar(mc)) return;
                 if (!existingInventoryPackRequested && hasSafeExistingItems(mc)) {
                     existingInventoryPackRequested = true;
                     packing = true;
@@ -392,7 +416,8 @@ final class RewardChestLooter {
                 Slot slot = (Slot) obj;
                 int playerSlot = slot.getSlotIndex();
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0 || playerSlot >= 36
-                    || initiallyOccupied[playerSlot] || !isReward(slot.getStack())) continue;
+                    || initiallyOccupied[playerSlot] || InventoryProtection.essential(slot.getStack())
+                    || !isReward(slot.getStack())) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
                 packPendingSlot = slot.slotNumber;
                 packPendingCount = slot.getStack().stackSize;
@@ -450,7 +475,9 @@ final class RewardChestLooter {
         if (mc.currentScreen != null) { status = "Close the open screen to use a backpack"; return; }
         if (backpackSlot < 0 || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
             backpackSlot = -1;
-            for (int i = 0; i < 36; i++) if (!backpackTried[i] && isBackpack(mc.thePlayer.inventory.getStackInSlot(i))) {
+            if (temporaryBag && !temporaryBagUsed && isBackpack(mc.thePlayer.inventory.getStackInSlot(bagHotbar)))
+                backpackSlot = bagHotbar;
+            for (int i = 0; backpackSlot < 0 && i < 36; i++) if (!backpackTried[i] && isBackpack(mc.thePlayer.inventory.getStackInSlot(i))) {
                 backpackSlot = i;
                 break;
             }
@@ -465,7 +492,15 @@ final class RewardChestLooter {
             int selected = backpackSlot;
             backpackTried[selected] = true;
             backpackSlot = -1;
-            if (backpackTransfer.start(mc, selected)) return;
+            if (backpackTransfer.start(mc, selected)) {
+                bagSource = selected;
+                bagHotbar = backpackTransfer.hotbarSlot();
+                ItemStack displaced = mc.thePlayer.inventory.getStackInSlot(bagHotbar);
+                bagDisplaced = displaced == null ? null : displaced.copy();
+                temporaryBag = true;
+                temporaryBagUsed = false;
+                return;
+            }
             waiting = 2;
             return;
         }
@@ -479,6 +514,7 @@ final class RewardChestLooter {
         mc.thePlayer.prevRotationPitch = -90F;
         packMoved = false;
         mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+        if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
         packOpening = true;
         openWait = 0;
         waiting = 5;
@@ -491,6 +527,22 @@ final class RewardChestLooter {
         backpackAimSaved = false;
     }
 
+    private boolean compactBackpackHotbar(Minecraft mc) {
+        int first = -1;
+        for (int i = 0; i < 9; i++) {
+            if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(i))) continue;
+            if (first < 0) { first = i; continue; }
+            for (int slot = 9; slot < 36; slot++) {
+                if (mc.thePlayer.inventory.getStackInSlot(slot) == null
+                    && backpackTransfer.clearHotbar(mc, i, slot)) {
+                    status = "Organizing backpacks";
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private boolean isReward(ItemStack stack) {
         if (stack == null) return false;
         for (ItemStack reward : rewardTypes) if (stack.isItemEqual(reward) && ItemStack.areItemStackTagsEqual(stack, reward)) return true;
@@ -498,16 +550,11 @@ final class RewardChestLooter {
     }
 
     private static boolean isBackpack(ItemStack stack) {
-        if (stack == null) return false;
-        String name = stack.getItem().getClass().getName();
-        return name.startsWith("de.eydamos.backpack.item.ItemBackpack")
-            || name.equals("com.darkona.adventurebackpack.item.ItemAdventureBackpack");
+        return InventoryProtection.bag(stack);
     }
 
     private static boolean safeToStore(ItemStack stack) {
-        return stack != null && !isBackpack(stack) && !stack.isItemStackDamageable()
-            && !(stack.getItem() instanceof ItemFood) && !(stack.getItem() instanceof ItemTool)
-            && !(stack.getItem() instanceof ItemSword) && !(stack.getItem() instanceof ItemArmor);
+        return stack != null && !InventoryProtection.essential(stack);
     }
 
     private static boolean hasSafeExistingItems(Minecraft mc) {

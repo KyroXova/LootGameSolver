@@ -128,7 +128,8 @@ final class TrashCleanup {
         }
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (i == reserve || stack == null || stack.hasDisplayName() || stack.hasTagCompound()) continue;
+            if (i == reserve || stack == null || InventoryProtection.essential(stack)
+                || stack.hasDisplayName() || stack.hasTagCompound()) continue;
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
             boolean ore = false;
             for (int oreId : OreDictionary.getOreIDs(stack)) {

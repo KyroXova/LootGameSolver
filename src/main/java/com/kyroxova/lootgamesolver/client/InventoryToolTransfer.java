@@ -39,16 +39,38 @@ final class InventoryToolTransfer {
         expected = stack.copy();
         clearing = false;
         source = inventorySlot;
-        hotbar = mc.thePlayer.inventory.currentItem;
-        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-            hotbar = i;
-            break;
+        hotbar = -1;
+        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) { hotbar = i; break; }
+        if (hotbar < 0) for (int i = 0; i < 9; i++) {
+            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))) { hotbar = i; break; }
         }
+        if (hotbar < 0) return false;
         ticks = 0;
         swapped = false;
         screen = new ToolScreen(mc);
         mc.getNetHandler()
             .addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
+        mc.displayGuiScreen(screen);
+        return true;
+    }
+
+    int hotbarSlot() { return hotbar; }
+
+    boolean restore(Minecraft mc, int inventorySlot, int hotbarSlot, ItemStack displaced) {
+        if (active() || mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null || inventorySlot < 9 || inventorySlot >= 36
+            || hotbarSlot < 0 || hotbarSlot >= 9
+            || !InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbarSlot))
+            || !ItemStack.areItemStacksEqual(displaced, mc.thePlayer.inventory.getStackInSlot(inventorySlot))) return false;
+        if (displaced == null) return clearHotbar(mc, hotbarSlot, inventorySlot);
+        source = inventorySlot;
+        hotbar = hotbarSlot;
+        expected = displaced.copy();
+        clearing = false;
+        ticks = 0;
+        swapped = false;
+        screen = new ToolScreen(mc);
+        mc.getNetHandler().addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
         mc.displayGuiScreen(screen);
         return true;
     }
