@@ -1389,7 +1389,7 @@ public final class ExplorationBeta {
         status = "Exit opened; continuing along saved access route";
     }
 
-    private String worldIdentity(Minecraft mc) {
+    static String worldIdentity(Minecraft mc) {
         if (mc.isSingleplayer() && mc.getIntegratedServer() != null) return "save:" + mc.getIntegratedServer()
             .getFolderName();
         net.minecraft.client.multiplayer.ServerData server = mc.func_147104_D();
