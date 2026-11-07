@@ -251,11 +251,10 @@ public final class ClientHooks {
     private void tickAutoPuzzle(Minecraft mc) {
         if (autoPuzzleState == AutoPuzzleState.OPENING) {
             puzzleWaitTicks++;
-            DetectedGame opened = puzzleBridge.detect(true);
             Object game = puzzleBridge.gameAtMaster(autoPuzzlePosition);
             if (game == null) game = puzzleBridge.nearbyGame(true);
             boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
-            if ((opened != null || masterInteractionSettled) && game != null) {
+            if (game != null) {
                 int[] center = puzzleBridge.gameCenter(game);
                 if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
                     autoPuzzleState = AutoPuzzleState.POSITIONING;
@@ -304,17 +303,6 @@ public final class ClientHooks {
             Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
             if (revealed != null && centerClickAttempts > 0) {
                 if (puzzleWaitTicks - lastCenterClickTick < 20) return;
-                if (puzzleBridge.requiresMinesweeperOpeningClick(revealed) && !minesweeperOpeningClickSent) {
-                    if (activeGame != null && puzzleBridge.activateBoardCenter(activeGame)) {
-                        minesweeperOpeningClickSent = true;
-                        lastCenterClickTick = puzzleWaitTicks;
-                        if (exploration != null) exploration.setAutomationStatus("Opening flag");
-                    } else if (puzzleWaitTicks > lastCenterClickTick + 100) {
-                        autoPuzzleState = AutoPuzzleState.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Flag click failed");
-                    }
-                    return;
-                }
                 startPuzzleSolver();
                 return;
             }
