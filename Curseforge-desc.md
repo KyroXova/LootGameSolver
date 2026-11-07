@@ -34,7 +34,7 @@ Press **H** to toggle in-world hints and navigation lines. Holograms show sugges
 - Display sequence positions as holograms, including multiple steps on the same tile.
 - Wait for accepted interactions before advancing the sequence.
 
-## Experimental explorer — powerful automation
+## Experimental explorer: powerful automation
 
 Press **G** to start or stop the explorer. This experimental mode brings structure finding, navigation, puzzle solving, and reward collection together in one automated flow.
 
@@ -45,7 +45,6 @@ The explorer can:
 - Select tools, clear obstructions, and avoid known hazardous plants, traps, and liquids.
 - Open boards, solve games, and resume an unfinished game inside a structure.
 - Collect reward chests and move eligible items into supported backpacks.
-- Save entrance paths, reconnect to them when leaving, and remember completed structures and emptied chests.
 - Use food and the Extra Utilities Healing Axe while exploring.
 - Clean unwanted inventory items when the trash-can command is available, while protecting backpacks, tools, food, and a stack of building material.
 
