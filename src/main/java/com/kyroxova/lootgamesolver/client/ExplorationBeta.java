@@ -1716,7 +1716,7 @@ public final class ExplorationBeta {
             if (digging && (Math.abs(target.yCoord + 1 - mc.thePlayer.boundingBox.minY) > 1
                 || Math.abs(mc.thePlayer.posX - target.xCoord) + Math.abs(mc.thePlayer.posZ - target.zCoord) > 3)) {
                 if (!stairStep(mc)) {
-                    if (++approachAttempts <= 3) {
+                    if (stairSteps == 0 && ++approachAttempts <= 3) {
                         excavationSearch = null;
                         excavationRoute.clear();
                         miningAim.reset();
@@ -1727,7 +1727,7 @@ public final class ExplorationBeta {
                             return;
                         }
                     }
-                    stop(mc, "No supported entrance found within the search limit");
+                    stop(mc, "Access route blocked; keeping the existing entrance for reuse");
                 }
                 return;
             }
@@ -2362,7 +2362,7 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
-        if (excavationRoute.isEmpty() && excavationSearch == null) {
+        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1) {
             excavationRoute.addAll(patternedAccess(mc, x, y, z));
             if (!excavationRoute.isEmpty()) {
                 approachPlan = null;
@@ -2425,7 +2425,11 @@ public final class ExplorationBeta {
             miningAim.reset();
             return ++excavationReplans <= 3;
         }
-        return attemptStairStep(mc, next[1]);
+        if (attemptStairStep(mc, next[1])) return true;
+        excavationRoute.clear();
+        miningAim.reset();
+        aimTicks = 0;
+        return ++excavationReplans <= 3;
     }
 
     private boolean excavatable(World w, int x, int y, int z) {
@@ -2649,17 +2653,17 @@ public final class ExplorationBeta {
         for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
-            if (isFoliage(b) && foliageSupportY(w, nx, by, nz, x, y, z, destinationY) >= 0) continue;
+            if (FoliagePolicy.canClear(isFoliage(b), w.getTileEntity(nx, by, nz) != null,
+                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz)) continue;
             if (!excavatable(w, nx, by, nz)) return false;
             if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
         }
         for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
+            if (isFoliage(b) && FoliagePolicy.canClear(true, w.getTileEntity(nx, by, nz) != null,
+                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz))
+                return minePlannedBlock(mc, nx, by, nz, destinationY);
             if (passable(w, nx, by, nz)) continue;
-            if (isFoliage(b)) {
-                int supportY = foliageSupportY(w, nx, by, nz, x, y, z, destinationY);
-                if (supportY >= 0) return minePlannedBlock(mc, nx, supportY, nz, destinationY);
-            }
             return minePlannedBlock(mc, nx, by, nz, destinationY);
         }
         digTicks = 0;
@@ -2737,27 +2741,11 @@ public final class ExplorationBeta {
                 z,
                 nx,
                 nz)) {
-                int rootY = obstruction.blockY;
-                for (int scan = 0; scan < 3; scan++) {
-                    if (!isFoliage(w.getBlock(obstruction.blockX, rootY, obstruction.blockZ))) break;
-                    rootY--;
-                }
-                boolean plannedSupport = obstruction.blockX == nx && obstruction.blockZ == nz
-                    && rootY >= destinationY
-                    && rootY <= Math.max(y, destinationY) + 1
-                    && excavatable(w, nx, rootY, nz);
-                net.minecraft.util.Vec3 supportAim = plannedSupport ? visibleMiningPoint(mc, nx, rootY, nz) : null;
-                if (supportAim != null) {
-                    mineY = rootY;
-                    aimPoint = supportAim;
-                    b = w.getBlock(nx, rootY, nz);
-                } else {
-                    mineX = obstruction.blockX;
-                    mineY = obstruction.blockY;
-                    mineZ = obstruction.blockZ;
-                    b = visible;
-                    aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
-                }
+                mineX = obstruction.blockX;
+                mineY = obstruction.blockY;
+                mineZ = obstruction.blockZ;
+                b = visible;
+                aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
             }
         }
         int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(mineX, mineY, mineZ));
