@@ -425,6 +425,14 @@ public final class SolverSession {
         return mode != null;
     }
 
+    boolean inventoryTransferActive() {
+        return sudokuTransfer.active();
+    }
+
+    void pauseForScreen() {
+        bridge.releaseSneak();
+    }
+
     public String getStatus() {
         return status;
     }

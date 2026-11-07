@@ -238,6 +238,11 @@ public final class ClientHooks {
                 return;
             }
         }
+        if (mc.currentScreen != null) {
+            if (session.inventoryTransferActive()) session.tick();
+            else session.pauseForScreen();
+            return;
+        }
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
             autoPuzzlePosition = exploration.puzzlePosition();
             floorActivatorPosition = null;
@@ -504,11 +509,13 @@ public final class ClientHooks {
             session.cancel("Exploration selected");
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
-            if (!exploration.navigating() && exploration.hasPendingReturn()) {
-                exploration.toggle(mc);
-                return;
-            }
-            if (exploration.inDungeonRoom(mc)) {
+            if (!exploration.navigating() && exploration.inDungeonRoom(mc)) {
+                int[] floor = puzzleBridge.nearbyFloorActivator();
+                Object nearbyGame = puzzleBridge.nearbyGame(true);
+                DetectedGame board = puzzleBridge.detect(true);
+                int[] boardCenter = floor != null ? floor : nearbyGame == null ? null : puzzleBridge.gameCenter(nearbyGame);
+                if ((floor != null || board != null || puzzleBridge.canOpenMinesweeperBoard(nearbyGame))
+                    && boardCenter != null && exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
                     exploration.prepareRewardCollection(mc, rewards);
@@ -518,6 +525,12 @@ public final class ClientHooks {
                     exploration.setAutomationStatus("Collecting reward chests");
                     return;
                 }
+                exploration.setAutomationStatus("Checking room board");
+                return;
+            }
+            if (!exploration.navigating() && exploration.hasPendingReturn()) {
+                exploration.toggle(mc);
+                return;
             }
             int[] center = puzzleBridge.nearbyFloorActivator();
             if (center == null) {

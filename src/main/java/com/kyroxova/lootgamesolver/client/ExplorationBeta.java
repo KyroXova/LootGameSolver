@@ -157,13 +157,17 @@ public final class ExplorationBeta {
     private net.minecraft.util.Vec3 visibleMiningPoint(Minecraft mc, int x, int y, int z) {
         net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
-        double[][] offsets = { { 0.5, 0.5, 0.5 }, { 0.15, 0.85, 0.15 }, { 0.85, 0.85, 0.15 }, { 0.15, 0.85, 0.85 },
-            { 0.85, 0.85, 0.85 }, { 0.15, 0.15, 0.15 }, { 0.85, 0.15, 0.85 } };
-        for (double[] offset : offsets) {
-            net.minecraft.util.Vec3 point = net.minecraft.util.Vec3
-                .createVectorHelper(x + offset[0], y + offset[1], z + offset[2]);
+        double[] offsets = { 0.5D, 0.3D, 0.7D };
+        int[] faces = { 2, 3, 4, 5, 1, 0 };
+        for (double a : offsets) for (double b : offsets) for (int face : faces) {
+            double dx = face == 4 ? 0.02D : face == 5 ? 0.98D : a;
+            double dy = face == 0 ? 0.02D : face == 1 ? 0.98D : face >= 4 ? a : b;
+            double dz = face == 2 ? 0.02D : face == 3 ? 0.98D : face >= 4 ? b : face <= 1 ? b : a;
+            net.minecraft.util.Vec3 point = net.minecraft.util.Vec3.createVectorHelper(x + dx, y + dy, z + dz);
             net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
-            if (hit != null && hit.blockX == x && hit.blockY == y && hit.blockZ == z) return point;
+            if (hit != null && hit.blockX == x && hit.blockY == y && hit.blockZ == z && hit.sideHit == face
+                && eye.squareDistanceTo(hit.hitVec) <= Math.pow(Math.min(4.2D, mc.playerController.getBlockReachDistance()), 2))
+                return point;
         }
         return null;
     }
@@ -1781,14 +1785,18 @@ public final class ExplorationBeta {
             } else target = previous;
         }
         if (!walking) return;
+        if (solverActive) {
+            pausedForControl = true;
+            mc.thePlayer.setSprinting(false);
+            status = "Puzzle in progress";
+            return;
+        }
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled
-            || solverActive
             || (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 100)) {
             stop(
                 mc,
-                solverActive ? "Solver took control"
-                    : !LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled ? "Exploration disabled"
-                        : "Stopped: low air underwater");
+                !LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled ? "Exploration disabled"
+                    : "Stopped: low air underwater");
             return;
         }
         boolean manual = NavigationControlPolicy.hasManualMovement(
@@ -3817,7 +3825,11 @@ public final class ExplorationBeta {
             && obstruction.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
             net.minecraft.block.Block visible = w.getBlock(obstruction.blockX, obstruction.blockY, obstruction.blockZ);
             boolean plant = isFoliage(visible);
-            if (aimPoint == null && FoliagePolicy.canClear(
+            boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling
+                && obstruction.blockX == nx && obstruction.blockZ == nz && obstruction.blockY > by
+                && obstruction.blockY <= y + 2 && visible instanceof net.minecraft.block.BlockFalling
+                && excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
+            if (aimPoint == null && (fallingObstruction || FoliagePolicy.canClear(
                 plant,
                 w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
                 visible.getBlockHardness(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ),
@@ -3829,7 +3841,7 @@ public final class ExplorationBeta {
                 z,
                 nx,
                 nz,
-                visible == Blocks.snow_layer)) {
+                visible == Blocks.snow_layer))) {
                 mineX = obstruction.blockX;
                 mineY = obstruction.blockY;
                 mineZ = obstruction.blockZ;
@@ -3874,9 +3886,12 @@ public final class ExplorationBeta {
         mc.thePlayer.motionZ = 0;
         mc.thePlayer.inventory.currentItem = slot;
         mc.playerController.updateController();
-        if (mc.thePlayer.getDistanceSq(mineX + 0.5D, mineY + 0.5D, mineZ + 0.5D) > 16D) return false;
-        if (aimPoint == null)
-            aimPoint = net.minecraft.util.Vec3.createVectorHelper(mineX + 0.5D, mineY + 0.5D, mineZ + 0.5D);
+        if (aimPoint == null) {
+            miningAim.reset();
+            mc.playerController.resetBlockRemoving();
+            status = "Finding visible block face";
+            return false;
+        }
         double aimX = aimPoint.xCoord - mc.thePlayer.posX;
         double aimY = aimPoint.yCoord - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double aimZ = aimPoint.zCoord - mc.thePlayer.posZ;
