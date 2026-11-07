@@ -1775,6 +1775,7 @@ public final class ExplorationBeta {
             status = "Eating or preparing food";
             return;
         }
+        if (returning && isRewardChestPit(mc) && jumpOutOfRewardPit(mc)) return;
         if (exitRecoveryTicks > 0) {
             if (--exitRecoveryTicks == 0) {
                 if (startChestPitReturn(mc, resumeSearchAfterReturn)) return;
@@ -2546,11 +2547,12 @@ public final class ExplorationBeta {
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
                 double speed = Math
-                    .min(centering ? (movingToPuzzleCenter ? 0.75D : 0.4D) : straight ? 1D : 0.95D, distance * 1.5D);
+                    .min(centering ? (movingToPuzzleCenter ? 0.75D : 0.4D) : straight ? 1D : 0.95D,
+                        !centering && route.size() > 1 ? 1D : distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
-            mc.thePlayer.setSprinting(!centering && !digging && !returning && !mc.thePlayer.isInWater()
+            mc.thePlayer.setSprinting(!centering && !digging && !mc.thePlayer.isInWater()
                 && Math.abs(turn) < 35F && navigationInput.forward > 0.8F);
         }
     }
@@ -2569,6 +2571,37 @@ public final class ExplorationBeta {
                 && box.maxY - mc.thePlayer.boundingBox.minY <= 1D) return true;
         }
         return false;
+    }
+
+    private boolean jumpOutOfRewardPit(Minecraft mc) {
+        if (navigationInput == null || mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int nearest = accessTrail.nearestIndex(x, y, z, 128);
+        int[] goal = nearest < 0 ? null : accessTrail.pointAt(nearest);
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        int[] best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (int[] direction : directions) {
+            int nx = x + direction[0], nz = z + direction[1];
+            if (!isRewardChest(mc.theWorld, nx, y, nz) || !passable(mc.theWorld, nx, y + 1, nz)
+                || !passable(mc.theWorld, x, y + 2, z)) continue;
+            double score = goal == null ? 0D : Math.hypot(nx - goal[0], nz - goal[2]);
+            if (score < bestScore) { best = direction; bestScore = score; }
+        }
+        if (best == null) return false;
+        float yaw = NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
+            x + best[0] + 0.5D, z + best[1] + 0.5D, mc.thePlayer.rotationYaw);
+        float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+        look(yaw, -10F);
+        if (Math.abs(turn) < 35F) {
+            navigationInput.forward = 1F;
+            navigationInput.hop = mc.thePlayer.onGround;
+        }
+        stalled = 0;
+        lastDistance = Double.MAX_VALUE;
+        status = "Jumping clear of reward chests";
+        return true;
     }
 
     private boolean isRewardChestPit(Minecraft mc) {

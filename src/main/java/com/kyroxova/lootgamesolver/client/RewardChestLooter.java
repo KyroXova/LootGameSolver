@@ -391,6 +391,11 @@ final class RewardChestLooter {
                 backpackSlot = -1;
                 waiting = 5;
                 openWait = 0;
+                if (collecting && queueIndex < queue.size()) {
+                    packing = false;
+                    packMoved = false;
+                    status = "Resuming reward collection";
+                }
                 return;
             }
             if (backpackSlot >= 0 && backpackSlot < backpackTried.length) backpackTried[backpackSlot] = true;
@@ -438,6 +443,8 @@ final class RewardChestLooter {
         backpackOldPitch = mc.thePlayer.rotationPitch;
         backpackAimSaved = true;
         mc.thePlayer.rotationPitch = -90F;
+        mc.thePlayer.prevRotationPitch = -90F;
+        packMoved = false;
         mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
         packOpening = true;
         openWait = 0;
