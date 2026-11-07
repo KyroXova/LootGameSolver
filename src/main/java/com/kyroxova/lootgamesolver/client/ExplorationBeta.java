@@ -296,6 +296,31 @@ public final class ExplorationBeta {
         return knownStructure == null ? null : knownStructure.clone();
     }
 
+    boolean resumePuzzleInCurrentRoom(Minecraft mc, int[] center) {
+        if (walking || center == null || mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
+        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]
+            || center[0] <= bounds[0] || center[0] >= bounds[1]
+            || center[2] <= bounds[2] || center[2] >= bounds[3]
+            || Math.abs(y - center[1] - 1) > 2) return false;
+        if (knownStructure == null || knownStructure[0] <= bounds[0] || knownStructure[0] >= bounds[1]
+            || knownStructure[2] <= bounds[2] || knownStructure[2] >= bounds[3]) {
+            knownStructure = center.clone();
+        }
+        TileEntity current = new TileEntity();
+        current.xCoord = knownStructure[0];
+        current.yCoord = knownStructure[1];
+        current.zCoord = knownStructure[2];
+        target = current;
+        beginAccessTrail(mc);
+        returnAvailable = false;
+        puzzleArrivalPending = true;
+        status = "Resuming unfinished puzzle in current room";
+        return true;
+    }
+
     boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
         if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
         puzzleMasterTarget = target;
@@ -2603,9 +2628,9 @@ public final class ExplorationBeta {
             || excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
             blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
             excavationRoute.clear();
-            return ++excavationReplans <= 3;
             miningAim.reset();
         }
+            return ++excavationReplans <= 3;
         if (attemptStairStep(mc, next[1])) return true;
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         excavationRoute.clear();

@@ -269,6 +269,10 @@ public final class ClientHooks {
             if (game == null) game = puzzleBridge.nearbyGame(true);
             boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
             if (game != null) {
+                if (puzzleBridge.detect(true) != null) {
+                    startPuzzleSolver();
+                    return;
+                }
                 int[] center = puzzleBridge.gameCenter(game);
                 if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
                     autoPuzzleState = AutoPuzzleState.POSITIONING;
@@ -417,7 +421,12 @@ public final class ClientHooks {
             session.cancel("Exploration selected");
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
-            exploration.toggle(mc);
+            int[] center = puzzleBridge.nearbyFloorActivator();
+            if (center == null) {
+                Object nearby = puzzleBridge.nearbyGame(true);
+                if (nearby != null) center = puzzleBridge.gameCenter(nearby);
+            }
+            if (!exploration.resumePuzzleInCurrentRoom(mc, center)) exploration.toggle(mc);
         }
         boolean autoSolvePressed = isKeyJustPressed(Keybinds.toggleAutoSolve, LootGameSolverConfig.solveKey);
         boolean overlayPressed = isKeyJustPressed(Keybinds.toggleOverlay, LootGameSolverConfig.overlayKey);
