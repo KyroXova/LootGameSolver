@@ -28,6 +28,10 @@ public final class GroundPathfinder {
         default int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
             return 0;
         }
+
+        default boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
+            return true;
+        }
     }
 
     private static final int[][] DIRECTIONS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 },
@@ -136,7 +140,7 @@ public final class GroundPathfinder {
                         canStand = terrain.stand(nx, ny, nz);
                         standable.put(position, canStand);
                     }
-                    if (!canStand) continue;
+                    if (!canStand || !terrain.canTransition(node.x, node.y, node.z, nx, ny, nz)) continue;
                     if (dy > 0 && !clear(terrain, clearable, node.x, node.y + 2, node.z)) continue;
                     if (dy < 0 && !clear(terrain, clearable, nx, node.y + 1, nz)) continue;
                     if (diagonal && (!clear(terrain, clearable, nx, node.y + 1, node.z)

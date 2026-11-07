@@ -2767,14 +2767,16 @@ public final class ExplorationBeta {
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
             boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
+            boolean climbSurface = NavigationSurfacePolicy
+                .needsJump(mc.thePlayer.boundingBox.minY, walkSurfaceY(mc.theWorld, next[0], next[1], next[2]));
             boolean chestPitJump = returning && chestPitJumpBoostTicks > 0
                 && isRewardChestPit(mc)
                 && mc.thePlayer.onGround
                 && Math.abs(turn) < 45F
                 && distance < 4D;
             if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
-            navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
-                || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
+            navigationInput.hop = ((next[1] > py || climbRewardChest || climbSurface) && Math.abs(turn) < 35F
+                && distance < 1.4D) || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
                 || chestPitJump
                 || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
@@ -3385,6 +3387,11 @@ public final class ExplorationBeta {
                     .getMaterial()
                     .isLiquid()) cost += 8;
                 return cost;
+            }
+
+            public boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
+                return NavigationSurfacePolicy
+                    .reachableRise(walkSurfaceY(terrainWorld, x, y, z), walkSurfaceY(terrainWorld, nx, ny, nz));
             }
         };
     }
@@ -4282,6 +4289,15 @@ public final class ExplorationBeta {
     }
 
     private static double walkSurfaceY(World world, int x, int y, int z) {
+        net.minecraft.block.Block at = world.getBlock(x, y, z);
+        net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
+        if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
+        if (box != null && box.maxY > y
+            && box.maxY < y + 1D
+            && box.minX < x + 0.5D
+            && box.maxX > x + 0.5D
+            && box.minZ < z + 0.5D
+            && box.maxZ > z + 0.5D) return box.maxY;
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
         if (below.isNormalCube()) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
@@ -4290,11 +4306,7 @@ public final class ExplorationBeta {
             && belowBox.maxX > x + 0.5D
             && belowBox.minZ < z + 0.5D
             && belowBox.maxZ > z + 0.5D) return y;
-        net.minecraft.block.Block at = world.getBlock(x, y, z);
-        net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
-        if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
-        if (box == null || box.maxY <= y || box.maxY >= y + 1D) return -1D;
-        return box.maxY;
+        return -1D;
     }
 
     public String hud(Minecraft mc) {
