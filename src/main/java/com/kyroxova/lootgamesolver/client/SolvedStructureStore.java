@@ -38,7 +38,19 @@ final class SolvedStructureStore {
 
     boolean contains(String world, int dimension, int x, int y, int z) {
         Set<String> positions = data.worlds.get(world);
-        return positions != null && positions.contains(key(dimension, x, y, z));
+        if (positions == null) return false;
+        if (positions.contains(key(dimension, x, y, z))) return true;
+        for (String position : positions) {
+            String[] parts = position.split(":");
+            if (parts.length != 4) continue;
+            try {
+                if (Integer.parseInt(parts[0]) != dimension) continue;
+                int sx = Integer.parseInt(parts[1]), sy = Integer.parseInt(parts[2]), sz = Integer.parseInt(parts[3]);
+                if (Math.abs((long) sx - x) <= 12 && Math.abs((long) sy - y) <= 12
+                    && Math.abs((long) sz - z) <= 12) return true;
+            } catch (NumberFormatException ignored) {}
+        }
+        return false;
     }
 
     void mark(String world, int dimension, int[] origin, int[] master) throws IOException {

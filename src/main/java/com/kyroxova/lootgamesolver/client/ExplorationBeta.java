@@ -546,6 +546,35 @@ public final class ExplorationBeta {
     }
 
     private void continueProgressiveSearch(Minecraft mc, boolean solved) {
+        removePersistedTrail();
+        route.clear();
+        walkingSearch = null;
+        continuationSearch = null;
+        extendedFrom = null;
+        excavationSearch = null;
+        excavationRoute.clear();
+        approachPlan = null;
+        approachAnchor = null;
+        approachReady = false;
+        clearChestPitSearch();
+        roomExitCandidates = null;
+        activeRoomExit = null;
+        roomExitPlanning = false;
+        roomExitNeedsResume = false;
+        roomExitCrossing = false;
+        exitRecoveryTicks = 0;
+        openExitSearch = null;
+        followingOpenExit = false;
+        blockedWalkNodes.clear();
+        digging = false;
+        returnDigging = false;
+        trailExcavating = false;
+        entranceSelected = false;
+        seekingDryEntrance = false;
+        returnAvailable = false;
+        stalled = 0;
+        stallRecoveries = 0;
+        lastDistance = Double.MAX_VALUE;
         target = null;
         knownStructure = null;
         accessTrail.clear();
@@ -1950,8 +1979,11 @@ public final class ExplorationBeta {
                         Math.max(16, LootGameSolverConfig.explorationRange));
                     return;
                 }
-                returning = false;
-                continueProgressiveSearch(mc, true);
+                int exitX = (int) Math.floor(mc.thePlayer.posX);
+                int exitY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int exitZ = (int) Math.floor(mc.thePlayer.posZ);
+                if (mc.theWorld.canBlockSeeTheSky(exitX, exitY, exitZ)) continueProgressiveSearch(mc, true);
+                else retryExitLater(mc);
             } else status = "Following saved access route out";
             return;
         }
@@ -2435,7 +2467,8 @@ public final class ExplorationBeta {
         }
         settlingTicks = 0;
         float desired = centering ? mc.thePlayer.rotationYaw
-            : NavigationSteering.heading(segmentX, segmentZ, next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
+            : NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
+                next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
         int plannedPitchDirection = staircaseDirection(route, py);
         if (plannedPitchDirection != 0) cameraPitchDirection = plannedPitchDirection;
@@ -2941,6 +2974,7 @@ public final class ExplorationBeta {
             mc.thePlayer.motionZ = 0;
         }
         walking = false;
+        if (searching) target = null;
         searching = false;
         route.clear();
         status = compactStatus(message);

@@ -50,6 +50,6 @@ final class NavigationSteering {
     }
 
     static boolean reached(double distance, int footY, int nodeY, boolean water, boolean intermediate) {
-        return distance < (intermediate ? 0.4D : 0.20D) && (footY == nodeY || (water && Math.abs(footY - nodeY) <= 1));
+        return distance < (intermediate ? 0.48D : 0.20D) && (footY == nodeY || (water && Math.abs(footY - nodeY) <= 1));
     }
 }
