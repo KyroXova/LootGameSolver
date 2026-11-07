@@ -2113,7 +2113,9 @@ public final class ExplorationBeta {
             boolean climbRewardChest = nextBlock instanceof net.minecraft.block.BlockChest && nextBox != null
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
-            navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
+            boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
+            navigationInput.hop = ((next[1] > py || climbRewardChest || escapeRewardPit)
+                && Math.abs(turn) < 35F && distance < 1.4D)
                 || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
@@ -2123,6 +2125,22 @@ public final class ExplorationBeta {
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
         }
+    }
+
+    private boolean rewardChestAhead(Minecraft mc, double dx, double dz) {
+        if (!mc.thePlayer.onGround || dx * dx + dz * dz < 0.001D) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) {
+            net.minecraft.block.Block block = mc.theWorld.getBlock(x + ox, y, z + oz);
+            if (!(block instanceof net.minecraft.block.BlockChest)) continue;
+            double cx = x + ox + 0.5D - mc.thePlayer.posX, cz = z + oz + 0.5D - mc.thePlayer.posZ;
+            if (cx * dx + cz * dz <= 0 || cx * cx + cz * cz > 2.25D) continue;
+            net.minecraft.util.AxisAlignedBB box = block.getCollisionBoundingBoxFromPool(mc.theWorld, x + ox, y, z + oz);
+            if (box != null && box.maxY - mc.thePlayer.boundingBox.minY > 0.45D
+                && box.maxY - mc.thePlayer.boundingBox.minY <= 1D) return true;
+        }
+        return false;
     }
 
     private boolean tryPlaceReturnStep(Minecraft mc, int[] next) {
@@ -2475,7 +2493,7 @@ public final class ExplorationBeta {
         List<int[]> continuation = continuationSearch.path();
         continuationSearch = null;
         if (continuation.isEmpty()) return;
-        route.addAll(continuation);
+        NavigationSteering.appendWithoutLoops(route, continuation);
         if (searching) {
             searchGoalX = continuationX;
             searchGoalZ = continuationZ;
@@ -2716,6 +2734,8 @@ public final class ExplorationBeta {
             && (material == net.minecraft.block.material.Material.rock
                 || material == net.minecraft.block.material.Material.ground
                 || material == net.minecraft.block.material.Material.grass
+                || material == net.minecraft.block.material.Material.snow
+                || material == net.minecraft.block.material.Material.craftedSnow
                 || material == net.minecraft.block.material.Material.wood
                 || material == net.minecraft.block.material.Material.leaves
                 || material == net.minecraft.block.material.Material.plants
@@ -2960,7 +2980,7 @@ public final class ExplorationBeta {
 
     private static boolean isFoliage(net.minecraft.block.Block block) {
         net.minecraft.block.material.Material material = block.getMaterial();
-        return block instanceof net.minecraft.block.BlockBush
+        return block == Blocks.snow_layer || block instanceof net.minecraft.block.BlockBush
             || material == net.minecraft.block.material.Material.plants
             || material == net.minecraft.block.material.Material.vine
             || material == net.minecraft.block.material.Material.leaves;

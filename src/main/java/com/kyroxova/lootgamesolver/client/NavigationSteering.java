@@ -3,6 +3,22 @@ package com.kyroxova.lootgamesolver.client;
 /** Continuous yaw avoids a full render-interpolation spin at the -180/180 boundary. */
 final class NavigationSteering {
 
+    static void appendWithoutLoops(java.util.List<int[]> route, java.util.List<int[]> continuation) {
+        for (int[] step : continuation) {
+            int match = -1;
+            for (int i = 0; i < route.size(); i++) {
+                int[] prior = route.get(i);
+                if (prior[0] == step[0] && prior[1] == step[1] && prior[2] == step[2]) {
+                    match = i;
+                    break;
+                }
+            }
+            if (match >= 0) {
+                while (route.size() > match + 1) route.remove(route.size() - 1);
+            } else route.add(step);
+        }
+    }
+
     static float heading(double ax, double az, double bx, double bz, float fallback) {
         double dx = bx - ax, dz = bz - az;
         if (dx * dx + dz * dz < 0.01D) return fallback;
