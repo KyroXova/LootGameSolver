@@ -260,8 +260,8 @@ public final class ExplorationBeta {
             || route.isEmpty()
             || route.size() > 8
             || !LootGameSolverConfig.staircaseEnabled) return;
-        int[] end = route.get(route.size() - 1);
-        if (target.yCoord >= end[1] - 2 || Math.abs(end[0] - target.xCoord) + Math.abs(end[2] - target.zCoord) > 32)
+        int[] end = route.get(Math.min(2, route.size() - 1));
+        if (target.yCoord >= end[1] - 2 || Math.abs(end[0] - target.xCoord) + Math.abs(end[2] - target.zCoord) > 48)
             return;
         if (approachAnchor != end) {
             approachAnchor = end;
@@ -1974,6 +1974,20 @@ public final class ExplorationBeta {
             segmentZ = next[2] + 0.5D;
             if (!returning && trailTarget != null) recordAccessPoint(px, py, pz);
             route.remove(0);
+            if (!returning && !digging && approachReady && approachPlan != null
+                && approachAnchor == next && !approachPlan.path.isEmpty()) {
+                route.clear();
+                excavationRoute.clear();
+                excavationRoute.addAll(approachPlan.path);
+                approachPlan = null;
+                approachAnchor = null;
+                approachReady = false;
+                digging = true;
+                entranceSelected = true;
+                savedSlot = mc.thePlayer.inventory.currentItem;
+                status = "Following planned excavation from this checkpoint";
+                return;
+            }
             lastDistance = Double.MAX_VALUE;
             stalled = 0;
             stallRecoveries = 0;
@@ -2656,9 +2670,9 @@ public final class ExplorationBeta {
         }
         if (attemptStairStep(mc, next[1])) return true;
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
-        miningAim.reset();
         excavationRoute.clear();
         aimTicks = 0;
+        miningAim.reset();
         return ++excavationReplans <= 3;
     }
 
@@ -2782,7 +2796,8 @@ public final class ExplorationBeta {
         if (entranceCandidates.isEmpty()) {
             entranceCandidate = 0;
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
-                { -1, -1 } };
+                { -1, -1 }, { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 },
+                { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
             for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
                 <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2)
                 for (int[] direction : directions) for (int dy = -1; dy <= 6; dy++) {

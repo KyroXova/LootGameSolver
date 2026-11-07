@@ -56,7 +56,7 @@ final class ExplorerSustain {
             }
             cooldown = 100;
         }
-        if (moving && mc.thePlayer.getFoodStats().getFoodLevel() < 20) {
+        if (moving) {
             boolean found = false;
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);

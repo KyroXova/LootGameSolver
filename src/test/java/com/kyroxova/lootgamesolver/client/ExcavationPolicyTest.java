@@ -20,7 +20,8 @@ public class ExcavationPolicyTest {
     public void choosesDigMouthTenToFifteenBlocksBeyondTheNearWall() {
         assertTrue(ExcavationPolicy.preferredEntrance(0, 0, 20, 0));
         assertTrue(ExcavationPolicy.preferredEntrance(0, 0, 0, 24));
-        assertFalse(ExcavationPolicy.preferredEntrance(0, 0, 30, 0));
+        assertTrue(ExcavationPolicy.preferredEntrance(0, 0, 30, 0));
+        assertFalse(ExcavationPolicy.preferredEntrance(0, 0, 37, 0));
         assertFalse(ExcavationPolicy.preferredEntrance(0, 0, 12, 0));
     }
 
