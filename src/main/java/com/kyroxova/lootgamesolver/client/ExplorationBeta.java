@@ -1832,7 +1832,7 @@ public final class ExplorationBeta {
         else if (!hasVerticalTransition(route, py, 5)) cameraPitchDirection = 0;
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
-        float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -30F : cameraPitchDirection < 0 ? 30F : 0F;
+        float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
         if (!centering) look(desired, desiredPitch);
         status = centering ? "Centering on supported ground"
             : returning ? "Returning along saved access path" : "Following checked route";
