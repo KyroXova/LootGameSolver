@@ -1777,7 +1777,7 @@ public final class ExplorationBeta {
             if (!started) retryExitLater(mc);
             return;
         }
-        if (chestPitSearch != null) {
+        if (chestPitExits != null) {
             advanceChestPitReturn(mc);
             return;
         }
@@ -2114,11 +2114,11 @@ public final class ExplorationBeta {
                     }
                     roomExitCandidates = null;
                     activeRoomExit = null;
-                    returning = false;
-                    returnAvailable = false;
-                    removePersistedTrail();
-                    trailExcavating = false;
-                    continueProgressiveSearch(mc, true);
+                    int ex = (int) Math.floor(mc.thePlayer.posX);
+                    int ey = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                    int ez = (int) Math.floor(mc.thePlayer.posZ);
+                    if (mc.theWorld.canBlockSeeTheSky(ex, ey, ez)) continueProgressiveSearch(mc, true);
+                    else if (!startSavedReturn(mc, true, 128) && !digTowardSavedExit(mc)) retryExitLater(mc);
                     return;
                 }
                 // Continue a partial link search before considering room walls.
@@ -3489,6 +3489,12 @@ public final class ExplorationBeta {
         int nx = x + stairX, nz = z + stairZ;
         if (!ExcavationPolicy.beside(x, z, nx, nz)) return false;
         World w = mc.theWorld;
+        for (int by = y; by <= y + 1; by++) {
+            net.minecraft.block.Block plant = w.getBlock(x, by, z);
+            if (FoliagePolicy.canClear(isFoliage(plant), w.getTileEntity(x, by, z) != null,
+                plant.getBlockHardness(w, x, by, z), x, by, z, x, y, z, nx, nz, plant == Blocks.snow_layer))
+                return minePlannedBlock(mc, x, by, z, destinationY);
+        }
         if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
         if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
         int clearTop = Math.max(y, destinationY) + 1;
