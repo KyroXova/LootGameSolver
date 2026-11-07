@@ -1994,14 +1994,8 @@ public final class ExplorationBeta {
         if (pausedForControl) {
             pausedForControl = false;
             if (!waitingForTool) {
-                excavationRoute.clear();
-                excavationSearch = null;
-                approachPlan = null;
-                approachAnchor = null;
-                digging = false;
-                seekingDryEntrance = false;
-                entranceSelected = false;
-                if (!returning) plan(mc);
+                stalled = 0;
+                lastDistance = Double.MAX_VALUE;
             }
         }
         inspectUpcomingRoute(mc);
@@ -3425,9 +3419,8 @@ public final class ExplorationBeta {
             }
             return harvestable;
         }
-        // Mine ordinary terrain and foliage; exclude fluids, tile entities, falling blocks, and unbreakable blocks.
+        // Falling blocks in the target column are cleared from the top down.
         return hardness >= 0 && hardness <= 10 && !material.isLiquid()
-            && !(block instanceof net.minecraft.block.BlockFalling)
             && block != Blocks.fire && block != Blocks.cactus && block != Blocks.portal;
     }
 
@@ -3435,19 +3428,26 @@ public final class ExplorationBeta {
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
             .isNormalCube()) return -1;
         boolean overhead = ny > y && !passable(w, x, y + 2, z);
+        if (overhead && w.getBlock(x, y + 2, z) instanceof net.minecraft.block.BlockFalling) return -1;
         if (overhead && !excavatable(w, x, y + 2, z)) return -1;
         int cost = 1 + Math.abs(ny - y), firstBreak = Integer.MAX_VALUE, lastBreak = Integer.MIN_VALUE;
         if (overhead) {
             cost += 2;
             for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) for (int by = y + 1; by <= y + 3; by++) {
                 net.minecraft.block.Block block = w.getBlock(x + ox, by, z + oz);
-                if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial()
-                    .isLiquid() || block == Blocks.sand || block == Blocks.gravel) return -1;
+                if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial().isLiquid()
+                    || ox == 0 && oz == 0 && block instanceof net.minecraft.block.BlockFalling) return -1;
             }
         }
         int clearanceTop = Math.max(y, ny) + 1;
         while (clearanceTop < Math.max(y, ny) + 8 && w.getBlock(nx, clearanceTop + 1, nz) == Blocks.snow_layer)
             clearanceTop++;
+        int fallingLimit = Math.max(y, ny) + 12;
+        while (clearanceTop < fallingLimit
+            && w.getBlock(nx, clearanceTop + 1, nz) instanceof net.minecraft.block.BlockFalling) clearanceTop++;
+        if (!w.blockExists(nx, clearanceTop + 1, nz)
+            || w.getBlock(nx, clearanceTop + 1, nz) instanceof net.minecraft.block.BlockFalling) return -1;
+        if (clearanceTop > y + 4) return -1;
         for (int by = ny; by <= clearanceTop; by++) {
             if (passable(w, nx, by, nz)) continue;
             if (!excavatable(w, nx, by, nz)) return -1;
@@ -3465,8 +3465,6 @@ public final class ExplorationBeta {
                     .isLiquid() && by >= firstBreak - 1
                     && by <= lastBreak + 1) || block == Blocks.fire
                     || block == Blocks.cactus
-                    || block == Blocks.sand
-                    || block == Blocks.gravel
                     || block == Blocks.portal) return -1;
             }
         return cost;
@@ -3572,6 +3570,13 @@ public final class ExplorationBeta {
             if (candidate.size() > Math.max(12D, 2D * Math.hypot(goal[0] - x, goal[2] - z))) continue;
             route.clear();
             route.addAll(candidate);
+            walkingSearch = null;
+            walkingSearchNeedsResume = false;
+            continuationSearch = null;
+            extendedFrom = null;
+            approachPlan = null;
+            approachAnchor = null;
+            approachReady = false;
             segmentX = mc.thePlayer.posX;
             segmentZ = mc.thePlayer.posZ;
             seekingDryEntrance = true;
@@ -3631,6 +3636,12 @@ public final class ExplorationBeta {
         int clearTop = Math.max(y, destinationY) + 1;
         while (clearTop < Math.max(y, destinationY) + 8
             && w.getBlock(nx, clearTop + 1, nz) == Blocks.snow_layer) clearTop++;
+        int fallingLimit = Math.max(y, destinationY) + 12;
+        while (clearTop < fallingLimit
+            && w.getBlock(nx, clearTop + 1, nz) instanceof net.minecraft.block.BlockFalling) clearTop++;
+        if (!w.blockExists(nx, clearTop + 1, nz)
+            || w.getBlock(nx, clearTop + 1, nz) instanceof net.minecraft.block.BlockFalling) return false;
+        if (clearTop > y + 4) return false;
         for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
