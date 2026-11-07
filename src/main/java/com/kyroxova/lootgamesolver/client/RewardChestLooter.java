@@ -74,6 +74,7 @@ final class RewardChestLooter {
     }
 
     boolean active() { return active; }
+    boolean completed() { return "Reward chests collected".equals(status); }
     String status() { return status; }
 
     void cancel(Minecraft mc) {
@@ -104,9 +105,7 @@ final class RewardChestLooter {
                     chests.add(new int[] { tile.xCoord, tile.yCoord, tile.zCoord });
             }
             if (chests.isEmpty()) {
-                if (ticks < 120) return;
-                status = "No reward chests found";
-                active = false;
+                status = "Waiting for reward chests";
                 return;
             }
         }
@@ -199,7 +198,7 @@ final class RewardChestLooter {
         }
         if (mc.currentScreen != null) { status = "Close the open screen to collect rewards"; return; }
         if (opened) {
-            if (++openWait > 40) { status = "Could not open reward chest"; active = false; }
+            if (++openWait > 40) { status = "Retrying reward chest"; opened = false; openWait = 0; }
             return;
         }
         double dx = pos[0] + 0.5D - mc.thePlayer.posX, dz = pos[2] + 0.5D - mc.thePlayer.posZ;
@@ -216,7 +215,7 @@ final class RewardChestLooter {
         mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(),
             pos[0], pos[1], pos[2], 1, Vec3.createVectorHelper(pos[0] + 0.5D, pos[1] + 1D, pos[2] + 0.5D));
         opened = true;
-        waiting = 5;
+        waiting = 12;
         status = "Opening reward chest";
     }
 

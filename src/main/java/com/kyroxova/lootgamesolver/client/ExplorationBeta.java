@@ -2667,7 +2667,7 @@ public final class ExplorationBeta {
                 System.nanoTime() + 3_000_000L);
             rejectedSteps.clear();
             rejectedSteps.addAll(excavationSearch.rejected);
-            status = "Planning access: " + excavationSearch.expandedNodes() + " checked nodes";
+            status = "Planning a safe tunnel";
             if (!complete) return true;
             excavationRoute.addAll(excavationSearch.path);
             excavationSearch = null;
@@ -3124,7 +3124,7 @@ public final class ExplorationBeta {
             return true;
         }
         miningAttack.hold(mc.gameSettings.keyBindAttack);
-        status = excavationMode + ": " + digTicks + "/" + allowance;
+        status = "Mining a safe path";
         return true;
     }
 
@@ -3137,6 +3137,14 @@ public final class ExplorationBeta {
     }
 
     private static boolean safe(World world, int x, int y, int z) {
+        for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
+                net.minecraft.block.Block nearby = world.getBlock(x + dx, y + dy, z + dz);
+                net.minecraftforge.fluids.Fluid fluid = net.minecraftforge.fluids.FluidRegistry.lookupFluidForBlock(nearby);
+                if (fluid != null && OilAvoidance.isOil(fluid.getName())) return false;
+            }
+        }
         // Open headroom and a full floor; reject nearby liquids, fire, cactus and unknown terrain.
         for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
             for (int dy = -1; dy <= 2; dy++) {

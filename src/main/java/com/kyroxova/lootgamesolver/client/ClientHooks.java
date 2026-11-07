@@ -216,9 +216,11 @@ public final class ClientHooks {
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
-                rewardReturnPending = false;
-                mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
-                if (exploration != null) exploration.finishPuzzle(mc, true);
+                if (rewardLooter.completed()) {
+                    rewardReturnPending = false;
+                    mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
+                    if (exploration != null) exploration.finishPuzzle(mc, true);
+                }
             }
             return;
         }
@@ -470,6 +472,12 @@ public final class ClientHooks {
                 session.start(ActionPlanner.Mode.SOLVE);
                 Object game = puzzleBridge.nearbyGame(true);
                 int level = puzzleBridge.currentMinesweeperLevel(game);
+                if (session.isActive()) {
+                    int[] currentCenter = game == null ? puzzleBridge.nearbyFloorActivator() : puzzleBridge.gameCenter(game);
+                    if (currentCenter != null) rewardCenter = currentCenter;
+                    puzzleCompletion.begin();
+                    autoPuzzleState = AutoPuzzleState.SOLVING;
+                }
                 if (level >= 1 && level <= 4) {
                     int[] currentCenter = puzzleBridge.gameCenter(game);
                     if (currentCenter != null) rewardCenter = currentCenter;
