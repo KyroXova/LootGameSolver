@@ -47,6 +47,7 @@ public final class ExplorationBeta {
     private double segmentX;
     private double segmentZ;
     private final MiningAimGate miningAim = new MiningAimGate();
+    private final ExplorerSustain sustain = new ExplorerSustain();
     private int settlingTicks;
     private ExcavationPathfinder excavationSearch;
     private int[] roofEscapeGoal;
@@ -1248,6 +1249,7 @@ public final class ExplorationBeta {
             navigationInput.hop = false;
         }
         if (world != mc.theWorld) {
+            sustain.stop(mc);
             persistAccessTrail(true);
             if (navigationInput != null) stop(mc, "World changed");
             if (savedFinder != null) savedFinder.cancel();
@@ -1291,6 +1293,10 @@ public final class ExplorationBeta {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (sustain.busy() && sustain.tick(mc, walking, false)) {
+            status = "Eating or preparing food";
+            return;
+        }
         if (toolTransfer.active()) {
             status = "Moving tool using inventory screen";
             if (!toolTransfer.tick(mc)) stop(mc, "Inventory transfer interrupted; inspect the tool slots");
@@ -1366,6 +1372,10 @@ public final class ExplorationBeta {
             status = manual ? "Paused: release movement keys to resume"
                 : mc.currentScreen != null ? "Paused: close menu to resume"
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
+            return;
+        }
+        if (sustain.tick(mc, true, !route.isEmpty())) {
+            status = "Eating or preparing food";
             return;
         }
         if (exitRecoveryTicks > 0) {
@@ -2180,6 +2190,7 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        sustain.stop(mc);
         exitRecoveryTicks = 0;
         exitRecoveryAttempts = 0;
         openExitSearch = null;
@@ -2637,9 +2648,9 @@ public final class ExplorationBeta {
             excavationRoute.clear();
             miningAim.reset();
             return ++excavationReplans <= 3;
-        if (attemptStairStep(mc, next[1])) return true;
         }
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
+        if (attemptStairStep(mc, next[1])) return true;
         excavationRoute.clear();
         miningAim.reset();
         aimTicks = 0;

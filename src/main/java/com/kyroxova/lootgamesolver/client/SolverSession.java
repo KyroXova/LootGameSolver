@@ -44,6 +44,8 @@ public final class SolverSession {
     private int remainingClicksForActiveAction = 0;
     private boolean sudokuReverseClick;
     private boolean interactionPending;
+    private int sudokuPreviousSlot = -1;
+    private int sudokuAutomaticSlot = -1;
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
@@ -57,6 +59,10 @@ public final class SolverSession {
         int forward = (targetVal - curVal + 10) % 10;
         int reverse = (curVal - targetVal + 10) % 10;
         return reverse < forward;
+    }
+
+    static boolean shouldUseReverseSudokuClicks(int curVal, int targetVal, boolean canSneakInteract) {
+        return canSneakInteract && shouldUseReverseSudokuClicks(curVal, targetVal);
     }
 
     public void invalidateDormantCache() {
@@ -256,7 +262,34 @@ public final class SolverSession {
                     ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
                     : 0;
                 remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
-                sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value);
+                int[] block = getBlockPos(activeAction.position);
+                if (mc.thePlayer != null && shouldUseReverseSudokuClicks(curVal, activeAction.value)) {
+                    int suitable = -1;
+                    for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+                        suitable = i;
+                        break;
+                    }
+                    if (suitable < 0 && block != null && mc.theWorld != null) {
+                        for (int i = 0; i < 9; i++) {
+                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                            if (stack != null && stack.getItem() instanceof net.minecraft.item.ItemPickaxe
+                                && stack.getItem().doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
+                                suitable = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (suitable >= 0 && suitable != mc.thePlayer.inventory.currentItem) {
+                        if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+                        sudokuAutomaticSlot = suitable;
+                        mc.thePlayer.inventory.currentItem = suitable;
+                        mc.playerController.updateController();
+                    }
+                }
+                net.minecraft.item.ItemStack held = mc.thePlayer == null ? null : mc.thePlayer.getHeldItem();
+                boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
+                    && held.getItem().doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
+                sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
             } else {
                 remainingClicksForActiveAction = 1;
                 sudokuReverseClick = false;
@@ -335,6 +368,14 @@ public final class SolverSession {
 
     public void cancel(String reason) {
         bridge.releaseSneak();
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer != null && sudokuPreviousSlot >= 0
+            && mc.thePlayer.inventory.currentItem == sudokuAutomaticSlot) {
+            mc.thePlayer.inventory.currentItem = sudokuPreviousSlot;
+            if (mc.playerController != null) mc.playerController.updateController();
+        }
+        sudokuPreviousSlot = -1;
+        sudokuAutomaticSlot = -1;
         bridge.resetGameOfLightPendingAction();
         puzzleIdentity.clear();
         interactionPending = false;
