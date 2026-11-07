@@ -57,10 +57,12 @@ final class AccessTrailStore {
         long bestDistance = (long) range * range + 1;
         for (String name : data.trails.keySet()) {
             if (!name.startsWith(prefix)) continue;
-            String[] coords = name.substring(prefix.length()).split(":");
+            String[] coords = name.substring(prefix.length())
+                .split(":");
             if (coords.length != 3) continue;
             try {
-                int sx = Integer.parseInt(coords[0]), sy = Integer.parseInt(coords[1]), sz = Integer.parseInt(coords[2]);
+                int sx = Integer.parseInt(coords[0]), sy = Integer.parseInt(coords[1]),
+                    sz = Integer.parseInt(coords[2]);
                 long dx = (long) sx - x, dy = (long) sy - y, dz = (long) sz - z;
                 long distance = dx * dx + dy * dy + dz * dz;
                 if (distance < bestDistance && load(world, dimension, sx, sy, sz).size() >= 2) {

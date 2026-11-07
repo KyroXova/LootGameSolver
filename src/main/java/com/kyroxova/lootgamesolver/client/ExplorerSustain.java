@@ -9,23 +9,29 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
 final class ExplorerSustain {
+
     private final InventoryToolTransfer transfer = new InventoryToolTransfer();
     private boolean eating;
     private int eatingTicks, restoreSlot = -1, automaticSlot = -1, cooldown;
 
-    boolean busy() { return eating || transfer.active(); }
+    boolean busy() {
+        return eating || transfer.active();
+    }
 
     boolean tick(Minecraft mc, boolean walking, boolean moving) {
         if (mc.thePlayer == null || mc.theWorld == null || mc.playerController == null) return false;
-        if (!walking) { stop(mc); return false; }
+        if (!walking) {
+            stop(mc);
+            return false;
+        }
         if (transfer.active()) {
             if (!transfer.tick(mc)) cooldown = 100;
             else if (!transfer.active()) automaticSlot = mc.thePlayer.inventory.currentItem;
             return true;
         }
         if (eating) {
-            if (mc.currentScreen != null || mc.thePlayer.getFoodStats().getFoodLevel() > 8
-                || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
+            if (mc.currentScreen != null || mc.thePlayer.getFoodStats()
+                .getFoodLevel() > 8 || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
                 releaseUse(mc);
                 eating = false;
                 cooldown = 20;
@@ -36,7 +42,8 @@ final class ExplorerSustain {
         }
         if (cooldown > 0) cooldown--;
         if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
-        if (mc.thePlayer.getFoodStats().getFoodLevel() <= 8 && cooldown == 0) {
+        if (mc.thePlayer.getFoodStats()
+            .getFoodLevel() <= 8 && cooldown == 0) {
             int food = findFood(mc, 0, 9);
             if (food < 0) {
                 int inventoryFood = findFood(mc, 9, 36);
@@ -85,7 +92,10 @@ final class ExplorerSustain {
     }
 
     private static boolean isHealingAxe(ItemStack stack) {
-        return stack != null && stack.getItem().getClass().getName().equals("com.rwtema.extrautils.item.ItemHealingAxe");
+        return stack != null && stack.getItem()
+            .getClass()
+            .getName()
+            .equals("com.rwtema.extrautils.item.ItemHealingAxe");
     }
 
     private void select(Minecraft mc, int slot) {

@@ -2,9 +2,11 @@ package com.kyroxova.lootgamesolver.client;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
 import org.junit.Test;
 
 public class NavigationSurfacePolicyTest {
+
     @Test
     public void avoidsUnrelatedCavesButAllowsARealApproachAndReturn() {
         assertFalse(NavigationSurfacePolicy.allow(true, false, true, 80, 60, 0, 0, 30, 0));

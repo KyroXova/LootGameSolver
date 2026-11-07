@@ -160,8 +160,7 @@ public final class ClientHooks {
     }
 
     @SubscribeEvent
-    public void onKeyInput(cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent event) {
-    }
+    public void onKeyInput(cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent event) {}
 
     @SubscribeEvent
     public void onPlayerInteract(PlayerInteractEvent event) {
@@ -214,6 +213,14 @@ public final class ClientHooks {
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (rewardReturnPending) {
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            if (exploration != null && !exploration.inDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+                rewardLooter.cancel(mc);
+                rewardReturnPending = false;
+                exploration.finishPuzzle(mc, true);
+                return;
+            }
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
@@ -231,8 +238,8 @@ public final class ClientHooks {
             return;
         }
         boolean inventoryCleanupSafe = exploration != null && exploration.inventoryCleanupSafe(mc);
-        if (!session.isActive() && (trashCleanup.active()
-            || inventoryCleanupSafe && trashCleanup.inventoryPressure(mc))) {
+        if (!session.isActive()
+            && (trashCleanup.active() || inventoryCleanupSafe && trashCleanup.inventoryPressure(mc))) {
             if (trashCleanup.tick(mc, true)) {
                 if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
                 return;
@@ -267,7 +274,8 @@ public final class ClientHooks {
                 if (nextLevel) activeMinesweeperLevel = level;
                 int[] center = puzzleBridge.gameCenter(game);
                 autoPuzzleState = exploration != null && center != null && exploration.moveToPuzzleCenter(mc, center)
-                    ? AutoPuzzleState.POSITIONING_NEXT_STAGE : AutoPuzzleState.REVEALING_NEXT_STAGE;
+                    ? AutoPuzzleState.POSITIONING_NEXT_STAGE
+                    : AutoPuzzleState.REVEALING_NEXT_STAGE;
                 puzzleWaitTicks = 0;
                 centerClickAttempts = 0;
                 minesweeperOpeningClickSent = false;
@@ -488,6 +496,10 @@ public final class ClientHooks {
             if (exploreHoldTicks >= 20 && !exploreHoldActionDone) {
                 exploreHoldActionDone = true;
                 checkpointClearDoneTicks = 12;
+                if (rewardReturnPending) {
+                    rewardLooter.cancel(mc);
+                    rewardReturnPending = false;
+                }
                 if (exploration != null && mc.thePlayer != null && mc.theWorld != null)
                     exploration.clearLastCheckpoint(mc);
             }
@@ -497,7 +509,9 @@ public final class ClientHooks {
             exploreHoldActionDone = false;
             exploreHoldTicks = 0;
         }
-        if (exploration != null && runExploreAction && mc.currentScreen == null && mc.thePlayer != null
+        if (exploration != null && runExploreAction
+            && mc.currentScreen == null
+            && mc.thePlayer != null
             && mc.theWorld != null) {
             if (rewardReturnPending) {
                 rewardLooter.cancel(mc);
@@ -513,9 +527,11 @@ public final class ClientHooks {
                 int[] floor = puzzleBridge.nearbyFloorActivator();
                 Object nearbyGame = puzzleBridge.nearbyGame(true);
                 DetectedGame board = puzzleBridge.detect(true);
-                int[] boardCenter = floor != null ? floor : nearbyGame == null ? null : puzzleBridge.gameCenter(nearbyGame);
+                int[] boardCenter = floor != null ? floor
+                    : nearbyGame == null ? null : puzzleBridge.gameCenter(nearbyGame);
                 if ((floor != null || board != null || puzzleBridge.canOpenMinesweeperBoard(nearbyGame))
-                    && boardCenter != null && exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
+                    && boardCenter != null
+                    && exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
                     exploration.prepareRewardCollection(mc, rewards);
@@ -552,7 +568,8 @@ public final class ClientHooks {
                 Object game = puzzleBridge.nearbyGame(true);
                 int level = puzzleBridge.currentMinesweeperLevel(game);
                 if (session.isActive()) {
-                    int[] currentCenter = game == null ? puzzleBridge.nearbyFloorActivator() : puzzleBridge.gameCenter(game);
+                    int[] currentCenter = game == null ? puzzleBridge.nearbyFloorActivator()
+                        : puzzleBridge.gameCenter(game);
                     if (currentCenter != null) rewardCenter = currentCenter;
                     puzzleCompletion.begin();
                     autoPuzzleState = AutoPuzzleState.SOLVING;
@@ -728,10 +745,12 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
-            String navigationLine = exploration != null && (cur == null || explorerActive) ? "\u00A77" + exploration.navigationStatus()
+            String navigationLine = exploration != null && (cur == null || explorerActive)
+                ? "\u00A77" + exploration.navigationStatus()
                 : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
-                line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77") + " ["
+                line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77")
+                    + " ["
                     + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] "
                     + exploration.explorationAction();
@@ -774,6 +793,11 @@ public final class ClientHooks {
     }
 
     private static void drawCheckpointProgressBar(int x, int y, int width, int height, float progress) {
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glShadeModel(GL11.GL_SMOOTH);
+        GL11.glDepthMask(false);
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);

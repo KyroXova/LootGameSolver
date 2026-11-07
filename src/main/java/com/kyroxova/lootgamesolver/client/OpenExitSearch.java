@@ -8,14 +8,23 @@ import java.util.List;
 import java.util.Set;
 
 final class OpenExitSearch {
+
     interface Terrain extends GroundPathfinder.Terrain {
+
         boolean exit(int x, int y, int z);
     }
 
     private static final class Node {
+
         final int x, y, z;
         final Node previous;
-        Node(int x, int y, int z, Node previous) { this.x = x; this.y = y; this.z = z; this.previous = previous; }
+
+        Node(int x, int y, int z, Node previous) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.previous = previous;
+        }
     }
 
     private final Terrain terrain;
@@ -26,18 +35,22 @@ final class OpenExitSearch {
 
     OpenExitSearch(Terrain terrain, int x, int y, int z) {
         this.terrain = terrain;
-        startX = x; startY = y; startZ = z;
+        startX = x;
+        startY = y;
+        startZ = z;
         pending.add(new Node(x, y, z, null));
         visited.add(key(x, y, z));
     }
 
     boolean advance(int limit, long deadline) {
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
-            { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
         int count = 0;
         while (!pending.isEmpty() && count++ < limit && visited.size() < 32768 && System.nanoTime() < deadline) {
             Node node = pending.removeFirst();
-            if (node.previous != null && terrain.exit(node.x, node.y, node.z)) { result = node; return true; }
+            if (node.previous != null && terrain.exit(node.x, node.y, node.z)) {
+                result = node;
+                return true;
+            }
             for (int[] d : directions) for (int dy = -1; dy <= 1; dy++) {
                 int x = node.x + d[0], y = node.y + dy, z = node.z + d[1];
                 if (Math.abs(x - startX) > 64 || Math.abs(z - startZ) > 64 || Math.abs(y - startY) > 32) continue;
@@ -45,9 +58,12 @@ final class OpenExitSearch {
                 if (visited.contains(key) || !terrain.stand(x, y, z)) continue;
                 if (dy > 0 && !terrain.clear(node.x, node.y + 2, node.z)) continue;
                 if (dy < 0 && !terrain.clear(x, node.y + 1, z)) continue;
-                if (d[0] != 0 && d[1] != 0 && (dy != 0 || !terrain.stand(x, node.y, node.z)
-                    || !terrain.stand(node.x, node.y, z) || !terrain.clear(x, node.y + 1, node.z)
-                    || !terrain.clear(node.x, node.y + 1, z))) continue;
+                if (d[0] != 0 && d[1] != 0
+                    && (dy != 0 || !terrain.stand(x, node.y, node.z)
+                        || !terrain.stand(node.x, node.y, z)
+                        || !terrain.clear(x, node.y + 1, node.z)
+                        || !terrain.clear(node.x, node.y + 1, z)))
+                    continue;
                 visited.add(key);
                 pending.addLast(new Node(x, y, z, node));
             }
@@ -62,5 +78,7 @@ final class OpenExitSearch {
         return path;
     }
 
-    private static String key(int x, int y, int z) { return x + ":" + y + ":" + z; }
+    private static String key(int x, int y, int z) {
+        return x + ":" + y + ":" + z;
+    }
 }

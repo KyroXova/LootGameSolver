@@ -109,7 +109,8 @@ public final class SolverSession {
         }
 
         game = currentSnapshot.type;
-        if (currentSnapshot.type == MiniGame.MINESWEEPER && MinesweeperActionGuard.complete(currentSnapshot.minesweeper)) {
+        if (currentSnapshot.type == MiniGame.MINESWEEPER
+            && MinesweeperActionGuard.complete(currentSnapshot.minesweeper)) {
             resetForNewRound();
             status = "Board complete; waiting for next stage";
             return;
@@ -273,8 +274,8 @@ public final class SolverSession {
                     if (suitable < 0 && block != null && mc.theWorld != null) {
                         for (int i = 0; i < 9; i++) {
                             net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                            if (stack != null && stack.getItem().doesSneakBypassUse(
-                                mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
+                            if (stack != null && stack.getItem()
+                                .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
                                 suitable = i;
                                 break;
                             }
@@ -293,7 +294,12 @@ public final class SolverSession {
                                 || stack.getItem() instanceof net.minecraft.item.ItemSword
                                 || stack.getItem() instanceof net.minecraft.item.ItemArmor
                                 || stack.getItem() instanceof net.minecraft.item.ItemFood
-                                || stack.getItem().getClass().getName().toLowerCase(java.util.Locale.ROOT).contains("backpack")) continue;
+                                || stack.getItem()
+                                    .getClass()
+                                    .getName()
+                                    .toLowerCase(java.util.Locale.ROOT)
+                                    .contains("backpack"))
+                                continue;
                             if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
                             if (sudokuTransfer.clearHotbar(mc, i, empty)) {
                                 sudokuAutomaticSlot = i;
@@ -312,7 +318,8 @@ public final class SolverSession {
                 }
                 net.minecraft.item.ItemStack held = mc.thePlayer == null ? null : mc.thePlayer.getHeldItem();
                 boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
-                    && held.getItem().doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
+                    && held.getItem()
+                        .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
                 sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
                 if (!sudokuReverseClick) remainingClicksForActiveAction = (activeAction.value - curVal + 10) % 10;
             } else {
@@ -331,7 +338,8 @@ public final class SolverSession {
     }
 
     private void send(DetectedGame snapshot) {
-        if (snapshot.type == MiniGame.MINESWEEPER && !MinesweeperActionGuard.valid(snapshot.minesweeper, activeAction)) {
+        if (snapshot.type == MiniGame.MINESWEEPER
+            && !MinesweeperActionGuard.valid(snapshot.minesweeper, activeAction)) {
             resetForNewRound();
             status = "Waiting for board update";
             return;

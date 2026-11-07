@@ -6,13 +6,21 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class MinesweeperGenerationTest {
+
     public static class SyncedGame {
+
         public boolean cIsGenerated;
-        public boolean isBoardGenerated() { return true; }
+
+        public boolean isBoardGenerated() {
+            return true;
+        }
     }
 
     public static class OlderGame {
-        public boolean isBoardGenerated() { return true; }
+
+        public boolean isBoardGenerated() {
+            return true;
+        }
     }
 
     @Test

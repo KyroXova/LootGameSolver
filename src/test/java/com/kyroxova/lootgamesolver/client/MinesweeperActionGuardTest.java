@@ -11,6 +11,7 @@ import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell;
 
 public class MinesweeperActionGuardTest {
+
     @Test
     public void blocksCompletedBoardsAndInvalidOrPreviouslyClickedCells() {
         MinesweeperBoard board = new MinesweeperBoard(2, 2, 1);

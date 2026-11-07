@@ -161,8 +161,8 @@ public final class GroundPathfinder {
 
         List<int[]> path() {
             List<int[]> result = new ArrayList<int[]>();
-            if (best == null || best == start || best.remaining >= start.remaining
-                && terrain.checkpoint(start.x, start.y, start.z)) return result;
+            if (best == null || best == start
+                || best.remaining >= start.remaining && terrain.checkpoint(start.x, start.y, start.z)) return result;
             for (Node node = best; node.parent != null; node = node.parent)
                 result.add(new int[] { node.x, node.y, node.z });
             Collections.reverse(result);

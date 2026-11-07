@@ -13,8 +13,8 @@ public class NavigationSteeringTest {
         route.add(new int[] { 1, 64, 0 });
         route.add(new int[] { 2, 64, 0 });
         route.add(new int[] { 3, 64, 0 });
-        java.util.List<int[]> extension = java.util.Arrays.asList(
-            new int[] { 2, 64, 0 }, new int[] { 2, 64, 1 }, new int[] { 2, 64, 2 });
+        java.util.List<int[]> extension = java.util.Arrays
+            .asList(new int[] { 2, 64, 0 }, new int[] { 2, 64, 1 }, new int[] { 2, 64, 2 });
         NavigationSteering.appendWithoutLoops(route, extension);
         assertEquals(4, route.size());
         assertEquals(2, route.get(1)[0]);

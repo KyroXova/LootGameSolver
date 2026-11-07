@@ -24,6 +24,7 @@ public class GameOfLightAcknowledgementTest {
     }
 
     private static final class FakeStage {
+
         private java.util.List<Integer> sequence = Collections.singletonList(1);
     }
 

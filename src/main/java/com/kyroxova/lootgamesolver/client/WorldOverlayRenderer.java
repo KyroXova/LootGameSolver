@@ -1,7 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import net.minecraft.client.Minecraft;
@@ -16,8 +16,8 @@ import net.minecraftforge.client.event.RenderWorldLastEvent;
 import org.lwjgl.opengl.GL11;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
-import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.core.CellPosition;
+import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
@@ -162,7 +162,8 @@ public final class WorldOverlayRenderer {
 
             int maxRender = actions.size();
             Map<CellPosition, String> lightLabels = current.type == MiniGame.GAME_OF_LIGHT
-                ? sequenceLabels(actions, current.gol == null ? 0 : current.gol.getCurrentSymbol()) : null;
+                ? sequenceLabels(actions, current.gol == null ? 0 : current.gol.getCurrentSymbol())
+                : null;
             for (int i = 0; i < maxRender; i++) {
                 SolverAction action = actions.get(i);
                 if (lightLabels != null && !lightLabels.containsKey(action.position)) continue;
@@ -201,7 +202,13 @@ public final class WorldOverlayRenderer {
                         drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
                     } else {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
-                        drawFloatingText(lightLabels.get(action.position), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
+                        drawFloatingText(
+                            lightLabels.get(action.position),
+                            minX + 0.5D,
+                            minY + 1.25D,
+                            minZ + 0.5D,
+                            0x00FFFF,
+                            mc);
                     }
                     lightLabels.remove(action.position);
                 }

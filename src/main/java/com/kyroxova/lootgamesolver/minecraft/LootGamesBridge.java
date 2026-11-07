@@ -166,14 +166,15 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     static boolean minesweeperGenerated(Object game) throws Exception {
         try {
-            return game.getClass().getField("cIsGenerated").getBoolean(game);
+            return game.getClass()
+                .getField("cIsGenerated")
+                .getBoolean(game);
         } catch (NoSuchFieldException absent) {
             return bool(game, "isBoardGenerated");
         }
     }
 
-    public void invalidateDormantCache() {
-    }
+    public void invalidateDormantCache() {}
 
     public void resetGameOfLightPendingAction() {
         golActionPending = false;
@@ -640,14 +641,19 @@ public final class LootGamesBridge implements MiniGameDetector {
             int x = px + dx, y = py + dy, z = pz + dz;
             if (!mc.theWorld.blockExists(x, y, z) || !isFloorActivator(mc.theWorld.getBlock(x, y, z))) continue;
             double distance = dx * dx + dy * dy + dz * dz;
-            if (distance < best) { closest = new int[] { x, y, z }; best = distance; }
+            if (distance < best) {
+                closest = new int[] { x, y, z };
+                best = distance;
+            }
         }
         return closest;
     }
 
     private static boolean isFloorActivator(net.minecraft.block.Block block) {
         if (block == null) return false;
-        return isFloorActivatorName(block.getClass().getName());
+        return isFloorActivatorName(
+            block.getClass()
+                .getName());
     }
 
     static boolean isFloorActivatorName(String name) {
@@ -658,16 +664,26 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public boolean activateFloorActivator(int[] position) {
         Minecraft mc = Minecraft.getMinecraft();
-        if (position == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+        if (position == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null)
+            return false;
         int x = position[0], y = position[1], z = position[2];
         if (!isFloorActivator(mc.theWorld.getBlock(x, y, z))) return false;
         if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-            || hit.blockX != x || hit.blockY != y || hit.blockZ != z) return false;
+            || hit.blockX != x
+            || hit.blockY != y
+            || hit.blockZ != z) return false;
         mc.thePlayer.swingItem();
-        return mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(),
-            x, y, z, hit.sideHit, hit.hitVec);
+        return mc.playerController.onPlayerRightClick(
+            mc.thePlayer,
+            mc.theWorld,
+            mc.thePlayer.getHeldItem(),
+            x,
+            y,
+            z,
+            hit.sideHit,
+            hit.hitVec);
     }
 
     public Object gameAtMaster(int[] position) {
@@ -796,8 +812,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             golPendingSymbol = snapshot.gol != null ? snapshot.gol.getCurrentSymbol() : golSubmitted;
             golActionPending = true;
             // Keep the playback index locally when LootGames provides no intermediate acknowledgement.
-            if (snapshot.gol != null
-                && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
+            if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
                 try {
                     Field sequence = getFieldRecursive(golPendingStage.getClass(), "sequence");
                     if (sequence != null && ((List<?>) sequence.get(golPendingStage)).isEmpty()) {

@@ -84,8 +84,7 @@ public final class ExplorationBeta {
     private boolean trailExcavating;
     private boolean returning, returnAvailable;
     private int cameraPitchDirection;
-    private static final java.util.Map<net.minecraft.block.Block, Boolean> QUICKSAND_BLOCKS =
-        new java.util.IdentityHashMap<net.minecraft.block.Block, Boolean>();
+    private static final java.util.Map<net.minecraft.block.Block, Boolean> QUICKSAND_BLOCKS = new java.util.IdentityHashMap<net.minecraft.block.Block, Boolean>();
     private int pitchLastY;
     private double pitchLandingX, pitchLandingZ;
     private boolean returnDigging;
@@ -127,6 +126,7 @@ public final class ExplorationBeta {
     private GroundPathfinder.Search chestPitApproachSearch;
     private GroundPathfinder.Search chestPitSearch;
     private int chestPitJumpBoostTicks;
+    private boolean escapingChestPit;
 
     String explorationAction() {
         return returnAvailable ? "Return" : returning ? "Stop" : "Explore";
@@ -165,8 +165,12 @@ public final class ExplorationBeta {
             double dz = face == 2 ? 0.02D : face == 3 ? 0.98D : face >= 4 ? b : face <= 1 ? b : a;
             net.minecraft.util.Vec3 point = net.minecraft.util.Vec3.createVectorHelper(x + dx, y + dy, z + dz);
             net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
-            if (hit != null && hit.blockX == x && hit.blockY == y && hit.blockZ == z && hit.sideHit == face
-                && eye.squareDistanceTo(hit.hitVec) <= Math.pow(Math.min(4.2D, mc.playerController.getBlockReachDistance()), 2))
+            if (hit != null && hit.blockX == x
+                && hit.blockY == y
+                && hit.blockZ == z
+                && hit.sideHit == face
+                && eye.squareDistanceTo(hit.hitVec)
+                    <= Math.pow(Math.min(4.2D, mc.playerController.getBlockReachDistance()), 2))
                 return point;
         }
         return null;
@@ -249,7 +253,8 @@ public final class ExplorationBeta {
         for (int i = 0; i < Math.min(12, route.size()); i++) {
             int[] step = route.get(i);
             boolean diagonal = step[0] != previous[0] && step[2] != previous[2] && step[1] == previous[1];
-            boolean returnStep = returning && step[1] > previous[1] && step[1] <= previous[1] + 2
+            boolean returnStep = returning && step[1] > previous[1]
+                && step[1] <= previous[1] + 2
                 && Math.abs(step[0] - previous[0]) + Math.abs(step[2] - previous[2]) == 1
                 && mc.theWorld.blockExists(step[0], previous[1], step[2])
                 && mc.theWorld.getBlock(step[0], previous[1], step[2])
@@ -325,12 +330,19 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
-        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]
-            || center[0] <= bounds[0] || center[0] >= bounds[1]
-            || center[2] <= bounds[2] || center[2] >= bounds[3]
+        if (bounds == null || x <= bounds[0]
+            || x >= bounds[1]
+            || z <= bounds[2]
+            || z >= bounds[3]
+            || center[0] <= bounds[0]
+            || center[0] >= bounds[1]
+            || center[2] <= bounds[2]
+            || center[2] >= bounds[3]
             || Math.abs(y - center[1] - 1) > 2) return false;
-        if (knownStructure == null || knownStructure[0] <= bounds[0] || knownStructure[0] >= bounds[1]
-            || knownStructure[2] <= bounds[2] || knownStructure[2] >= bounds[3]) {
+        if (knownStructure == null || knownStructure[0] <= bounds[0]
+            || knownStructure[0] >= bounds[1]
+            || knownStructure[2] <= bounds[2]
+            || knownStructure[2] >= bounds[3]) {
             knownStructure = center.clone();
         }
         TileEntity current = new TileEntity();
@@ -535,6 +547,12 @@ public final class ExplorationBeta {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (!insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+            continueProgressiveSearch(mc, solved);
+            return;
+        }
         if (startChestPitReturn(mc, true)) return;
         if (insideDungeonRoom(mc) && startRoomExitSearch(mc)) return;
         if (startSavedReturn(mc, true, 128)) return;
@@ -814,7 +832,8 @@ public final class ExplorationBeta {
                 || Math.abs(point[2] - previous[2]) > 1) return false;
             if (point[0] != previous[0] && point[2] != previous[2]
                 && (!safe(mc.theWorld, point[0], previous[1], previous[2])
-                    || !safe(mc.theWorld, previous[0], previous[1], point[2]))) return false;
+                    || !safe(mc.theWorld, previous[0], previous[1], point[2])))
+                return false;
         }
         return true;
     }
@@ -827,8 +846,7 @@ public final class ExplorationBeta {
         int trailIndex = accessTrail.nearestIndex(x, y, z, 128);
         if (trailIndex < 0) return false;
 
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
-            { -1, -1 } };
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
         List<int[]> exits = new ArrayList<int[]>();
         int chestSides = 0;
         for (int[] direction : directions) {
@@ -844,9 +862,12 @@ public final class ExplorationBeta {
         }
         if (chestSides < 3 || exits.isEmpty()) return false;
 
-        exits.sort((a, b) -> Double.compare(
-            Math.abs(a[0] - accessTrail.pointAt(trailIndex)[0]) + Math.abs(a[2] - accessTrail.pointAt(trailIndex)[2]),
-            Math.abs(b[0] - accessTrail.pointAt(trailIndex)[0]) + Math.abs(b[2] - accessTrail.pointAt(trailIndex)[2])));
+        exits.sort(
+            (a, b) -> Double.compare(
+                Math.abs(a[0] - accessTrail.pointAt(trailIndex)[0])
+                    + Math.abs(a[2] - accessTrail.pointAt(trailIndex)[2]),
+                Math.abs(b[0] - accessTrail.pointAt(trailIndex)[0])
+                    + Math.abs(b[2] - accessTrail.pointAt(trailIndex)[2])));
         chestPitExits = exits;
         chestPitExitIndex = 0;
         chestPitTrailIndex = trailIndex;
@@ -888,6 +909,7 @@ public final class ExplorationBeta {
         }
         final World exitWorld = mc.theWorld;
         GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
             public boolean stand(int px, int py, int pz) {
                 return safe(exitWorld, px, py, pz);
             }
@@ -921,6 +943,7 @@ public final class ExplorationBeta {
         }
         final World exitWorld = mc.theWorld;
         GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+
             public boolean stand(int px, int py, int pz) {
                 return safe(exitWorld, px, py, pz);
             }
@@ -1017,6 +1040,7 @@ public final class ExplorationBeta {
         chestPitSource = null;
         chestPitExits = null;
         chestPitTrailIndex = -1;
+        escapingChestPit = false;
     }
 
     private static void appendRoutePoint(List<int[]> points, int[] point) {
@@ -1038,7 +1062,7 @@ public final class ExplorationBeta {
         roomExitCandidates = findRoomExitCandidates(mc, bounds);
         // Prefer room openings nearest the saved tunnel mouth.
         if (accessTrail.size() >= 2 && roomExitCandidates.size() > 1) {
-            int[] mouth = accessTrail.pointAt(0);
+            int[] mouth = accessTrail.pointAt(accessTrail.size() - 1);
             roomExitCandidates.sort((a, b) -> Double.compare(exitMouthDistance(a, mouth), exitMouthDistance(b, mouth)));
         }
         roomExitCandidateIndex = 0;
@@ -1095,8 +1119,8 @@ public final class ExplorationBeta {
             || target.xCoord >= bounds[1]
             || target.zCoord <= bounds[2]
             || target.zCoord >= bounds[3]
-            || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3]
-                && y <= target.yCoord + 3)) return false;
+            || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3] && y <= target.yCoord + 3))
+            return false;
         roomEntryCandidates = findRoomExitCandidates(mc, bounds);
         roomEntryCandidates.removeIf(candidate -> candidate.length >= 9);
         roomEntryCandidateIndex = 0;
@@ -1151,18 +1175,22 @@ public final class ExplorationBeta {
                     int outZ = xSide ? along : wallZ + side[2];
                     if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
                         || !(solidCheckpoint(mc.theWorld, outX, floorY, outZ)
-                            || clearableExitColumn(mc.theWorld, outX, floorY, outZ))) continue;
+                            || clearableExitColumn(mc.theWorld, outX, floorY, outZ)))
+                        continue;
                     boolean levelInside = safe(mc.theWorld, inX, floorY, inZ);
                     boolean lowerInside = !levelInside && safe(mc.theWorld, inX, floorY - 1, inZ)
                         && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
                             .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ).isNormalCube();
-                    boolean twoBelow = !levelInside && !lowerInside && safe(mc.theWorld, inX, floorY - 2, inZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
+                            .isNormalCube();
+                    boolean twoBelow = !levelInside && !lowerInside
+                        && safe(mc.theWorld, inX, floorY - 2, inZ)
                         && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
                             .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
                         && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
                             .isReplaceable(mc.theWorld, wallX, floorY - 2, wallZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 3, wallZ).isNormalCube();
+                        && mc.theWorld.getBlock(wallX, floorY - 3, wallZ)
+                            .isNormalCube();
                     if (!levelInside && !lowerInside && !twoBelow) continue;
                     boolean sideWallA = isDungeonWall(
                         mc.theWorld,
@@ -1177,8 +1205,8 @@ public final class ExplorationBeta {
                         xSide ? along + 1 : wallZ)
                         || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
                     if (!sideWallA && !sideWallB) continue;
-                    if (lowerInside || twoBelow) found.add(new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ,
-                        wallX, floorY, wallZ });
+                    if (lowerInside || twoBelow) found.add(
+                        new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ, wallX, floorY, wallZ });
                     else found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
                 }
             }
@@ -1192,12 +1220,14 @@ public final class ExplorationBeta {
     }
 
     private boolean clearableExitColumn(World world, int x, int y, int z) {
-        if (!world.blockExists(x, y - 1, z) || !world.getBlock(x, y - 1, z).isNormalCube()) return false;
+        if (!world.blockExists(x, y - 1, z) || !world.getBlock(x, y - 1, z)
+            .isNormalCube()) return false;
         for (int by = y; by <= y + 1; by++) {
             if (!world.blockExists(x, by, z)) return false;
             net.minecraft.block.Block block = world.getBlock(x, by, z);
-            if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z))
-                || block.getMaterial().isLiquid() || block instanceof net.minecraft.block.BlockFalling
+            if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z)) || block.getMaterial()
+                .isLiquid()
+                || block instanceof net.minecraft.block.BlockFalling
                 || !passable(world, x, by, z) && !excavatable(world, x, by, z)) return false;
         }
         return true;
@@ -1286,12 +1316,12 @@ public final class ExplorationBeta {
         if (y <= target.yCoord + 3 || !isDungeonWall(mc.theWorld, x, y - 1, z)) return false;
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
         if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
-        int[][] exits = { { bounds[0] - 3, y, z }, { bounds[1] + 3, y, z },
-            { x, y, bounds[2] - 3 }, { x, y, bounds[3] + 3 } };
+        int[][] exits = { { bounds[0] - 3, y, z }, { bounds[1] + 3, y, z }, { x, y, bounds[2] - 3 },
+            { x, y, bounds[3] + 3 } };
         int[] best = exits[0];
         for (int[] exit : exits) {
-            if (Math.abs(exit[0] - x) + Math.abs(exit[2] - z)
-                < Math.abs(best[0] - x) + Math.abs(best[2] - z)) best = exit;
+            if (Math.abs(exit[0] - x) + Math.abs(exit[2] - z) < Math.abs(best[0] - x) + Math.abs(best[2] - z))
+                best = exit;
         }
         roofEscapeGoal = best;
         excavationRoute.clear();
@@ -1308,8 +1338,10 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        int checkpointIndex = ReturnRoutePolicy.nextSafeCheckpoint(route, firstCheckpoint, point ->
-            solidCheckpoint(mc.theWorld, point[0], point[1], point[2])
+        int checkpointIndex = ReturnRoutePolicy.nextSafeCheckpoint(
+            route,
+            firstCheckpoint,
+            point -> solidCheckpoint(mc.theWorld, point[0], point[1], point[2])
                 && !blockedWalkNodes.contains(supportKey(point[0], point[1], point[2])));
         if (checkpointIndex < 0) return false;
         int[] join = route.get(checkpointIndex);
@@ -1522,8 +1554,13 @@ public final class ExplorationBeta {
         if (walking) stop(mc, "Reward collection started");
         if (mc == null || mc.theWorld == null || center == null) return;
         if (accessTrail.size() < 2) {
-            int[] saved = accessTrailStore.nearestStructure(worldIdentity(mc), mc.theWorld.provider.dimensionId,
-                center[0], center[1], center[2], 24);
+            int[] saved = accessTrailStore.nearestStructure(
+                worldIdentity(mc),
+                mc.theWorld.provider.dimensionId,
+                center[0],
+                center[1],
+                center[2],
+                24);
             if (saved != null) {
                 knownStructure = saved;
                 trailTarget = null;
@@ -1534,14 +1571,6 @@ public final class ExplorationBeta {
 
     void clearLastCheckpoint(Minecraft mc) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
-        if (!accessTrail.removeLast()) {
-            status = "No saved checkpoint to clear";
-            return;
-        }
-        trailDirty = true;
-        if (accessTrail.size() >= 2) persistAccessTrail(true);
-        else removePersistedTrail();
-
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
@@ -1550,6 +1579,13 @@ public final class ExplorationBeta {
             continueProgressiveSearch(mc, true);
             return;
         }
+        if (!accessTrail.removeLast()) {
+            status = "No saved checkpoint to clear";
+            return;
+        }
+        trailDirty = true;
+        if (accessTrail.size() >= 2) persistAccessTrail(true);
+        else removePersistedTrail();
         if (returning || returnAvailable) {
             boolean resumeSearch = resumeSearchAfterReturn;
             route.clear();
@@ -1563,8 +1599,13 @@ public final class ExplorationBeta {
     }
 
     boolean inventoryCleanupSafe(Minecraft mc) {
-        return walking && !returning && !digging && !movingToPuzzleCenter && !insideDungeonRoom(mc)
-            && mc.thePlayer != null && mc.thePlayer.onGround && route.size() >= 2;
+        return walking && !returning
+            && !digging
+            && !movingToPuzzleCenter
+            && !insideDungeonRoom(mc)
+            && mc.thePlayer != null
+            && mc.thePlayer.onGround
+            && route.size() >= 2;
     }
 
     public void toggle(Minecraft mc) {
@@ -1636,9 +1677,7 @@ public final class ExplorationBeta {
             trailDirty = false;
             removePersistedTrail();
         }
-        if (reuseSavedAccessPath(mc)) {
-        } else if (beginExistingAccessSearch(mc)) {
-        } else {
+        if (reuseSavedAccessPath(mc)) {} else if (beginExistingAccessSearch(mc)) {} else {
             plan(mc);
             walking = walkingSearch != null || !route.isEmpty();
             if (!walking && LootGameSolverConfig.staircaseEnabled
@@ -1864,6 +1903,32 @@ public final class ExplorationBeta {
             status = "Eating or preparing food";
             return;
         }
+        if (returning && resumeSearchAfterReturn && !insideDungeonRoom(mc)) {
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            int[] entrance = accessTrail.pointAt(0);
+            boolean reachedMouth = entrance != null && Math.abs(x - entrance[0]) + Math.abs(z - entrance[2]) <= 1
+                && y >= entrance[1]
+                && Math.abs(y - entrance[1]) <= 2
+                && solidCheckpoint(mc.theWorld, x, y, z);
+            if (reachedMouth || mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+                continueProgressiveSearch(mc, true);
+                return;
+            }
+        }
+        if (returning && escapingChestPit && mc.thePlayer.onGround && !isRewardChestPit(mc)) {
+            escapingChestPit = false;
+            clearChestPitSearch();
+            route.clear();
+            returnJoinSearch = null;
+            returnTrailRoute = null;
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            if (insideDungeonRoom(mc) && startRoomExitSearch(mc)) return;
+            if (startSavedReturn(mc, resumeSearchAfterReturn, 128)) return;
+            retryExitLater(mc);
+            return;
+        }
         if (returning && isRewardChestPit(mc) && jumpOutOfRewardPit(mc)) return;
         if (exitRecoveryTicks > 0) {
             if (--exitRecoveryTicks == 0) {
@@ -1874,8 +1939,15 @@ public final class ExplorationBeta {
                 int sx = (int) Math.floor(mc.thePlayer.posX), sy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
                 int sz = (int) Math.floor(mc.thePlayer.posZ);
                 openExitSearch = new OpenExitSearch(new OpenExitSearch.Terrain() {
-                    public boolean stand(int x, int y, int z) { return ground.stand(x, y, z); }
-                    public boolean clear(int x, int y, int z) { return ground.clear(x, y, z); }
+
+                    public boolean stand(int x, int y, int z) {
+                        return ground.stand(x, y, z);
+                    }
+
+                    public boolean clear(int x, int y, int z) {
+                        return ground.clear(x, y, z);
+                    }
+
                     public boolean exit(int x, int y, int z) {
                         if (!solidCheckpoint(exitWorld, x, y, z)) return false;
                         int index = accessTrail.nearestIndex(x, y, z, 0);
@@ -2128,14 +2200,19 @@ public final class ExplorationBeta {
         if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
             int[] end = route.get(route.size() - 1);
             if (excavationSearch == null) {
-                excavationSearch = new ExcavationPathfinder(end[0], end[1], end[2],
+                excavationSearch = new ExcavationPathfinder(
+                    end[0],
+                    end[1],
+                    end[2],
                     roofEscapeGoal == null ? target.xCoord : roofEscapeGoal[0],
                     roofEscapeGoal == null ? target.yCoord + 1 : roofEscapeGoal[1],
-                    roofEscapeGoal == null ? target.zCoord : roofEscapeGoal[2], true);
+                    roofEscapeGoal == null ? target.zCoord : roofEscapeGoal[2],
+                    true);
             }
             if (excavationSearch.advance(
                 (a, b, c, nx, ny, nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
-                24, System.nanoTime() + 3_000_000L)) {
+                24,
+                System.nanoTime() + 3_000_000L)) {
                 excavationRoute.addAll(excavationSearch.path);
                 excavationSearch = null;
             }
@@ -2144,7 +2221,10 @@ public final class ExplorationBeta {
             if (continuationSearch != null && !returning && !digging && !movingToPuzzleCenter) {
                 extendRoute(mc);
                 if (!route.isEmpty()) return;
-                if (continuationSearch != null) { status = "Planning next route"; return; }
+                if (continuationSearch != null) {
+                    status = "Planning next route";
+                    return;
+                }
             }
             if (followingOpenExit) {
                 followingOpenExit = false;
@@ -2403,9 +2483,12 @@ public final class ExplorationBeta {
             int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int cz = (int) Math.floor(mc.thePlayer.posZ);
             if ((first.length < 4 || first[3] == 0) && (second.length < 4 || second[3] == 0)
-                && first[1] == cy && second[1] == cy
-                && Math.abs(second[0] - cx) == 1 && Math.abs(second[2] - cz) == 1
-                && safe(mc.theWorld, second[0], cy, cz) && safe(mc.theWorld, cx, cy, second[2])
+                && first[1] == cy
+                && second[1] == cy
+                && Math.abs(second[0] - cx) == 1
+                && Math.abs(second[2] - cz) == 1
+                && safe(mc.theWorld, second[0], cy, cz)
+                && safe(mc.theWorld, cx, cy, second[2])
                 && safe(mc.theWorld, second[0], cy, second[2])) {
                 route.remove(0);
             }
@@ -2414,17 +2497,27 @@ public final class ExplorationBeta {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
-        if (returning && roomExitCrossing && mc.thePlayer.onGround
+        if (returning && roomExitCrossing
+            && mc.thePlayer.onGround
             && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1
             && clearRoomExitObstruction(mc, next, px, py, pz)) return;
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
         if (digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
                 net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
-                if (FoliagePolicy.canClear(isFoliage(plant),
+                if (FoliagePolicy.canClear(
+                    isFoliage(plant),
                     mc.theWorld.getTileEntity(next[0], by, next[2]) != null,
                     plant.getBlockHardness(mc.theWorld, next[0], by, next[2]),
-                    next[0], by, next[2], px, py, pz, next[0], next[2], plant == Blocks.snow_layer)) {
+                    next[0],
+                    by,
+                    next[2],
+                    px,
+                    py,
+                    pz,
+                    next[0],
+                    next[2],
+                    plant == Blocks.snow_layer)) {
                     minePlannedBlock(mc, next[0], by, next[2], next[1]);
                     return;
                 }
@@ -2483,8 +2576,11 @@ public final class ExplorationBeta {
                 continueProgressiveSearch(mc, true);
                 return;
             }
-            if (!returning && !digging && approachReady && approachPlan != null
-                && approachAnchor == next && !approachPlan.path.isEmpty()) {
+            if (!returning && !digging
+                && approachReady
+                && approachPlan != null
+                && approachAnchor == next
+                && !approachPlan.path.isEmpty()) {
                 route.clear();
                 excavationRoute.clear();
                 excavationRoute.addAll(approachPlan.path);
@@ -2529,15 +2625,23 @@ public final class ExplorationBeta {
         }
         settlingTicks = 0;
         float desired = centering ? mc.thePlayer.rotationYaw
-            : NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
-                next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
+            : NavigationSteering.heading(
+                mc.thePlayer.posX,
+                mc.thePlayer.posZ,
+                next[0] + 0.5D,
+                next[2] + 0.5D,
+                mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
         int upcomingPitch = staircaseDirection(route, py);
         if (upcomingPitch != 0) {
             int[] firstStep = null;
-            for (int[] step : route) if (step[1] != py) { firstStep = step; break; }
-            if (firstStep != null && Math.hypot(firstStep[0] + 0.5D - mc.thePlayer.posX,
-                firstStep[2] + 0.5D - mc.thePlayer.posZ) <= 1.8D) {
+            for (int[] step : route) if (step[1] != py) {
+                firstStep = step;
+                break;
+            }
+            if (firstStep != null
+                && Math.hypot(firstStep[0] + 0.5D - mc.thePlayer.posX, firstStep[2] + 0.5D - mc.thePlayer.posZ)
+                    <= 1.8D) {
                 if (cameraPitchDirection == 0) {
                     pitchLastY = py;
                     pitchLandingX = mc.thePlayer.posX;
@@ -2551,7 +2655,8 @@ public final class ExplorationBeta {
             pitchLandingX = mc.thePlayer.posX;
             pitchLandingZ = mc.thePlayer.posZ;
         }
-        if (cameraPitchDirection != 0 && upcomingPitch == 0 && mc.thePlayer.onGround
+        if (cameraPitchDirection != 0 && upcomingPitch == 0
+            && mc.thePlayer.onGround
             && Math.hypot(mc.thePlayer.posX - pitchLandingX, mc.thePlayer.posZ - pitchLandingZ) >= 1D)
             cameraPitchDirection = 0;
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
@@ -2651,8 +2756,11 @@ public final class ExplorationBeta {
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
             boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
-            boolean chestPitJump = returning && chestPitJumpBoostTicks > 0 && isRewardChestPit(mc)
-                && mc.thePlayer.onGround && Math.abs(turn) < 45F && distance < 4D;
+            boolean chestPitJump = returning && chestPitJumpBoostTicks > 0
+                && isRewardChestPit(mc)
+                && mc.thePlayer.onGround
+                && Math.abs(turn) < 45F
+                && distance < 4D;
             if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
             navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
                 || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
@@ -2660,14 +2768,17 @@ public final class ExplorationBeta {
                 || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
-                double speed = Math
-                    .min(centering ? (movingToPuzzleCenter ? 0.75D : 0.4D) : straight ? 1D : 0.95D,
-                        !centering && route.size() > 1 ? 1D : distance * 1.5D);
+                double speed = Math.min(
+                    centering ? (movingToPuzzleCenter ? 0.75D : 0.4D) : straight ? 1D : 0.95D,
+                    !centering && route.size() > 1 ? 1D : distance * 1.5D);
                 navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
                 navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
             }
-            mc.thePlayer.setSprinting(!centering && !digging && !mc.thePlayer.isInWater()
-                && Math.abs(turn) < 35F && navigationInput.forward > 0.8F);
+            mc.thePlayer.setSprinting(
+                !centering && !digging
+                    && !mc.thePlayer.isInWater()
+                    && Math.abs(turn) < 35F
+                    && navigationInput.forward > 0.8F);
         }
     }
 
@@ -2680,7 +2791,8 @@ public final class ExplorationBeta {
             if (!(block instanceof net.minecraft.block.BlockChest)) continue;
             double cx = x + ox + 0.5D - mc.thePlayer.posX, cz = z + oz + 0.5D - mc.thePlayer.posZ;
             if (cx * dx + cz * dz <= 0 || cx * cx + cz * cz > 2.25D) continue;
-            net.minecraft.util.AxisAlignedBB box = block.getCollisionBoundingBoxFromPool(mc.theWorld, x + ox, y, z + oz);
+            net.minecraft.util.AxisAlignedBB box = block
+                .getCollisionBoundingBoxFromPool(mc.theWorld, x + ox, y, z + oz);
             if (box != null && box.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && box.maxY - mc.thePlayer.boundingBox.minY <= 1D) return true;
         }
@@ -2701,16 +2813,24 @@ public final class ExplorationBeta {
             if (!isRewardChest(mc.theWorld, nx, y, nz) || !passable(mc.theWorld, nx, y + 1, nz)
                 || !passable(mc.theWorld, x, y + 2, z)) continue;
             double score = goal == null ? 0D : Math.hypot(nx - goal[0], nz - goal[2]);
-            if (score < bestScore) { best = direction; bestScore = score; }
+            if (score < bestScore) {
+                best = direction;
+                bestScore = score;
+            }
         }
         if (best == null) return false;
-        float yaw = NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
-            x + best[0] + 0.5D, z + best[1] + 0.5D, mc.thePlayer.rotationYaw);
+        float yaw = NavigationSteering.heading(
+            mc.thePlayer.posX,
+            mc.thePlayer.posZ,
+            x + best[0] + 0.5D,
+            z + best[1] + 0.5D,
+            mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
         look(yaw, -10F);
         if (Math.abs(turn) < 35F) {
             navigationInput.forward = 1F;
             navigationInput.hop = mc.thePlayer.onGround;
+            escapingChestPit = true;
         }
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
@@ -2724,12 +2844,16 @@ public final class ExplorationBeta {
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int sides = 0;
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
-            { -1, -1 } };
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
         for (int[] direction : directions) {
             boolean chest = false;
-            for (int dy = -2; dy <= 1 && !chest; dy++)
-                chest = isRewardChest(mc.theWorld, x + direction[0], y + dy, z + direction[1]);
+            for (int dy = 0; dy <= 1 && !chest; dy++) {
+                int cx = x + direction[0], cy = y + dy, cz = z + direction[1];
+                if (!isRewardChest(mc.theWorld, cx, cy, cz)) continue;
+                net.minecraft.util.AxisAlignedBB box = mc.theWorld.getBlock(cx, cy, cz)
+                    .getCollisionBoundingBoxFromPool(mc.theWorld, cx, cy, cz);
+                chest = box != null && box.maxY > mc.thePlayer.boundingBox.minY + 0.3D;
+            }
             if (chest) sides++;
         }
         return sides >= 3;
@@ -2740,7 +2864,8 @@ public final class ExplorationBeta {
         int playerX = (int) Math.floor(mc.thePlayer.posX);
         int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int playerZ = (int) Math.floor(mc.thePlayer.posZ);
-        if (next[1] <= playerY || next[1] > playerY + 2 || Math.abs(next[0] - playerX) > 1
+        if (next[1] <= playerY || next[1] > playerY + 2
+            || Math.abs(next[0] - playerX) > 1
             || Math.abs(next[2] - playerZ) > 1
             || Math.abs(next[0] - playerX) + Math.abs(next[2] - playerZ) == 0
             || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D)
@@ -2781,12 +2906,16 @@ public final class ExplorationBeta {
             double hx = side[0] + 0.5D + (x - side[0]) * 0.49D;
             double hy = side[1] + 0.5D + (y - side[1]) * 0.49D;
             double hz = side[2] + 0.5D + (z - side[2]) * 0.49D;
-            net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3.createVectorHelper(mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
-            net.minecraft.util.MovingObjectPosition visible = mc.theWorld.rayTraceBlocks(eye,
-                net.minecraft.util.Vec3.createVectorHelper(hx, hy, hz));
-            if (visible == null || visible.blockX != side[0] || visible.blockY != side[1]
-                || visible.blockZ != side[2] || visible.sideHit != side[3]
+            net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ);
+            net.minecraft.util.MovingObjectPosition visible = mc.theWorld
+                .rayTraceBlocks(eye, net.minecraft.util.Vec3.createVectorHelper(hx, hy, hz));
+            if (visible == null || visible.blockX != side[0]
+                || visible.blockY != side[1]
+                || visible.blockZ != side[2]
+                || visible.sideHit != side[3]
                 || eye.squareDistanceTo(visible.hitVec) > 16D) continue;
             int previousSlot = mc.thePlayer.inventory.currentItem;
             mc.thePlayer.inventory.currentItem = slot;
@@ -2803,7 +2932,9 @@ public final class ExplorationBeta {
             look(yaw, pitch);
             net.minecraft.util.MovingObjectPosition aimed = mc.objectMouseOver;
             if (aimed == null || aimed.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-                || aimed.blockX != side[0] || aimed.blockY != side[1] || aimed.blockZ != side[2]
+                || aimed.blockX != side[0]
+                || aimed.blockY != side[1]
+                || aimed.blockZ != side[2]
                 || aimed.sideHit != side[3]) {
                 status = "Aiming at return step support";
                 return true;
@@ -2851,10 +2982,16 @@ public final class ExplorationBeta {
 
     private boolean recoverableRouteFailure(String message) {
         String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
-        return text.contains("no safe") || text.contains("no verified") || text.contains("blocked")
-            || text.contains("obstructed") || text.contains("stalled") || text.contains("route")
-            || text.contains("search limit") || text.contains("landing did not") || text.contains("no walkable")
-            || text.contains("entrance did not cross") || text.contains("target no longer loaded")
+        return text.contains("no safe") || text.contains("no verified")
+            || text.contains("blocked")
+            || text.contains("obstructed")
+            || text.contains("stalled")
+            || text.contains("route")
+            || text.contains("search limit")
+            || text.contains("landing did not")
+            || text.contains("no walkable")
+            || text.contains("entrance did not cross")
+            || text.contains("target no longer loaded")
             || text.contains("could not place a safe return step");
     }
 
@@ -2874,7 +3011,8 @@ public final class ExplorationBeta {
         miningAim.reset();
         stalled = 0;
         lastDistance = Double.MAX_VALUE;
-        boolean nearEntrance = !returning && target != null && !target.isInvalid()
+        boolean nearEntrance = !returning && target != null
+            && !target.isInvalid()
             && Math.hypot(mc.thePlayer.posX - target.xCoord, mc.thePlayer.posZ - target.zCoord) <= 6D;
         if (nearEntrance && !route.isEmpty()) {
             int[] failed = route.get(0);
@@ -3188,19 +3326,33 @@ public final class ExplorationBeta {
         int pz = mc.thePlayer == null ? 0 : (int) Math.floor(mc.thePlayer.posZ);
         final boolean surfaceStart = mc.thePlayer != null && terrainWorld.blockExists(px, py, pz)
             && terrainWorld.getHeightValue(px, pz) - py <= 6;
-        final boolean protectedJourney = returning || digging || movingToPuzzleCenter || roomEntryPlanning
-            || roomEntryCrossing || roomExitPlanning || roomExitCrossing;
+        final boolean protectedJourney = returning || digging
+            || movingToPuzzleCenter
+            || roomEntryPlanning
+            || roomEntryCrossing
+            || roomExitPlanning
+            || roomExitCrossing;
         final boolean structureApproach = knownStructure != null && !searching;
         final int gx = target == null ? px : target.xCoord, gz = target == null ? pz : target.zCoord;
         return new GroundPathfinder.Terrain() {
 
             public boolean stand(int x, int y, int z) {
                 return !blockedWalkNodes.contains(supportKey(x, y, z)) && terrainWorld.blockExists(x, y, z)
-                    && NavigationSurfacePolicy.allow(surfaceStart, protectedJourney, structureApproach,
-                        terrainWorld.getHeightValue(x, z), y, x, z, gx, gz)
-                    && (safe(terrainWorld, x, y, z)
-                        || movingToPuzzleCenter && target != null && x == target.xCoord && y == target.yCoord + 1
-                            && z == target.zCoord && puzzleCenterStandable(terrainWorld, x, y, z));
+                    && NavigationSurfacePolicy.allow(
+                        surfaceStart,
+                        protectedJourney,
+                        structureApproach,
+                        terrainWorld.getHeightValue(x, z),
+                        y,
+                        x,
+                        z,
+                        gx,
+                        gz)
+                    && (safe(terrainWorld, x, y, z) || movingToPuzzleCenter && target != null
+                        && x == target.xCoord
+                        && y == target.yCoord + 1
+                        && z == target.zCoord
+                        && puzzleCenterStandable(terrainWorld, x, y, z));
             }
 
             public boolean clear(int x, int y, int z) {
@@ -3296,12 +3448,14 @@ public final class ExplorationBeta {
         for (int i = continuation.size() - 1; i >= 0; i--) {
             int[] step = continuation.get(i);
             int dx = Math.abs(step[0] - x), dz = Math.abs(step[2] - z);
-            if (step[1] != y || dx > 1 || dz > 1 || dx + dz == 0
-                || (step[0] + 0.5D - mc.thePlayer.posX) * forwardX
-                    + (step[2] + 0.5D - mc.thePlayer.posZ) * forwardZ <= 0D
+            if (step[1] != y || dx > 1
+                || dz > 1
+                || dx + dz == 0
+                || (step[0] + 0.5D - mc.thePlayer.posX) * forwardX + (step[2] + 0.5D - mc.thePlayer.posZ) * forwardZ
+                    <= 0D
                 || !safe(mc.theWorld, step[0], y, step[2])
-                || dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], y, z)
-                    || !safe(mc.theWorld, x, y, step[2]))) continue;
+                || dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], y, z) || !safe(mc.theWorld, x, y, step[2])))
+                continue;
             if (route.size() + i < 3) return false;
             route.clear();
             route.addAll(continuation.subList(i, continuation.size()));
@@ -3367,13 +3521,18 @@ public final class ExplorationBeta {
     }
 
     private static boolean puzzleCenterStandable(World world, int x, int y, int z) {
-        if (!world.blockExists(x, y - 1, z) || !passable(world, x, y, z) || !passable(world, x, y + 1, z))
-            return false;
+        if (!world.blockExists(x, y - 1, z) || !passable(world, x, y, z) || !passable(world, x, y + 1, z)) return false;
         net.minecraft.block.Block floor = world.getBlock(x, y - 1, z);
         net.minecraft.util.AxisAlignedBB support = floor.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
-        if (support == null || support.maxY < y - 0.05D || floor.getMaterial().isLiquid()) return false;
-        return world.func_147461_a(net.minecraft.util.AxisAlignedBB.getBoundingBox(
-            x + 0.19D, y + 0.01D, z + 0.19D, x + 0.81D, y + 1.81D, z + 0.81D)).isEmpty();
+        if (support == null || support.maxY < y - 0.05D
+            || floor.getMaterial()
+                .isLiquid())
+            return false;
+        return world
+            .func_147461_a(
+                net.minecraft.util.AxisAlignedBB
+                    .getBoundingBox(x + 0.19D, y + 0.01D, z + 0.19D, x + 0.81D, y + 1.81D, z + 0.81D))
+            .isEmpty();
     }
 
     private List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
@@ -3451,8 +3610,10 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
-        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1
-            && roofEscapeGoal == null && excavationReplans == 0) {
+        if (excavationRoute.isEmpty() && excavationSearch == null
+            && accessTrail.size() <= 1
+            && roofEscapeGoal == null
+            && excavationReplans == 0) {
             excavationRoute.addAll(patternedAccess(mc, x, y, z));
             if (!excavationRoute.isEmpty()) {
                 approachPlan = null;
@@ -3480,9 +3641,9 @@ public final class ExplorationBeta {
                 rejectedSteps.clear();
             }
             boolean complete = excavationSearch.advance(
-                (a, b, c, nx, ny, nz) -> a == x && b == y && c == z
-                    && blockedWalkNodes.contains(supportKey(nx, ny, nz)) ? -1
-                        : excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
+                (a, b, c, nx, ny, nz) -> a == x && b == y && c == z && blockedWalkNodes.contains(supportKey(nx, ny, nz))
+                    ? -1
+                    : excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
                 24,
                 System.nanoTime() + 3_000_000L);
             rejectedSteps.clear();
@@ -3552,8 +3713,11 @@ public final class ExplorationBeta {
             return harvestable;
         }
         // Falling blocks in the target column are cleared from the bottom up.
-        return hardness >= 0 && hardness <= 10 && !material.isLiquid()
-            && block != Blocks.fire && block != Blocks.cactus && block != Blocks.portal;
+        return hardness >= 0 && hardness <= 10
+            && !material.isLiquid()
+            && block != Blocks.fire
+            && block != Blocks.cactus
+            && block != Blocks.portal;
     }
 
     private int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
@@ -3568,8 +3732,8 @@ public final class ExplorationBeta {
             cost += 2;
             for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) for (int by = y + 1; by <= y + 3; by++) {
                 net.minecraft.block.Block block = w.getBlock(x + ox, by, z + oz);
-                if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial().isLiquid()
-                    || ox == 0 && oz == 0 && block instanceof net.minecraft.block.BlockFalling) return -1;
+                if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial()
+                    .isLiquid() || ox == 0 && oz == 0 && block instanceof net.minecraft.block.BlockFalling) return -1;
             }
         }
         int clearanceTop = Math.max(y, ny) + 1;
@@ -3591,9 +3755,8 @@ public final class ExplorationBeta {
                 if (ContactHazards.dangerous(block, w.getBlockMetadata(nx + ox, by, nz + oz))) return -1;
                 if ((block.getMaterial()
                     .isLiquid() && by >= firstBreak - 1
-                    && by <= lastBreak + 1) || block == Blocks.fire
-                    || block == Blocks.cactus
-                    || block == Blocks.portal) return -1;
+                    && by <= lastBreak + 1) || block == Blocks.fire || block == Blocks.cactus || block == Blocks.portal)
+                    return -1;
             }
         return cost;
     }
@@ -3646,9 +3809,8 @@ public final class ExplorationBeta {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (entranceCandidates.isEmpty()) {
             entranceCandidate = 0;
-            int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
-                { -1, -1 }, { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 },
-                { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
+            int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
+                { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
             for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
                 <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2)
                 for (int[] direction : directions) for (int dy = -1; dy <= 6; dy++) {
@@ -3754,9 +3916,19 @@ public final class ExplorationBeta {
         World w = mc.theWorld;
         for (int by = y; by <= y + 1; by++) {
             net.minecraft.block.Block plant = w.getBlock(x, by, z);
-            if (FoliagePolicy.canClear(isFoliage(plant), w.getTileEntity(x, by, z) != null,
-                plant.getBlockHardness(w, x, by, z), x, by, z, x, y, z, nx, nz, plant == Blocks.snow_layer))
-                return minePlannedBlock(mc, x, by, z, destinationY);
+            if (FoliagePolicy.canClear(
+                isFoliage(plant),
+                w.getTileEntity(x, by, z) != null,
+                plant.getBlockHardness(w, x, by, z),
+                x,
+                by,
+                z,
+                x,
+                y,
+                z,
+                nx,
+                nz,
+                plant == Blocks.snow_layer)) return minePlannedBlock(mc, x, by, z, destinationY);
         }
         if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
         if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
@@ -3764,10 +3936,20 @@ public final class ExplorationBeta {
         if (!w.blockExists(nx, clearTop + 1, nz)) return false;
         if (clearTop > y + 4) return false;
         for (int by = destinationY; by <= clearTop; by++) {
-            if (w.getBlock(nx, by, nz) == Blocks.snow_layer
-                && FoliagePolicy.canClear(true, w.getTileEntity(nx, by, nz) != null,
-                    w.getBlock(nx, by, nz).getBlockHardness(w, nx, by, nz), nx, by, nz,
-                    x, y, z, nx, nz, true)) return minePlannedBlock(mc, nx, by, nz, destinationY);
+            if (w.getBlock(nx, by, nz) == Blocks.snow_layer && FoliagePolicy.canClear(
+                true,
+                w.getTileEntity(nx, by, nz) != null,
+                w.getBlock(nx, by, nz)
+                    .getBlockHardness(w, nx, by, nz),
+                nx,
+                by,
+                nz,
+                x,
+                y,
+                z,
+                nx,
+                nz,
+                true)) return minePlannedBlock(mc, nx, by, nz, destinationY);
             if (w.getBlock(nx, by, nz) instanceof net.minecraft.block.BlockFalling)
                 return minePlannedBlock(mc, nx, by, nz, destinationY);
         }
@@ -3775,7 +3957,8 @@ public final class ExplorationBeta {
             if (entity instanceof net.minecraft.entity.item.EntityFallingBlock) {
                 net.minecraft.entity.Entity falling = (net.minecraft.entity.Entity) entity;
                 if ((int) Math.floor(falling.posX) == nx && (int) Math.floor(falling.posZ) == nz
-                    && falling.posY >= destinationY && falling.posY <= clearTop + 12) {
+                    && falling.posY >= destinationY
+                    && falling.posY <= clearTop + 12) {
                     status = "Waiting for sand";
                     return true;
                 }
@@ -3784,16 +3967,37 @@ public final class ExplorationBeta {
         for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
-            if (FoliagePolicy.canClear(isFoliage(b), w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz, b == Blocks.snow_layer)) continue;
+            if (FoliagePolicy.canClear(
+                isFoliage(b),
+                w.getTileEntity(nx, by, nz) != null,
+                b.getBlockHardness(w, nx, by, nz),
+                nx,
+                by,
+                nz,
+                x,
+                y,
+                z,
+                nx,
+                nz,
+                b == Blocks.snow_layer)) continue;
             if (!excavatable(w, nx, by, nz)) return false;
             if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
         }
         for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-            if (isFoliage(b) && FoliagePolicy.canClear(true, w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz, b == Blocks.snow_layer))
-                return minePlannedBlock(mc, nx, by, nz, destinationY);
+            if (isFoliage(b) && FoliagePolicy.canClear(
+                true,
+                w.getTileEntity(nx, by, nz) != null,
+                b.getBlockHardness(w, nx, by, nz),
+                nx,
+                by,
+                nz,
+                x,
+                y,
+                z,
+                nx,
+                nz,
+                b == Blocks.snow_layer)) return minePlannedBlock(mc, nx, by, nz, destinationY);
             if (passable(w, nx, by, nz)) continue;
             return minePlannedBlock(mc, nx, by, nz, destinationY);
         }
@@ -3806,11 +4010,9 @@ public final class ExplorationBeta {
         int lastX = nx, lastY = destinationY, lastZ = nz;
         while (!excavationRoute.isEmpty() && route.size() < 6) {
             int[] following = excavationRoute.get(0);
-            if (!ExcavationPolicy.beside(lastX, lastZ, following[0], following[2])
-                || Math.abs(following[1] - lastY) > 1
+            if (!ExcavationPolicy.beside(lastX, lastZ, following[0], following[2]) || Math.abs(following[1] - lastY) > 1
                 || !safe(w, following[0], following[1], following[2])
-                || excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2]) < 0)
-                break;
+                || excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2]) < 0) break;
             boolean clear = true;
             for (int by = following[1]; by <= Math.max(lastY, following[1]) + 1; by++) {
                 if (isFoliage(w.getBlock(following[0], by, following[2]))
@@ -3882,9 +4084,11 @@ public final class ExplorationBeta {
             && obstruction.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
             net.minecraft.block.Block visible = w.getBlock(obstruction.blockX, obstruction.blockY, obstruction.blockZ);
             boolean plant = isFoliage(visible);
-            boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling
-                && obstruction.blockX == nx && obstruction.blockZ == nz && obstruction.blockY > by
-                && obstruction.blockY <= y + 2 && visible instanceof net.minecraft.block.BlockFalling
+            boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling && obstruction.blockX == nx
+                && obstruction.blockZ == nz
+                && obstruction.blockY > by
+                && obstruction.blockY <= y + 2
+                && visible instanceof net.minecraft.block.BlockFalling
                 && excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
             if (aimPoint == null && (fallingObstruction || FoliagePolicy.canClear(
                 plant,
@@ -4003,7 +4207,8 @@ public final class ExplorationBeta {
             for (int dy = -1; dy <= 1; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
                 net.minecraft.block.Block nearby = world.getBlock(x + dx, y + dy, z + dz);
-                net.minecraftforge.fluids.Fluid fluid = net.minecraftforge.fluids.FluidRegistry.lookupFluidForBlock(nearby);
+                net.minecraftforge.fluids.Fluid fluid = net.minecraftforge.fluids.FluidRegistry
+                    .lookupFluidForBlock(nearby);
                 if (fluid != null && OilAvoidance.isOil(fluid.getName())) return false;
             }
         }
@@ -4039,7 +4244,9 @@ public final class ExplorationBeta {
     private static boolean isQuicksand(World world, int x, int y, int z) {
         if (!world.blockExists(x, y, z)) return false;
         net.minecraft.block.Block block = world.getBlock(x, y, z);
-        if ("biomesoplenty.common.blocks.BlockMud".equals(block.getClass().getName()))
+        if ("biomesoplenty.common.blocks.BlockMud".equals(
+            block.getClass()
+                .getName()))
             return world.getBlockMetadata(x, y, z) == 1;
         Boolean quicksand = QUICKSAND_BLOCKS.get(block);
         if (quicksand == null) {
@@ -4053,9 +4260,14 @@ public final class ExplorationBeta {
 
     private static boolean solidCheckpoint(World world, int x, int y, int z) {
         return world.blockExists(x, y - 1, z) && world.blockExists(x, y, z)
-            && !world.getBlock(x, y, z).getMaterial().isLiquid()
-            && !world.getBlock(x, y - 1, z).getMaterial().isLiquid()
-            && walkSurfaceY(world, x, y, z) >= y && safe(world, x, y, z);
+            && !world.getBlock(x, y, z)
+                .getMaterial()
+                .isLiquid()
+            && !world.getBlock(x, y - 1, z)
+                .getMaterial()
+                .isLiquid()
+            && walkSurfaceY(world, x, y, z) >= y
+            && safe(world, x, y, z);
     }
 
     private static double walkSurfaceY(World world, int x, int y, int z) {

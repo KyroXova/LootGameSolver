@@ -40,9 +40,15 @@ final class InventoryToolTransfer {
         clearing = false;
         source = inventorySlot;
         hotbar = -1;
-        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) { hotbar = i; break; }
+        for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+            hotbar = i;
+            break;
+        }
         if (hotbar < 0) for (int i = 0; i < 9; i++) {
-            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))) { hotbar = i; break; }
+            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))) {
+                hotbar = i;
+                break;
+            }
         }
         if (hotbar < 0) return false;
         ticks = 0;
@@ -54,14 +60,21 @@ final class InventoryToolTransfer {
         return true;
     }
 
-    int hotbarSlot() { return hotbar; }
+    int hotbarSlot() {
+        return hotbar;
+    }
 
     boolean restore(Minecraft mc, int inventorySlot, int hotbarSlot, ItemStack displaced) {
-        if (active() || mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
-            || mc.thePlayer.inventory.getItemStack() != null || inventorySlot < 9 || inventorySlot >= 36
-            || hotbarSlot < 0 || hotbarSlot >= 9
+        if (active() || mc.currentScreen != null
+            || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null
+            || inventorySlot < 9
+            || inventorySlot >= 36
+            || hotbarSlot < 0
+            || hotbarSlot >= 9
             || !InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbarSlot))
-            || !ItemStack.areItemStacksEqual(displaced, mc.thePlayer.inventory.getStackInSlot(inventorySlot))) return false;
+            || !ItemStack.areItemStacksEqual(displaced, mc.thePlayer.inventory.getStackInSlot(inventorySlot)))
+            return false;
         if (displaced == null) return clearHotbar(mc, hotbarSlot, inventorySlot);
         source = inventorySlot;
         hotbar = hotbarSlot;
@@ -70,16 +83,21 @@ final class InventoryToolTransfer {
         ticks = 0;
         swapped = false;
         screen = new ToolScreen(mc);
-        mc.getNetHandler().addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
+        mc.getNetHandler()
+            .addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
         mc.displayGuiScreen(screen);
         return true;
     }
 
     boolean clearHotbar(Minecraft mc, int hotbarSlot, int emptySlot) {
-        if (active() || mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
-            || mc.thePlayer.inventory.getItemStack() != null || hotbarSlot < 0 || hotbarSlot >= 9
-            || emptySlot < 9 || emptySlot >= 36 || mc.thePlayer.inventory.getStackInSlot(emptySlot) != null)
-            return false;
+        if (active() || mc.currentScreen != null
+            || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
+            || mc.thePlayer.inventory.getItemStack() != null
+            || hotbarSlot < 0
+            || hotbarSlot >= 9
+            || emptySlot < 9
+            || emptySlot >= 36
+            || mc.thePlayer.inventory.getStackInSlot(emptySlot) != null) return false;
         ItemStack stack = mc.thePlayer.inventory.getStackInSlot(hotbarSlot);
         if (stack == null) return false;
         expected = stack.copy();
@@ -89,7 +107,8 @@ final class InventoryToolTransfer {
         swapped = false;
         clearing = true;
         screen = new ToolScreen(mc);
-        mc.getNetHandler().addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
+        mc.getNetHandler()
+            .addToSendQueue(new C16PacketClientStatus(C16PacketClientStatus.EnumState.OPEN_INVENTORY_ACHIEVEMENT));
         mc.displayGuiScreen(screen);
         return true;
     }
@@ -101,8 +120,9 @@ final class InventoryToolTransfer {
             return false;
         }
         if (++ticks == 6) {
-            if (clearing ? mc.thePlayer.inventory.getStackInSlot(source) != null
-                || !ItemStack.areItemStacksEqual(expected, mc.thePlayer.inventory.getStackInSlot(hotbar))
+            if (clearing
+                ? mc.thePlayer.inventory.getStackInSlot(source) != null
+                    || !ItemStack.areItemStacksEqual(expected, mc.thePlayer.inventory.getStackInSlot(hotbar))
                 : !ItemStack.areItemStacksEqual(expected, mc.thePlayer.inventory.getStackInSlot(source))) {
                 cancel(mc);
                 return false;

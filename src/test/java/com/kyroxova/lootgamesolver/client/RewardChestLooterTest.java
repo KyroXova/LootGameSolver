@@ -1,9 +1,11 @@
 package com.kyroxova.lootgamesolver.client;
 
 import static org.junit.Assert.assertEquals;
+
 import org.junit.Test;
 
 public class RewardChestLooterTest {
+
     @Test
     public void mapsRewardChestDirectionsToLootGamesStageOrder() {
         assertEquals(1, RewardChestLooter.stageAt(0, -1));

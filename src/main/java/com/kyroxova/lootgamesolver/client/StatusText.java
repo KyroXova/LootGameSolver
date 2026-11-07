@@ -4,7 +4,7 @@ import java.util.Locale;
 
 final class StatusText {
 
-    private static final int MAX_LENGTH = 24;
+    private static final int MAX_LENGTH = 36;
 
     private StatusText() {}
 
@@ -56,7 +56,11 @@ final class StatusText {
             || text.contains("no walkable")
             || text.contains("no longer safe")
             || text.contains("still inside room")
-            || text.contains("stopped")) return "Path Blocked";
+            || text.contains("stopped")) {
+            if (text.contains("exit") || text.contains("return") || text.contains("room")) return "Exit Blocked";
+            if (text.contains("dig") || text.contains("tunnel") || text.contains("mining")) return "Tunnel Blocked";
+            return "Route Blocked";
+        }
         if (text.contains("waiting") && text.contains("tool")) return "Waiting: Tool";
         if (text.contains("waiting") && text.contains("land")) return "Waiting: Landing";
         if (text.contains("waiting") && text.contains("placement")) return "Waiting: Place";
@@ -116,12 +120,10 @@ final class StatusText {
     }
 
     private static String shorten(String detail) {
-        String[] words = detail.trim().split("\\s+");
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < words.length && i < 3; i++) {
-            if (i > 0) result.append(' ');
-            result.append(words[i]);
-        }
-        return result.length() <= MAX_LENGTH ? result.toString() : result.substring(0, MAX_LENGTH - 1) + "…";
+        String text = detail.trim()
+            .replaceAll("\\s+", " ");
+        if (text.length() <= MAX_LENGTH) return text;
+        int end = text.lastIndexOf(' ', MAX_LENGTH - 1);
+        return text.substring(0, end > 0 ? end : MAX_LENGTH - 1) + "…";
     }
 }

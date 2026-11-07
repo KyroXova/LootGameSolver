@@ -5,6 +5,7 @@ import net.minecraft.util.WeightedRandomChestContent;
 import net.minecraftforge.oredict.OreDictionary;
 
 final class RewardWeighting {
+
     private RewardWeighting() {}
 
     static double probability(ItemStack stack, WeightedRandomChestContent[] entries) {
@@ -16,7 +17,8 @@ final class RewardWeighting {
             ItemStack template = entry.theItemId;
             if (template != null && template.getItem() == stack.getItem()
                 && (template.getItemDamage() == OreDictionary.WILDCARD_VALUE
-                    || template.getItemDamage() == stack.getItemDamage())) matching += entry.itemWeight;
+                    || template.getItemDamage() == stack.getItemDamage()))
+                matching += entry.itemWeight;
         }
         return total == 0 || matching == 0 ? Double.NaN : (double) matching / total;
     }

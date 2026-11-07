@@ -93,7 +93,7 @@ jobs:
               MAKE_LATEST="true"
             fi
 
-            if [[ "$FORCE_RELEASE" != "true" && -n "$LATEST_RELEASE_TAG" && "$MOD_VERSION" == "$LATEST_RELEASE_TAG" ]]; then
+            if [[ "$FORCE_RELEASE" != "true" && -n "$LATEST_RELEASE_TAG" && "$MOD_VERSION" == "${LATEST_RELEASE_TAG#v}" ]]; then
               echo "Version '$MOD_VERSION' already matches latest release '$LATEST_RELEASE_TAG'. Skipping release."
               SHOULD_RELEASE="false"
             fi
@@ -153,25 +153,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Disable beta finder for public build
-        shell: bash
-        run: |
-          set -euo pipefail
-          SOURCE=src/main/java/com/kyroxova/lootgamesolver/client/ExplorationBeta.java
-          python3 - "$SOURCE" <<'PY'
-          from pathlib import Path
-          import sys
-
-          source = Path(sys.argv[1])
-          text = source.read_text()
-          enabled = "public static final boolean ENABLED = true;"
-          disabled = "public static final boolean ENABLED = false;"
-          if text.count(enabled) != 1:
-              raise SystemExit("Expected exactly one enabled local beta gate")
-          source.write_text(text.replace(enabled, disabled, 1))
-          PY
-          grep -q 'public static final boolean ENABLED = false;' "$SOURCE"
-
       - name: Setup workspace
         run: ./gradlew setupCIWorkspace
 
@@ -192,6 +173,10 @@ jobs:
           cmp "$NOTES" build/release_body.md
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"
           echo "CHANGELOG_FILE=$GITHUB_WORKSPACE/$NOTES" >> "$GITHUB_ENV"
+      - name: Check CurseForge credentials
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

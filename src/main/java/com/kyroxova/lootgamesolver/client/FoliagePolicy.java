@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-
 final class FoliagePolicy {
 
     static boolean canClear(boolean plant, boolean tile, float hardness, int x, int y, int z, int playerX, int footY,

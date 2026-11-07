@@ -12,14 +12,19 @@ import net.minecraft.util.StatCollector;
 import net.minecraftforge.oredict.OreDictionary;
 
 final class TrashCleanup {
+
     private boolean opening, open;
     private int wait, timeout, retryDelay;
     private int pendingIndex = -1, pendingSize;
     private String status = "";
 
-    String status() { return status; }
+    String status() {
+        return status;
+    }
 
-    boolean active() { return opening || open; }
+    boolean active() {
+        return opening || open;
+    }
 
     void advanceCooldown() {
         if (retryDelay > 0) retryDelay--;
@@ -32,17 +37,29 @@ final class TrashCleanup {
         return empty <= 8 && nextTrash(mc) >= 0;
     }
 
-    void reset() { opening = false; open = false; wait = 0; timeout = 0; retryDelay = 0; pendingIndex = -1; }
+    void reset() {
+        opening = false;
+        open = false;
+        wait = 0;
+        timeout = 0;
+        retryDelay = 0;
+        pendingIndex = -1;
+    }
 
     boolean shouldClean(Minecraft mc) {
         return retryDelay == 0 && mc.currentScreen == null && nextTrash(mc) >= 0;
     }
 
     boolean tick(Minecraft mc, boolean enabled) {
-        if (mc.thePlayer == null || mc.theWorld == null) { reset(); return false; }
+        if (mc.thePlayer == null || mc.theWorld == null) {
+            reset();
+            return false;
+        }
         if (!opening && !open) {
-            if (!enabled || retryDelay > 0 || mc.currentScreen != null
-                || mc.thePlayer.inventory.getItemStack() != null || nextTrash(mc) < 0) return false;
+            if (!enabled || retryDelay > 0
+                || mc.currentScreen != null
+                || mc.thePlayer.inventory.getItemStack() != null
+                || nextTrash(mc) < 0) return false;
             mc.thePlayer.sendChatMessage("/trash_can");
             opening = true;
             timeout = 0;
@@ -53,9 +70,9 @@ final class TrashCleanup {
             if (mc.currentScreen instanceof GuiChest && mc.thePlayer.openContainer instanceof ContainerChest) {
                 IInventory inventory = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
                 String name = inventory.getInventoryName();
-                if (inventory.getSizeInventory() == 36
-                    && ("key.serverutilities.trash".equals(name)
-                        || StatCollector.translateToLocal("key.serverutilities.trash").equals(name))) {
+                if (inventory.getSizeInventory() == 36 && ("key.serverutilities.trash".equals(name)
+                    || StatCollector.translateToLocal("key.serverutilities.trash")
+                        .equals(name))) {
                     opening = false;
                     open = true;
                     wait = 10;
@@ -128,12 +145,18 @@ final class TrashCleanup {
         }
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (i == reserve || stack == null || InventoryProtection.essential(stack)
-                || stack.hasDisplayName() || stack.hasTagCompound()) continue;
+            if (i == reserve || stack == null
+                || InventoryProtection.essential(stack)
+                || stack.hasDisplayName()
+                || stack.hasTagCompound()) continue;
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
             boolean ore = false;
             for (int oreId : OreDictionary.getOreIDs(stack)) {
-                if (OreDictionary.getOreName(oreId).startsWith("ore")) { ore = true; break; }
+                if (OreDictionary.getOreName(oreId)
+                    .startsWith("ore")) {
+                    ore = true;
+                    break;
+                }
             }
             if (TrashPolicy.discard(id, stack.getItemDamage(), ore, stack.getItem() instanceof ItemBlock)) return i;
         }

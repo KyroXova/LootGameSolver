@@ -2,10 +2,13 @@ package com.kyroxova.lootgamesolver.client;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
 import org.junit.Test;
 
 public class TrashPolicyTest {
-    @Test public void filtersSpecifiedJunkAndKeepsUnrelatedLoot() {
+
+    @Test
+    public void filtersSpecifiedJunkAndKeepsUnrelatedLoot() {
         assertTrue(TrashPolicy.buildingReserve("minecraft:cobblestone"));
         assertTrue(TrashPolicy.buildingReserve("minecraft:dirt"));
         assertTrue(TrashPolicy.discard("mod:ore", 0, true, false));

@@ -7,10 +7,12 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Set;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 final class LootedChestStore {
+
     private final File file;
     private final Set<String> entries;
 
@@ -18,7 +20,8 @@ final class LootedChestStore {
         this.file = file;
         Set<String> loaded = null;
         if (file.isFile() && file.length() < 4_000_000L) try {
-            loaded = new Gson().fromJson(new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8),
+            loaded = new Gson().fromJson(
+                new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8),
                 new TypeToken<Set<String>>() {}.getType());
         } catch (IOException | RuntimeException ignored) {}
         entries = loaded == null ? new HashSet<String>() : loaded;
@@ -36,11 +39,19 @@ final class LootedChestStore {
         String key = key(world, dimension, pos);
         if (!entries.add(key)) return true;
         try {
-            Files.createDirectories(file.getParentFile().toPath());
+            Files.createDirectories(
+                file.getParentFile()
+                    .toPath());
             File pending = new File(file.getParentFile(), file.getName() + ".pending");
-            Files.write(pending.toPath(), new Gson().toJson(entries).getBytes(StandardCharsets.UTF_8));
+            Files.write(
+                pending.toPath(),
+                new Gson().toJson(entries)
+                    .getBytes(StandardCharsets.UTF_8));
             try {
-                Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
+                Files.move(
+                    pending.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
             } catch (java.nio.file.AtomicMoveNotSupportedException e) {
                 Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);

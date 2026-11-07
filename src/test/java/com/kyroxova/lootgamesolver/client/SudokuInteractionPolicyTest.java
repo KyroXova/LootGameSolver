@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class SudokuInteractionPolicyTest {
+
     @Test
     public void avoidsSneakClickWhenHeldItemBlocksInteraction() {
         assertFalse(SolverSession.shouldUseReverseSudokuClicks(0, 9, false));
