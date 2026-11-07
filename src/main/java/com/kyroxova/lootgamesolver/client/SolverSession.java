@@ -100,6 +100,13 @@ public final class SolverSession {
         }
 
         game = currentSnapshot.type;
+        if (currentSnapshot.type == MiniGame.MINESWEEPER && MinesweeperActionGuard.complete(currentSnapshot.minesweeper)) {
+            resetForNewRound();
+            status = "Board complete; waiting for next stage";
+            return;
+        }
+        if (currentSnapshot.type == MiniGame.MINESWEEPER && activeAction != null
+            && !currentSnapshot.minesweeper.contains(activeAction.position)) resetForNewRound();
         if (currentSnapshot.type == MiniGame.SUDOKU) {
             StringBuilder puzzle = new StringBuilder(81);
             for (int r = 0; r < 9; r++)
@@ -266,10 +273,19 @@ public final class SolverSession {
     }
 
     private void send(DetectedGame snapshot) {
+        if (snapshot.type == MiniGame.MINESWEEPER && !MinesweeperActionGuard.valid(snapshot.minesweeper, activeAction)) {
+            resetForNewRound();
+            status = "Waiting for board update";
+            return;
+        }
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
         if (snapshot.type == MiniGame.GAME_OF_LIGHT && bridge.isGameOfLightActionPending()) {
+            if (System.currentTimeMillis() - lastActionAt >= LootGameSolverConfig.boardUpdateTimeoutMs) {
+                cancel("Game of Light action timed out; solver stopped");
+                return;
+            }
             status = "Waiting: GoL";
             return;
         }

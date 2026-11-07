@@ -146,6 +146,14 @@ public final class LootGamesBridge implements MiniGameDetector {
         return ((Number) value).intValue();
     }
 
+    static boolean minesweeperGenerated(Object game) throws Exception {
+        try {
+            return game.getClass().getField("cIsGenerated").getBoolean(game);
+        } catch (NoSuchFieldException absent) {
+            return bool(game, "isBoardGenerated");
+        }
+    }
+
     public void invalidateDormantCache() {
         // Kept for backward compatibility
     }
@@ -325,7 +333,7 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     private DetectedGame readMinesweeper(Object game) throws Exception {
-        if (!bool(game, "isBoardGenerated")) return null;
+        if (!minesweeperGenerated(game)) return null;
         Object rawBoard = invoke(game, "getBoard");
         if (rawBoard == null) return null;
         int size = number(invoke(rawBoard, "size"));
@@ -689,7 +697,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                 .getName()))
             return false;
         try {
-            if (bool(game, "isBoardGenerated")) return false;
+            if (minesweeperGenerated(game)) return false;
             Object stage = invoke(game, "getStage");
             return "waiting".equals(String.valueOf(invoke(stage, "getID")));
         } catch (Exception e) {
@@ -770,6 +778,7 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public boolean actionComplete(DetectedGame current, SolverAction action) {
         if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER) {
+            if (!current.minesweeper.contains(action.position)) return true;
             MinesweeperCell cell = current.minesweeper.get(action.position);
             return action.type == SolverAction.Type.REVEAL
                 ? cell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.REVEALED
