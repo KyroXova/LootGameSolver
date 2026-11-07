@@ -17,6 +17,10 @@ public final class GroundPathfinder {
 
         boolean clear(int x, int y, int z);
 
+        default boolean checkpoint(int x, int y, int z) {
+            return stand(x, y, z);
+        }
+
         default int extraCost(int x, int y, int z) {
             return 0;
         }
@@ -97,7 +101,7 @@ public final class GroundPathfinder {
             this.gy = gy;
             this.radius = radius;
             start = new Node(x, y, z, 0, gx, gy, gz, null);
-            best = start;
+            best = terrain.checkpoint(x, y, z) ? start : null;
             done = !terrain.stand(x, y, z);
             if (!done) {
                 open.add(start);
@@ -113,8 +117,9 @@ public final class GroundPathfinder {
                 long nodeKey = key(node.x, node.y, node.z);
                 Integer bestCost = bestCosts.get(nodeKey);
                 if (bestCost == null || node.cost != bestCost.intValue() || !visited.add(nodeKey)) continue;
-                if (node.remaining < best.remaining) best = node;
-                if (reachesGoal(node)) {
+                boolean canStop = terrain.checkpoint(node.x, node.y, node.z);
+                if (canStop && (best == null || node.remaining < best.remaining)) best = node;
+                if (canStop && reachesGoal(node)) {
                     best = node;
                     done = true;
                     break;
@@ -156,7 +161,8 @@ public final class GroundPathfinder {
 
         List<int[]> path() {
             List<int[]> result = new ArrayList<int[]>();
-            if (best.remaining >= start.remaining) return result;
+            if (best == null || best == start || best.remaining >= start.remaining
+                && terrain.checkpoint(start.x, start.y, start.z)) return result;
             for (Node node = best; node.parent != null; node = node.parent)
                 result.add(new int[] { node.x, node.y, node.z });
             Collections.reverse(result);
@@ -164,7 +170,7 @@ public final class GroundPathfinder {
         }
 
         boolean reachedGoal() {
-            return reachesGoal(best);
+            return best != null && terrain.checkpoint(best.x, best.y, best.z) && reachesGoal(best);
         }
 
         private boolean reachesGoal(Node node) {

@@ -737,6 +737,8 @@ public final class ExplorationBeta {
 
     private boolean savedRouteWalkable(Minecraft mc, List<int[]> points) {
         if (mc == null || mc.theWorld == null || points == null || points.isEmpty()) return false;
+        int[] endpoint = points.get(points.size() - 1);
+        if (!solidCheckpoint(mc.theWorld, endpoint[0], endpoint[1], endpoint[2])) return false;
         for (int i = 0; i < points.size(); i++) {
             int[] point = points.get(i);
             if (!safe(mc.theWorld, point[0], point[1], point[2])
@@ -772,7 +774,7 @@ public final class ExplorationBeta {
             chestSides++;
             for (int distance = 1; distance <= 5; distance++) for (int dy = -1; dy <= 2; dy++) {
                 int ex = x + direction[0] * distance, ey = y + dy, ez = z + direction[1] * distance;
-                if (safe(mc.theWorld, ex, ey, ez)) exits.add(new int[] { ex, ey, ez });
+                if (solidCheckpoint(mc.theWorld, ex, ey, ez)) exits.add(new int[] { ex, ey, ez });
             }
         }
         if (chestSides < 3 || exits.isEmpty()) return false;
@@ -828,6 +830,10 @@ public final class ExplorationBeta {
             public boolean clear(int px, int py, int pz) {
                 return passable(exitWorld, px, py, pz);
             }
+
+            public boolean checkpoint(int px, int py, int pz) {
+                return solidCheckpoint(exitWorld, px, py, pz);
+            }
         };
         chestPitApproachSearch = new GroundPathfinder.Search(
             terrain,
@@ -856,6 +862,10 @@ public final class ExplorationBeta {
 
             public boolean clear(int px, int py, int pz) {
                 return passable(exitWorld, px, py, pz);
+            }
+
+            public boolean checkpoint(int px, int py, int pz) {
+                return solidCheckpoint(exitWorld, px, py, pz);
             }
         };
         chestPitSearch = new GroundPathfinder.Search(
@@ -1075,7 +1085,7 @@ public final class ExplorationBeta {
                     int outX = xSide ? wallX + side[1] : along;
                     int outZ = xSide ? along : wallZ + side[2];
                     if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
-                        || !safe(mc.theWorld, outX, floorY, outZ)) continue;
+                        || !solidCheckpoint(mc.theWorld, outX, floorY, outZ)) continue;
                     boolean levelInside = safe(mc.theWorld, inX, floorY, inZ);
                     boolean lowerInside = !levelInside && safe(mc.theWorld, inX, floorY - 1, inZ)
                         && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
@@ -1195,7 +1205,7 @@ public final class ExplorationBeta {
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int checkpointIndex = ReturnRoutePolicy.nextSafeCheckpoint(route, firstCheckpoint, point ->
-            safe(mc.theWorld, point[0], point[1], point[2])
+            solidCheckpoint(mc.theWorld, point[0], point[1], point[2])
                 && !blockedWalkNodes.contains(supportKey(point[0], point[1], point[2])));
         if (checkpointIndex < 0) return false;
         int[] join = route.get(checkpointIndex);
@@ -1748,6 +1758,7 @@ public final class ExplorationBeta {
                     public boolean stand(int x, int y, int z) { return ground.stand(x, y, z); }
                     public boolean clear(int x, int y, int z) { return ground.clear(x, y, z); }
                     public boolean exit(int x, int y, int z) {
+                        if (!solidCheckpoint(exitWorld, x, y, z)) return false;
                         int index = accessTrail.nearestIndex(x, y, z, 0);
                         if (accessTrail.size() >= 2) return index >= 0 && index < accessTrail.size() - 1;
                         return exitWorld.canBlockSeeTheSky(x, y, z);
@@ -2995,6 +3006,10 @@ public final class ExplorationBeta {
                 return passable(terrainWorld, x, y, z);
             }
 
+            public boolean checkpoint(int x, int y, int z) {
+                return solidCheckpoint(terrainWorld, x, y, z);
+            }
+
             public int extraCost(int x, int y, int z) {
                 return terrainWorld.getBlock(x, y, z)
                     .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
@@ -3433,6 +3448,10 @@ public final class ExplorationBeta {
                 public boolean clear(int a, int b, int c) {
                     return passable(w, a, b, c);
                 }
+
+                public boolean checkpoint(int a, int b, int c) {
+                    return solidCheckpoint(w, a, b, c);
+                }
             }, x, y, z, goal[0], goal[2], 48);
             if (candidate.isEmpty()) continue;
             int[] last = candidate.get(candidate.size() - 1);
@@ -3744,6 +3763,13 @@ public final class ExplorationBeta {
                 net.minecraft.util.AxisAlignedBB
                     .getBoundingBox(x + 0.19D, surfaceY + 0.01D, z + 0.19D, x + 0.81D, surfaceY + 1.81D, z + 0.81D))
             .isEmpty();
+    }
+
+    private static boolean solidCheckpoint(World world, int x, int y, int z) {
+        return world.blockExists(x, y - 1, z) && world.blockExists(x, y, z)
+            && !world.getBlock(x, y, z).getMaterial().isLiquid()
+            && !world.getBlock(x, y - 1, z).getMaterial().isLiquid()
+            && walkSurfaceY(world, x, y, z) >= y && safe(world, x, y, z);
     }
 
     private static double walkSurfaceY(World world, int x, int y, int z) {
