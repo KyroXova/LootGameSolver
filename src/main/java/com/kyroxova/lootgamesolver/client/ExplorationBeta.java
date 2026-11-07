@@ -1721,6 +1721,7 @@ public final class ExplorationBeta {
                     if (mc.thePlayer.getDistanceSq(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D)
                         <= 16D) {
                         stop(mc, "Found nearby LootGame");
+                        puzzleArrivalPending = true;
                         return;
                     }
                     plan(mc);
@@ -1760,6 +1761,7 @@ public final class ExplorationBeta {
                 if (!route.isEmpty() || walkingSearch != null) return;
             }
             stop(mc, "Arrived beside LootGame");
+            puzzleArrivalPending = true;
             return;
         }
         int[] next = route.get(0);
