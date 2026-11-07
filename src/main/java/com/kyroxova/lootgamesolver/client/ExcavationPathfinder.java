@@ -76,7 +76,9 @@ final class ExcavationPathfinder {
         int expanded = 0;
         while (!open.isEmpty() && visited.size() < 4096 && expanded < limit && System.nanoTime() < deadline) {
             Node node = open.remove();
-            if (!visited.add(key(node.x, node.y, node.z))) continue;
+            long nodeKey = key(node.x, node.y, node.z);
+            Integer bestCost = costs.get(nodeKey);
+            if (bestCost == null || node.cost != bestCost.intValue() || !visited.add(nodeKey)) continue;
             expanded++;
             if (node.remaining < best.remaining || (node.remaining == best.remaining && node.y < best.y)) best = node;
             if (node.remaining == 0) {
@@ -120,6 +122,8 @@ final class ExcavationPathfinder {
             }
         }
         done = open.isEmpty() || visited.size() >= 4096;
+        if (done && horizon && best.parent != null && best.remaining < new Node(x, y, z, 0, gx, gy, gz, null).remaining)
+            finish(best);
         return done;
     }
 

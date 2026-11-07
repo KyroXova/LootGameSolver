@@ -2465,7 +2465,8 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
-        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1 && roofEscapeGoal == null) {
+        if (excavationRoute.isEmpty() && excavationSearch == null && accessTrail.size() <= 1
+            && roofEscapeGoal == null && excavationReplans == 0) {
             excavationRoute.addAll(patternedAccess(mc, x, y, z));
             if (!excavationRoute.isEmpty()) {
                 approachPlan = null;
@@ -2527,6 +2528,7 @@ public final class ExplorationBeta {
         if (!ExcavationPolicy.beside(x, z, next[0], next[2])
             || excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
             excavationRoute.clear();
+            blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
             miningAim.reset();
             return ++excavationReplans <= 3;
         }

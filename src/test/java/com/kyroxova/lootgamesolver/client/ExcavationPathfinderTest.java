@@ -82,6 +82,15 @@ public class ExcavationPathfinderTest {
     }
 
     @Test
+    public void horizonReturnsSafeProgressWhenFullGoalIsBlocked() {
+        ExcavationPathfinder search = new ExcavationPathfinder(0, 5, 0, 10, 5, 0, true);
+        finish(search, (x, y, z, nx, ny, nz) -> ny == 5 && nz == 0 && nx >= 0 && nx <= 4 ? 1 : -1);
+        assertFalse(search.path.isEmpty());
+        int[] end = search.path.get(search.path.size() - 1);
+        assertTrue(end[0] == 4 && end[1] == 5 && end[2] == 0);
+    }
+
+    @Test
     public void searchYieldsAndContinuesAcrossTicks() {
         ExcavationPathfinder search = new ExcavationPathfinder(0, 1, 0, 10, 1, 0);
         ExcavationPathfinder.Terrain terrain = (x, y, z, nx, ny, nz) -> ny == 1 ? 1 : -1;
