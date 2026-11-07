@@ -127,6 +127,30 @@ public final class LootGamesBridge implements MiniGameDetector {
             && Math.abs(pitch - player.rotationPitch) < 2F;
     }
 
+    private static boolean prepareExactCenterAndAim(EntityPlayer player, int x, int y, int z) {
+        if (player == null) return false;
+        double dx = x + 0.5D - player.posX, dz = z + 0.5D - player.posZ;
+        double horizontal = Math.sqrt(dx * dx + dz * dz);
+        int footY = (int) Math.floor(player.boundingBox.minY);
+        if (!player.onGround || footY != y + 1 || horizontal > 0.18D) {
+            if (horizontal > 0.18D) {
+                double step = Math.min(0.045D, (horizontal - 0.12D) * 0.12D);
+                player.motionX += dx / horizontal * step;
+                player.motionZ += dz / horizontal * step;
+            } else if (footY < y + 1 && player.onGround) {
+                player.jump();
+            }
+            return false;
+        }
+        float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+        double dy = y + 0.5D - player.posY - player.getEyeHeight();
+        float pitch = (float) (-Math.atan2(dy, horizontal) * 180.0D / Math.PI);
+        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
+        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
+        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
+            && Math.abs(pitch - player.rotationPitch) < 2F;
+    }
+
     private static Object invoke(Object target, String name, Object... args) throws Exception {
         Method[] methods = target.getClass()
             .getMethods();
@@ -690,7 +714,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             int[] position = gameCenter(game);
             if (position == null) return false;
             int x = position[0], y = position[1], z = position[2];
-            if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+            if (!prepareExactCenterAndAim(mc.thePlayer, x, y, z)) return false;
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
                 || hit.blockX != x

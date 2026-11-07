@@ -117,7 +117,13 @@ final class RewardChestLooter {
             opened = false;
         }
         if (collecting) {
-            if (queueIndex >= queue.size()) { status = "Reward chests collected"; active = false; return; }
+            if (queueIndex >= queue.size()) {
+                if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
+                opened = false;
+                status = "Reward chests collected";
+                active = false;
+                return;
+            }
             int nextChest = queue.get(queueIndex).chest;
             if (opened && index != nextChest && mc.currentScreen instanceof GuiChest) {
                 mc.thePlayer.closeScreen();

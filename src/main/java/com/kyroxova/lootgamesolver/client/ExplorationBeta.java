@@ -2430,7 +2430,10 @@ public final class ExplorationBeta {
             public boolean stand(int x, int y, int z) {
                 return !blockedWalkNodes.contains(supportKey(x, y, z)) && terrainWorld.blockExists(x, y, z)
                     && NavigationSurfacePolicy.allow(surfaceStart, protectedJourney, structureApproach,
-                        terrainWorld.getHeightValue(x, z), y, x, z, gx, gz) && safe(terrainWorld, x, y, z);
+                        terrainWorld.getHeightValue(x, z), y, x, z, gx, gz)
+                    && (safe(terrainWorld, x, y, z)
+                        || movingToPuzzleCenter && target != null && x == target.xCoord && y == target.yCoord + 1
+                            && z == target.zCoord && puzzleCenterStandable(terrainWorld, x, y, z));
             }
 
             public boolean clear(int x, int y, int z) {
@@ -2553,6 +2556,16 @@ public final class ExplorationBeta {
             .isLiquid()
             && world.getBlock(x, y, z)
                 .getCollisionBoundingBoxFromPool(world, x, y, z) == null;
+    }
+
+    private static boolean puzzleCenterStandable(World world, int x, int y, int z) {
+        if (!world.blockExists(x, y - 1, z) || !passable(world, x, y, z) || !passable(world, x, y + 1, z))
+            return false;
+        net.minecraft.block.Block floor = world.getBlock(x, y - 1, z);
+        net.minecraft.util.AxisAlignedBB support = floor.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
+        if (support == null || support.maxY < y - 0.05D || floor.getMaterial().isLiquid()) return false;
+        return world.func_147461_a(net.minecraft.util.AxisAlignedBB.getBoundingBox(
+            x + 0.19D, y + 0.01D, z + 0.19D, x + 0.81D, y + 1.81D, z + 0.81D)).isEmpty();
     }
 
     private List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
@@ -2756,7 +2769,10 @@ public final class ExplorationBeta {
                     .isLiquid() || block == Blocks.sand || block == Blocks.gravel) return -1;
             }
         }
-        for (int by = ny; by <= Math.max(y, ny) + 1; by++) {
+        int clearanceTop = Math.max(y, ny) + 1;
+        while (clearanceTop < Math.max(y, ny) + 8 && w.getBlock(nx, clearanceTop + 1, nz) == Blocks.snow_layer)
+            clearanceTop++;
+        for (int by = ny; by <= clearanceTop; by++) {
             if (passable(w, nx, by, nz)) continue;
             if (!excavatable(w, nx, by, nz)) return -1;
             firstBreak = Math.min(firstBreak, by);
@@ -2928,18 +2944,21 @@ public final class ExplorationBeta {
         // Recheck the same support, hazard and clearance rules used by the planner.
         if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
         if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
-        for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
+        int clearTop = Math.max(y, destinationY) + 1;
+        while (clearTop < Math.max(y, destinationY) + 8
+            && w.getBlock(nx, clearTop + 1, nz) == Blocks.snow_layer) clearTop++;
+        for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;
             if (FoliagePolicy.canClear(isFoliage(b), w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz)) continue;
+                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz, b == Blocks.snow_layer)) continue;
             if (!excavatable(w, nx, by, nz)) return false;
             if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
         }
-        for (int by = Math.max(y, destinationY) + 1; by >= destinationY; by--) {
+        for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (isFoliage(b) && FoliagePolicy.canClear(true, w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz))
+                b.getBlockHardness(w, nx, by, nz), nx, by, nz, x, y, z, nx, nz, b == Blocks.snow_layer))
                 return minePlannedBlock(mc, nx, by, nz, destinationY);
             if (passable(w, nx, by, nz)) continue;
             return minePlannedBlock(mc, nx, by, nz, destinationY);
@@ -3000,9 +3019,10 @@ public final class ExplorationBeta {
             footY,
             playerZ,
             x,
-            z)) return -1;
+            z,
+            foliage == Blocks.snow_layer)) return -1;
         int supportY = foliageY;
-        for (int scan = 0; scan < 4 && supportY > destinationY - 1; scan++) {
+        for (int scan = 0; scan < 8 && supportY > destinationY - 1; scan++) {
             if (!isFoliage(w.getBlock(x, supportY, z))) break;
             supportY--;
         }
@@ -3039,7 +3059,8 @@ public final class ExplorationBeta {
                 y,
                 z,
                 nx,
-                nz)) {
+                nz,
+                visible == Blocks.snow_layer)) {
                 mineX = obstruction.blockX;
                 mineY = obstruction.blockY;
                 mineZ = obstruction.blockZ;

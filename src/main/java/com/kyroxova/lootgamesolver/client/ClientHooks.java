@@ -41,6 +41,7 @@ public final class ClientHooks {
     private final LootGamesBridge puzzleBridge = new LootGamesBridge();
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
+    private final TrashCleanup trashCleanup = new TrashCleanup();
     private boolean rewardReturnPending;
     private int[] rewardCenter;
 
@@ -48,6 +49,7 @@ public final class ClientHooks {
         IDLE,
         OPENING,
         POSITIONING,
+        POSITIONING_NEXT_STAGE,
         REVEALING,
         REVEALING_NEXT_STAGE,
         SOLVING,
@@ -199,6 +201,7 @@ public final class ClientHooks {
 
         Minecraft mc = Minecraft.getMinecraft();
         if (puzzleWorld != mc.theWorld) {
+            trashCleanup.reset();
             rewardLooter.cancel(mc);
             rewardReturnPending = false;
             rewardCenter = null;
@@ -212,11 +215,17 @@ public final class ClientHooks {
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (trashCleanup.tick(mc, !session.isActive()
+            && (rewardReturnPending || exploration != null && exploration.navigating()))) {
+            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+            return;
+        }
         if (rewardReturnPending) {
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
                 if (rewardLooter.completed()) {
+                    if (trashCleanup.shouldClean(mc)) return;
                     rewardReturnPending = false;
                     mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
                     if (exploration != null) exploration.finishPuzzle(mc, true);
@@ -246,7 +255,9 @@ public final class ClientHooks {
             if (nextLevel || retryReady) {
                 session.cancel(nextLevel ? "Minesweeper stage advanced" : "Minesweeper attempt reset");
                 if (nextLevel) activeMinesweeperLevel = level;
-                autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
+                int[] center = puzzleBridge.gameCenter(game);
+                autoPuzzleState = exploration != null && center != null && exploration.moveToPuzzleCenter(mc, center)
+                    ? AutoPuzzleState.POSITIONING_NEXT_STAGE : AutoPuzzleState.REVEALING_NEXT_STAGE;
                 puzzleWaitTicks = 0;
                 centerClickAttempts = 0;
                 minesweeperOpeningClickSent = false;
@@ -335,6 +346,20 @@ public final class ClientHooks {
             }
             return;
         }
+        if (autoPuzzleState == AutoPuzzleState.POSITIONING_NEXT_STAGE) {
+            if (exploration != null && exploration.consumePuzzleCenterArrival()) {
+                autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
+                puzzleWaitTicks = 0;
+                lastCenterClickTick = -40;
+            } else if (exploration == null || !exploration.navigating()) {
+                // The exact-center click helper continues alignment and refuses to
+                // click until the player is grounded on the center tile.
+                autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
+                puzzleWaitTicks = 0;
+                lastCenterClickTick = -40;
+            }
+            return;
+        }
         if (autoPuzzleState == AutoPuzzleState.REVEALING) {
             puzzleWaitTicks++;
             DetectedGame revealed = puzzleBridge.detect(true);
@@ -370,13 +395,13 @@ public final class ClientHooks {
                 return;
             }
             if (centerClickAttempts < 4 && activeGame != null
-                && puzzleWaitTicks - lastCenterClickTick >= 20
+                && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
                 && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
                 if (exploration != null) exploration.setAutomationStatus("Revealing board");
             }
-            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 200)) {
+            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Board reveal failed");
             }
@@ -393,13 +418,13 @@ public final class ClientHooks {
                 return;
             }
             if (centerClickAttempts == 0 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
-                && puzzleWaitTicks - lastCenterClickTick >= 20
+                && puzzleWaitTicks - lastCenterClickTick >= 1
                 && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
                 if (exploration != null) exploration.setAutomationStatus("Revealing Minesweeper board");
             }
-            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 200)) {
+            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
                 autoPuzzleState = AutoPuzzleState.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Stage reveal failed");
             }
