@@ -438,6 +438,20 @@ public final class ClientHooks {
                 if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
                 session.start(ActionPlanner.Mode.SOLVE);
+                Object game = puzzleBridge.nearbyGame(true);
+                int level = puzzleBridge.currentMinesweeperLevel(game);
+                if (level >= 1 && level <= 4) {
+                    activeMinesweeperLevel = level;
+                    puzzleCompletion.begin();
+                    if (session.isActive()) {
+                        autoPuzzleState = AutoPuzzleState.SOLVING;
+                    } else if (puzzleBridge.canOpenMinesweeperBoard(game)) {
+                        autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
+                        puzzleWaitTicks = 0;
+                        centerClickAttempts = 0;
+                        lastCenterClickTick = -40;
+                    }
+                }
             }
         }
 
