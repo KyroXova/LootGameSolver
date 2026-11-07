@@ -58,6 +58,8 @@ public final class ExplorationBeta {
     private int excavationReplans;
     private int exitRecoveryTicks;
     private int exitRecoveryAttempts;
+    private OpenExitSearch openExitSearch;
+    private boolean followingOpenExit;
     private boolean cameraActive;
     private float cameraYaw, cameraPitch;
     private long cameraFrame;
@@ -485,6 +487,8 @@ public final class ExplorationBeta {
         excavationSearch = null;
         excavationRoute.clear();
         exitRecoveryTicks = 40;
+        openExitSearch = null;
+        followingOpenExit = false;
         if (mc.playerController != null) mc.playerController.resetBlockRemoving();
         status = "Exit blocked; retrying saved tunnel and safe alternatives";
     }
@@ -1342,11 +1346,40 @@ public final class ExplorationBeta {
         if (exitRecoveryTicks > 0) {
             if (--exitRecoveryTicks == 0) {
                 blockedWalkNodes.clear();
-                boolean started = ++exitRecoveryAttempts % 2 == 1 && digTowardSavedExit(mc);
-                if (!started) started = startSavedReturn(mc, true, 128);
-                if (!started) started = startRoomExitSearch(mc);
-                if (!started) retryExitLater(mc);
+                final World exitWorld = mc.theWorld;
+                final GroundPathfinder.Terrain ground = walkingTerrain(exitWorld);
+                int sx = (int) Math.floor(mc.thePlayer.posX), sy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int sz = (int) Math.floor(mc.thePlayer.posZ);
+                openExitSearch = new OpenExitSearch(new OpenExitSearch.Terrain() {
+                    public boolean stand(int x, int y, int z) { return ground.stand(x, y, z); }
+                    public boolean clear(int x, int y, int z) { return ground.clear(x, y, z); }
+                    public boolean exit(int x, int y, int z) {
+                        if (exitWorld.canBlockSeeTheSky(x, y, z)) return true;
+                        int index = accessTrail.nearestIndex(x, y, z, 0);
+                        return index >= 0 && index < accessTrail.size() - 1;
+                    }
+                }, sx, sy, sz);
             }
+            return;
+        }
+        if (openExitSearch != null) {
+            status = "Searching connected open blocks for an exit";
+            if (!openExitSearch.advance(96, System.nanoTime() + 3_000_000L)) return;
+            List<int[]> openPath = openExitSearch.path();
+            openExitSearch = null;
+            if (!openPath.isEmpty()) {
+                route.clear();
+                route.addAll(openPath);
+                followingOpenExit = true;
+                segmentX = mc.thePlayer.posX;
+                segmentZ = mc.thePlayer.posZ;
+                status = "Following connected open route";
+                return;
+            }
+            boolean started = ++exitRecoveryAttempts % 2 == 1 && digTowardSavedExit(mc);
+            if (!started) started = startSavedReturn(mc, true, 128);
+            if (!started) started = startRoomExitSearch(mc);
+            if (!started) retryExitLater(mc);
             return;
         }
         // Reaching interaction range is the hand-off point: first open the master, then
@@ -1591,6 +1624,14 @@ public final class ExplorationBeta {
             }
         }
         if (route.isEmpty()) {
+            if (followingOpenExit) {
+                followingOpenExit = false;
+                int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int z = (int) Math.floor(mc.thePlayer.posZ);
+                if (mc.theWorld.canBlockSeeTheSky(x, y, z)) continueProgressiveSearch(mc, true);
+                else if (!startSavedReturn(mc, true, 128)) retryExitLater(mc);
+                return;
+            }
             if (movingToPuzzleCenter) {
                 reachPuzzleCenter(mc);
                 return;
@@ -2109,6 +2150,8 @@ public final class ExplorationBeta {
     private void stop(Minecraft mc, String message) {
         exitRecoveryTicks = 0;
         exitRecoveryAttempts = 0;
+        openExitSearch = null;
+        followingOpenExit = false;
         persistAccessTrail(true);
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
         puzzleMasterTarget = null;
@@ -2559,9 +2602,9 @@ public final class ExplorationBeta {
         if (!ExcavationPolicy.beside(x, z, next[0], next[2])
             || excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
             blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
-            miningAim.reset();
             excavationRoute.clear();
             return ++excavationReplans <= 3;
+            miningAim.reset();
         }
         if (attemptStairStep(mc, next[1])) return true;
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
