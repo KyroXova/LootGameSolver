@@ -123,6 +123,7 @@ public final class ExplorationBeta {
     private List<int[]> chestPitApproach;
     private GroundPathfinder.Search chestPitApproachSearch;
     private GroundPathfinder.Search chestPitSearch;
+    private int chestPitJumpBoostTicks;
 
     String explorationAction() {
         return returnAvailable ? "Return" : returning ? "Stop" : "Explore";
@@ -1370,6 +1371,38 @@ public final class ExplorationBeta {
         return walking;
     }
 
+    void clearLastCheckpoint(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
+        if (!accessTrail.removeLast()) {
+            status = "No saved checkpoint to clear";
+            mc.thePlayer.addChatMessage(new ChatComponentText("[LootGame Solver] No saved checkpoint to clear"));
+            return;
+        }
+        trailDirty = true;
+        if (accessTrail.size() >= 2) persistAccessTrail(true);
+        else removePersistedTrail();
+        mc.thePlayer.addChatMessage(new ChatComponentText("[LootGame Solver] Last saved checkpoint cleared"));
+
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        boolean onSurfaceOutsideRoom = !insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z);
+        if (onSurfaceOutsideRoom) {
+            continueProgressiveSearch(mc, true);
+            return;
+        }
+        if (returning || returnAvailable) {
+            boolean resumeSearch = resumeSearchAfterReturn;
+            route.clear();
+            clearChestPitSearch();
+            returnJoinSearch = null;
+            returnTrailRoute = null;
+            if (!startChestPitReturn(mc, resumeSearch) && !startSavedReturn(mc, resumeSearch, 128)) {
+                retryExitLater(mc);
+            }
+        } else status = "Last saved checkpoint cleared";
+    }
+
     boolean inventoryCleanupSafe(Minecraft mc) {
         return walking && !returning && !digging && !movingToPuzzleCenter && !insideDungeonRoom(mc)
             && mc.thePlayer != null && mc.thePlayer.onGround && route.size() >= 2;
@@ -2261,6 +2294,10 @@ public final class ExplorationBeta {
             segmentZ = next[2] + 0.5D;
             if (!returning && trailTarget != null) recordAccessPoint(px, py, pz);
             route.remove(0);
+            if (returning && !insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(px, py, pz)) {
+                continueProgressiveSearch(mc, true);
+                return;
+            }
             if (!returning && !digging && approachReady && approachPlan != null
                 && approachAnchor == next && !approachPlan.path.isEmpty()) {
                 route.clear();
@@ -2332,6 +2369,11 @@ public final class ExplorationBeta {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
             if (returning) {
+                if (isRewardChestPit(mc)) {
+                    chestPitJumpBoostTicks = 12;
+                    status = "Jumping clear of the reward chests";
+                    return;
+                }
                 if (rerouteSavedReturn(mc, 1) || digTowardSavedExit(mc)) {
                     status = "Recovering along the saved exit route";
                     return;
@@ -2401,8 +2443,12 @@ public final class ExplorationBeta {
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
             boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
+            boolean chestPitJump = returning && chestPitJumpBoostTicks > 0 && isRewardChestPit(mc)
+                && mc.thePlayer.onGround && Math.abs(turn) < 45F && distance < 4D;
+            if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
             navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
                 || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
+                || chestPitJump
                 || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
@@ -2428,6 +2474,23 @@ public final class ExplorationBeta {
                 && box.maxY - mc.thePlayer.boundingBox.minY <= 1D) return true;
         }
         return false;
+    }
+
+    private boolean isRewardChestPit(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int sides = 0;
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 },
+            { -1, -1 } };
+        for (int[] direction : directions) {
+            boolean chest = false;
+            for (int dy = -2; dy <= 1 && !chest; dy++)
+                chest = isRewardChest(mc.theWorld, x + direction[0], y + dy, z + direction[1]);
+            if (chest) sides++;
+        }
+        return sides >= 3;
     }
 
     private boolean tryPlaceReturnStep(Minecraft mc, int[] next) {

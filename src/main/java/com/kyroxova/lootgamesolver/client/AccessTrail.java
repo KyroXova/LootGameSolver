@@ -45,6 +45,12 @@ final class AccessTrail {
         return points.size();
     }
 
+    boolean removeLast() {
+        if (points.size() <= 1) return false;
+        points.remove(points.size() - 1);
+        return true;
+    }
+
     boolean nearTerminal(int x, int y, int z, int maxDistance) {
         int nearest = nearestIndex(x, y, z, maxDistance);
         return points.size() >= 2 && nearest >= Math.max(1, (int) (points.size() * 0.6D));

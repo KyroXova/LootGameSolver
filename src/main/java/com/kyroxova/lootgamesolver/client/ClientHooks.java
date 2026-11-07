@@ -44,6 +44,9 @@ public final class ClientHooks {
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private boolean rewardReturnPending;
     private int[] rewardCenter;
+    private boolean exploreKeyHeld;
+    private boolean exploreHoldActionDone;
+    private int exploreHoldTicks;
 
     private enum AutoPuzzleState {
         IDLE,
@@ -472,9 +475,29 @@ public final class ClientHooks {
 
     private void checkKeyToggles() {
         Minecraft mc = Minecraft.getMinecraft();
-        if (exploration != null && Keybinds.explore.isPressed()
-            && mc.currentScreen == null
-            && mc.thePlayer != null
+        boolean explorePressed = Keybinds.explore.isPressed();
+        int exploreCode = Keybinds.explore.getKeyCode();
+        boolean exploreDown = exploreCode > 0 && exploreCode < 256 && Keyboard.isKeyDown(exploreCode);
+        boolean runExploreAction = false;
+        if (mc.currentScreen != null) {
+            exploreKeyHeld = false;
+            exploreHoldActionDone = false;
+            exploreHoldTicks = 0;
+        } else if (exploreDown) {
+            if (!exploreKeyHeld) exploreHoldTicks = 0;
+            exploreKeyHeld = true;
+            if (++exploreHoldTicks >= 20 && !exploreHoldActionDone) {
+                exploreHoldActionDone = true;
+                if (exploration != null && mc.thePlayer != null && mc.theWorld != null)
+                    exploration.clearLastCheckpoint(mc);
+            }
+        } else {
+            runExploreAction = exploreKeyHeld ? !exploreHoldActionDone : explorePressed;
+            exploreKeyHeld = false;
+            exploreHoldActionDone = false;
+            exploreHoldTicks = 0;
+        }
+        if (exploration != null && runExploreAction && mc.currentScreen == null && mc.thePlayer != null
             && mc.theWorld != null) {
             if (rewardReturnPending) {
                 rewardLooter.cancel(mc);
