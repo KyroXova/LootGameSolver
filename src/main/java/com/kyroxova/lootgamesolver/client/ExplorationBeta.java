@@ -2078,7 +2078,14 @@ public final class ExplorationBeta {
         if (navigationInput != null) {
             navigationInput.forward = Math.abs(turn) > 35F ? 0F
                 : route.size() == 1 && !movingToPuzzleCenter ? (float) Math.min(1D, distance * 1.5D) : 1F;
-            navigationInput.hop = (next[1] > py && Math.abs(turn) < 35F && distance < 1.4D) || mc.thePlayer.isInWater();
+            net.minecraft.block.Block nextBlock = mc.theWorld.getBlock(next[0], next[1], next[2]);
+            net.minecraft.util.AxisAlignedBB nextBox = nextBlock
+                .getCollisionBoundingBoxFromPool(mc.theWorld, next[0], next[1], next[2]);
+            boolean climbRewardChest = nextBlock instanceof net.minecraft.block.BlockChest && nextBox != null
+                && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
+                && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
+            navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
+                || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
                 double speed = Math
@@ -2629,9 +2636,9 @@ public final class ExplorationBeta {
             blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
             excavationRoute.clear();
             miningAim.reset();
-        }
             return ++excavationReplans <= 3;
         if (attemptStairStep(mc, next[1])) return true;
+        }
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         excavationRoute.clear();
         miningAim.reset();
