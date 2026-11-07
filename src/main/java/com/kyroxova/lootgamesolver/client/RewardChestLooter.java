@@ -46,6 +46,7 @@ final class RewardChestLooter {
     private boolean active, opened, collecting, packing, packOpening, packMoved, packingExisting;
     private boolean existingInventoryPackRequested;
     private boolean backpackAimSaved;
+    private boolean backpackAiming;
     private boolean temporaryBag, temporaryBagUsed, restoringBag;
     private int bagSource, bagHotbar;
     private ItemStack bagDisplaced;
@@ -74,6 +75,7 @@ final class RewardChestLooter {
         oldSlot = -1;
         packPendingSlot = -1;
         backpackAimSaved = false;
+        backpackAiming = false;
         temporaryBag = false;
         temporaryBagUsed = false;
         restoringBag = false;
@@ -310,8 +312,12 @@ final class RewardChestLooter {
         }
         double hitX = hit.hitVec.xCoord - eye.xCoord, hitY = hit.hitVec.yCoord - eye.yCoord;
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
-        mc.thePlayer.rotationYaw = (float) (Math.atan2(hitZ, hitX) * 180D / Math.PI) - 90F;
-        mc.thePlayer.rotationPitch = (float) (-Math.atan2(hitY, Math.hypot(hitX, hitZ)) * 180D / Math.PI);
+        float targetYaw = (float) (Math.atan2(hitZ, hitX) * 180D / Math.PI) - 90F;
+        float targetPitch = (float) (-Math.atan2(hitY, Math.hypot(hitX, hitZ)) * 180D / Math.PI);
+        if (!turnToward(mc, targetYaw, targetPitch)) {
+            status = "Facing reward chest";
+            return;
+        }
         if (mc.thePlayer.isSneaking()) {
             status = "Release sneak to open reward chest";
             return;
@@ -371,6 +377,22 @@ final class RewardChestLooter {
 
     private void tickBackpack(Minecraft mc) {
         if (waiting > 0) { waiting--; return; }
+        if (backpackAiming) {
+            if (mc.currentScreen != null || backpackSlot < 0
+                || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
+                backpackAiming = false;
+                restoreBackpackAim(mc);
+                return;
+            }
+            if (!turnToward(mc, backpackOldYaw, -90F)) { status = "Facing clear space"; return; }
+            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+            if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
+            backpackAiming = false;
+            packOpening = true;
+            openWait = 0;
+            waiting = 5;
+            return;
+        }
         Container container = mc.thePlayer.openContainer;
         String name = container.getClass().getName();
         boolean isBackpack = name.startsWith("de.eydamos.backpack.inventory.container.")
@@ -510,14 +532,16 @@ final class RewardChestLooter {
         backpackOldYaw = mc.thePlayer.rotationYaw;
         backpackOldPitch = mc.thePlayer.rotationPitch;
         backpackAimSaved = true;
-        mc.thePlayer.rotationPitch = -90F;
-        mc.thePlayer.prevRotationPitch = -90F;
         packMoved = false;
-        mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
-        if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
-        packOpening = true;
-        openWait = 0;
-        waiting = 5;
+        backpackAiming = true;
+    }
+
+    private static boolean turnToward(Minecraft mc, float yaw, float pitch) {
+        float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+        float pitchDelta = pitch - mc.thePlayer.rotationPitch;
+        mc.thePlayer.rotationYaw += Math.max(-12F, Math.min(12F, yawDelta));
+        mc.thePlayer.rotationPitch += Math.max(-12F, Math.min(12F, pitchDelta));
+        return Math.abs(yawDelta) < 1F && Math.abs(pitchDelta) < 1F;
     }
 
     private void restoreBackpackAim(Minecraft mc) {

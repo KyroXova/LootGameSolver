@@ -84,6 +84,8 @@ public final class ExplorationBeta {
     private boolean trailExcavating;
     private boolean returning, returnAvailable;
     private int cameraPitchDirection;
+    private int pitchLastY;
+    private double pitchLandingX, pitchLandingZ;
     private boolean returnDigging;
     private TileEntity returnOriginalTarget;
     private List<int[]> returnAfterDig;
@@ -2468,7 +2470,28 @@ public final class ExplorationBeta {
             : NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
                 next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        cameraPitchDirection = distance <= 1.5D ? staircaseDirection(route, py) : 0;
+        int upcomingPitch = staircaseDirection(route, py);
+        if (upcomingPitch != 0) {
+            int[] firstStep = null;
+            for (int[] step : route) if (step[1] != py) { firstStep = step; break; }
+            if (firstStep != null && Math.hypot(firstStep[0] + 0.5D - mc.thePlayer.posX,
+                firstStep[2] + 0.5D - mc.thePlayer.posZ) <= 1.8D) {
+                if (cameraPitchDirection == 0) {
+                    pitchLastY = py;
+                    pitchLandingX = mc.thePlayer.posX;
+                    pitchLandingZ = mc.thePlayer.posZ;
+                }
+                cameraPitchDirection = upcomingPitch;
+            }
+        }
+        if (cameraPitchDirection != 0 && py != pitchLastY) {
+            pitchLastY = py;
+            pitchLandingX = mc.thePlayer.posX;
+            pitchLandingZ = mc.thePlayer.posZ;
+        }
+        if (cameraPitchDirection != 0 && upcomingPitch == 0 && mc.thePlayer.onGround
+            && Math.hypot(mc.thePlayer.posX - pitchLandingX, mc.thePlayer.posZ - pitchLandingZ) >= 1D)
+            cameraPitchDirection = 0;
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
@@ -3441,8 +3464,6 @@ public final class ExplorationBeta {
             }
         }
         int clearanceTop = Math.max(y, ny) + 1;
-        while (clearanceTop < Math.max(y, ny) + 8 && w.getBlock(nx, clearanceTop + 1, nz) == Blocks.snow_layer)
-            clearanceTop++;
         if (!w.blockExists(nx, clearanceTop + 1, nz)) return -1;
         if (clearanceTop > y + 4) return -1;
         for (int by = ny; by <= clearanceTop; by++) {
@@ -3631,11 +3652,13 @@ public final class ExplorationBeta {
         if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
         if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
         int clearTop = Math.max(y, destinationY) + 1;
-        while (clearTop < Math.max(y, destinationY) + 8
-            && w.getBlock(nx, clearTop + 1, nz) == Blocks.snow_layer) clearTop++;
         if (!w.blockExists(nx, clearTop + 1, nz)) return false;
         if (clearTop > y + 4) return false;
         for (int by = destinationY; by <= clearTop; by++) {
+            if (w.getBlock(nx, by, nz) == Blocks.snow_layer
+                && FoliagePolicy.canClear(true, w.getTileEntity(nx, by, nz) != null,
+                    w.getBlock(nx, by, nz).getBlockHardness(w, nx, by, nz), nx, by, nz,
+                    x, y, z, nx, nz, true)) return minePlannedBlock(mc, nx, by, nz, destinationY);
             if (w.getBlock(nx, by, nz) instanceof net.minecraft.block.BlockFalling)
                 return minePlannedBlock(mc, nx, by, nz, destinationY);
         }
