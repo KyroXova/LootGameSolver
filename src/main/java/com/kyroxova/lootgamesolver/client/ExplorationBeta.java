@@ -218,7 +218,7 @@ public final class ExplorationBeta {
             || !undergroundNearby(mc)) return;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
+        if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, target.xCoord, target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {
             route.clear();
@@ -3531,6 +3531,7 @@ public final class ExplorationBeta {
             for (int oz = -1; oz <= 1; oz++) for (int by = ny - 1; by <= Math.max(y, ny) + 2; by++) {
                 if (!w.blockExists(nx + ox, by, nz + oz)) return -1;
                 net.minecraft.block.Block block = w.getBlock(nx + ox, by, nz + oz);
+                if (ContactHazards.dangerous(block, w.getBlockMetadata(nx + ox, by, nz + oz))) return -1;
                 if ((block.getMaterial()
                     .isLiquid() && by >= firstBreak - 1
                     && by <= lastBreak + 1) || block == Blocks.fire
@@ -3556,7 +3557,7 @@ public final class ExplorationBeta {
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (mc.thePlayer.onGround && ExcavationPolicy.preferredEntrance(x, z, target.xCoord, target.zCoord)
+        if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, target.xCoord, target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {
             route.clear();
@@ -3668,8 +3669,7 @@ public final class ExplorationBeta {
     private static double entranceScore(int[] candidate, double x, double z, int tx, int tz) {
         double travel = Math.hypot(candidate[0] + 0.5D - x, candidate[2] + 0.5D - z);
         double approach = Math.hypot(candidate[0] - tx, candidate[2] - tz);
-        double preferred = (ExcavationPolicy.MIN_ENTRANCE_RADIUS + ExcavationPolicy.MAX_ENTRANCE_RADIUS) / 2D;
-        return travel + 2D * Math.abs(approach - preferred);
+        return 0.5D * travel + 2D * Math.max(0D, approach - ExcavationPolicy.MIN_ENTRANCE_RADIUS);
     }
 
     private boolean attemptStairStep(Minecraft mc, int destinationY) {
@@ -3954,6 +3954,7 @@ public final class ExplorationBeta {
             for (int dy = -1; dy <= 2; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
+                if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
                 if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
                 if ((block.getMaterial()
                     .isLiquid() && block.getMaterial() != net.minecraft.block.material.Material.water)

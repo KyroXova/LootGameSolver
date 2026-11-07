@@ -19,6 +19,11 @@ final class ExcavationPolicy {
         return distance >= MIN_ENTRANCE_RADIUS && distance <= MAX_ENTRANCE_RADIUS;
     }
 
+    static boolean closeEntrance(double x, double z, int targetX, int targetZ) {
+        double distance = Math.hypot(x - targetX, z - targetZ);
+        return distance >= MIN_ENTRANCE_RADIUS && distance <= 18D;
+    }
+
     static boolean beside(int x, int z, int nx, int nz) {
         return Math.abs(nx - x) + Math.abs(nz - z) == 1;
     }

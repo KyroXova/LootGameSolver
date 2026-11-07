@@ -43,11 +43,6 @@ final class NavigationOverlayRenderer {
             if (exploration.navigating()) {
                 double[] end = draw(t, exploration.navigationRoute(), start, false);
                 draw(t, exploration.excavationPreview(), end, true);
-                for (int[] blocked : exploration.rejectedPreview()) {
-                    t.setColorRGBA_F(1F, 0.15F, 0.1F, 0.5F);
-                    t.addVertex(blocked[3] + 0.5D, blocked[4] + 0.15D, blocked[5] + 0.5D);
-                    t.addVertex(blocked[0] + 0.5D, blocked[1] + 0.15D, blocked[2] + 0.5D);
-                }
             }
             t.draw();
             if (waypoint != null) {
