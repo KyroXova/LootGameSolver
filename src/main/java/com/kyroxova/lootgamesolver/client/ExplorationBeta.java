@@ -1518,6 +1518,19 @@ public final class ExplorationBeta {
             && route.size() <= 8
             && ticks % 5 == 0) extendRoute(mc);
         prepareApproach(mc);
+        if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
+            int[] end = route.get(route.size() - 1);
+            if (excavationSearch == null) {
+                excavationSearch = new ExcavationPathfinder(end[0], end[1], end[2], target.xCoord,
+                    target.yCoord + 1, target.zCoord, true);
+            }
+            if (excavationSearch.advance(
+                (a, b, c, nx, ny, nz) -> excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
+                24, System.nanoTime() + 3_000_000L)) {
+                excavationRoute.addAll(excavationSearch.path);
+                excavationSearch = null;
+            }
+        }
         if (route.isEmpty()) {
             if (movingToPuzzleCenter) {
                 reachPuzzleCenter(mc);
@@ -2689,6 +2702,27 @@ public final class ExplorationBeta {
         singleStep(mc, nx, destinationY, nz, false);
         returnSupports.add(supportKey(nx, destinationY - 1, nz));
         if (!excavationRoute.isEmpty()) excavationRoute.remove(0);
+        int lastX = nx, lastY = destinationY, lastZ = nz;
+        while (!excavationRoute.isEmpty() && route.size() < 6) {
+            int[] following = excavationRoute.get(0);
+            if (!ExcavationPolicy.beside(lastX, lastZ, following[0], following[2])
+                || Math.abs(following[1] - lastY) > 1
+                || !safe(w, following[0], following[1], following[2])
+                || excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2]) < 0)
+                break;
+            boolean clear = true;
+            for (int by = following[1]; by <= Math.max(lastY, following[1]) + 1; by++) {
+                if (isFoliage(w.getBlock(following[0], by, following[2]))
+                    || !passable(w, following[0], by, following[2])) clear = false;
+            }
+            if (!clear) break;
+            route.add(new int[] { following[0], following[1], following[2], 0 });
+            returnSupports.add(supportKey(following[0], following[1] - 1, following[2]));
+            lastX = following[0];
+            lastY = following[1];
+            lastZ = following[2];
+            excavationRoute.remove(0);
+        }
         excavationReplans = 0;
         stairSteps++;
         lastDistance = Double.MAX_VALUE;
