@@ -2989,16 +2989,11 @@ public final class ExplorationBeta {
             }
             return harvestable;
         }
-        return hardness >= 0 && hardness <= 5
-            && (material == net.minecraft.block.material.Material.rock
-                || material == net.minecraft.block.material.Material.ground
-                || material == net.minecraft.block.material.Material.grass
-                || material == net.minecraft.block.material.Material.snow
-                || material == net.minecraft.block.material.Material.craftedSnow
-                || material == net.minecraft.block.material.Material.wood
-                || material == net.minecraft.block.material.Material.leaves
-                || material == net.minecraft.block.material.Material.plants
-                || material == net.minecraft.block.material.Material.vine);
+        // Include solid materials outside the vanilla terrain allowlist (for example
+        // clay/terracotta and modded construction blocks). Keep falling blocks out of
+        // planned tunnels; the surrounding safety checks rely on their support.
+        return hardness >= 0 && material.isSolid() && !material.isLiquid()
+            && !(block instanceof net.minecraft.block.BlockFalling);
     }
 
     private int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
