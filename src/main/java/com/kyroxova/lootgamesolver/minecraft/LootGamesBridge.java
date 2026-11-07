@@ -629,6 +629,47 @@ public final class LootGamesBridge implements MiniGameDetector {
         return findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
     }
 
+    public int[] nearbyFloorActivator() {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null) return null;
+        int px = (int) Math.floor(mc.thePlayer.posX), py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        int[] closest = null;
+        double best = Double.MAX_VALUE;
+        for (int dy = -4; dy <= 2; dy++) for (int dx = -16; dx <= 16; dx++) for (int dz = -16; dz <= 16; dz++) {
+            int x = px + dx, y = py + dy, z = pz + dz;
+            if (!mc.theWorld.blockExists(x, y, z) || !isFloorActivator(mc.theWorld.getBlock(x, y, z))) continue;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance < best) { closest = new int[] { x, y, z }; best = distance; }
+        }
+        return closest;
+    }
+
+    private static boolean isFloorActivator(net.minecraft.block.Block block) {
+        if (block == null) return false;
+        return isFloorActivatorName(block.getClass().getName());
+    }
+
+    static boolean isFloorActivatorName(String name) {
+        return name.equals(LOOTGAMES_PKG + "common.block.GOLActivatorBlock")
+            || name.equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock")
+            || name.equals(LOOTGAMES_PKG + "common.block.SudokuActivatorBlock");
+    }
+
+    public boolean activateFloorActivator(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+        int x = position[0], y = position[1], z = position[2];
+        if (!isFloorActivator(mc.theWorld.getBlock(x, y, z))) return false;
+        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+            || hit.blockX != x || hit.blockY != y || hit.blockZ != z) return false;
+        mc.thePlayer.swingItem();
+        return mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(),
+            x, y, z, hit.sideHit, hit.hitVec);
+    }
+
     /** Direct fallback for the just-activated master, before its tile is picked up by the nearby scan. */
     public Object gameAtMaster(int[] position) {
         Minecraft mc = Minecraft.getMinecraft();

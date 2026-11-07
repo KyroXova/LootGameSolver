@@ -53,6 +53,8 @@ public final class ClientHooks {
 
     private AutoPuzzleState autoPuzzleState = AutoPuzzleState.IDLE;
     private int[] autoPuzzlePosition;
+    private int[] floorActivatorPosition;
+    private boolean floorActivatorClicked;
     private int puzzleWaitTicks;
     private int masterClickAttempts;
     private int centerClickAttempts;
@@ -206,6 +208,8 @@ public final class ClientHooks {
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
             autoPuzzlePosition = exploration.puzzlePosition();
+            floorActivatorPosition = null;
+            floorActivatorClicked = false;
             autoPuzzleState = AutoPuzzleState.OPENING;
             puzzleWaitTicks = 0;
             masterClickAttempts = 0;
@@ -251,6 +255,16 @@ public final class ClientHooks {
     private void tickAutoPuzzle(Minecraft mc) {
         if (autoPuzzleState == AutoPuzzleState.OPENING) {
             puzzleWaitTicks++;
+            int[] activator = puzzleBridge.nearbyFloorActivator();
+            if (activator != null && exploration != null) {
+                floorActivatorPosition = activator;
+                floorActivatorClicked = false;
+                if (exploration.moveToPuzzleCenter(mc, activator)) {
+                    autoPuzzleState = AutoPuzzleState.POSITIONING;
+                    puzzleWaitTicks = 0;
+                    return;
+                }
+            }
             Object game = puzzleBridge.gameAtMaster(autoPuzzlePosition);
             if (game == null) game = puzzleBridge.nearbyGame(true);
             boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
@@ -301,6 +315,30 @@ public final class ClientHooks {
             DetectedGame revealed = puzzleBridge.detect(true);
             Object game = puzzleBridge.nearbyGame(true);
             Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
+            if (floorActivatorPosition != null) {
+                if (!floorActivatorClicked) {
+                    if (puzzleBridge.activateFloorActivator(floorActivatorPosition)) {
+                        floorActivatorClicked = true;
+                        lastCenterClickTick = puzzleWaitTicks;
+                        if (exploration != null) exploration.setAutomationStatus("Opening floor activator");
+                    }
+                    if (puzzleWaitTicks > 200 && !floorActivatorClicked) {
+                        autoPuzzleState = AutoPuzzleState.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Could not click floor activator");
+                    }
+                    return;
+                }
+                if (activeGame == null) {
+                    if (puzzleWaitTicks > lastCenterClickTick + 200) {
+                        autoPuzzleState = AutoPuzzleState.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Floor activator did not open puzzle");
+                    }
+                    return;
+                }
+                floorActivatorPosition = null;
+                centerClickAttempts = 0;
+                lastCenterClickTick = puzzleWaitTicks - 20;
+            }
             if (revealed != null && centerClickAttempts > 0) {
                 if (puzzleWaitTicks - lastCenterClickTick < 20) return;
                 startPuzzleSolver();
