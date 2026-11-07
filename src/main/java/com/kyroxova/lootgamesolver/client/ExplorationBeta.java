@@ -3425,6 +3425,7 @@ public final class ExplorationBeta {
     }
 
     private int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
+        for (int by = ny - 1; by <= ny + 1; by++) if (isQuicksand(w, nx, by, nz)) return -1;
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
             .isNormalCube()) return -1;
         boolean overhead = ny > y && !passable(w, x, y + 2, z);
@@ -3871,6 +3872,7 @@ public final class ExplorationBeta {
             for (int dy = -1; dy <= 2; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
+                if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
                 if ((block.getMaterial()
                     .isLiquid() && block.getMaterial() != net.minecraft.block.material.Material.water)
                     || block == Blocks.fire
@@ -3892,6 +3894,15 @@ public final class ExplorationBeta {
                 net.minecraft.util.AxisAlignedBB
                     .getBoundingBox(x + 0.19D, surfaceY + 0.01D, z + 0.19D, x + 0.81D, surfaceY + 1.81D, z + 0.81D))
             .isEmpty();
+    }
+
+    private static boolean isQuicksand(World world, int x, int y, int z) {
+        if (!world.blockExists(x, y, z)) return false;
+        net.minecraft.block.Block block = world.getBlock(x, y, z);
+        String id = String.valueOf(net.minecraft.block.Block.blockRegistry.getNameForObject(block))
+            .toLowerCase(java.util.Locale.ROOT);
+        return id.contains("quicksand") || ("biomesoplenty.common.blocks.BlockMud".equals(block.getClass().getName())
+            && world.getBlockMetadata(x, y, z) == 1);
     }
 
     private static boolean solidCheckpoint(World world, int x, int y, int z) {

@@ -35,6 +35,9 @@ final class RewardChestLooter {
     private final boolean[] backpackTried = new boolean[36];
     private final InventoryToolTransfer backpackTransfer = new InventoryToolTransfer();
     private int[] center;
+    private int[] chestView;
+    private final List<int[]> failedChestViews = new ArrayList<int[]>();
+    private int failedViewChest = -1;
     private MiniGame gameType;
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
@@ -47,6 +50,9 @@ final class RewardChestLooter {
 
     void start(Minecraft mc, int[] position, MiniGame type) {
         center = position == null ? null : position.clone();
+        chestView = null;
+        failedChestViews.clear();
+        failedViewChest = -1;
         gameType = type;
         ticks = 0;
         index = 0;
@@ -95,12 +101,16 @@ final class RewardChestLooter {
     void tick(Minecraft mc, ExplorationBeta exploration) {
         if (!active || mc.thePlayer == null || mc.theWorld == null) return;
         if (exploration != null && exploration.navigating()) {
-            if (index >= 0 && index < chests.size()) {
-                Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX,
-                    mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
-                if (visibleChest(mc, eye, chests.get(index)) != null) exploration.stopRewardView(mc);
-            }
-            if (exploration.navigating()) { status = "Moving toward reward chests"; return; }
+            status = "Moving toward reward chests";
+            return;
+        }
+        if (chestView != null) {
+            Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+            if (mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D) > 2.25D
+                || index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null)
+                failedChestViews.add(chestView);
+            chestView = null;
         }
         if (exploration != null) exploration.consumePuzzleCenterArrival();
         if (backpackTransfer.active()) {
@@ -165,6 +175,10 @@ final class RewardChestLooter {
         }
         if (waiting > 0) { waiting--; return; }
         int[] pos = chests.get(index);
+        if (failedViewChest != index) {
+            failedViewChest = index;
+            failedChestViews.clear();
+        }
         if (mc.currentScreen instanceof GuiChest && opened && mc.thePlayer.openContainer instanceof ContainerChest) {
             ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
             IInventory chest = container.getLowerChestInventory();
@@ -244,7 +258,7 @@ final class RewardChestLooter {
         double dx = pos[0] + 0.5D - mc.thePlayer.posX, dz = pos[2] + 0.5D - mc.thePlayer.posZ;
         double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
-        if (dx * dx + dy * dy + dz * dz > 16D) {
+        if (dx * dx + dy * dy + dz * dz > 16D || horizontal > 2.5D) {
             if (exploration != null && moveToChestView(mc, exploration, pos))
                 status = "Moving toward reward chests";
             else status = "Finding a safe position beside the reward chest";
@@ -304,18 +318,30 @@ final class RewardChestLooter {
             for (int dz = -radius; dz <= radius; dz++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
                 int x = chest[0] + dx, z = chest[2] + dz;
+                if (dx * dx + dz * dz > 4) continue;
                 if (center != null && Math.abs(x - center[0]) <= 1 && Math.abs(z - center[2]) <= 1) continue;
-                if (!mc.theWorld.blockExists(x, floorY, z)
+                boolean failed = false;
+                for (int[] view : failedChestViews)
+                    if (view[0] == x && view[1] == floorY && view[2] == z) { failed = true; break; }
+                if (failed || !mc.theWorld.blockExists(x, floorY, z)
                     || !mc.theWorld.getBlock(x, floorY, z).getMaterial().isSolid()
                     || !mc.theWorld.isAirBlock(x, floorY + 1, z)
                     || !mc.theWorld.isAirBlock(x, floorY + 2, z)) continue;
                 Vec3 eye = Vec3.createVectorHelper(x + 0.5D, floorY + 1D + mc.thePlayer.getEyeHeight(), z + 0.5D);
                 if (visibleChest(mc, eye, chest) != null) positions.add(new int[] { x, floorY, z });
             }
-        positions.sort((a, b) -> Double.compare(
-            mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1] + 1D, a[2] + 0.5D),
-            mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1] + 1D, b[2] + 0.5D)));
-        for (int[] position : positions) if (exploration.moveToRewardView(mc, position)) return true;
+        positions.sort((a, b) -> {
+            int da = Math.abs(a[0] - chest[0]) + Math.abs(a[2] - chest[2]);
+            int db = Math.abs(b[0] - chest[0]) + Math.abs(b[2] - chest[2]);
+            return da != db ? Integer.compare(da, db) : Double.compare(
+                mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1] + 1D, a[2] + 0.5D),
+                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1] + 1D, b[2] + 0.5D));
+        });
+        for (int[] position : positions) if (exploration.moveToRewardView(mc, position)) {
+            chestView = position;
+            return true;
+        }
+        failedChestViews.clear();
         return false;
     }
 
