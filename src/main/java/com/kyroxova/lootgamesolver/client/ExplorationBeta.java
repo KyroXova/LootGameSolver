@@ -1072,7 +1072,7 @@ public final class ExplorationBeta {
         roomExitCandidates = findRoomExitCandidates(mc, bounds);
         // Prefer room openings nearest the saved tunnel mouth.
         if (accessTrail.size() >= 2 && roomExitCandidates.size() > 1) {
-            int[] mouth = accessTrail.pointAt(accessTrail.size() - 1);
+            int[] mouth = savedRoomMouth(bounds);
             roomExitCandidates.sort((a, b) -> Double.compare(exitMouthDistance(a, mouth), exitMouthDistance(b, mouth)));
         }
         roomExitCandidateIndex = 0;
@@ -1080,6 +1080,20 @@ public final class ExplorationBeta {
         roomExitNeedsResume = false;
         roomExitCrossing = false;
         return startNextRoomExitSearch(mc);
+    }
+
+    private int[] savedRoomMouth(int[] bounds) {
+        for (int i = accessTrail.size() - 1; i >= 0; i--) {
+            int[] point = accessTrail.pointAt(i);
+            boolean besideX = (Math.abs(point[0] - bounds[0]) <= 1 || Math.abs(point[0] - bounds[1]) <= 1)
+                && point[2] >= bounds[2]
+                && point[2] <= bounds[3];
+            boolean besideZ = (Math.abs(point[2] - bounds[2]) <= 1 || Math.abs(point[2] - bounds[3]) <= 1)
+                && point[0] >= bounds[0]
+                && point[0] <= bounds[1];
+            if (besideX || besideZ) return point;
+        }
+        return accessTrail.pointAt(accessTrail.size() - 1);
     }
 
     private static double exitMouthDistance(int[] candidate, int[] mouth) {
@@ -1132,7 +1146,7 @@ public final class ExplorationBeta {
             || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3] && y <= target.yCoord + 3))
             return false;
         roomEntryCandidates = findRoomExitCandidates(mc, bounds);
-        roomEntryCandidates.removeIf(candidate -> candidate.length >= 9);
+        roomEntryCandidates.removeIf(candidate -> candidate.length >= 10);
         roomEntryCandidateIndex = 0;
         final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
         final int tx = target.xCoord, tz = target.zCoord;
@@ -1174,15 +1188,12 @@ public final class ExplorationBeta {
             int floorY = (int) Math.floor(mc.thePlayer.boundingBox.minY) + dy;
             for (int[] side : sides) {
                 boolean xSide = side[1] != 0;
-                int wallX = xSide ? side[0] : 0;
-                int wallZ = xSide ? 0 : side[0];
                 int alongMin = xSide ? bounds[2] + 1 : bounds[0] + 1;
                 int alongMax = xSide ? bounds[3] - 1 : bounds[1] - 1;
                 for (int along = alongMin; along <= alongMax; along++) {
-                    int inX = xSide ? wallX - side[1] : along;
-                    int inZ = xSide ? along : wallZ - side[2];
-                    int outX = xSide ? wallX + side[1] : along;
-                    int outZ = xSide ? along : wallZ + side[2];
+                    int[] opening = RoomOpeningGeometry.positions(side[0], xSide, along, side[1], side[2], floorY);
+                    int inX = opening[0], inZ = opening[2], outX = opening[3], outZ = opening[5];
+                    int wallX = opening[6], wallZ = opening[8];
                     if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
                         || !(solidCheckpoint(mc.theWorld, outX, floorY, outZ)
                             || clearableExitColumn(mc.theWorld, outX, floorY, outZ)))
@@ -1216,8 +1227,9 @@ public final class ExplorationBeta {
                         || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
                     if (!sideWallA && !sideWallB) continue;
                     if (lowerInside || twoBelow) found.add(
-                        new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ, wallX, floorY, wallZ });
-                    else found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
+                        new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ, wallX, floorY, wallZ,
+                            1 });
+                    else found.add(opening);
                 }
             }
         }
@@ -2184,6 +2196,7 @@ public final class ExplorationBeta {
                         route.clear();
                         route.addAll(entryPath);
                         appendRoomExitWaypoint(activeRoomEntry, 3);
+                        appendRoomExitWaypoint(activeRoomEntry, 6);
                         appendRoomExitWaypoint(activeRoomEntry, 0);
                         roomEntryCrossing = true;
                         segmentX = mc.thePlayer.posX;
