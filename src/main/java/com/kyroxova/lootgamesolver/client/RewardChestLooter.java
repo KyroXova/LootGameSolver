@@ -160,7 +160,7 @@ final class RewardChestLooter {
             ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
             IInventory chest = container.getLowerChestInventory();
             if (chest.getSizeInventory() != 27
-                || chest != mc.theWorld.getTileEntity(pos[0], pos[1], pos[2])) {
+                || !(mc.theWorld.getTileEntity(pos[0], pos[1], pos[2]) instanceof TileEntityChest)) {
                 mc.thePlayer.closeScreen();
                 opened = false;
                 openWait = 0;
@@ -241,6 +241,17 @@ final class RewardChestLooter {
             else status = "No safe route to the reward chests";
             return;
         }
+        Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX,
+            mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 aim = Vec3.createVectorHelper(pos[0] + 0.5D, pos[1] + 0.5D, pos[2] + 0.5D);
+        net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, aim);
+        if (hit == null || hit.blockX != pos[0] || hit.blockY != pos[1] || hit.blockZ != pos[2]) {
+            if (exploration != null && exploration.moveToPuzzleCenter(mc, center))
+                status = "Moving toward reward chests";
+            else status = "Finding a clear view of the reward chest";
+            waiting = 10;
+            return;
+        }
         mc.thePlayer.rotationYaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
         mc.thePlayer.rotationPitch = (float) (-Math.atan2(dy, horizontal) * 180D / Math.PI);
         if (mc.thePlayer.isSneaking()) {
@@ -248,7 +259,7 @@ final class RewardChestLooter {
             return;
         }
         mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(),
-            pos[0], pos[1], pos[2], 1, Vec3.createVectorHelper(pos[0] + 0.5D, pos[1] + 1D, pos[2] + 0.5D));
+            pos[0], pos[1], pos[2], hit.sideHit, hit.hitVec);
         opened = true;
         waiting = 12;
         status = "Opening reward chest";

@@ -2240,7 +2240,7 @@ public final class ExplorationBeta {
             puzzleArrivalPending = true;
             return;
         }
-        if (!returning && route.size() >= 2) {
+        if (!digging && !roomExitCrossing && !roomEntryCrossing && route.size() >= 2) {
             int[] first = route.get(0), second = route.get(1);
             int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int cz = (int) Math.floor(mc.thePlayer.posZ);

@@ -267,8 +267,8 @@ public final class SolverSession {
                     if (suitable < 0 && block != null && mc.theWorld != null) {
                         for (int i = 0; i < 9; i++) {
                             net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                            if (stack != null && stack.getItem() instanceof net.minecraft.item.ItemPickaxe
-                                && stack.getItem().doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
+                            if (stack != null && stack.getItem().doesSneakBypassUse(
+                                mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
                                 suitable = i;
                                 break;
                             }
@@ -285,6 +285,7 @@ public final class SolverSession {
                 boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
                     && held.getItem().doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
                 sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
+                if (!sudokuReverseClick) remainingClicksForActiveAction = (activeAction.value - curVal + 10) % 10;
             } else {
                 remainingClicksForActiveAction = 1;
                 sudokuReverseClick = false;
