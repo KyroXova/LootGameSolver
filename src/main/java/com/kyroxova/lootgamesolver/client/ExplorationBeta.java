@@ -536,6 +536,7 @@ public final class ExplorationBeta {
         puzzleArrivalPending = false;
         returnAvailable = false;
         if (startChestPitReturn(mc, true)) return;
+        if (insideDungeonRoom(mc) && startRoomExitSearch(mc)) return;
         if (startSavedReturn(mc, true, 128)) return;
         if (startRoomExitSearch(mc)) return;
         retryExitLater(mc);
@@ -1149,13 +1150,20 @@ public final class ExplorationBeta {
                     int outX = xSide ? wallX + side[1] : along;
                     int outZ = xSide ? along : wallZ + side[2];
                     if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
-                        || !solidCheckpoint(mc.theWorld, outX, floorY, outZ)) continue;
+                        || !(solidCheckpoint(mc.theWorld, outX, floorY, outZ)
+                            || clearableExitColumn(mc.theWorld, outX, floorY, outZ))) continue;
                     boolean levelInside = safe(mc.theWorld, inX, floorY, inZ);
                     boolean lowerInside = !levelInside && safe(mc.theWorld, inX, floorY - 1, inZ)
                         && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
                             .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
                         && mc.theWorld.getBlock(wallX, floorY - 2, wallZ).isNormalCube();
-                    if (!levelInside && !lowerInside) continue;
+                    boolean twoBelow = !levelInside && !lowerInside && safe(mc.theWorld, inX, floorY - 2, inZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
+                            .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
+                            .isReplaceable(mc.theWorld, wallX, floorY - 2, wallZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 3, wallZ).isNormalCube();
+                    if (!levelInside && !lowerInside && !twoBelow) continue;
                     boolean sideWallA = isDungeonWall(
                         mc.theWorld,
                         xSide ? wallX : along - 1,
@@ -1169,7 +1177,7 @@ public final class ExplorationBeta {
                         xSide ? along + 1 : wallZ)
                         || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
                     if (!sideWallA && !sideWallB) continue;
-                    if (lowerInside) found.add(new int[] { inX, floorY - 1, inZ, outX, floorY, outZ,
+                    if (lowerInside || twoBelow) found.add(new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ,
                         wallX, floorY, wallZ });
                     else found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
                 }
@@ -1181,6 +1189,37 @@ public final class ExplorationBeta {
                 Math.hypot(first[0] + 0.5D - px, first[2] + 0.5D - pz),
                 Math.hypot(second[0] + 0.5D - px, second[2] + 0.5D - pz)));
         return found;
+    }
+
+    private boolean clearableExitColumn(World world, int x, int y, int z) {
+        if (!world.blockExists(x, y - 1, z) || !world.getBlock(x, y - 1, z).isNormalCube()) return false;
+        for (int by = y; by <= y + 1; by++) {
+            if (!world.blockExists(x, by, z)) return false;
+            net.minecraft.block.Block block = world.getBlock(x, by, z);
+            if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z))
+                || block.getMaterial().isLiquid() || block instanceof net.minecraft.block.BlockFalling
+                || !passable(world, x, by, z) && !excavatable(world, x, by, z)) return false;
+        }
+        return true;
+    }
+
+    private boolean clearRoomExitObstruction(Minecraft mc, int[] next, int x, int y, int z) {
+        World world = mc.theWorld;
+        if (next[1] > y && !passable(world, x, y + 2, z)) {
+            net.minecraft.block.Block overhead = world.getBlock(x, y + 2, z);
+            if (!(overhead instanceof net.minecraft.block.BlockFalling) && excavatable(world, x, y + 2, z))
+                return minePlannedBlock(mc, x, y + 2, z, y + 2);
+        }
+        if (next[0] == x && next[2] == z) return false;
+        for (int by = next[1] + 1; by >= next[1]; by--) {
+            if (passable(world, next[0], by, next[2])) continue;
+            net.minecraft.block.Block block = world.getBlock(next[0], by, next[2]);
+            if (block instanceof net.minecraft.block.BlockFalling
+                || ContactHazards.dangerous(block, world.getBlockMetadata(next[0], by, next[2]))
+                || !excavatable(world, next[0], by, next[2])) return false;
+            return minePlannedBlock(mc, next[0], by, next[2], next[1]);
+        }
+        return false;
     }
 
     private int[] dungeonRoomBounds(World world, int x, int y, int z) {
@@ -1235,8 +1274,9 @@ public final class ExplorationBeta {
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
-        return bounds != null && target != null && y <= target.yCoord + 3
-            && x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3];
+        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
+        int roomY = knownStructure != null ? knownStructure[1] : target == null ? Integer.MIN_VALUE : target.yCoord;
+        return roomY != Integer.MIN_VALUE && y <= roomY + 3;
     }
 
     private boolean planRoofEscape(Minecraft mc) {
@@ -1299,6 +1339,7 @@ public final class ExplorationBeta {
 
     private boolean digTowardSavedExit(Minecraft mc) {
         if (!returning || returnDigging || mc.thePlayer == null) return false;
+        if (insideDungeonRoom(mc)) return roomExitCandidates == null && startRoomExitSearch(mc);
         List<int[]> savedRoute = new ArrayList<int[]>(route.size());
         for (int[] point : route) savedRoute.add(point.clone());
         if (savedRoute.size() < 2 && accessTrail.size() >= 2) {
@@ -1740,6 +1781,9 @@ public final class ExplorationBeta {
                 .getMaterial()
                 .isSolid()) {
                 if (pendingReturnWaypoint != null && returning) {
+                    if (!route.isEmpty() && route.get(0)[0] == pendingReturnWaypoint[0]
+                        && route.get(0)[2] == pendingReturnWaypoint[2]
+                        && route.get(0)[1] == pendingReturnWaypoint[1] + 1) route.remove(0);
                     if (route.isEmpty() || !samePosition(route.get(0), pendingReturnWaypoint))
                         route.add(0, pendingReturnWaypoint);
                     pendingReturnWaypoint = null;
@@ -2370,6 +2414,9 @@ public final class ExplorationBeta {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
+        if (returning && roomExitCrossing && mc.thePlayer.onGround
+            && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1
+            && clearRoomExitObstruction(mc, next, px, py, pz)) return;
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
         if (digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
@@ -2696,7 +2743,7 @@ public final class ExplorationBeta {
         if (next[1] <= playerY || next[1] > playerY + 2 || Math.abs(next[0] - playerX) > 1
             || Math.abs(next[2] - playerZ) > 1
             || Math.abs(next[0] - playerX) + Math.abs(next[2] - playerZ) == 0
-            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.25D)
+            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D)
             return false;
         if (next[0] != playerX && next[2] != playerZ
             && (!safe(mc.theWorld, next[0], playerY, playerZ) || !safe(mc.theWorld, playerX, playerY, next[2])))
@@ -2731,14 +2778,24 @@ public final class ExplorationBeta {
             net.minecraft.block.Block support = mc.theWorld.getBlock(side[0], side[1], side[2]);
             if (support == Blocks.air || !support.getMaterial()
                 .isSolid() || mc.theWorld.getTileEntity(side[0], side[1], side[2]) != null) continue;
+            double hx = side[0] + 0.5D + (x - side[0]) * 0.49D;
+            double hy = side[1] + 0.5D + (y - side[1]) * 0.49D;
+            double hz = side[2] + 0.5D + (z - side[2]) * 0.49D;
+            net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3.createVectorHelper(mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+            net.minecraft.util.MovingObjectPosition visible = mc.theWorld.rayTraceBlocks(eye,
+                net.minecraft.util.Vec3.createVectorHelper(hx, hy, hz));
+            if (visible == null || visible.blockX != side[0] || visible.blockY != side[1]
+                || visible.blockZ != side[2] || visible.sideHit != side[3]
+                || eye.squareDistanceTo(visible.hitVec) > 16D) continue;
             int previousSlot = mc.thePlayer.inventory.currentItem;
             mc.thePlayer.inventory.currentItem = slot;
             mc.playerController.updateController();
             if (returnPlacementSlot < 0) returnPlacementSlot = previousSlot;
-            double hx = side[0] + 0.5D + (x - side[0]) * 0.5D;
-            double hy = side[1] + 0.5D + (y - side[1]) * 0.5D;
-            double hz = side[2] + 0.5D + (z - side[2]) * 0.5D;
-            net.minecraft.util.Vec3 hit = net.minecraft.util.Vec3.createVectorHelper(hx, hy, hz);
+            net.minecraft.util.Vec3 hit = visible.hitVec;
+            hx = hit.xCoord;
+            hy = hit.yCoord;
+            hz = hit.zCoord;
             double dx = hx - mc.thePlayer.posX, dz = hz - mc.thePlayer.posZ;
             double dy = hy - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
             float yaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
@@ -2759,7 +2816,7 @@ public final class ExplorationBeta {
                 side[1],
                 side[2],
                 side[3],
-                hit)) {
+                aimed.hitVec)) {
                 pendingReturnPlacement = new int[] { x, y, z };
                 returnPlacementAimTicks = 0;
                 pendingReturnWaypoint = needsIntermediateStep ? new int[] { next[0], playerY + 1, next[2] } : null;
