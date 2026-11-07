@@ -789,6 +789,7 @@ public final class ExplorationBeta {
             || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3]
                 && y <= target.yCoord + 3)) return false;
         roomEntryCandidates = findRoomExitCandidates(mc, bounds);
+        roomEntryCandidates.removeIf(candidate -> candidate.length >= 9);
         roomEntryCandidateIndex = 0;
         final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
         final int tx = target.xCoord, tz = target.zCoord;
@@ -840,8 +841,13 @@ public final class ExplorationBeta {
                     int outX = xSide ? wallX + side[1] : along;
                     int outZ = xSide ? along : wallZ + side[2];
                     if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
-                        || !safe(mc.theWorld, inX, floorY, inZ)
                         || !safe(mc.theWorld, outX, floorY, outZ)) continue;
+                    boolean levelInside = safe(mc.theWorld, inX, floorY, inZ);
+                    boolean lowerInside = !levelInside && safe(mc.theWorld, inX, floorY - 1, inZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
+                            .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
+                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ).isNormalCube();
+                    if (!levelInside && !lowerInside) continue;
                     boolean sideWallA = isDungeonWall(
                         mc.theWorld,
                         xSide ? wallX : along - 1,
@@ -855,7 +861,9 @@ public final class ExplorationBeta {
                         xSide ? along + 1 : wallZ)
                         || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
                     if (!sideWallA && !sideWallB) continue;
-                    found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
+                    if (lowerInside) found.add(new int[] { inX, floorY - 1, inZ, outX, floorY, outZ,
+                        wallX, floorY, wallZ });
+                    else found.add(new int[] { inX, floorY, inZ, outX, floorY, outZ });
                 }
             }
         }
@@ -1512,6 +1520,7 @@ public final class ExplorationBeta {
                         new int[] { (int) Math.floor(mc.thePlayer.posX),
                             (int) Math.floor(mc.thePlayer.boundingBox.minY), (int) Math.floor(mc.thePlayer.posZ) });
                     appendRoomExitWaypoint(activeRoomExit, 0);
+                    if (activeRoomExit.length >= 9) appendRoomExitWaypoint(activeRoomExit, 6);
                     appendRoomExitWaypoint(activeRoomExit, 3);
                     roomExitCrossing = true;
                     roomExitNeedsResume = false;
@@ -2646,9 +2655,9 @@ public final class ExplorationBeta {
             return ++excavationReplans <= 3;
         }
         if (attemptStairStep(mc, next[1])) return true;
-        excavationRoute.clear();
         blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
         miningAim.reset();
+        excavationRoute.clear();
         aimTicks = 0;
         return ++excavationReplans <= 3;
     }
