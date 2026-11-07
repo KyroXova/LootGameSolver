@@ -56,6 +56,8 @@ public final class ExplorationBeta {
     private int[] previewHead;
     private int previewSize = -1;
     private int excavationReplans;
+    private int exitRecoveryTicks;
+    private int exitRecoveryAttempts;
     private boolean cameraActive;
     private float cameraYaw, cameraPitch;
     private long cameraFrame;
@@ -234,7 +236,7 @@ public final class ExplorationBeta {
                         status = "Rerouting saved exit";
                         return;
                     }
-                    stop(mc, "Saved exit blocked");
+                    retryExitLater(mc);
                     return;
                 }
                 plan(mc);
@@ -463,10 +465,28 @@ public final class ExplorationBeta {
         returnAvailable = false;
         if (startSavedReturn(mc, true, 128)) return;
         if (startRoomExitSearch(mc)) return;
-        stop(
-            mc,
-            solved ? "Puzzle solved; no saved entrance route, explorer held"
-                : "Puzzle ended; no saved entrance route, explorer held");
+        retryExitLater(mc);
+    }
+
+    private void retryExitLater(Minecraft mc) {
+        if (returnDigging && returnOriginalTarget != null) target = returnOriginalTarget;
+        returnOriginalTarget = null;
+        returnDigging = false;
+        digging = false;
+        returning = true;
+        walking = true;
+        searching = false;
+        route.clear();
+        returnJoinSearch = null;
+        returnTrailRoute = null;
+        roomExitCandidates = null;
+        roomExitPlanning = false;
+        roomExitCrossing = false;
+        excavationSearch = null;
+        excavationRoute.clear();
+        exitRecoveryTicks = 40;
+        if (mc.playerController != null) mc.playerController.resetBlockRemoving();
+        status = "Exit blocked; retrying saved tunnel and safe alternatives";
     }
 
     private void continueProgressiveSearch(Minecraft mc, boolean solved) {
@@ -934,7 +954,6 @@ public final class ExplorationBeta {
     /** A blocked saved route gets a checked excavation link to a later checkpoint, never a new in-room search. */
     private boolean digTowardSavedExit(Minecraft mc) {
         if (!returning || returnDigging || mc.thePlayer == null) return false;
-        if (insideDungeonRoom(mc) && roomExitCandidates == null && startRoomExitSearch(mc)) return true;
         List<int[]> savedRoute = new ArrayList<int[]>(route.size());
         for (int[] point : route) savedRoute.add(point.clone());
         if (savedRoute.size() < 2 && accessTrail.size() >= 2) {
@@ -945,8 +964,8 @@ public final class ExplorationBeta {
                 128);
             savedRoute = accessTrail.reverseFrom(nearest);
         }
-        if (savedRoute.size() < 2) return false;
-        return startReturnDig(mc, savedRoute);
+        if (savedRoute.size() >= 2 && startReturnDig(mc, savedRoute)) return true;
+        return insideDungeonRoom(mc) && roomExitCandidates == null && startRoomExitSearch(mc);
     }
 
     private boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
@@ -1320,6 +1339,16 @@ public final class ExplorationBeta {
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return;
         }
+        if (exitRecoveryTicks > 0) {
+            if (--exitRecoveryTicks == 0) {
+                blockedWalkNodes.clear();
+                boolean started = ++exitRecoveryAttempts % 2 == 1 && digTowardSavedExit(mc);
+                if (!started) started = startSavedReturn(mc, true, 128);
+                if (!started) started = startRoomExitSearch(mc);
+                if (!started) retryExitLater(mc);
+            }
+            return;
+        }
         // Reaching interaction range is the hand-off point: first open the master, then
         // move to the floor center and reveal the board. Without this signal automation
         // never leaves IDLE after the route ends at the structure.
@@ -1428,7 +1457,7 @@ public final class ExplorationBeta {
                     roomExitCandidateIndex++;
                     if (startNextRoomExitSearch(mc)) return;
                     if (digTowardSavedExit(mc)) return;
-                    stop(mc, "No open room exit");
+                    retryExitLater(mc);
                     return;
                 }
             } else if (returnTrailRoute != null && reachedJoin) {
@@ -1443,7 +1472,7 @@ public final class ExplorationBeta {
                 status = "Following safe checkpoint toward the saved exit";
             } else if (returnTrailRoute != null) {
                 if (digTowardSavedExit(mc)) return;
-                stop(mc, "No walkable or breakable link to the saved exit");
+                retryExitLater(mc);
                 return;
             } else {
                 route.addAll(join);
@@ -1616,7 +1645,7 @@ public final class ExplorationBeta {
                 }
                 if (!stairStep(mc)) {
                     if (tryNextReturnDigAnchor(mc)) return;
-                    stop(mc, "No safe breakable link to the saved tunnel");
+                    retryExitLater(mc);
                 }
                 return;
             }
@@ -1642,7 +1671,7 @@ public final class ExplorationBeta {
                         roomExitCandidateIndex++;
                         if (startNextRoomExitSearch(mc)) return;
                         if (digTowardSavedExit(mc)) return;
-                        stop(mc, "Exit blocked");
+                        retryExitLater(mc);
                         return;
                     }
                     roomExitCandidates = null;
@@ -1676,7 +1705,7 @@ public final class ExplorationBeta {
                     // navigator repeat the same corner-to-corner search forever.
                     if (roomExitCandidates == null && startRoomExitSearch(mc)) return;
                     if (digTowardSavedExit(mc)) return;
-                    stop(mc, "Still inside room");
+                    retryExitLater(mc);
                     return;
                 }
                 returning = false;
@@ -1817,7 +1846,7 @@ public final class ExplorationBeta {
             if (returning) {
                 if (rerouteSavedReturn(mc, 1)) return;
                 if (digTowardSavedExit(mc)) return;
-                stop(mc, "Saved return path clearance changed");
+                retryExitLater(mc);
                 return;
             }
             if (!digging) plan(mc);
@@ -1831,7 +1860,7 @@ public final class ExplorationBeta {
                 if (next[1] > py && tryPlaceReturnStep(mc, next)) return;
                 if (rerouteSavedReturn(mc, 1)) return;
                 if (digTowardSavedExit(mc)) return;
-                stop(mc, "Saved return path is no longer safe");
+                retryExitLater(mc);
                 return;
             }
             mc.thePlayer.motionX = 0;
@@ -1922,7 +1951,7 @@ public final class ExplorationBeta {
                     status = "Recovering along the saved exit route";
                     return;
                 }
-                stop(mc, "Saved exit route is blocked; navigation held safely");
+                retryExitLater(mc);
                 return;
             }
             if (!route.isEmpty() && blockedWalkNodes.size() < 64) {
@@ -2078,6 +2107,8 @@ public final class ExplorationBeta {
     }
 
     private void stop(Minecraft mc, String message) {
+        exitRecoveryTicks = 0;
+        exitRecoveryAttempts = 0;
         persistAccessTrail(true);
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
         puzzleMasterTarget = null;
@@ -2527,9 +2558,9 @@ public final class ExplorationBeta {
         stairZ = next[2] - z;
         if (!ExcavationPolicy.beside(x, z, next[0], next[2])
             || excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
-            excavationRoute.clear();
             blockedWalkNodes.add(supportKey(next[0], next[1], next[2]));
             miningAim.reset();
+            excavationRoute.clear();
             return ++excavationReplans <= 3;
         }
         if (attemptStairStep(mc, next[1])) return true;
