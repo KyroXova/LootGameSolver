@@ -65,6 +65,7 @@ final class StatusText {
         if (text.contains("waiting") && text.contains("land")) return "Waiting: Landing";
         if (text.contains("waiting") && text.contains("placement")) return "Waiting: Place";
         if (text.contains("waiting") && text.contains("terrain")) return "Waiting: Chunks";
+        if (text.contains("waiting") && text.contains("safe route")) return "Planning Route";
         if (text.contains("tool") && (text.contains("inventory") || text.contains("prepare"))) return "Tool: Prepare";
         if (text.contains("return step") && (text.contains("place") || text.contains("block"))) return "Place: Return";
         if (text.contains("exit") || text.contains("tunnel")

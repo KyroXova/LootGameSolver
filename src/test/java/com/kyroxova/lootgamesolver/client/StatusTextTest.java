@@ -12,6 +12,7 @@ public class StatusTextTest {
         assertEquals("Following Route", StatusText.explorer("Following checked route"));
         assertEquals("Searching Structures", StatusText.explorer("Puzzle solved; searching for the next structure"));
         assertEquals("Planning Route", StatusText.explorer("Checking existing route: 325 positions"));
+        assertEquals("Planning Route", StatusText.explorer("Waiting for a safe route, then retrying"));
         assertEquals("Stage Complete", StatusText.explorer("Puzzle solved"));
         assertEquals("Following Exit", StatusText.explorer("Following saved access route out"));
         assertEquals("Following Exit", StatusText.explorer("Returning along saved access route"));

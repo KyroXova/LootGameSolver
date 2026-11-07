@@ -157,13 +157,20 @@ public final class ExplorationBeta {
     private net.minecraft.util.Vec3 visibleMiningPoint(Minecraft mc, int x, int y, int z) {
         net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        double height = 1D;
+        net.minecraft.block.Block block = mc.theWorld.getBlock(x, y, z);
+        if (block == Blocks.snow_layer) {
+            block.setBlockBoundsBasedOnState(mc.theWorld, x, y, z);
+            net.minecraft.util.AxisAlignedBB bounds = block.getSelectedBoundingBoxFromPool(mc.theWorld, x, y, z);
+            if (bounds != null) height = Math.max(0.01D, Math.min(1D, bounds.maxY - y));
+        }
         double[] offsets = { 0.5D, 0.3D, 0.7D };
         int[] faces = { 2, 3, 4, 5, 1, 0 };
         for (double a : offsets) for (double b : offsets) for (int face : faces) {
             double dx = face == 4 ? 0.02D : face == 5 ? 0.98D : a;
             double dy = face == 0 ? 0.02D : face == 1 ? 0.98D : face >= 4 ? a : b;
             double dz = face == 2 ? 0.02D : face == 3 ? 0.98D : face >= 4 ? b : face <= 1 ? b : a;
-            net.minecraft.util.Vec3 point = net.minecraft.util.Vec3.createVectorHelper(x + dx, y + dy, z + dz);
+            net.minecraft.util.Vec3 point = net.minecraft.util.Vec3.createVectorHelper(x + dx, y + dy * height, z + dz);
             net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
             if (hit != null && hit.blockX == x
                 && hit.blockY == y
@@ -178,6 +185,7 @@ public final class ExplorationBeta {
 
     private boolean pausedForControl;
     private GroundPathfinder.Search walkingSearch;
+    private int[] snowRecoveryTarget;
     private boolean walkingPlanFailed;
     private GroundPathfinder.Search continuationSearch;
     private final java.util.Set<Long> returnSupports = new java.util.HashSet<Long>();
@@ -585,6 +593,7 @@ public final class ExplorationBeta {
     }
 
     private void continueProgressiveSearch(Minecraft mc, boolean solved) {
+        snowRecoveryTarget = null;
         removePersistedTrail();
         route.clear();
         walkingSearch = null;
@@ -3137,6 +3146,7 @@ public final class ExplorationBeta {
             return;
         }
         sustain.stop(mc);
+        snowRecoveryTarget = null;
         exitRecoveryTicks = 0;
         exitRecoveryAttempts = 0;
         openExitSearch = null;
@@ -3628,6 +3638,13 @@ public final class ExplorationBeta {
             singleStep(mc, x, y, z, true);
             return true;
         }
+        if (snowRecoveryTarget != null) {
+            int[] snow = snowRecoveryTarget;
+            if (Math.abs(snow[0] - x) + Math.abs(snow[2] - z) == 1
+                && mc.theWorld.getBlock(snow[0], snow[1], snow[2]) == Blocks.snow_layer
+                && minePlannedBlock(mc, snow[0], snow[1], snow[2], snow[1])) return true;
+            snowRecoveryTarget = null;
+        }
         if (excavationRoute.isEmpty() && excavationSearch == null
             && accessTrail.size() <= 1
             && roofEscapeGoal == null
@@ -3671,7 +3688,7 @@ public final class ExplorationBeta {
             rejectedSteps.clear();
             excavationRoute.addAll(excavationSearch.path);
             excavationSearch = null;
-            if (excavationRoute.isEmpty()) return false;
+            if (excavationRoute.isEmpty()) return clearSnowForExcavation(mc, x, y, z);
             excavationMode = "Checked access route";
         }
         if (excavationRoute.size() >= 2) {
@@ -3738,6 +3755,37 @@ public final class ExplorationBeta {
             && block != Blocks.portal;
     }
 
+    private boolean clearSnowForExcavation(Minecraft mc, int x, int y, int z) {
+        if (target == null || !dryShore(mc.theWorld, x, y, z)) return false;
+        for (int[] direction : ExcavationPolicy.approachDirections(x, z, target.xCoord, target.zCoord)) {
+            int nx = x + direction[0], nz = z + direction[1];
+            for (int by = y + 1; by >= y - 1; by--) {
+                if (!mc.theWorld.blockExists(nx, by, nz) || mc.theWorld.getBlock(nx, by, nz) != Blocks.snow_layer
+                    || !excavatable(mc.theWorld, nx, by, nz)
+                    || visibleMiningPoint(mc, nx, by, nz) == null) continue;
+                if (by < y && !mc.theWorld.getBlock(nx, by - 1, nz)
+                    .isNormalCube()) continue;
+                boolean hazard = false;
+                for (int dy = -1; dy <= 2; dy++) {
+                    if (!mc.theWorld.blockExists(nx, y + dy, nz)) {
+                        hazard = true;
+                        break;
+                    }
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(nx, y + dy, nz);
+                    if (block.getMaterial()
+                        .isLiquid() || ContactHazards.dangerous(block, mc.theWorld.getBlockMetadata(nx, y + dy, nz))) {
+                        hazard = true;
+                        break;
+                    }
+                }
+                if (hazard) continue;
+                snowRecoveryTarget = new int[] { nx, by, nz };
+                return minePlannedBlock(mc, nx, by, nz, by);
+            }
+        }
+        return false;
+    }
+
     private int excavationCost(World w, int x, int y, int z, int nx, int ny, int nz) {
         for (int by = ny - 1; by <= ny + 1; by++) if (isQuicksand(w, nx, by, nz)) return -1;
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
@@ -3780,8 +3828,7 @@ public final class ExplorationBeta {
     }
 
     private static boolean dryShore(World world, int x, int y, int z) {
-        if (!passable(world, x, y, z) || !world.getBlock(x, y - 1, z)
-            .isNormalCube()) return false;
+        if (!solidCheckpoint(world, x, y, z)) return false;
         for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -2; dy <= 1; dy++) {
             if (!world.blockExists(x + dx, y + dy, z + dz) || world.getBlock(x + dx, y + dy, z + dz)
                 .getMaterial()
@@ -3830,14 +3877,21 @@ public final class ExplorationBeta {
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
                 { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
             for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
-                <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2)
-                for (int[] direction : directions) for (int dy = -1; dy <= 6; dy++) {
+                <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2) for (int[] direction : directions) {
                     double norm = Math.hypot(direction[0], direction[1]);
-                    int gx = target.xCoord + (int) Math.round(direction[0] * radius / norm), gy = y + dy;
+                    int gx = target.xCoord + (int) Math.round(direction[0] * radius / norm);
                     int gz = target.zCoord + (int) Math.round(direction[1] * radius / norm);
                     if (!ExcavationPolicy.preferredEntrance(gx, gz, target.xCoord, target.zCoord)) continue;
-                    if (dryShore(w, gx, gy, gz) && safe(w, gx, gy, gz))
-                        entranceCandidates.add(new int[] { gx, gy, gz });
+                    if (!w.blockExists(gx, y, gz)) continue;
+                    int surface = w.getHeightValue(gx, gz);
+                    int[] heights = { surface - 2, surface - 1, surface, surface + 1, y - 1, y, y + 1 };
+                    for (int i = 0; i < heights.length; i++) {
+                        int gy = heights[i];
+                        boolean duplicate = false;
+                        for (int j = 0; j < i; j++) if (heights[j] == gy) duplicate = true;
+                        if (!duplicate && gy > 0 && gy < w.getHeight() - 2 && dryShore(w, gx, gy, gz))
+                            entranceCandidates.add(new int[] { gx, gy, gz });
+                    }
                 }
             final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
             final int tx = target.xCoord, tz = target.zCoord;
