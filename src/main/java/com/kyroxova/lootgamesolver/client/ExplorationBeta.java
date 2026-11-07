@@ -84,6 +84,8 @@ public final class ExplorationBeta {
     private boolean trailExcavating;
     private boolean returning, returnAvailable;
     private int cameraPitchDirection;
+    private static final java.util.Map<net.minecraft.block.Block, Boolean> QUICKSAND_BLOCKS =
+        new java.util.IdentityHashMap<net.minecraft.block.Block, Boolean>();
     private int pitchLastY;
     private double pitchLandingX, pitchLandingZ;
     private boolean returnDigging;
@@ -3199,7 +3201,7 @@ public final class ExplorationBeta {
         }
         boolean finished = continuationSearch.advance(3_000_000L);
         List<int[]> continuation = continuationSearch.path();
-        if (!finished && continuation.size() < 3) return;
+        if (!finished && (route.size() > 8 || continuation.size() < 6)) return;
         continuationSearch = null;
         if (continuation.isEmpty()) {
             extendedFrom = null;
@@ -3223,10 +3225,15 @@ public final class ExplorationBeta {
         for (int[] step : route) if (step.length > 3 && step[3] != 0) return false;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
+        int[] current = route.get(0);
+        double forwardX = current[0] + 0.5D - mc.thePlayer.posX;
+        double forwardZ = current[2] + 0.5D - mc.thePlayer.posZ;
         for (int i = continuation.size() - 1; i >= 0; i--) {
             int[] step = continuation.get(i);
             int dx = Math.abs(step[0] - x), dz = Math.abs(step[2] - z);
             if (step[1] != y || dx > 1 || dz > 1 || dx + dz == 0
+                || (step[0] + 0.5D - mc.thePlayer.posX) * forwardX
+                    + (step[2] + 0.5D - mc.thePlayer.posZ) * forwardZ <= 0D
                 || !safe(mc.theWorld, step[0], y, step[2])
                 || dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], y, z)
                     || !safe(mc.theWorld, x, y, step[2]))) continue;
@@ -3959,10 +3966,16 @@ public final class ExplorationBeta {
     private static boolean isQuicksand(World world, int x, int y, int z) {
         if (!world.blockExists(x, y, z)) return false;
         net.minecraft.block.Block block = world.getBlock(x, y, z);
-        String id = String.valueOf(net.minecraft.block.Block.blockRegistry.getNameForObject(block))
-            .toLowerCase(java.util.Locale.ROOT);
-        return id.contains("quicksand") || ("biomesoplenty.common.blocks.BlockMud".equals(block.getClass().getName())
-            && world.getBlockMetadata(x, y, z) == 1);
+        if ("biomesoplenty.common.blocks.BlockMud".equals(block.getClass().getName()))
+            return world.getBlockMetadata(x, y, z) == 1;
+        Boolean quicksand = QUICKSAND_BLOCKS.get(block);
+        if (quicksand == null) {
+            String id = String.valueOf(net.minecraft.block.Block.blockRegistry.getNameForObject(block))
+                .toLowerCase(java.util.Locale.ROOT);
+            quicksand = id.contains("quicksand");
+            QUICKSAND_BLOCKS.put(block, quicksand);
+        }
+        return quicksand;
     }
 
     private static boolean solidCheckpoint(World world, int x, int y, int z) {

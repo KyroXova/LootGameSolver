@@ -314,7 +314,7 @@ final class RewardChestLooter {
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
         float targetYaw = (float) (Math.atan2(hitZ, hitX) * 180D / Math.PI) - 90F;
         float targetPitch = (float) (-Math.atan2(hitY, Math.hypot(hitX, hitZ)) * 180D / Math.PI);
-        if (!turnToward(mc, targetYaw, targetPitch)) {
+        if (!turnToward(mc, targetYaw, targetPitch, 14.4F)) {
             status = "Facing reward chest";
             return;
         }
@@ -384,7 +384,7 @@ final class RewardChestLooter {
                 restoreBackpackAim(mc);
                 return;
             }
-            if (!turnToward(mc, backpackOldYaw, -90F)) { status = "Facing clear space"; return; }
+            if (!turnToward(mc, backpackOldYaw, -90F, 12F)) { status = "Facing clear space"; return; }
             mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
             if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
             backpackAiming = false;
@@ -409,7 +409,6 @@ final class RewardChestLooter {
             return;
         }
         if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
-            restoreBackpackAim(mc);
             if (packPendingSlot >= 0) {
                 ItemStack remaining = container.getSlot(packPendingSlot).getStack();
                 if (remaining == null || remaining.stackSize < packPendingCount) {
@@ -422,6 +421,7 @@ final class RewardChestLooter {
                 }
                 else {
                     mc.thePlayer.closeScreen();
+                    restoreBackpackAim(mc);
                     packOpening = false;
                     if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
                     oldSlot = -1;
@@ -463,6 +463,7 @@ final class RewardChestLooter {
                 return;
             }
             mc.thePlayer.closeScreen();
+            restoreBackpackAim(mc);
             packOpening = false;
             if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
             oldSlot = -1;
@@ -494,6 +495,7 @@ final class RewardChestLooter {
             }
             return;
         }
+        restoreBackpackAim(mc);
         if (mc.currentScreen != null) { status = "Close the open screen to use a backpack"; return; }
         if (backpackSlot < 0 || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
             backpackSlot = -1;
@@ -536,11 +538,11 @@ final class RewardChestLooter {
         backpackAiming = true;
     }
 
-    private static boolean turnToward(Minecraft mc, float yaw, float pitch) {
+    private static boolean turnToward(Minecraft mc, float yaw, float pitch, float speed) {
         float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
         float pitchDelta = pitch - mc.thePlayer.rotationPitch;
-        mc.thePlayer.rotationYaw += Math.max(-12F, Math.min(12F, yawDelta));
-        mc.thePlayer.rotationPitch += Math.max(-12F, Math.min(12F, pitchDelta));
+        mc.thePlayer.rotationYaw += Math.max(-speed, Math.min(speed, yawDelta));
+        mc.thePlayer.rotationPitch += Math.max(-speed, Math.min(speed, pitchDelta));
         return Math.abs(yawDelta) < 1F && Math.abs(pitchDelta) < 1F;
     }
 
