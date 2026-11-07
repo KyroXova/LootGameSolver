@@ -39,7 +39,9 @@ final class RewardChestLooter {
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
     private int packPendingSlot = -1, packPendingCount;
+    private float backpackOldYaw, backpackOldPitch;
     private boolean active, opened, collecting, packing, packOpening, packMoved, packingExisting;
+    private boolean backpackAimSaved;
     private String status = "";
 
     void start(Minecraft mc, int[] position, MiniGame type) {
@@ -60,6 +62,7 @@ final class RewardChestLooter {
         backpackSlot = -1;
         oldSlot = -1;
         packPendingSlot = -1;
+        backpackAimSaved = false;
         discovered.clear();
         queue.clear();
         rewardTypes.clear();
@@ -82,6 +85,7 @@ final class RewardChestLooter {
         if ((opened || packing) && mc.thePlayer != null && mc.currentScreen instanceof GuiContainer)
             mc.thePlayer.closeScreen();
         if (mc.thePlayer != null && oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
+        restoreBackpackAim(mc);
         active = false;
         opened = false;
     }
@@ -232,7 +236,19 @@ final class RewardChestLooter {
         boolean isBackpack = name.startsWith("de.eydamos.backpack.inventory.container.")
             || name.startsWith("de.eydamos.guiadvanced.")
             || name.startsWith("com.darkona.adventurebackpack.inventory.Container");
+        if (packOpening && mc.currentScreen instanceof GuiChest) {
+            // Never let a chest container pass through the backpack transfer path,
+            // even if another mod uses a shared container package name.
+            mc.thePlayer.closeScreen();
+            restoreBackpackAim(mc);
+            packOpening = false;
+            openWait = 0;
+            waiting = 5;
+            status = "Avoiding chest while opening backpack";
+            return;
+        }
         if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
+            restoreBackpackAim(mc);
             if (packPendingSlot >= 0) {
                 ItemStack remaining = container.getSlot(packPendingSlot).getStack();
                 if (remaining == null || remaining.stackSize < packPendingCount) {
@@ -306,7 +322,13 @@ final class RewardChestLooter {
             backpackSlot = -1;
         }
         if (packOpening) {
-            if (++openWait > 40) { status = "Could not open backpack; rewards remain in chest"; active = false; }
+            if (++openWait > 40) {
+                restoreBackpackAim(mc);
+                if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
+                oldSlot = -1;
+                status = "Could not open backpack; rewards remain in chest";
+                active = false;
+            }
             return;
         }
         if (mc.currentScreen != null) { status = "Close the open screen to use a backpack"; return; }
@@ -328,10 +350,21 @@ final class RewardChestLooter {
         if (oldSlot < 0) oldSlot = mc.thePlayer.inventory.currentItem;
         mc.thePlayer.inventory.currentItem = backpackSlot;
         mc.playerController.updateController();
+        backpackOldYaw = mc.thePlayer.rotationYaw;
+        backpackOldPitch = mc.thePlayer.rotationPitch;
+        backpackAimSaved = true;
+        mc.thePlayer.rotationPitch = -90F;
         mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
         packOpening = true;
         openWait = 0;
         waiting = 5;
+    }
+
+    private void restoreBackpackAim(Minecraft mc) {
+        if (!backpackAimSaved || mc.thePlayer == null) return;
+        mc.thePlayer.rotationYaw = backpackOldYaw;
+        mc.thePlayer.rotationPitch = backpackOldPitch;
+        backpackAimSaved = false;
     }
 
     private boolean isReward(ItemStack stack) {
