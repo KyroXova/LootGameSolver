@@ -24,6 +24,19 @@ public class GameOfLightAcknowledgementTest {
     }
 
     private static final class FakeStage {
+        private java.util.List<Integer> sequence = Collections.singletonList(1);
+    }
+
+    @Test
+    public void clientOnlyWaitingStageAdvancesWithoutPerSymbolServerAcknowledgement() {
+        LootGamesBridge bridge = new LootGamesBridge();
+        FakeGame game = new FakeGame();
+        game.stage.sequence = Collections.emptyList();
+        SolverAction action = new SolverAction(SolverAction.Type.REVEAL, new CellPosition(1, 1), 0, 1D);
+        DetectedGame waiting = snapshot(game, GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE, 0);
+        bridge.recordSubmittedAction(waiting);
+        assertFalse(bridge.isGameOfLightActionPending());
+        assertTrue(bridge.actionComplete(waiting, action));
     }
 
     private static final class FakeAppearance {

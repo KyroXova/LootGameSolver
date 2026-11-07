@@ -123,7 +123,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             return false;
         }
-        return true;
+        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
+            && Math.abs(pitch - player.rotationPitch) < 2F;
     }
 
     private static Object invoke(Object target, String name, Object... args) throws Exception {
@@ -699,6 +700,12 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public int[] gameCenter(Object game) {
         try {
+            if (game != null) {
+                try {
+                    int size = number(invoke(game, "getCurrentBoardSize"));
+                    if (size > 0) return boardBlock(game, new CellPosition(size / 2, size / 2));
+                } catch (Exception ignored) {}
+            }
             if (game != null && MS_GAME.equals(
                 game.getClass()
                     .getName())) {
@@ -744,6 +751,20 @@ public final class LootGamesBridge implements MiniGameDetector {
             golPendingAppearanceState = readMarkStateName(golPendingAppearance);
             golPendingSymbol = snapshot.gol != null ? snapshot.gol.getCurrentSymbol() : golSubmitted;
             golActionPending = true;
+            // Intermediate symbols have no server acknowledgement in LootGames.
+            // The client waiting stage has an empty sequence; keep our playback index locally.
+            if (snapshot.gol != null
+                && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
+                try {
+                    Field sequence = getFieldRecursive(golPendingStage.getClass(), "sequence");
+                    if (sequence != null && ((List<?>) sequence.get(golPendingStage)).isEmpty()) {
+                        golSubmitted = golPendingSymbol + 1;
+                        clearGameOfLightAction();
+                    }
+                } catch (Exception e) {
+                    LootGameSolver.LOG.debug("Could not read client sequence progress", e);
+                }
+            }
         }
     }
 
