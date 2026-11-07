@@ -1400,6 +1400,10 @@ public final class ExplorationBeta {
         return walking;
     }
 
+    boolean inDungeonRoom(Minecraft mc) {
+        return mc != null && mc.thePlayer != null && mc.theWorld != null && insideDungeonRoom(mc);
+    }
+
     void clearLastCheckpoint(Minecraft mc) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
         if (!accessTrail.removeLast()) {
@@ -2257,7 +2261,7 @@ public final class ExplorationBeta {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (!returning && trailTarget != null && mc.thePlayer.onGround) recordAccessPoint(px, py, pz);
-        if (mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
+        if (digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
                 net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
                 if (FoliagePolicy.canClear(isFoliage(plant),

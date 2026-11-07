@@ -43,6 +43,7 @@ public final class SolverSession {
     private boolean interactionPending;
     private int sudokuPreviousSlot = -1;
     private int sudokuAutomaticSlot = -1;
+    private final InventoryToolTransfer sudokuTransfer = new InventoryToolTransfer();
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
@@ -81,6 +82,11 @@ public final class SolverSession {
 
     public void tick() {
         bridge.tick();
+        Minecraft client = Minecraft.getMinecraft();
+        if (sudokuTransfer.active()) {
+            if (!sudokuTransfer.tick(client)) cancel("Could not prepare an empty Sudoku slot");
+            return;
+        }
         DetectedGame detected = bridge.detect(mode != null);
         if (mode != null && detected != null) {
             PuzzleSessionIdentity.Change change = puzzleIdentity
@@ -274,6 +280,29 @@ public final class SolverSession {
                             }
                         }
                     }
+                    if (suitable < 0) {
+                        int empty = -1;
+                        for (int i = 9; i < 36; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+                            empty = i;
+                            break;
+                        }
+                        if (empty >= 0) for (int i = 0; i < 9; i++) {
+                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                            if (stack == null || stack.isItemStackDamageable()
+                                || stack.getItem() instanceof net.minecraft.item.ItemTool
+                                || stack.getItem() instanceof net.minecraft.item.ItemSword
+                                || stack.getItem() instanceof net.minecraft.item.ItemArmor
+                                || stack.getItem() instanceof net.minecraft.item.ItemFood
+                                || stack.getItem().getClass().getName().toLowerCase(java.util.Locale.ROOT).contains("backpack")) continue;
+                            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+                            if (sudokuTransfer.clearHotbar(mc, i, empty)) {
+                                sudokuAutomaticSlot = i;
+                                activeAction = null;
+                                status = "Preparing an empty hand for Sudoku";
+                                return;
+                            }
+                        }
+                    }
                     if (suitable >= 0 && suitable != mc.thePlayer.inventory.currentItem) {
                         if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
                         sudokuAutomaticSlot = suitable;
@@ -364,6 +393,7 @@ public final class SolverSession {
     public void cancel(String reason) {
         bridge.releaseSneak();
         Minecraft mc = Minecraft.getMinecraft();
+        sudokuTransfer.cancel(mc);
         if (mc.thePlayer != null && sudokuPreviousSlot >= 0
             && mc.thePlayer.inventory.currentItem == sudokuAutomaticSlot) {
             mc.thePlayer.inventory.currentItem = sudokuPreviousSlot;

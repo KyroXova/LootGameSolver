@@ -508,6 +508,17 @@ public final class ClientHooks {
                 Object nearby = puzzleBridge.nearbyGame(true);
                 if (nearby != null) center = puzzleBridge.gameCenter(nearby);
             }
+            if (center == null && exploration.inDungeonRoom(mc)) {
+                int[] rewards = nearbyRewardCenter(mc);
+                if (rewards != null) {
+                    if (exploration.navigating()) exploration.toggle(mc);
+                    rewardCenter = rewards;
+                    rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
+                    rewardReturnPending = true;
+                    exploration.setAutomationStatus("Collecting reward chests");
+                    return;
+                }
+            }
             if (!exploration.resumePuzzleInCurrentRoom(mc, center)) exploration.toggle(mc);
         }
         boolean autoSolvePressed = isKeyJustPressed(Keybinds.toggleAutoSolve, LootGameSolverConfig.solveKey);
@@ -549,6 +560,27 @@ public final class ClientHooks {
             session.invalidateDormantCache();
             LootGameSolverConfig.showOverlay = !LootGameSolverConfig.showOverlay;
         }
+    }
+
+    static int[] nearbyRewardCenter(Minecraft mc) {
+        java.util.List<net.minecraft.tileentity.TileEntityChest> nearby = new java.util.ArrayList<>();
+        for (Object value : mc.theWorld.loadedTileEntityList) {
+            if (!(value instanceof net.minecraft.tileentity.TileEntityChest)) continue;
+            net.minecraft.tileentity.TileEntityChest chest = (net.minecraft.tileentity.TileEntityChest) value;
+            if (mc.thePlayer.getDistanceSq(chest.xCoord + 0.5D, chest.yCoord + 0.5D, chest.zCoord + 0.5D) <= 256D)
+                nearby.add(chest);
+        }
+        for (net.minecraft.tileentity.TileEntityChest chest : nearby) {
+            int x = chest.xCoord, y = chest.yCoord, z = chest.zCoord;
+            int[][] offsets = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+            for (int[] offset : offsets) {
+                int cx = x + offset[0], cz = z + offset[1], count = 0;
+                for (net.minecraft.tileentity.TileEntityChest other : nearby)
+                    if (other.yCoord == y && Math.abs(other.xCoord - cx) + Math.abs(other.zCoord - cz) == 1) count++;
+                if (count >= 3) return new int[] { cx, y, cz };
+            }
+        }
+        return null;
     }
 
     private boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {

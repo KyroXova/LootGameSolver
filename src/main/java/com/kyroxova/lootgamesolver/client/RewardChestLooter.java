@@ -103,6 +103,8 @@ final class RewardChestLooter {
         if (center == null) { status = "Reward center unavailable"; active = false; return; }
         if (++ticks < 30) return;
         if (chests.isEmpty() && index == 0) {
+            int[] cluster = ClientHooks.nearbyRewardCenter(mc);
+            if (cluster != null) center = cluster;
             for (Object obj : mc.theWorld.loadedTileEntityList) {
                 if (!(obj instanceof TileEntityChest)) continue;
                 TileEntity tile = (TileEntity) obj;
