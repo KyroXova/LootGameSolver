@@ -215,23 +215,31 @@ public final class ClientHooks {
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
-        if (trashCleanup.tick(mc, !session.isActive()
-            && (rewardReturnPending || exploration != null && exploration.navigating()))) {
-            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
-            return;
-        }
         if (rewardReturnPending) {
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
                 if (rewardLooter.completed()) {
-                    if (trashCleanup.shouldClean(mc)) return;
+                    if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
+                        if (trashCleanup.tick(mc, true)) {
+                            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                            return;
+                        }
+                    }
                     rewardReturnPending = false;
                     mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
                     if (exploration != null) exploration.finishPuzzle(mc, true);
                 }
             }
             return;
+        }
+        boolean inventoryCleanupSafe = exploration != null && exploration.inventoryCleanupSafe(mc);
+        if (!session.isActive() && (trashCleanup.active()
+            || inventoryCleanupSafe && trashCleanup.inventoryPressure(mc))) {
+            if (trashCleanup.tick(mc, true)) {
+                if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                return;
+            }
         }
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
             autoPuzzlePosition = exploration.puzzlePosition();

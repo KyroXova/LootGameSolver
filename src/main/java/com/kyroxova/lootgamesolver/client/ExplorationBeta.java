@@ -114,6 +114,12 @@ public final class ExplorationBeta {
     private int[] pendingReturnPlacement;
     private int returnPlacementTicks;
     private int returnPlacementSlot = -1;
+    private int routeRetryTicks;
+    private String routeRetryStatus = "";
+    private List<int[]> chestPitExits;
+    private int chestPitExitIndex;
+    private int chestPitTrailIndex = -1;
+    private GroundPathfinder.Search chestPitSearch;
 
     String explorationAction() {
         return returnAvailable ? "Return" : returning ? "Stop" : "Explore";
@@ -491,6 +497,7 @@ public final class ExplorationBeta {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
+        if (startChestPitReturn(mc, true)) return;
         if (startSavedReturn(mc, true, 128)) return;
         if (startRoomExitSearch(mc)) return;
         retryExitLater(mc);
@@ -715,6 +722,133 @@ public final class ExplorationBeta {
         continuationSearch = null;
         status = returnJoinSearch == null ? "Returning along saved access route" : "Rejoining saved access route";
         return true;
+    }
+
+    private boolean startChestPitReturn(Minecraft mc, boolean resumeSearch) {
+        if (mc.thePlayer == null || mc.theWorld == null || accessTrail.size() < 2) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int trailIndex = accessTrail.nearestIndex(x, y, z, 128);
+        if (trailIndex < 0) return false;
+
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        List<int[]> exits = new ArrayList<int[]>();
+        int chestSides = 0;
+        for (int[] direction : directions) {
+            boolean chest = isRewardChest(mc.theWorld, x + direction[0], y, z + direction[1])
+                || isRewardChest(mc.theWorld, x + direction[0], y - 1, z + direction[1]);
+            if (!chest) continue;
+            chestSides++;
+            for (int distance = 2; distance <= 3; distance++) {
+                int ex = x + direction[0] * distance, ez = z + direction[1] * distance;
+                if (safe(mc.theWorld, ex, y, ez)) {
+                    exits.add(new int[] { ex, y, ez });
+                    break;
+                }
+            }
+        }
+        if (chestSides < 3 || exits.isEmpty()) return false;
+
+        exits.sort((a, b) -> Double.compare(
+            Math.abs(a[0] - accessTrail.pointAt(trailIndex)[0]) + Math.abs(a[2] - accessTrail.pointAt(trailIndex)[2]),
+            Math.abs(b[0] - accessTrail.pointAt(trailIndex)[0]) + Math.abs(b[2] - accessTrail.pointAt(trailIndex)[2])));
+        chestPitExits = exits;
+        chestPitExitIndex = 0;
+        chestPitTrailIndex = trailIndex;
+        chestPitSearch = null;
+        returnJoinSearch = null;
+        returnTrailRoute = null;
+        roomExitCandidates = null;
+        roomExitPlanning = false;
+        roomExitCrossing = false;
+        returning = true;
+        returnAvailable = false;
+        resumeSearchAfterReturn = resumeSearch;
+        walking = true;
+        searching = false;
+        digging = false;
+        route.clear();
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        beginNextChestPitSearch(mc);
+        status = "Planning a jump out of the reward chest pit";
+        return true;
+    }
+
+    private void beginNextChestPitSearch(Minecraft mc) {
+        if (chestPitExits == null || chestPitExitIndex >= chestPitExits.size()) {
+            chestPitSearch = null;
+            return;
+        }
+        int[] exit = chestPitExits.get(chestPitExitIndex);
+        int[] join = accessTrail.pointAt(chestPitTrailIndex);
+        if (join == null) {
+            chestPitSearch = null;
+            return;
+        }
+        final World exitWorld = mc.theWorld;
+        GroundPathfinder.Terrain terrain = new GroundPathfinder.Terrain() {
+            public boolean stand(int px, int py, int pz) {
+                return safe(exitWorld, px, py, pz);
+            }
+
+            public boolean clear(int px, int py, int pz) {
+                return passable(exitWorld, px, py, pz);
+            }
+        };
+        chestPitSearch = new GroundPathfinder.Search(
+            terrain,
+            exit[0],
+            exit[1],
+            exit[2],
+            join[0],
+            join[1],
+            join[2],
+            Math.max(128, LootGameSolverConfig.explorationRange));
+    }
+
+    private boolean advanceChestPitReturn(Minecraft mc) {
+        if (chestPitSearch == null || chestPitExits == null) return false;
+        status = "Finding a clear jump from the chest pit to the saved tunnel";
+        if (!chestPitSearch.advance(3_000_000L)) return true;
+        List<int[]> path = chestPitSearch.path();
+        if (chestPitSearch.reachedGoal()) {
+            route.clear();
+            route.add(chestPitExits.get(chestPitExitIndex).clone());
+            for (int[] step : path) appendRoutePoint(route, step);
+            for (int[] step : accessTrail.reverseFrom(chestPitTrailIndex)) appendRoutePoint(route, step);
+            chestPitSearch = null;
+            chestPitExits = null;
+            chestPitTrailIndex = -1;
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+            segmentX = mc.thePlayer.posX;
+            segmentZ = mc.thePlayer.posZ;
+            status = "Jumping clear of the reward chests; returning through the saved tunnel";
+            return true;
+        }
+        chestPitExitIndex++;
+        if (chestPitExitIndex < chestPitExits.size()) {
+            beginNextChestPitSearch(mc);
+            return true;
+        }
+        chestPitSearch = null;
+        chestPitExits = null;
+        chestPitTrailIndex = -1;
+        if (startSavedReturn(mc, true, 128)) return true;
+        if (startRoomExitSearch(mc)) return true;
+        retryExitLater(mc);
+        return true;
+    }
+
+    private static void appendRoutePoint(List<int[]> points, int[] point) {
+        if (point == null) return;
+        if (points.isEmpty() || !samePosition(points.get(points.size() - 1), point)) points.add(point.clone());
+    }
+
+    private static boolean isRewardChest(World world, int x, int y, int z) {
+        return world.blockExists(x, y, z) && world.getBlock(x, y, z) instanceof net.minecraft.block.BlockChest;
     }
 
     private boolean startRoomExitSearch(Minecraft mc) {
@@ -1168,6 +1302,11 @@ public final class ExplorationBeta {
         return walking;
     }
 
+    boolean inventoryCleanupSafe(Minecraft mc) {
+        return walking && !returning && !digging && !movingToPuzzleCenter && !insideDungeonRoom(mc)
+            && mc.thePlayer != null && mc.thePlayer.onGround && route.size() >= 2;
+    }
+
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
         if (walking) {
@@ -1175,8 +1314,10 @@ public final class ExplorationBeta {
             return;
         }
         if (returnAvailable) {
+            if (startChestPitReturn(mc, true)) return;
             if (startSavedReturn(mc, true, 64)) return;
         }
+        if (startChestPitReturn(mc, true)) return;
         if (startRoomExitSearch(mc)) return;
         returnAvailable = false;
         puzzleArrivalPending = false;
@@ -1285,6 +1426,10 @@ public final class ExplorationBeta {
             roomEntryCrossing = false;
             roomEntrySearchNeedsResume = false;
             walkingSearchNeedsResume = false;
+            chestPitExits = null;
+            chestPitSearch = null;
+            chestPitTrailIndex = -1;
+            routeRetryTicks = 0;
             structureTools.clear();
             walking = false;
             route.clear();
@@ -1388,6 +1533,7 @@ public final class ExplorationBeta {
         }
         if (exitRecoveryTicks > 0) {
             if (--exitRecoveryTicks == 0) {
+                if (startChestPitReturn(mc, resumeSearchAfterReturn)) return;
                 blockedWalkNodes.clear();
                 final World exitWorld = mc.theWorld;
                 final GroundPathfinder.Terrain ground = walkingTerrain(exitWorld);
@@ -1419,10 +1565,15 @@ public final class ExplorationBeta {
                 status = "Following connected open route";
                 return;
             }
-            boolean started = ++exitRecoveryAttempts % 2 == 1 && digTowardSavedExit(mc);
+            boolean started = startChestPitReturn(mc, true);
+            if (!started) started = ++exitRecoveryAttempts % 2 == 1 && digTowardSavedExit(mc);
             if (!started) started = startSavedReturn(mc, true, 128);
             if (!started) started = startRoomExitSearch(mc);
             if (!started) retryExitLater(mc);
+            return;
+        }
+        if (chestPitSearch != null) {
+            advanceChestPitReturn(mc);
             return;
         }
         // Reaching interaction range is the hand-off point: first open the master, then
@@ -1587,6 +1738,11 @@ public final class ExplorationBeta {
         }
         inspectUpcomingRoute(mc);
         if (!walking) return;
+        if (routeRetryTicks > 0) {
+            if (--routeRetryTicks > 0) return;
+            retryCurrentRoute(mc, routeRetryStatus);
+            return;
+        }
         chooseApproachDuringWalking(mc);
         if (walkingSearch != null) {
             if (!walkingSearch.advance(3_000_000L)) {
@@ -2114,8 +2270,8 @@ public final class ExplorationBeta {
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
                 && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1.0D;
             boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
-            navigationInput.hop = ((next[1] > py || climbRewardChest || escapeRewardPit)
-                && Math.abs(turn) < 35F && distance < 1.4D)
+            navigationInput.hop = ((next[1] > py || climbRewardChest) && Math.abs(turn) < 35F && distance < 1.4D)
+                || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
                 || mc.thePlayer.isInWater();
             if (distance > 0.02D) {
                 double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
@@ -2226,7 +2382,92 @@ public final class ExplorationBeta {
         return fallback;
     }
 
+    private boolean recoverableRouteFailure(String message) {
+        String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
+        return text.contains("no safe") || text.contains("no verified") || text.contains("blocked")
+            || text.contains("obstructed") || text.contains("stalled") || text.contains("route")
+            || text.contains("search limit") || text.contains("landing did not") || text.contains("no walkable")
+            || text.contains("could not place a safe return step");
+    }
+
+    private void queueRouteRetry(Minecraft mc, String message) {
+        if (mc.thePlayer == null) return;
+        if (!route.isEmpty() && !returning) {
+            int[] failed = route.get(0);
+            if (blockedWalkNodes.size() < 64) blockedWalkNodes.add(supportKey(failed[0], failed[1], failed[2]));
+        }
+        if (navigationInput != null) {
+            navigationInput.forward = 0;
+            navigationInput.sideways = 0;
+            navigationInput.hop = false;
+        }
+        mc.thePlayer.setSprinting(false);
+        if (mc.playerController != null) mc.playerController.resetBlockRemoving();
+        miningAim.reset();
+        stalled = 0;
+        lastDistance = Double.MAX_VALUE;
+        routeRetryTicks = Math.max(routeRetryTicks, 20);
+        routeRetryStatus = message;
+        walking = true;
+        status = "Checking another safe route";
+    }
+
+    private void retryCurrentRoute(Minecraft mc, String reason) {
+        routeRetryTicks = 0;
+        route.clear();
+        walkingSearch = null;
+        continuationSearch = null;
+        extendedFrom = null;
+        if (returning) {
+            if (startChestPitReturn(mc, true)) return;
+            retryExitLater(mc);
+            return;
+        }
+        if (movingToPuzzleCenter) {
+            reachPuzzleCenter(mc);
+            return;
+        }
+        if (digging) {
+            digging = false;
+            entranceSelected = false;
+            excavationRoute.clear();
+            excavationSearch = null;
+            miningAim.reset();
+        }
+        if (searching && nextSearchLeg(mc)) {
+            status = "Trying another exploration direction";
+            return;
+        }
+        if (target != null && !target.isInvalid()) {
+            if (beginExistingAccessSearch(mc)) {
+                status = "Checking a different existing path";
+                return;
+            }
+            plan(mc);
+            if (!route.isEmpty() || walkingSearch != null) {
+                status = "Following a newly checked route";
+                return;
+            }
+            if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+                status = "Checking another safe approach";
+                return;
+            }
+        }
+        if (nextSearchLeg(mc)) {
+            status = "Trying another exploration direction";
+            return;
+        }
+        routeRetryStatus = reason;
+        routeRetryTicks = 40;
+        walking = true;
+        status = "Waiting for a safe route, then retrying";
+    }
+
     private void stop(Minecraft mc, String message) {
+        if (recoverableRouteFailure(message)) {
+            queueRouteRetry(mc, message);
+            return;
+        }
         sustain.stop(mc);
         exitRecoveryTicks = 0;
         exitRecoveryAttempts = 0;
@@ -2265,6 +2506,11 @@ public final class ExplorationBeta {
         if (returnPlacementSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
         pendingReturnPlacement = null;
         returnPlacementSlot = -1;
+        chestPitExits = null;
+        chestPitSearch = null;
+        chestPitTrailIndex = -1;
+        routeRetryTicks = 0;
+        routeRetryStatus = "";
         miningTarget = Long.MIN_VALUE;
         miningSlot = -1;
         walkingSearch = null;

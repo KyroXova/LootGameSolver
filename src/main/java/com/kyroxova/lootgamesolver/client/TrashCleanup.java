@@ -20,6 +20,15 @@ final class TrashCleanup {
 
     String status() { return status; }
 
+    boolean active() { return opening || open; }
+
+    boolean inventoryPressure(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return false;
+        int empty = 0;
+        for (int i = 0; i < 36; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) empty++;
+        return empty <= 8 && nextTrash(mc) >= 0;
+    }
+
     void reset() { opening = false; open = false; wait = 0; timeout = 0; retryDelay = 0; pendingIndex = -1; }
 
     boolean shouldClean(Minecraft mc) {
