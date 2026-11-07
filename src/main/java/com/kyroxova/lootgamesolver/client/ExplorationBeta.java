@@ -269,7 +269,7 @@ public final class ExplorationBeta {
             || route.isEmpty()
             || route.size() > 8
             || !LootGameSolverConfig.staircaseEnabled) return;
-        int[] end = route.get(Math.min(2, route.size() - 1));
+        int[] end = route.get(route.size() - 1);
         if (target.yCoord >= end[1] - 2 || Math.abs(end[0] - target.xCoord) + Math.abs(end[2] - target.zCoord) > 48)
             return;
         if (approachAnchor != end) {
@@ -332,6 +332,14 @@ public final class ExplorationBeta {
     }
 
     boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
+        return moveToPosition(mc, center, true);
+    }
+
+    boolean moveToRewardView(Minecraft mc, int[] center) {
+        return moveToPosition(mc, center, false);
+    }
+
+    private boolean moveToPosition(Minecraft mc, int[] center, boolean allowDigging) {
         if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
         puzzleMasterTarget = target;
         TileEntity point = new TileEntity();
@@ -370,12 +378,16 @@ public final class ExplorationBeta {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
             if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
-                if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+                if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
                     walking = true;
                     status = digging ? "Planning board entry" : "Moving to board entrance";
                     return true;
                 }
-                abandonPuzzleCenterMove(mc);
+                if (!allowDigging) {
+                    target = puzzleMasterTarget;
+                    puzzleMasterTarget = null;
+                    movingToPuzzleCenter = false;
+                } else abandonPuzzleCenterMove(mc);
                 return false;
             }
         }
@@ -384,12 +396,16 @@ public final class ExplorationBeta {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
             if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
-                if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+                if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
                     walking = true;
                     status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
                     return true;
                 }
-                abandonPuzzleCenterMove(mc);
+                if (!allowDigging) {
+                    target = puzzleMasterTarget;
+                    puzzleMasterTarget = null;
+                    movingToPuzzleCenter = false;
+                } else abandonPuzzleCenterMove(mc);
                 return false;
             }
             movingToPuzzleCenter = false;
@@ -1959,7 +1975,6 @@ public final class ExplorationBeta {
             retryCurrentRoute(mc, routeRetryStatus);
             return;
         }
-        chooseApproachDuringWalking(mc);
         if (walkingSearch != null) {
             if (!walkingSearch.advance(3_000_000L)) {
                 List<int[]> partial = walkingSearch.path();
