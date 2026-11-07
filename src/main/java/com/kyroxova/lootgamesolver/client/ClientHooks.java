@@ -40,6 +40,9 @@ public final class ClientHooks {
     private int detectCounter = 0;
     private final LootGamesBridge puzzleBridge = new LootGamesBridge();
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+    private final RewardChestLooter rewardLooter = new RewardChestLooter();
+    private boolean rewardReturnPending;
+    private int[] rewardCenter;
 
     private enum AutoPuzzleState {
         IDLE,
@@ -196,6 +199,9 @@ public final class ClientHooks {
 
         Minecraft mc = Minecraft.getMinecraft();
         if (puzzleWorld != mc.theWorld) {
+            rewardLooter.cancel(mc);
+            rewardReturnPending = false;
+            rewardCenter = null;
             puzzleWorld = mc.theWorld;
             if (autoPuzzleState != AutoPuzzleState.IDLE) {
                 session.cancel("World changed during puzzle automation");
@@ -206,6 +212,16 @@ public final class ClientHooks {
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (rewardReturnPending) {
+            rewardLooter.tick(mc, exploration);
+            if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
+            if (!rewardLooter.active()) {
+                rewardReturnPending = false;
+                mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
+                if (exploration != null) exploration.finishPuzzle(mc, true);
+            }
+            return;
+        }
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
             autoPuzzlePosition = exploration.puzzlePosition();
             floorActivatorPosition = null;
@@ -257,6 +273,7 @@ public final class ClientHooks {
             puzzleWaitTicks++;
             int[] activator = puzzleBridge.nearbyFloorActivator();
             if (activator != null && exploration != null) {
+                rewardCenter = activator.clone();
                 floorActivatorPosition = activator;
                 floorActivatorClicked = false;
                 if (exploration.moveToPuzzleCenter(mc, activator)) {
@@ -269,11 +286,13 @@ public final class ClientHooks {
             if (game == null) game = puzzleBridge.nearbyGame(true);
             boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
             if (game != null) {
+                int[] detectedCenter = puzzleBridge.gameCenter(game);
+                if (detectedCenter != null) rewardCenter = detectedCenter;
                 if (puzzleBridge.detect(true) != null) {
                     startPuzzleSolver();
                     return;
                 }
-                int[] center = puzzleBridge.gameCenter(game);
+                int[] center = detectedCenter;
                 if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
                     autoPuzzleState = AutoPuzzleState.POSITIONING;
                     puzzleWaitTicks = 0;
@@ -392,10 +411,14 @@ public final class ClientHooks {
                 return;
             }
             if (puzzleCompletion.won(mc.theWorld != null)) {
+                com.kyroxova.lootgamesolver.core.MiniGame completedGame = session.getGame();
                 session.cancel("Puzzle solved");
                 puzzleCompletion.clear();
                 autoPuzzleState = AutoPuzzleState.IDLE;
-                if (exploration != null) exploration.finishPuzzle(mc, true);
+                if (exploration != null) {
+                    rewardLooter.start(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition, completedGame);
+                    rewardReturnPending = true;
+                }
                 autoPuzzlePosition = null;
             }
         }
@@ -418,6 +441,13 @@ public final class ClientHooks {
             && mc.currentScreen == null
             && mc.thePlayer != null
             && mc.theWorld != null) {
+            if (rewardReturnPending) {
+                rewardLooter.cancel(mc);
+                rewardReturnPending = false;
+                if (exploration.navigating()) exploration.toggle(mc);
+                exploration.setAutomationStatus("Reward collection stopped");
+                return;
+            }
             session.cancel("Exploration selected");
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
@@ -441,6 +471,8 @@ public final class ClientHooks {
                 Object game = puzzleBridge.nearbyGame(true);
                 int level = puzzleBridge.currentMinesweeperLevel(game);
                 if (level >= 1 && level <= 4) {
+                    int[] currentCenter = puzzleBridge.gameCenter(game);
+                    if (currentCenter != null) rewardCenter = currentCenter;
                     activeMinesweeperLevel = level;
                     puzzleCompletion.begin();
                     if (session.isActive()) {
