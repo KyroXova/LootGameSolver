@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Manual controls that immediately hand movement back to the player. */
 final class NavigationControlPolicy {
 
     private NavigationControlPolicy() {}

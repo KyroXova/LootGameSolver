@@ -8,7 +8,6 @@ import net.minecraft.client.renderer.entity.RenderManager;
 
 import org.lwjgl.opengl.GL11;
 
-/** Draws cached decisions only; rendering never runs world scans or route searches. */
 final class NavigationOverlayRenderer {
 
     static void render(ExplorationBeta exploration, float partialTicks) {
@@ -72,8 +71,7 @@ final class NavigationOverlayRenderer {
         double height = top - ground;
         double rotation = time * 0.06D;
         GL11.glLineWidth(4F);
-        // Use explicit line pairs instead of GL_LINE_LOOP/point primitives: legacy 1.7 drivers
-        // can render those as a dotted vertical spine. These rings remain visibly circular and rotate.
+        // Explicit line pairs avoid rendering glitches in legacy 1.7 drivers.
         t.startDrawing(GL11.GL_LINES);
         for (int ring = 0; ring < 36; ring++) {
             double progress = (ring / 36D + time * 0.006D) % 1D;

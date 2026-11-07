@@ -2,7 +2,6 @@ package com.kyroxova.lootgamesolver.client;
 
 import com.kyroxova.lootgamesolver.core.MiniGame;
 
-/** Tracks game replacement and Minesweeper round transitions during an active solver run. */
 final class PuzzleSessionIdentity {
 
     enum Change {

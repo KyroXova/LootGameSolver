@@ -4,7 +4,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.WeightedRandomChestContent;
 import net.minecraftforge.oredict.OreDictionary;
 
-/** Calculates a table's relative per-draw weight, including duplicate entries. */
 final class RewardWeighting {
     private RewardWeighting() {}
 

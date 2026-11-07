@@ -14,7 +14,6 @@ import java.util.Map;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-/** Persistent, world-specific entrance routes so a client restart does not lose the tunnel back out. */
 final class AccessTrailStore {
 
     private static final long MAX_FILE_SIZE = 24_000_000L;

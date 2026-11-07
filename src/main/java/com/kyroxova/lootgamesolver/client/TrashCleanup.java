@@ -11,7 +11,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.oredict.OreDictionary;
 
-/** Uses the ServerUtilities trash inventory; never drops items into the world. */
 final class TrashCleanup {
     private boolean opening, open;
     private int wait, timeout, retryDelay;

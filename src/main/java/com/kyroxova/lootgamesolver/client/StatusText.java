@@ -2,7 +2,6 @@ package com.kyroxova.lootgamesolver.client;
 
 import java.util.Locale;
 
-/** Compact, consistent HUD labels; detailed state remains available internally. */
 final class StatusText {
 
     private static final int MAX_LENGTH = 24;

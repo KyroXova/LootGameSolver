@@ -5,7 +5,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.ForgeHooks;
 
-/** Uses mod-provided harvesting and digging hooks, never item names or vanilla tool classes. */
 final class DigToolSelector {
 
     static boolean canHarvest(Minecraft mc, Block block, int metadata) {
@@ -32,7 +31,6 @@ final class DigToolSelector {
         return best;
     }
 
-    // Returns an inventory index; the caller opens the inventory UI for indices outside the hotbar.
     static int equip(Minecraft mc, Block block, int metadata) {
         if (mc.thePlayer.capabilities.isCreativeMode) return mc.thePlayer.inventory.currentItem;
         float[] speeds = new float[36];

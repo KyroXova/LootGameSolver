@@ -135,8 +135,7 @@ public class GameOfLightAcknowledgementTest {
         bridge.recordSubmittedAction(waiting);
         mark.state = "ACCEPTED";
 
-        // Real LootGames versions may mutate and reuse their mark instance,
-        // while the reflected symbol counter remains unchanged for a tick.
+        // The mark may be reused while the reflected symbol counter is unchanged.
         assertFalse(bridge.actionComplete(waiting, action));
         assertFalse(bridge.isGameOfLightActionPending());
         assertTrue(bridge.actionComplete(waiting, action));

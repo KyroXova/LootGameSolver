@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Deterministic expanding rings, bounded relative to the starting position. */
 public final class ProgressiveSearch {
 
     private final int x;

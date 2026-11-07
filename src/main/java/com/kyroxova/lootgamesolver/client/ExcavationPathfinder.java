@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 
-/** Incremental search: each edge is a supported, cardinal walk, stair or excavation. */
 final class ExcavationPathfinder {
 
     interface Terrain {
@@ -104,7 +103,6 @@ final class ExcavationPathfinder {
                     }
                 }
                 // Existing tunnels may revisit an X/Z column at another height.
-                // Keep the anti-cut rule for newly excavated stairs only.
                 if (horizon && cutsReturnStair) continue;
                 long key = key(nx, ny, nz);
                 if (visited.contains(key)) continue;

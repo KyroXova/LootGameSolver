@@ -22,10 +22,6 @@ import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard;
 
-/**
- * Optional, reflection-only adapter for LootGames 2.x. No LootGames classes
- * appear in this mod's bytecode, so a missing or newer jar fails closed.
- */
 public final class LootGamesBridge implements MiniGameDetector {
 
     private boolean pendingSneakRelease;
@@ -50,7 +46,6 @@ public final class LootGamesBridge implements MiniGameDetector {
     private List<CellPosition> golSequence = new ArrayList<CellPosition>();
     private int golSubmitted;
 
-    // Reflection caches
     private static boolean subordinateReflectionInitialized = false;
     private static Class<?> cachedSubordinateClass = null;
     private static Method cachedGetMasterPosMethod = null;
@@ -108,7 +103,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
         player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
 
-        // Auto-walk / auto-fly towards target block if out of reach range (> 4.2 blocks)
         if (distSq > 17.64D) {
             double speed = 0.15D;
             if (distXZ > 0.1D) {
@@ -179,7 +173,6 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     public void invalidateDormantCache() {
-        // Kept for backward compatibility
     }
 
     public void resetGameOfLightPendingAction() {
@@ -220,8 +213,7 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     @SuppressWarnings("unchecked")
     private Object findNearbyGame(World world, EntityPlayer player, boolean forceScan) {
-        // Strategy 1: Check crosshair targeted block (instant detection when directly looking at puzzle/master within
-        // 16 blocks)
+        // Check the targeted block first for immediate detection.
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.objectMouseOver != null
             && mc.objectMouseOver.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
@@ -243,13 +235,11 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
         }
 
-        // Strategy 2: If not forced and not physically standing inside/near a LootGames structure, DO NOT scan
         if (!forceScan && !isPlayerInsideOrNearStructure(world, player)) {
             return null;
         }
 
-        // Strategy 3: Player is confirmed inside a structure or forceScan was requested.
-        // Search loaded tile entities strictly filtered by LootGames package.
+        // Search loaded tile entities only after confirming proximity to LootGames.
         Object selected = null;
         double selectedDistance = Double.MAX_VALUE;
         List<TileEntity> tiles = world.loadedTileEntityList;
@@ -257,7 +247,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             TileEntity tile = tiles.get(i);
             if (tile == null || tile.isInvalid()) continue;
 
-            // Fast-path: Skip all non-LootGames tile entities immediately
             if (!tile.getClass()
                 .getName()
                 .startsWith(LOOTGAMES_PKG)) continue;
@@ -278,11 +267,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         return selected;
     }
 
-    /**
-     * Fast check to test if the player is physically standing inside or adjacent to a LootGames
-     * structure.
-     * Uses direct chunk block array lookups without touching tile entities or reflection.
-     */
     private boolean isPlayerInsideOrNearStructure(World world, EntityPlayer player) {
         int px = (int) Math.floor(player.posX);
         int py = (int) Math.floor(player.posY);
@@ -319,7 +303,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             } catch (Exception ignored) {}
         }
 
-        // Check if block at position is SmartSubordinateBlock
         net.minecraft.block.Block b = world.getBlock(x, y, z);
         if (b != null && b.getClass()
             .getName()
@@ -490,8 +473,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             currentSymbol = golSubmitted;
         }
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
-            // LootGames can leave its reflected counter behind while the mark
-            // animation is the only acknowledgement available to the client.
+            // The mark animation may be the only client-visible acknowledgement.
             currentSymbol = Math.max(currentSymbol, golSubmitted);
         }
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && currentSymbol > 0
@@ -530,9 +512,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         return map;
     }
 
-    /**
-     * Executes exactly one normal Minecraft interaction. Caller waits for a packet-driven board update.
-     */
     public boolean interact(DetectedGame detected, SolverAction action) {
         return interact(detected, action, false);
     }
@@ -544,7 +523,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             releasePendingSneak(mc);
             int[] block = boardBlock(detected.game, action.position);
 
-            // Realistic player interaction: auto-walk/fly into range, aim camera at block, and swing arm
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
                 return false;
             }
@@ -620,7 +598,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         mc.thePlayer.setSneaking(restoreSneaking);
     }
 
-    /** Opens the nearby master block with one ordinary, aimed player interaction. */
     public boolean activateMaster(int x, int y, int z) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
@@ -646,7 +623,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             hit.hitVec);
     }
 
-    /** Returns the nearby game object even before its board has been revealed. */
     public Object nearbyGame(boolean forceScan) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.currentScreen != null) return null;
@@ -694,7 +670,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             x, y, z, hit.sideHit, hit.hitVec);
     }
 
-    /** Direct fallback for the just-activated master, before its tile is picked up by the nearby scan. */
     public Object gameAtMaster(int[] position) {
         Minecraft mc = Minecraft.getMinecraft();
         if (position == null || position.length < 3
@@ -705,7 +680,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             : extractGameFromTile(mc.theWorld, tile, position[0], position[1], position[2]);
     }
 
-    /** Right-clicks the floor-center cell used to reveal or advance a newly opened board. */
     public boolean activateBoardCenter(Object game) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
@@ -740,7 +714,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         return detected != null && detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER;
     }
 
-    /** Reads the current Minesweeper round before a cleared board is discarded by solver detection. */
     public int currentMinesweeperLevel(Object game) {
         if (game == null || !MS_GAME.equals(
             game.getClass()
@@ -755,7 +728,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         }
     }
 
-    /** True when a Minesweeper attempt is ready to generate its board after a reset. */
     public boolean canOpenMinesweeperBoard(Object game) {
         if (game == null || !MS_GAME.equals(
             game.getClass()
@@ -794,8 +766,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             int z = number(invoke(center, "getZ"));
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld != null) {
-                // LootGames exposes its logical center at the master height. In dungeon rooms
-                // that can be above the clickable floor cell, so resolve the solid block below.
+                // Resolve the clickable floor block below LootGames' logical center.
                 for (int floorY = y; floorY >= y - 5; floorY--) {
                     if (!mc.theWorld.blockExists(x, floorY, z)) break;
                     net.minecraft.block.Block block = mc.theWorld.getBlock(x, floorY, z);
@@ -824,8 +795,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             golPendingAppearanceState = readMarkStateName(golPendingAppearance);
             golPendingSymbol = snapshot.gol != null ? snapshot.gol.getCurrentSymbol() : golSubmitted;
             golActionPending = true;
-            // Intermediate symbols have no server acknowledgement in LootGames.
-            // The client waiting stage has an empty sequence; keep our playback index locally.
+            // Keep the playback index locally when LootGames provides no intermediate acknowledgement.
             if (snapshot.gol != null
                 && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
                 try {
@@ -888,7 +858,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                 return false;
             }
             if (appearanceChanged && "DENIED".equalsIgnoreCase(stateName)) {
-                // A rejected symbol must not advance the local sequence index or be resent.
+                // Keep the sequence index unchanged after a rejected symbol.
                 golActionPending = false;
                 golActionRejected = true;
                 golRejectedStageId = current.gol.getStageId();

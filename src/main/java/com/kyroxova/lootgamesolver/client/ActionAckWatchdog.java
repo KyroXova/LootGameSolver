@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Decides whether an unacknowledged board click can continue, must wait, or must stop. */
 final class ActionAckWatchdog {
 
     enum Decision {

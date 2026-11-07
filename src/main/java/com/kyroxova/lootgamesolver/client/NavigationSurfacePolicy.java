@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Avoid unrelated deep cave detours when a walk starts near the surface. */
 final class NavigationSurfacePolicy {
     private NavigationSurfacePolicy() {}
 

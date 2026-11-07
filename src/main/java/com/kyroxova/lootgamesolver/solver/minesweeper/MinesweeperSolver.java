@@ -19,12 +19,6 @@ import com.kyroxova.lootgamesolver.core.MiniGameSolver;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 
-/**
- * Advanced Minesweeper solver combining:
- * 1. Direct deduction and iterative Subset Reduction (Tank solver)
- * 2. Connected component MRV-backtracking with eager constraint forward-checking
- * 3. Exact global probability calculations for constrained and unconstrained cells
- */
 public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard> {
 
     private static final int MAX_COMPONENT_VARIABLES = 60;
@@ -43,7 +37,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
         List<Constraint> rawConstraints = extractConstraints(board);
 
-        // Phase 1: Iterative Direct Deduction & Subset Reduction (Tank Algorithm)
+        // Apply direct deductions and subset reduction.
         ReductionResult reduction = reduceConstraints(rawConstraints);
         if (reduction.isContradictory) {
             return SolveResult.none(SolveResult.Status.INVALID, "Board constraints are contradictory");
@@ -58,7 +52,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
 
         List<Constraint> reducedConstraints = reduction.remainingConstraints;
 
-        // Phase 2: Connected Component Decomposition & Backtracking
+        // Solve connected frontier components with backtracking.
         List<Enumeration> components = enumerateComponents(reducedConstraints);
         List<SolverAction> guaranteed = new ArrayList<SolverAction>();
         boolean incompleteEnumeration = false;
@@ -90,7 +84,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             return SolveResult.none(SolveResult.Status.NO_MOVE, "Frontier too large for exact probability");
         }
 
-        // Phase 3: Weight all complete frontier assignments against the global mine count.
+        // Weight frontier assignments against the global mine count.
         GlobalProbability global = calculateGlobalProbabilities(board, components);
         if (global.contradictory) {
             return SolveResult.none(SolveResult.Status.INVALID, "Mine count conflicts with board constraints");
@@ -391,12 +385,8 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         return result;
     }
 
-    /**
-     * Performs iterative constraint simplification and subset reduction (Tank Solver algorithm).
-     */
     private ReductionResult reduceConstraints(List<Constraint> initial) {
         Map<CellPosition, Boolean> knownAssignments = new LinkedHashMap<CellPosition, Boolean>(); // true = mine, false
-        // = safe
         List<Constraint> current = new ArrayList<Constraint>();
         for (Constraint c : initial) {
             current.add(new Constraint(new LinkedHashSet<CellPosition>(c.variables), c.mines));
@@ -406,7 +396,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         while (changed) {
             changed = false;
 
-            // 1. Simplify constraints with known assignments
+            // Apply known assignments to each constraint.
             if (!knownAssignments.isEmpty()) {
                 List<Constraint> updated = new ArrayList<Constraint>();
                 for (Constraint c : current) {
@@ -432,7 +422,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
                 current = updated;
             }
 
-            // 2. Direct deductions on each constraint
+            // Apply direct deductions.
             List<Constraint> nextConstraints = new ArrayList<Constraint>();
             for (Constraint c : current) {
                 if (c.mines < 0 || c.mines > c.variables.size()) {
@@ -462,7 +452,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             current = nextConstraints;
             if (changed) continue;
 
-            // 3. Pairwise Subset Reduction (If C1.vars is a strict subset of C2.vars -> C3 = C2 - C1)
+            // Derive constraints from strict subsets.
             int n = current.size();
             List<Constraint> addedSubsets = new ArrayList<Constraint>();
             for (int i = 0; i < n; i++) {
@@ -508,7 +498,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             current.addAll(addedSubsets);
         }
 
-        // Deduce actions from known assignments
         List<SolverAction> actions = new ArrayList<SolverAction>();
         for (Map.Entry<CellPosition, Boolean> entry : knownAssignments.entrySet()) {
             if (entry.getValue()) {
@@ -518,7 +507,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             }
         }
 
-        // Deduplicate remaining constraints
         List<Constraint> distinctRemaining = new ArrayList<Constraint>();
         for (Constraint c : current) {
             if (!containsEquivalentConstraint(distinctRemaining, c)) {
@@ -581,7 +569,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             return incomplete;
         }
 
-        // Variable ordering: Most Restricted Variable (MRV) first (order by constraint involvement count)
+        // Search the most constrained variable first.
         final Map<CellPosition, Integer> constraintCount = new HashMap<CellPosition, Integer>();
         for (CellPosition p : all) {
             constraintCount.put(p, Integer.valueOf(0));
@@ -653,7 +641,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             return;
         }
 
-        // Try SAFE (false) first
         if (canAssign(varIndex, false, terms, required, currentMineCounts, unsetCounts)) {
             applyAssignment(varIndex, false, terms, currentMineCounts, unsetCounts);
             assignment[varIndex] = false;
@@ -663,7 +650,6 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             assigned[varIndex] = false;
         }
 
-        // Try MINE (true)
         if (canAssign(varIndex, true, terms, required, currentMineCounts, unsetCounts)) {
             applyAssignment(varIndex, true, terms, currentMineCounts, unsetCounts);
             assignment[varIndex] = true;

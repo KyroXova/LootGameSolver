@@ -2,7 +2,6 @@ package com.kyroxova.lootgamesolver.client;
 
 import net.minecraft.client.settings.KeyBinding;
 
-/** Owns only simulated attack input; physical input is preserved on release. */
 final class MiningAttackInput {
 
     private boolean owned;

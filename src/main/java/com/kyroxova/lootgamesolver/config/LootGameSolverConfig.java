@@ -6,9 +6,6 @@ import net.minecraftforge.common.config.Configuration;
 
 import org.lwjgl.input.Keyboard;
 
-/**
- * Forge 1.7.10 configuration. Key values are LWJGL key codes.
- */
 public final class LootGameSolverConfig {
 
     public static boolean enabled = true;

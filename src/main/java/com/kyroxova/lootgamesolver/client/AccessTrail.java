@@ -3,7 +3,6 @@ package com.kyroxova.lootgamesolver.client;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reached access waypoints, retained for a checked return walk. */
 final class AccessTrail {
 
     private final List<int[]> points = new ArrayList<int[]>();
@@ -16,8 +15,7 @@ final class AccessTrail {
         if (!points.isEmpty()) {
             int[] last = points.get(points.size() - 1);
             if (last[0] == x && last[1] == y && last[2] == z) return false;
-            // Never synthesize a Manhattan bridge between checkpoints: those guessed
-            // points can cross walls and send the return route into room corners.
+            // Do not infer a bridge between checkpoints; it could cross walls.
             if (!adjacent(last, x, y, z)) return false;
         }
         points.add(new int[] { x, y, z });

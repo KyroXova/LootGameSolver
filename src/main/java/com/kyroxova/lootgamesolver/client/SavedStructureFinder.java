@@ -16,7 +16,6 @@ import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
-/** Reads existing region files without opening them for writing or generating chunks. */
 final class SavedStructureFinder {
 
     private volatile List<int[]> positions = Collections.emptyList();
@@ -85,7 +84,7 @@ final class SavedStructureFinder {
                             }
                         }
                     } catch (IOException ignored) {
-                        // A concurrent save or damaged chunk must not abort the remaining search.
+                        // Skip chunks that fail to load and continue searching.
                     }
                 }
                 positions = Collections.unmodifiableList(new ArrayList<int[]>(found));

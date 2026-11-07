@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-/** Orders discovered loot by known per-draw probability; unknown entries are retained. */
 final class RewardLootPolicy {
     static final class Entry {
         final int chest, slot;

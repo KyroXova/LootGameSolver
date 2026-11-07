@@ -24,13 +24,6 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
-/**
- * Ultra-optimized 3D overlay renderer.
- * Renders ONLY when a LootGames puzzle is actively detected. Reads cached solver actions
- * without performing any solver or world inspection work on the render thread.
- * Fully isolates OpenGL states using glPushAttrib / glPopAttrib so world and chest lighting
- * are completely unaffected.
- */
 public final class WorldOverlayRenderer {
 
     private static final ResourceLocation RED_FLAG = new ResourceLocation(
@@ -176,7 +169,6 @@ public final class WorldOverlayRenderer {
                 int[] block = session.getBlockPos(action.position);
                 if (block == null) continue;
 
-                // Distance Restriction (32.0 block radius)
                 double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
                 double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
                 double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);

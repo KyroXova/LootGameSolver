@@ -85,7 +85,6 @@ public final class ClientHooks {
 
         float t = 32.0F; // 32x32 texture sheet
 
-        // 1. Center Background (Tiled 6x6 from UV 13,13)
         int fillStartX = x + 12;
         int fillEndX = x + width - 12;
         int fillStartY = y + 12;
@@ -99,7 +98,6 @@ public final class ClientHooks {
             }
         }
 
-        // 2. Top Edge (Tiled 6x12 from UV 13,0 between 12x12 corners)
         int topStartX = x + 12;
         int topEndX = x + width - 12;
         for (int curX = topStartX; curX < topEndX; curX += 6) {
@@ -107,7 +105,6 @@ public final class ClientHooks {
             drawSubTexture(curX, y, 13, 0, drawW, 12, drawW, 12, t, t);
         }
 
-        // 3. Bottom Edge (Tiled 6x12 from UV 13,20 between 12x12 corners)
         int botStartX = x + 12;
         int botEndX = x + width - 12;
         for (int curX = botStartX; curX < botEndX; curX += 6) {
@@ -115,7 +112,6 @@ public final class ClientHooks {
             drawSubTexture(curX, y + height - 12, 13, 20, drawW, 12, drawW, 12, t, t);
         }
 
-        // 4. Left Edge (Tiled 12x6 from UV 0,13 between 12x12 corners)
         int leftStartY = y + 12;
         int leftEndY = y + height - 12;
         for (int curY = leftStartY; curY < leftEndY; curY += 6) {
@@ -123,7 +119,6 @@ public final class ClientHooks {
             drawSubTexture(x, curY, 0, 13, 12, drawH, 12, drawH, t, t);
         }
 
-        // 5. Right Edge (Tiled 12x6 from UV 20,13 between 12x12 corners)
         int rightStartY = y + 12;
         int rightEndY = y + height - 12;
         for (int curY = rightStartY; curY < rightEndY; curY += 6) {
@@ -131,17 +126,12 @@ public final class ClientHooks {
             drawSubTexture(x + width - 12, curY, 20, 13, 12, drawH, 12, drawH, t, t);
         }
 
-        // 6. 4 Corners (12x12 un-stretched at 1:1 pixel scale)
-        // Top-Left Corner (UV 0,0 12x12)
         drawSubTexture(x, y, 0, 0, 12, 12, 12, 12, t, t);
 
-        // Top-Right Corner (UV 20,0 12x12)
         drawSubTexture(x + width - 12, y, 20, 0, 12, 12, 12, 12, t, t);
 
-        // Bottom-Left Corner (UV 0,20 12x12)
         drawSubTexture(x, y + height - 12, 0, 20, 12, 12, 12, 12, t, t);
 
-        // Bottom-Right Corner (UV 20,20 12x12)
         drawSubTexture(x + width - 12, y + height - 12, 20, 20, 12, 12, 12, 12, t, t);
     }
 
@@ -171,7 +161,6 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void onKeyInput(cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent event) {
-        // Key state and held duration are sampled once per client tick below.
     }
 
     @SubscribeEvent
@@ -281,8 +270,7 @@ public final class ClientHooks {
             }
         }
 
-        // Poll board detection every 20 ticks (1s) when dormant (using smart movement gate), or every tick when
-        // actively auto-solving
+        // Poll dormant board detection less often; poll every tick while solving.
         detectCounter++;
         if (session.isActive() || detectCounter % 20 == 0) {
             session.tick();
@@ -366,8 +354,7 @@ public final class ClientHooks {
                 puzzleWaitTicks = 0;
                 lastCenterClickTick = -40;
             } else if (exploration == null || !exploration.navigating()) {
-                // The exact-center click helper continues alignment and refuses to
-                // click until the player is grounded on the center tile.
+                // Wait until grounded and centered before clicking.
                 autoPuzzleState = AutoPuzzleState.REVEALING_NEXT_STAGE;
                 puzzleWaitTicks = 0;
                 lastCenterClickTick = -40;
@@ -606,13 +593,11 @@ public final class ClientHooks {
         double distSq = dx * dx + dy * dy + dz * dz;
         double distXZ = Math.sqrt(dx * dx + dz * dz);
 
-        // Smooth humanized camera rotation to face target block
         float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
         float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
         mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 40.0F);
         mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 30.0F);
 
-        // Step towards target block if > 2.8 blocks away
         if (distSq > 7.84D) {
             double speed = 0.22D;
             if (distXZ > 0.1D) {

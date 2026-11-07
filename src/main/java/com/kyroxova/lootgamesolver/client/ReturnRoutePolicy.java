@@ -3,7 +3,6 @@ package com.kyroxova.lootgamesolver.client;
 import java.util.List;
 import java.util.function.Predicate;
 
-/** Return-route decisions that must remain independent of room geometry. */
 final class ReturnRoutePolicy {
 
     private ReturnRoutePolicy() {}

@@ -8,7 +8,6 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
-/** Manages food and the optional Extra Utilities Healing Axe while exploring. */
 final class ExplorerSustain {
     private final InventoryToolTransfer transfer = new InventoryToolTransfer();
     private boolean eating;

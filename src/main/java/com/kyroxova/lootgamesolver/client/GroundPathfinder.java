@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 
-/** Bounded three-dimensional ground search, allowing one-block steps and detours. */
 public final class GroundPathfinder {
 
     public interface Terrain {
@@ -22,7 +21,6 @@ public final class GroundPathfinder {
             return 0;
         }
 
-        /** Additional cost for entering this node from its predecessor, in tenths of a block. */
         default int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
             return 0;
         }

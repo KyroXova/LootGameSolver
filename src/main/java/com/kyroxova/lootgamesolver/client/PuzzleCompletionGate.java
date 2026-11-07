@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Only a server win signal for the current loaded world can confirm a solved structure. */
 final class PuzzleCompletionGate {
 
     private boolean bound, win, loss;

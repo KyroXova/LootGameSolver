@@ -13,10 +13,8 @@ import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
-/** Loaded-terrain exploration. Routes deliberately require level, open ground. */
 public final class ExplorationBeta {
 
-    // Local testing only. Set false before pushing or publishing.
     public static final boolean ENABLED = true;
     private final List<int[]> route = new ArrayList<int[]>();
     private World world;
@@ -963,9 +961,7 @@ public final class ExplorationBeta {
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
         if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
         roomExitCandidates = findRoomExitCandidates(mc, bounds);
-        // When a saved dig route exists, its first point is the tunnel mouth.
-        // Prefer room openings nearest that mouth instead of whichever wall
-        // happens to be nearest to the player (often a corner).
+        // Prefer room openings nearest the saved tunnel mouth.
         if (accessTrail.size() >= 2 && roomExitCandidates.size() > 1) {
             int[] mouth = accessTrail.pointAt(0);
             roomExitCandidates.sort((a, b) -> Double.compare(exitMouthDistance(a, mouth), exitMouthDistance(b, mouth)));
@@ -1128,8 +1124,7 @@ public final class ExplorationBeta {
         }
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
         int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
-        // A dug tunnel can extend the dungeon wall blocks far beyond the room. Use
-        // only dense wall cross-sections as room edges; thin tunnel walls are sparse.
+        // Use dense wall cross-sections as room edges; tunnel walls are sparse.
         for (int i = 0; i < 65; i++) {
             if (xWallCounts[i] >= 24) {
                 minX = Math.min(minX, x + i - 32);
@@ -1228,7 +1223,6 @@ public final class ExplorationBeta {
         return true;
     }
 
-    /** A blocked saved route gets a checked excavation link to a later checkpoint, never a new in-room search. */
     private boolean digTowardSavedExit(Minecraft mc) {
         if (!returning || returnDigging || mc.thePlayer == null) return false;
         List<int[]> savedRoute = new ArrayList<int[]>(route.size());
@@ -1351,7 +1345,6 @@ public final class ExplorationBeta {
             || mc.isGamePaused()) return;
         float yaw = NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, cameraYaw, seconds);
         float pitch = NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, cameraPitch, seconds);
-        // Vanilla mouse look keeps the previous rotation in the same angular frame.
         mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
     }
 
@@ -1454,8 +1447,7 @@ public final class ExplorationBeta {
             if (startChestPitReturn(mc, true)) return;
             if (startSavedReturn(mc, true, 64)) return;
         }
-        // G resumes the current destination first. Starting an exit search here used to
-        // discard an in-progress approach and send the player to a different wall.
+        // Resume the current destination before starting a new exit search.
         if (target != null && !target.isInvalid()) {
             resumeCurrentTarget(mc);
             return;
@@ -1492,14 +1484,12 @@ public final class ExplorationBeta {
             return;
         }
         beginAccessTrail(mc);
-        // Keep the saved entrance when we are inside; a stop/restart here is a resume,
-        // not an implicit request to return through the structure.
+        // Preserve the saved entrance while inside so a restart resumes the current route.
         int playerX = (int) Math.floor(mc.thePlayer.posX);
         int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int playerZ = (int) Math.floor(mc.thePlayer.posZ);
         int nearbyTrailIndex = accessTrail.nearestIndex(playerX, playerY, playerZ, 24);
-        // Preserve a persisted trail only while near any of its real checkpoints.
-        // Starting a fresh approach elsewhere must not inherit a stale entrance.
+        // Reuse a persisted trail only while near one of its checkpoints.
         if (nearbyTrailIndex < 0 && trailTarget != null && accessTrail.size() > 0) {
             accessTrail.clear();
             trailTarget = knownStructure == null ? null : knownStructure.clone();
@@ -1508,9 +1498,7 @@ public final class ExplorationBeta {
             removePersistedTrail();
         }
         if (reuseSavedAccessPath(mc)) {
-            // Continue along the validated route into the structure before digging.
         } else if (beginExistingAccessSearch(mc)) {
-            // Search existing walkable space before selecting a new dig entrance.
         } else {
             plan(mc);
             walking = walkingSearch != null || !route.isEmpty();
@@ -1775,9 +1763,7 @@ public final class ExplorationBeta {
             advanceChestPitReturn(mc);
             return;
         }
-        // Reaching interaction range is the hand-off point: first open the master, then
-        // move to the floor center and reveal the board. Without this signal automation
-        // never leaves IDLE after the route ends at the structure.
+        // Open the game, move to the floor center, and reveal the board on arrival.
         if (!returning && !searching && !movingToPuzzleCenter && target != null && reachableBoard(mc)) {
             if (mc.thePlayer.onGround && trailTarget != null) recordAccessPoint(
                 (int) Math.floor(mc.thePlayer.posX),
@@ -1894,8 +1880,7 @@ public final class ExplorationBeta {
                 returnTrailRoute = null;
                 rejoiningSavedTrail = false;
             } else if (returnTrailRoute != null && !join.isEmpty()) {
-                // A partial search path is only a safe intermediate checkpoint. Walk
-                // it, then continue searching from there; never jump to the saved trail.
+                // Walk to the partial-search checkpoint, then continue searching there.
                 route.addAll(join);
                 status = "Following safe checkpoint toward the saved exit";
             } else if (returnTrailRoute != null) {
@@ -2129,9 +2114,7 @@ public final class ExplorationBeta {
                     continueProgressiveSearch(mc, true);
                     return;
                 }
-                // A partial link search is an intermediate checkpoint, not a
-                // doorway. Continue the same search before considering room
-                // walls, or the player is sent around the room toward corners.
+                // Continue a partial link search before considering room walls.
                 if (ReturnRoutePolicy.shouldContinueSavedTrailJoin(rejoiningSavedTrail, returnTrailRoute)) {
                     returnJoinSearch = new GroundPathfinder.Search(
                         walkingTerrain(mc.theWorld),
@@ -2146,9 +2129,7 @@ public final class ExplorationBeta {
                     return;
                 }
                 if (insideDungeonRoom(mc)) {
-                    // Do not reset the tried doorway list when a return route
-                    // reaches an empty checkpoint. Resetting here made the
-                    // navigator repeat the same corner-to-corner search forever.
+                    // Keep the tried-doorway list to prevent repeating failed routes.
                     if (roomExitCandidates == null && startRoomExitSearch(mc)) return;
                     if (digTowardSavedExit(mc)) return;
                     retryExitLater(mc);
@@ -2571,8 +2552,7 @@ public final class ExplorationBeta {
         }
         if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z))
             return false;
-        // Prefer a block directly below the placement target. This is the usual
-        // staircase-up case and was previously skipped, so no click could succeed.
+        // Prefer a support block directly below the placement target.
         int[][] adjacent = { { x, y - 1, z, 1 }, { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 },
             { x, y, z + 1, 2 } };
         for (int[] side : adjacent) {
@@ -2924,7 +2904,6 @@ public final class ExplorationBeta {
 
     private boolean nextSearchLeg(Minecraft mc) {
         if (search == null) return false;
-        // Keep checking new headings over successive ticks instead of stopping after a few blocked legs.
         for (int attempt = 0; attempt < 8; attempt++) {
             int[] goal = search.next();
             if (goal == null) return false;
@@ -3175,8 +3154,7 @@ public final class ExplorationBeta {
                 trailExcavating = accessTrail.size() > 1;
             }
             if (!trailExcavating) {
-                // The surface walk is only an approach. Save a compact trail from the
-                // actual excavation mouth so return never walks back to the old start.
+                // Save the return trail from the excavation mouth, not the old start.
                 accessTrail.clear();
                 trailDirty = false;
                 trailExcavating = true;
@@ -3287,9 +3265,7 @@ public final class ExplorationBeta {
             }
             return harvestable;
         }
-        // Mine ordinary terrain and obstructing foliage using the currently held
-        // tool when no specialized harvesting tool is available. Fluids, tile
-        // entities, falling blocks and unbreakable blocks remain excluded.
+        // Mine ordinary terrain and foliage; exclude fluids, tile entities, falling blocks, and unbreakable blocks.
         return hardness >= 0 && hardness <= 10 && !material.isLiquid()
             && !(block instanceof net.minecraft.block.BlockFalling)
             && block != Blocks.fire && block != Blocks.cactus && block != Blocks.portal;
@@ -3402,7 +3378,6 @@ public final class ExplorationBeta {
             entranceCandidates
                 .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
         }
-        // Continue across ticks instead of abandoning all later shores after a few failed candidates.
         for (int attempts = 0; attempts < 1 && entranceCandidate < entranceCandidates.size(); attempts++) {
             int[] goal = entranceCandidates.get(entranceCandidate++);
             if (Math.abs(goal[0] - x) + Math.abs(goal[2] - z) <= 1 && Math.abs(goal[1] - y) <= 1) {
@@ -3481,7 +3456,6 @@ public final class ExplorationBeta {
         int nx = x + stairX, nz = z + stairZ;
         if (!ExcavationPolicy.beside(x, z, nx, nz)) return false;
         World w = mc.theWorld;
-        // Recheck the same support, hazard and clearance rules used by the planner.
         if (excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
         if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
         int clearTop = Math.max(y, destinationY) + 1;
@@ -3706,7 +3680,6 @@ public final class ExplorationBeta {
                 if (fluid != null && OilAvoidance.isOil(fluid.getName())) return false;
             }
         }
-        // Open headroom and a full floor; reject nearby liquids, fire, cactus and unknown terrain.
         for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
             for (int dy = -1; dy <= 2; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;

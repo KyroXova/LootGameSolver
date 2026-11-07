@@ -17,9 +17,6 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightSolver;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperSolver;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuSolver;
 
-/**
- * Event-driven, single-action automation state machine. It never clicks in a busy loop.
- */
 public final class SolverSession {
 
     private final LootGamesBridge bridge = new LootGamesBridge();
@@ -127,7 +124,6 @@ public final class SolverSession {
             }
         }
 
-        // Recompute cached actions only when snapshot signature changes or if cache is empty
         if (cachedRenderActions == null || !currentSnapshot.signature.equals(lastSnapshotSignature)) {
             cachedRenderActions = computeActionsForGame(currentSnapshot);
             lastSnapshotSignature = currentSnapshot.signature;
@@ -198,7 +194,6 @@ public final class SolverSession {
         List<SolverAction> actions = planner
             .plan(result, mode, LootGameSolverConfig.allowProbabilityMoves, LootGameSolverConfig.probabilityThreshold);
 
-        // Sort actions by distance to player so nearest target block is always executed first
         Minecraft mc = Minecraft.getMinecraft();
         if (snapshot.type != MiniGame.GAME_OF_LIGHT && mc.thePlayer != null && actions.size() > 1) {
             final double px = mc.thePlayer.posX;
@@ -334,8 +329,7 @@ public final class SolverSession {
                 System.currentTimeMillis(),
                 LootGameSolverConfig.boardUpdateTimeoutMs);
             if (decision == ActionAckWatchdog.Decision.SEND) {
-                // A visible digit change acknowledges one click in the multi-click
-                // number cycle. Continue only after that progress is visible.
+                // Advance a multi-click number cycle only after the visible digit changes.
                 interactionPending = false;
             } else if (decision == ActionAckWatchdog.Decision.WAIT) {
                 status = "Waiting: Board";

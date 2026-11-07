@@ -114,8 +114,7 @@ public class MinesweeperSolverTest {
 
     @Test
     public void usesGlobalMineCountToResolveDisconnectedChoicePatterns() {
-        // The two clues permit either (safe, mine, safe) or (mine, safe, mine).
-        // One adjacent flag and the total mine count allow only the first pattern.
+        // One adjacent flag and the total mine count select the safe-mine-safe pattern.
         MinesweeperBoard board = new MinesweeperBoard(3, 2, 2);
         board.set(0, 0, MinesweeperCell.revealed(2));
         board.set(1, 0, MinesweeperCell.flagged());
@@ -155,12 +154,6 @@ public class MinesweeperSolverTest {
 
     @Test
     public void solvesOneTwoOnePattern() {
-        // Row 0: 1, 2, 1
-        // Row 1: ?, ?, ?
-        // 1-2-1 pattern against straight wall requires:
-        // (0, 1) = MINE (FLAG)
-        // (1, 1) = SAFE (REVEAL)
-        // (2, 1) = MINE (FLAG)
         MinesweeperBoard board = new MinesweeperBoard(3, 2, 2);
         board.set(0, 0, MinesweeperCell.revealed(1));
         board.set(1, 0, MinesweeperCell.revealed(2));
@@ -180,7 +173,6 @@ public class MinesweeperSolverTest {
 
     @Test
     public void solvesLargeConnectedFrontier() {
-        // Test a large connected board with consistent 1-1-1 repeating frontier (mines at 0, 3, 6, 9, 12)
         int size = 13;
         MinesweeperBoard board = new MinesweeperBoard(size, 4, 10);
         for (int x = 0; x < size; x++) {
@@ -188,11 +180,9 @@ public class MinesweeperSolverTest {
             board.set(x, 1, MinesweeperCell.revealed(1));
             board.set(x, 2, MinesweeperCell.unknown());
         }
-        // Set specific known flag at (0, 2)
         board.set(0, 2, MinesweeperCell.flagged());
 
         SolveResult result = new MinesweeperSolver().solve(board);
-        // Since (0, 2) is flagged, (1, 2) and (2, 2) must be safe, (3, 2) must be flagged, etc.
         assertTrue(
             result.getStatus() == SolveResult.Status.GUARANTEED_SAFE
                 || result.getStatus() == SolveResult.Status.GUARANTEED_MINE);

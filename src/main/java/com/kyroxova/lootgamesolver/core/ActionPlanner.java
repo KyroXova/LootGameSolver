@@ -3,9 +3,6 @@ package com.kyroxova.lootgamesolver.core;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Keeps all policy choices (mark-only, one step and optional guessing) out of solvers.
- */
 public final class ActionPlanner {
 
     public List<SolverAction> plan(SolveResult result, Mode mode, boolean allowProbabilityMoves, double threshold) {

@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Continuous yaw avoids a full render-interpolation spin at the -180/180 boundary. */
 final class NavigationSteering {
 
     static void appendWithoutLoops(java.util.List<int[]> route, java.util.List<int[]> continuation) {

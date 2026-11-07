@@ -6,7 +6,6 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.client.C16PacketClientStatus;
 
-/** Visible inventory, vanilla GUI number-key swap, verification, then ordinary close. No cursor stack is picked up. */
 final class InventoryToolTransfer {
 
     private static final class ToolScreen extends GuiInventory {

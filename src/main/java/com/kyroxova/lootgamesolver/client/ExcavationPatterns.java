@@ -3,7 +3,6 @@ package com.kyroxova.lootgamesolver.client;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Explicit cardinal excavation layouts. Width includes both outer corners. */
 final class ExcavationPatterns {
 
     static List<int[]> spiral(int x, int y, int z, int goalY, int width, int orientation) {

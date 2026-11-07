@@ -1,7 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
 
-/** Only remove a visible, soft plant in the occupied or intended excavation column. */
 final class FoliagePolicy {
 
     static boolean canClear(boolean plant, boolean tile, float hardness, int x, int y, int z, int playerX, int footY,

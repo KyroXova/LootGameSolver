@@ -8,9 +8,6 @@ import com.kyroxova.lootgamesolver.core.MiniGameSolver;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 
-/**
- * Candidate propagation with a minimum-remaining-values backtracking fallback.
- */
 public final class SudokuSolver implements MiniGameSolver<SudokuBoard> {
 
     private String cachedPuzzle;

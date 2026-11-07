@@ -2,7 +2,6 @@ package com.kyroxova.lootgamesolver.client;
 
 import net.minecraft.util.MovementInput;
 
-/** Feeds normal movement physics while preserving the player's original input handler. */
 final class NavigationInput extends MovementInput {
 
     final MovementInput original;

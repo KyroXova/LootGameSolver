@@ -25,7 +25,6 @@ import net.minecraft.util.WeightedRandomChestContent;
 import net.minecraftforge.common.ChestGenHooks;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 
-/** Opens generated reward chests and transfers their contents through normal container clicks. */
 final class RewardChestLooter {
     private final List<int[]> chests = new ArrayList<int[]>();
     private final List<RewardLootPolicy.Entry> discovered = new ArrayList<RewardLootPolicy.Entry>();
@@ -108,9 +107,7 @@ final class RewardChestLooter {
                 if (!(obj instanceof TileEntityChest)) continue;
                 TileEntity tile = (TileEntity) obj;
                 int dx = tile.xCoord - center[0], dz = tile.zCoord - center[2];
-                // The active board center can be reported on its ground support or
-                // one adjacent board block depending on game stage. Include the small
-                // surrounding chest cluster, then keep the four nearest reward chests.
+                // Include the nearby chest cluster because the reported board center varies by stage.
                 if (Math.abs(dx) + Math.abs(dz) <= 3 && Math.abs(tile.yCoord - center[1]) <= 5)
                     chests.add(new int[] { tile.xCoord, tile.yCoord, tile.zCoord });
             }
@@ -257,8 +254,7 @@ final class RewardChestLooter {
             || name.startsWith("de.eydamos.guiadvanced.")
             || name.startsWith("com.darkona.adventurebackpack.inventory.Container");
         if (packOpening && mc.currentScreen instanceof GuiChest) {
-            // Never let a chest container pass through the backpack transfer path,
-            // even if another mod uses a shared container package name.
+            // Exclude chest containers from backpack transfers, including shared package names.
             mc.thePlayer.closeScreen();
             restoreBackpackAim(mc);
             packOpening = false;
@@ -305,8 +301,7 @@ final class RewardChestLooter {
                 waiting = 5;
                 return;
             }
-            // An already-full inventory may contain no newly collected stacks. Move one
-            // ordinary main-inventory stack to make room, keeping hotbar and equipment safe.
+            // Free a main-inventory slot while leaving the hotbar and equipment untouched.
             for (Object obj : container.inventorySlots) {
                 Slot slot = (Slot) obj;
                 int playerSlot = slot.getSlotIndex();

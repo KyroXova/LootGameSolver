@@ -14,7 +14,6 @@ import java.util.Set;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-/** Local completion history, separated by world/server and dimension. */
 final class SolvedStructureStore {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting()

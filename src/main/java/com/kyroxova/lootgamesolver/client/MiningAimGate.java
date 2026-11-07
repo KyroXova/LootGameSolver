@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-/** Mining is permitted only after the same visible target is reached and aimed at on consecutive ticks. */
 final class MiningAimGate {
 
     private int x, y, z;

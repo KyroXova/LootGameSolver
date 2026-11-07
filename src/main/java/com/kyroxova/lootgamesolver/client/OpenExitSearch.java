@@ -7,7 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Searches connected standable air for a verified exit without tunneling through walls. */
 final class OpenExitSearch {
     interface Terrain extends GroundPathfinder.Terrain {
         boolean exit(int x, int y, int z);
