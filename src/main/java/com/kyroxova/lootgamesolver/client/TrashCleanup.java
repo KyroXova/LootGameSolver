@@ -21,6 +21,10 @@ final class TrashCleanup {
 
     boolean active() { return opening || open; }
 
+    void advanceCooldown() {
+        if (retryDelay > 0) retryDelay--;
+    }
+
     boolean inventoryPressure(Minecraft mc) {
         if (mc == null || mc.thePlayer == null) return false;
         int empty = 0;
@@ -36,7 +40,6 @@ final class TrashCleanup {
 
     boolean tick(Minecraft mc, boolean enabled) {
         if (mc.thePlayer == null || mc.theWorld == null) { reset(); return false; }
-        if (retryDelay > 0) retryDelay--;
         if (!opening && !open) {
             if (!enabled || retryDelay > 0 || mc.currentScreen != null
                 || mc.thePlayer.inventory.getItemStack() != null || nextTrash(mc) < 0) return false;

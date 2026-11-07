@@ -3419,7 +3419,7 @@ public final class ExplorationBeta {
             }
             return harvestable;
         }
-        // Falling blocks in the target column are cleared from the top down.
+        // Falling blocks in the target column are cleared from the bottom up.
         return hardness >= 0 && hardness <= 10 && !material.isLiquid()
             && block != Blocks.fire && block != Blocks.cactus && block != Blocks.portal;
     }
@@ -3442,11 +3442,7 @@ public final class ExplorationBeta {
         int clearanceTop = Math.max(y, ny) + 1;
         while (clearanceTop < Math.max(y, ny) + 8 && w.getBlock(nx, clearanceTop + 1, nz) == Blocks.snow_layer)
             clearanceTop++;
-        int fallingLimit = Math.max(y, ny) + 12;
-        while (clearanceTop < fallingLimit
-            && w.getBlock(nx, clearanceTop + 1, nz) instanceof net.minecraft.block.BlockFalling) clearanceTop++;
-        if (!w.blockExists(nx, clearanceTop + 1, nz)
-            || w.getBlock(nx, clearanceTop + 1, nz) instanceof net.minecraft.block.BlockFalling) return -1;
+        if (!w.blockExists(nx, clearanceTop + 1, nz)) return -1;
         if (clearanceTop > y + 4) return -1;
         for (int by = ny; by <= clearanceTop; by++) {
             if (passable(w, nx, by, nz)) continue;
@@ -3636,12 +3632,22 @@ public final class ExplorationBeta {
         int clearTop = Math.max(y, destinationY) + 1;
         while (clearTop < Math.max(y, destinationY) + 8
             && w.getBlock(nx, clearTop + 1, nz) == Blocks.snow_layer) clearTop++;
-        int fallingLimit = Math.max(y, destinationY) + 12;
-        while (clearTop < fallingLimit
-            && w.getBlock(nx, clearTop + 1, nz) instanceof net.minecraft.block.BlockFalling) clearTop++;
-        if (!w.blockExists(nx, clearTop + 1, nz)
-            || w.getBlock(nx, clearTop + 1, nz) instanceof net.minecraft.block.BlockFalling) return false;
+        if (!w.blockExists(nx, clearTop + 1, nz)) return false;
         if (clearTop > y + 4) return false;
+        for (int by = destinationY; by <= clearTop; by++) {
+            if (w.getBlock(nx, by, nz) instanceof net.minecraft.block.BlockFalling)
+                return minePlannedBlock(mc, nx, by, nz, destinationY);
+        }
+        for (Object entity : w.loadedEntityList) {
+            if (entity instanceof net.minecraft.entity.item.EntityFallingBlock) {
+                net.minecraft.entity.Entity falling = (net.minecraft.entity.Entity) entity;
+                if ((int) Math.floor(falling.posX) == nx && (int) Math.floor(falling.posZ) == nz
+                    && falling.posY >= destinationY && falling.posY <= clearTop + 12) {
+                    status = "Waiting for sand";
+                    return true;
+                }
+            }
+        }
         for (int by = clearTop; by >= destinationY; by--) {
             net.minecraft.block.Block b = w.getBlock(nx, by, nz);
             if (passable(w, nx, by, nz)) continue;

@@ -210,6 +210,7 @@ public final class ClientHooks {
                 autoPuzzlePosition = null;
             }
         }
+        trashCleanup.advanceCooldown();
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (rewardReturnPending) {
