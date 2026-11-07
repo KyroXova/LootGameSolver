@@ -199,7 +199,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             double dx = bx + 0.5D - player.posX;
             double dy = by + 0.5D - player.posY;
             double dz = bz + 0.5D - player.posZ;
-            if (Math.abs(dx) <= 16.0D && Math.abs(dz) <= 16.0D && Math.abs(dy) <= 8.0D) {
+            if (Math.abs(dx) <= 32.0D && Math.abs(dz) <= 32.0D && Math.abs(dy) <= 8.0D) {
                 net.minecraft.block.Block hitBlock = world.getBlock(bx, by, bz);
                 if (hitBlock != null && hitBlock.getClass()
                     .getName()
@@ -233,7 +233,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             double tdx = tile.xCoord + 0.5D - player.posX;
             double tdy = tile.yCoord + 0.5D - player.posY;
             double tdz = tile.zCoord + 0.5D - player.posZ;
-            if (Math.abs(tdx) > 16.0D || Math.abs(tdz) > 16.0D || Math.abs(tdy) > 8.0D) continue;
+            if (Math.abs(tdx) > 32.0D || Math.abs(tdz) > 32.0D || Math.abs(tdy) > 8.0D) continue;
 
             Object game = extractGameFromTile(world, tile, tile.xCoord, tile.yCoord, tile.zCoord);
             if (game == null) continue;

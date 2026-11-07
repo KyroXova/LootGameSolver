@@ -218,20 +218,6 @@ public final class SolverSession {
                 status = "All Sudoku numbers confirmed. Waiting for next stage...";
                 return;
             }
-            if (snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
-                // If Minesweeper is reset for new stage, click center cell to start next stage
-                int cx = snapshot.minesweeper.getWidth() / 2;
-                int cy = snapshot.minesweeper.getHeight() / 2;
-                com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell centerCell = snapshot.minesweeper
-                    .get(cx, cy);
-                if (centerCell != null
-                    && centerCell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.UNKNOWN) {
-                    actions = new java.util.ArrayList<SolverAction>();
-                    actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
-                    activeActions = actions;
-                    cachedRenderActions = actions;
-                }
-            }
             if (actions.isEmpty()) {
                 if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
                     || "under_expanding".equals(snapshot.gol.getStageId()))) {
