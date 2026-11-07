@@ -1,6 +1,8 @@
 package com.kyroxova.lootgamesolver.client;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -15,6 +17,7 @@ import org.lwjgl.opengl.GL11;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.MiniGame;
+import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
@@ -39,6 +42,16 @@ public final class WorldOverlayRenderer {
 
     private final SolverSession session;
     private final ExplorationBeta exploration;
+
+    static Map<CellPosition, String> sequenceLabels(List<SolverAction> actions, int completed) {
+        Map<CellPosition, String> labels = new LinkedHashMap<CellPosition, String>();
+        for (int i = 0; i < actions.size(); i++) {
+            CellPosition position = actions.get(i).position;
+            String label = labels.get(position);
+            labels.put(position, (label == null ? "" : label + ", ") + "#" + (completed + i + 1));
+        }
+        return labels;
+    }
 
     public WorldOverlayRenderer(SolverSession session, ExplorationBeta exploration) {
         this.session = session;
@@ -154,10 +167,12 @@ public final class WorldOverlayRenderer {
             GL11.glDepthMask(false);
             GL11.glLineWidth(1.5F);
 
-            int index = 1;
             int maxRender = actions.size();
+            Map<CellPosition, String> lightLabels = current.type == MiniGame.GAME_OF_LIGHT
+                ? sequenceLabels(actions, current.gol == null ? 0 : current.gol.getCurrentSymbol()) : null;
             for (int i = 0; i < maxRender; i++) {
                 SolverAction action = actions.get(i);
+                if (lightLabels != null && !lightLabels.containsKey(action.position)) continue;
                 int[] block = session.getBlockPos(action.position);
                 if (block == null) continue;
 
@@ -194,10 +209,10 @@ public final class WorldOverlayRenderer {
                         drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
                     } else {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
-                        drawFloatingText("#" + index, minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
+                        drawFloatingText(lightLabels.get(action.position), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
                     }
+                    lightLabels.remove(action.position);
                 }
-                index++;
             }
         } finally {
             GL11.glDepthMask(true);

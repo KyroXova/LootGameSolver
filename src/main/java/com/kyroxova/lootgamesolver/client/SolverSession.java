@@ -396,6 +396,7 @@ public final class SolverSession {
     }
 
     public List<SolverAction> getActiveActions() {
+        if (currentSnapshot != null && currentSnapshot.type == MiniGame.GAME_OF_LIGHT) return cachedRenderActions;
         if (activeActions != null && !activeActions.isEmpty()) {
             return activeActions;
         }
