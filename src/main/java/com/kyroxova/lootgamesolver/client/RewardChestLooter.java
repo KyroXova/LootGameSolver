@@ -94,7 +94,14 @@ final class RewardChestLooter {
 
     void tick(Minecraft mc, ExplorationBeta exploration) {
         if (!active || mc.thePlayer == null || mc.theWorld == null) return;
-        if (exploration != null && exploration.navigating()) { status = "Moving toward reward chests"; return; }
+        if (exploration != null && exploration.navigating()) {
+            if (index >= 0 && index < chests.size()) {
+                Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX,
+                    mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+                if (visibleChest(mc, eye, chests.get(index)) != null) exploration.stopRewardView(mc);
+            }
+            if (exploration.navigating()) { status = "Moving toward reward chests"; return; }
+        }
         if (exploration != null) exploration.consumePuzzleCenterArrival();
         if (backpackTransfer.active()) {
             if (!backpackTransfer.tick(mc)) { status = "Backpack transfer interrupted"; active = false; }

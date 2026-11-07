@@ -8,7 +8,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
@@ -112,6 +111,7 @@ public final class ExplorationBeta {
     private int[] pendingReturnPlacement;
     private int[] pendingReturnWaypoint;
     private int returnPlacementTicks;
+    private int returnPlacementAimTicks;
     private int returnPlacementSlot = -1;
     private int routeRetryTicks;
     private String routeRetryStatus = "";
@@ -180,6 +180,7 @@ public final class ExplorationBeta {
     private boolean planningExistingAccess;
     private boolean existingAccessChecked;
     private boolean movingToPuzzleCenter;
+    private boolean movingToRewardView;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
     private boolean resumeSearchAfterReturn;
@@ -240,7 +241,12 @@ public final class ExplorationBeta {
         for (int i = 0; i < Math.min(12, route.size()); i++) {
             int[] step = route.get(i);
             boolean diagonal = step[0] != previous[0] && step[2] != previous[2] && step[1] == previous[1];
-            if (!safe(mc.theWorld, step[0], step[1], step[2])
+            boolean returnStep = returning && step[1] > previous[1] && step[1] <= previous[1] + 2
+                && Math.abs(step[0] - previous[0]) + Math.abs(step[2] - previous[2]) == 1
+                && mc.theWorld.blockExists(step[0], previous[1], step[2])
+                && mc.theWorld.getBlock(step[0], previous[1], step[2])
+                    .isReplaceable(mc.theWorld, step[0], previous[1], step[2]);
+            if ((!safe(mc.theWorld, step[0], step[1], step[2]) && !returnStep)
                 || (diagonal && (!safe(mc.theWorld, step[0], step[1], previous[2])
                     || !safe(mc.theWorld, previous[0], step[1], step[2])))) {
                 if (returning) {
@@ -348,6 +354,7 @@ public final class ExplorationBeta {
         point.zCoord = center[2];
         target = point;
         movingToPuzzleCenter = true;
+        movingToRewardView = !allowDigging;
         puzzleCenterArrivalPending = false;
         cameraPitchDirection = 0;
         route.clear();
@@ -418,7 +425,7 @@ public final class ExplorationBeta {
     }
 
     private void appendPuzzleCenterWaypoint(int[] center) {
-        int[] stand = new int[] { center[0], center[1] + 1, center[2], 2 };
+        int[] stand = new int[] { center[0], center[1] + 1, center[2], movingToRewardView ? 0 : 2 };
         if (route.isEmpty() || !samePosition(route.get(route.size() - 1), stand)) route.add(stand);
         else route.set(route.size() - 1, stand);
     }
@@ -432,7 +439,7 @@ public final class ExplorationBeta {
         double distance = center == null ? Double.MAX_VALUE
             : Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
         boolean atFloor = center != null && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) < 0.01D;
-        if (distance <= 0.35D && atFloor && mc.thePlayer.onGround) {
+        if (distance <= (movingToRewardView ? 0.75D : 0.35D) && atFloor && mc.thePlayer.onGround) {
             target = puzzleMasterTarget;
             puzzleMasterTarget = null;
             movingToPuzzleCenter = false;
@@ -465,6 +472,10 @@ public final class ExplorationBeta {
             route.clear();
             walking = true;
             status = "Checking route to board center";
+            return true;
+        }
+        if (movingToRewardView) {
+            stop(mc, "Chest view unreachable");
             return true;
         }
         if (seekingDryEntrance) {
@@ -1422,21 +1433,12 @@ public final class ExplorationBeta {
             int nextDirection = Integer.compare(y, previousY);
             previousY = y;
             if (nextDirection == 0) continue;
+            if (direction == 0 && i > 1) return 0;
             if (direction != 0 && nextDirection != direction) return 0;
             direction = nextDirection;
             transitions++;
         }
-        return transitions >= 2 ? direction : 0;
-    }
-
-    private static boolean hasVerticalTransition(List<int[]> steps, int startY, int lookAhead) {
-        int previousY = startY;
-        for (int i = 0; i < Math.min(lookAhead, steps.size()); i++) {
-            int y = steps.get(i)[1];
-            if (y != previousY) return true;
-            previousY = y;
-        }
-        return false;
+        return transitions >= 3 ? direction : 0;
     }
 
     List<int[]> navigationRoute() {
@@ -1453,6 +1455,10 @@ public final class ExplorationBeta {
 
     boolean navigating() {
         return walking;
+    }
+
+    void stopRewardView(Minecraft mc) {
+        if (movingToRewardView) stop(mc, "Chest in reach");
     }
 
     boolean hasPendingReturn() {
@@ -1481,13 +1487,11 @@ public final class ExplorationBeta {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
         if (!accessTrail.removeLast()) {
             status = "No saved checkpoint to clear";
-            mc.thePlayer.addChatMessage(new ChatComponentText("[LootGame Solver] No saved checkpoint to clear"));
             return;
         }
         trailDirty = true;
         if (accessTrail.size() >= 2) persistAccessTrail(true);
         else removePersistedTrail();
-        mc.thePlayer.addChatMessage(new ChatComponentText("[LootGame Solver] Last saved checkpoint cleared"));
 
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -2470,9 +2474,7 @@ public final class ExplorationBeta {
             : NavigationSteering.heading(mc.thePlayer.posX, mc.thePlayer.posZ,
                 next[0] + 0.5D, next[2] + 0.5D, mc.thePlayer.rotationYaw);
         float turn = net.minecraft.util.MathHelper.wrapAngleTo180_float(desired - mc.thePlayer.rotationYaw);
-        int plannedPitchDirection = staircaseDirection(route, py);
-        if (plannedPitchDirection != 0) cameraPitchDirection = plannedPitchDirection;
-        else if (!hasVerticalTransition(route, py, 5)) cameraPitchDirection = 0;
+        cameraPitchDirection = distance <= 1.5D ? staircaseDirection(route, py) : 0;
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
@@ -2688,7 +2690,12 @@ public final class ExplorationBeta {
         // Prefer a support block directly below the placement target.
         int[][] adjacent = { { x, y - 1, z, 1 }, { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 },
             { x, y, z + 1, 2 } };
-        for (int[] side : adjacent) {
+        if (++returnPlacementAimTicks > 100) {
+            returnPlacementAimTicks = 0;
+            return false;
+        }
+        for (int sideIndex = 0; sideIndex < adjacent.length; sideIndex++) {
+            int[] side = adjacent[(sideIndex + (returnPlacementAimTicks - 1) / 20) % adjacent.length];
             net.minecraft.block.Block support = mc.theWorld.getBlock(side[0], side[1], side[2]);
             if (support == Blocks.air || !support.getMaterial()
                 .isSolid() || mc.theWorld.getTileEntity(side[0], side[1], side[2]) != null) continue;
@@ -2722,6 +2729,7 @@ public final class ExplorationBeta {
                 side[3],
                 hit)) {
                 pendingReturnPlacement = new int[] { x, y, z };
+                returnPlacementAimTicks = 0;
                 pendingReturnWaypoint = needsIntermediateStep ? new int[] { next[0], playerY + 1, next[2] } : null;
                 returnPlacementTicks = 0;
                 status = "Placing a checked block for the return step";
@@ -2897,6 +2905,7 @@ public final class ExplorationBeta {
         if (movingToPuzzleCenter && puzzleMasterTarget != null) target = puzzleMasterTarget;
         puzzleMasterTarget = null;
         movingToPuzzleCenter = false;
+        movingToRewardView = false;
         if (returnDigging) {
             target = returnOriginalTarget;
             returnOriginalTarget = null;
@@ -2926,6 +2935,7 @@ public final class ExplorationBeta {
         if (returnPlacementSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
         pendingReturnPlacement = null;
         pendingReturnWaypoint = null;
+        returnPlacementAimTicks = 0;
         returnPlacementSlot = -1;
         chestPitExits = null;
         chestPitApproach = null;
@@ -2978,8 +2988,6 @@ public final class ExplorationBeta {
         searching = false;
         route.clear();
         status = compactStatus(message);
-        if (mc.thePlayer != null)
-            mc.thePlayer.addChatMessage(new ChatComponentText("[LootGames Beta] " + compactStatus(message)));
     }
 
     private void scan(Minecraft mc) {

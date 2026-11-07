@@ -224,7 +224,6 @@ public final class ClientHooks {
                         }
                     }
                     rewardReturnPending = false;
-                    mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText("[LootGames] " + rewardLooter.status()));
                     if (exploration != null) exploration.finishPuzzle(mc, true);
                 }
             }
@@ -697,7 +696,7 @@ public final class ClientHooks {
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
-            boolean explorerActive = cur == null && exploration != null && exploration.navigating();
+            boolean explorerActive = exploration != null && (exploration.navigating() || rewardReturnPending);
 
             String autoColor = autoActive ? "\u00A7c" : "\u00A77";
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
@@ -715,7 +714,7 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
-            String navigationLine = cur == null && exploration != null ? "\u00A77" + exploration.navigationStatus()
+            String navigationLine = exploration != null && (cur == null || explorerActive) ? "\u00A77" + exploration.navigationStatus()
                 : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
                 line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77") + " ["

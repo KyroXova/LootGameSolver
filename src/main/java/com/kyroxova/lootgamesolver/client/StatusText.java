@@ -12,8 +12,20 @@ final class StatusText {
         if (detail == null || detail.isEmpty()) return "Idle";
         String text = detail.toLowerCase(Locale.ROOT);
 
+        if (text.contains("backpack") || text.contains("packing")) return "Packing Rewards";
+        if (text.contains("chest") || text.contains("reward")) {
+            if (text.contains("jump") || text.contains("clear of")) return "Leaving Chests";
+            if (text.contains("waiting") || text.contains("finding")) return "Finding Chests";
+            if (text.contains("moving") || text.contains("position")) return "Approaching Chests";
+            if (text.contains("opening")) return "Opening Chest";
+            if (text.contains("collect")) return "Collecting Loot";
+            return "Checking Chests";
+        }
+        if (text.contains("trash")) return "Clearing Inventory";
+        if (text.contains("checkpoint") && text.contains("cleared")) return "Checkpoint Cleared";
+
         if (text.contains("searching for the next structure") || text.contains("next structure"))
-            return "Next Structure";
+            return "Searching Structures";
         if (text.contains("puzzle solved") || text.contains("stage complete")) return "Stage Complete";
         if (text.contains("puzzle could not be located")) return "Puzzle: Missing";
         if (text.contains("puzzle did not open")) return "Puzzle: Missing";
@@ -21,7 +33,7 @@ final class StatusText {
         if (text.contains("arrived at lootgame") || text.contains("arrived beside lootgame")) return "Puzzle: Ready";
         if (text.contains("opening puzzle") || text.contains("waiting for lootgames to create")) return "Puzzle: Open";
         if (text.contains("target no longer loaded")) return "Target: Unloaded";
-        if (text.contains("returned to access entrance")) return "Walk: Exit";
+        if (text.contains("returned to access entrance")) return "Returned Outside";
         if (text.contains("no usable tool") || text.contains("needs cobblestone")
             || text.contains("needs dirt")
             || text.contains("keep a usable pickaxe")) return "Tool: Needed";
@@ -36,7 +48,7 @@ final class StatusText {
         if (text.contains("low air")) return "Stop: Low Air";
         if (text.contains("entrance")
             && (text.contains("no safe") || text.contains("no verified") || text.contains("blocked")))
-            return "Entrance: Blocked";
+            return "Entrance Blocked";
         if (text.contains("blocked") || text.contains("obstructed")
             || text.contains("no safe")
             || text.contains("no verified route")
@@ -44,7 +56,7 @@ final class StatusText {
             || text.contains("no walkable")
             || text.contains("no longer safe")
             || text.contains("still inside room")
-            || text.contains("stopped")) return "Route: Blocked";
+            || text.contains("stopped")) return "Path Blocked";
         if (text.contains("waiting") && text.contains("tool")) return "Waiting: Tool";
         if (text.contains("waiting") && text.contains("land")) return "Waiting: Landing";
         if (text.contains("waiting") && text.contains("placement")) return "Waiting: Place";
@@ -55,31 +67,31 @@ final class StatusText {
             || text.contains("return")
             || text.contains("saved access route")
             || text.contains("saved exit")) {
-            if (text.contains("dig") || text.contains("mining")) return "Dig: Exit";
+            if (text.contains("dig") || text.contains("mining")) return "Digging Exit";
             if (text.startsWith("finding") || text.startsWith("checking")
                 || text.startsWith("planning")
                 || text.startsWith("continuing")
-                || text.startsWith("rejoining")) return "Waiting: Reroute";
-            return "Walk: Exit";
+                || text.startsWith("rejoining")) return "Planning Exit";
+            return "Following Exit";
         }
         if (text.contains("board center") || text.contains("room center") || text.contains("lootgame; opening"))
-            return "Walk: Center";
+            return "Approaching Board";
         if (text.contains("entrance")
             && (text.startsWith("walking") || text.startsWith("moving") || text.startsWith("following")))
-            return "Walk: Entrance";
-        if (text.contains("aiming")) return "Dig: Aim";
-        if (text.contains("dig") || text.contains("stair") || text.contains("mining")) return "Dig: Access";
+            return "Approaching Entrance";
+        if (text.contains("aiming")) return "Aiming Tool";
+        if (text.contains("dig") || text.contains("stair") || text.contains("mining")) return "Digging Tunnel";
         if (text.startsWith("finding") || text.startsWith("checking")
             || text.startsWith("planning")
             || text.startsWith("continuing")
             || text.startsWith("replanning")
-            || text.startsWith("rerouted")) return "Waiting: Reroute";
-        if (text.contains("search") || text.contains("scan") || text.contains("terrain")) return "Next Structure";
+            || text.startsWith("rerouted")) return "Planning Route";
+        if (text.contains("search") || text.contains("scan") || text.contains("terrain")) return "Searching Structures";
         if (text.startsWith("walk") || text.startsWith("following")
             || text.startsWith("moving")
             || text.startsWith("aligning")
             || text.startsWith("centering")
-            || text.startsWith("exploring")) return "Walk: Forward";
+            || text.startsWith("exploring")) return "Following Route";
         return shorten(detail);
     }
 
@@ -91,7 +103,7 @@ final class StatusText {
             || text.contains("confirmed") && text.contains("next stage")) return "Stage Complete";
         if (text.contains("watching") || text.contains("sequence")) return "Stage: Watch";
         if (text.contains("waiting") && (text.contains("board") || text.contains("update"))) return "Waiting: Board";
-        if (text.contains("navigating")) return "Walk: Tile";
+        if (text.contains("navigating")) return "Approaching Tile";
         if (text.contains("reveal")) return "Solve: Reveal";
         if (text.contains("flag")) return "Solve: Flag";
         if (text.contains("setting")) return "Solve: Number";
@@ -104,7 +116,12 @@ final class StatusText {
     }
 
     private static String shorten(String detail) {
-        if (detail.length() <= MAX_LENGTH) return detail;
-        return detail.substring(0, MAX_LENGTH - 1) + "…";
+        String[] words = detail.trim().split("\\s+");
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < words.length && i < 3; i++) {
+            if (i > 0) result.append(' ');
+            result.append(words[i]);
+        }
+        return result.length() <= MAX_LENGTH ? result.toString() : result.substring(0, MAX_LENGTH - 1) + "…";
     }
 }
