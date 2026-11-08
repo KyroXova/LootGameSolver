@@ -47,6 +47,7 @@ public final class ExplorationBeta {
     private double segmentX;
     private double segmentZ;
     private final MiningAimGate miningAim = new MiningAimGate();
+    private final MiningAimGate placementAim = new MiningAimGate();
     private final ExplorerSustain sustain = new ExplorerSustain();
     private int settlingTicks;
     private ExcavationPathfinder excavationSearch;
@@ -1936,7 +1937,7 @@ public final class ExplorationBeta {
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return;
         }
-        if (sustain.tick(mc, true, !route.isEmpty() && !digging && !returnDigging)) {
+        if (sustain.tick(mc, true, !route.isEmpty() && !digging && !returnDigging && returnPlacementSlot < 0)) {
             status = "Eating or preparing food";
             return;
         }
@@ -2956,6 +2957,14 @@ public final class ExplorationBeta {
             status = "Return step needs cobblestone or dirt";
             return false;
         }
+        if (returnPlacementSlot < 0) returnPlacementSlot = mc.thePlayer.inventory.currentItem;
+        if (mc.thePlayer.inventory.currentItem != slot) {
+            mc.thePlayer.inventory.currentItem = slot;
+            mc.playerController.updateController();
+            placementAim.reset();
+            status = "Preparing return step";
+            return true;
+        }
         if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z))
             return false;
         // Prefer a support block directly below the placement target.
@@ -2963,6 +2972,7 @@ public final class ExplorationBeta {
             { x, y, z + 1, 2 } };
         if (++returnPlacementAimTicks > 100) {
             returnPlacementAimTicks = 0;
+            restoreReturnPlacementSlot(mc);
             return false;
         }
         for (int sideIndex = 0; sideIndex < adjacent.length; sideIndex++) {
@@ -2984,10 +2994,6 @@ public final class ExplorationBeta {
                 || visible.blockZ != side[2]
                 || visible.sideHit != side[3]
                 || eye.squareDistanceTo(visible.hitVec) > 16D) continue;
-            int previousSlot = mc.thePlayer.inventory.currentItem;
-            mc.thePlayer.inventory.currentItem = slot;
-            mc.playerController.updateController();
-            if (returnPlacementSlot < 0) returnPlacementSlot = previousSlot;
             net.minecraft.util.Vec3 hit = visible.hitVec;
             hx = hit.xCoord;
             hy = hit.yCoord;
@@ -2998,11 +3004,21 @@ public final class ExplorationBeta {
             float pitch = (float) (-Math.atan2(dy, Math.hypot(dx, dz)) * 180D / Math.PI);
             look(yaw, pitch);
             net.minecraft.util.MovingObjectPosition aimed = mc.objectMouseOver;
-            if (aimed == null || aimed.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-                || aimed.blockX != side[0]
-                || aimed.blockY != side[1]
-                || aimed.blockZ != side[2]
-                || aimed.sideHit != side[3]) {
+            boolean matches = aimed != null
+                && aimed.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+                && aimed.blockX == side[0]
+                && aimed.blockY == side[1]
+                && aimed.blockZ == side[2]
+                && aimed.sideHit == side[3];
+            if (!placementAim.ready(
+                side[0],
+                side[1],
+                side[2],
+                matches,
+                Math.sqrt(eye.squareDistanceTo(hit)),
+                Math.min(4D, mc.playerController.getBlockReachDistance()),
+                net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw),
+                pitch - mc.thePlayer.rotationPitch)) {
                 status = "Aiming at return step support";
                 return true;
             }
@@ -3017,13 +3033,24 @@ public final class ExplorationBeta {
                 aimed.hitVec)) {
                 pendingReturnPlacement = new int[] { x, y, z };
                 returnPlacementAimTicks = 0;
+                placementAim.reset();
                 pendingReturnWaypoint = needsIntermediateStep ? new int[] { next[0], playerY + 1, next[2] } : null;
                 returnPlacementTicks = 0;
                 status = "Placing a checked block for the return step";
                 return true;
             }
         }
+        restoreReturnPlacementSlot(mc);
         return false;
+    }
+
+    private void restoreReturnPlacementSlot(Minecraft mc) {
+        placementAim.reset();
+        if (returnPlacementSlot >= 0) {
+            mc.thePlayer.inventory.currentItem = returnPlacementSlot;
+            mc.playerController.updateController();
+            returnPlacementSlot = -1;
+        }
     }
 
     private int findPlaceableBlock(Minecraft mc, boolean hotbarOnly) {
