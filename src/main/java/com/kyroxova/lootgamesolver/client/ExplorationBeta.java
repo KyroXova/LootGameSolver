@@ -1204,14 +1204,14 @@ public final class ExplorationBeta {
                             .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
                         && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
                             .isNormalCube();
+                    int approachX = inX - side[1], approachZ = inZ - side[2];
                     boolean twoBelow = !levelInside && !lowerInside
                         && safe(mc.theWorld, inX, floorY - 2, inZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
-                            .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
-                            .isReplaceable(mc.theWorld, wallX, floorY - 2, wallZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 3, wallZ)
-                            .isNormalCube();
+                        && safe(mc.theWorld, approachX, floorY - 2, approachZ)
+                        && passable(mc.theWorld, inX, floorY, inZ)
+                        && passable(mc.theWorld, inX, floorY + 1, inZ)
+                        && mc.theWorld.getBlock(inX, floorY - 2, inZ)
+                            .isReplaceable(mc.theWorld, inX, floorY - 2, inZ);
                     if (!levelInside && !lowerInside && !twoBelow) continue;
                     boolean sideWallA = isDungeonWall(
                         mc.theWorld,
@@ -1226,9 +1226,11 @@ public final class ExplorationBeta {
                         xSide ? along + 1 : wallZ)
                         || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
                     if (!sideWallA && !sideWallB) continue;
-                    if (lowerInside || twoBelow) found.add(
-                        new int[] { inX, floorY - (twoBelow ? 2 : 1), inZ, outX, floorY, outZ, wallX, floorY, wallZ,
-                            1 });
+                    if (twoBelow) found.add(
+                        new int[] { approachX, floorY - 2, approachZ, outX, floorY, outZ, wallX, floorY, wallZ, inX,
+                            floorY - 1, inZ });
+                    else if (lowerInside)
+                        found.add(new int[] { inX, floorY - 1, inZ, outX, floorY, outZ, wallX, floorY, wallZ, 1 });
                     else found.add(opening);
                 }
             }
@@ -2097,6 +2099,7 @@ public final class ExplorationBeta {
                         new int[] { (int) Math.floor(mc.thePlayer.posX),
                             (int) Math.floor(mc.thePlayer.boundingBox.minY), (int) Math.floor(mc.thePlayer.posZ) });
                     appendRoomExitWaypoint(activeRoomExit, 0);
+                    if (activeRoomExit.length >= 12) appendRoomExitWaypoint(activeRoomExit, 9);
                     if (activeRoomExit.length >= 9) appendRoomExitWaypoint(activeRoomExit, 6);
                     appendRoomExitWaypoint(activeRoomExit, 3);
                     roomExitCrossing = true;
@@ -3439,11 +3442,15 @@ public final class ExplorationBeta {
             }
 
             public boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
-                if (terrainWorld.getBlock(x, y, z)
+                boolean waterAtFeet = terrainWorld.getBlock(x, y, z)
+                    .getMaterial() == net.minecraft.block.material.Material.water;
+                boolean waterBelow = terrainWorld.getBlock(x, y - 1, z)
+                    .getMaterial() == net.minecraft.block.material.Material.water;
+                boolean destinationWater = terrainWorld.getBlock(nx, ny, nz)
                     .getMaterial() == net.minecraft.block.material.Material.water
-                    && terrainWorld.getBlock(nx, ny, nz)
-                        .getMaterial() != net.minecraft.block.material.Material.water
-                    && ny > y) return false;
+                    || terrainWorld.getBlock(nx, ny - 1, nz)
+                        .getMaterial() == net.minecraft.block.material.Material.water;
+                if ((waterAtFeet || waterBelow) && !destinationWater && ny > (waterAtFeet ? y + 1 : y)) return false;
                 return NavigationSurfacePolicy
                     .reachableRise(walkSurfaceY(terrainWorld, x, y, z), walkSurfaceY(terrainWorld, nx, ny, nz));
             }
