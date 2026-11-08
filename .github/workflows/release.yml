@@ -15,11 +15,6 @@ on:
         required: false
         default: false
         type: boolean
-      force_release:
-        description: 'Force release even if version matches latest release'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -37,6 +32,7 @@ jobs:
       release_title: ${{ steps.check.outputs.release_title }}
       is_prerelease: ${{ steps.check.outputs.is_prerelease }}
       make_latest: ${{ steps.check.outputs.make_latest }}
+      github_release_exists: ${{ steps.check.outputs.github_release_exists }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,16 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MANUAL_TAG: ${{ inputs.tag_name }}
-          FORCE_RELEASE: ${{ inputs.force_release }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
           REF_NAME: ${{ github.ref_name }}
           MANUAL_PRERELEASE: ${{ inputs.prerelease }}
         run: |
+          set -euo pipefail
           MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
-
-          LATEST_RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name 2>/dev/null || echo "")
           echo "Current modVersion: '$MOD_VERSION'"
-          echo "Latest release tag: '$LATEST_RELEASE_TAG'"
 
           SHOULD_RELEASE="true"
           TARGET_TAG=""
@@ -93,27 +86,30 @@ jobs:
               MAKE_LATEST="true"
             fi
 
-            if [[ "$FORCE_RELEASE" != "true" && -n "$LATEST_RELEASE_TAG" && "$MOD_VERSION" == "${LATEST_RELEASE_TAG#v}" ]]; then
-              echo "Version '$MOD_VERSION' already matches latest release '$LATEST_RELEASE_TAG'. Skipping release."
-              SHOULD_RELEASE="false"
-            fi
+          fi
+
+          if [[ "$MANUAL_PRERELEASE" == "true" ]]; then
+            IS_PRE="true"
+            MAKE_LATEST="false"
           fi
 
           if [[ "${TARGET_TAG#v}" != "$MOD_VERSION" ]]; then
             echo "Release tag must match modVersion" >&2
             exit 1
           fi
-          if [[ "$SHOULD_RELEASE" == "true" ]]; then
-            if gh release view "$TARGET_TAG" >/dev/null 2>&1; then
-              echo "Release already exists; refusing to upload this version again" >&2
-              exit 1
-            fi
+          GITHUB_RELEASE_EXISTS="false"
+          if RELEASE_RESULT=$(gh api "repos/${{ github.repository }}/releases/tags/$TARGET_TAG" 2>&1); then
+            GITHUB_RELEASE_EXISTS="true"
+          elif [[ "$RELEASE_RESULT" != *"HTTP 404"* ]]; then
+            echo "Could not verify the GitHub release: $RELEASE_RESULT" >&2
+            exit 1
           fi
           echo "should_release=${SHOULD_RELEASE}" >> $GITHUB_OUTPUT
           echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
           echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
           echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
           echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
+          echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> $GITHUB_OUTPUT
 
   release:
     needs: check-version
@@ -173,11 +169,8 @@ jobs:
           cmp "$NOTES" build/release_body.md
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"
           echo "CHANGELOG_FILE=$GITHUB_WORKSPACE/$NOTES" >> "$GITHUB_ENV"
-      - name: Check CurseForge credentials
-        env:
-          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-        run: test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
       - name: Publish GitHub Release
+        if: needs.check-version.outputs.github_release_exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -189,9 +182,48 @@ jobs:
           target_commitish: ${{ github.sha }}
           generate_release_notes: false
           files: ${{ steps.release-notes.outputs.jar }}
-
+      - name: Check CurseForge credentials
+        if: needs.check-version.outputs.is_prerelease != 'true'
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: |
+          test -n "$CURSEFORGE_API_KEY" || { echo "Missing read-only CURSEFORGE_API_KEY secret; cannot check for duplicate uploads"; exit 1; }
+      - name: Check for existing CurseForge file
+        id: curseforge-check
+        if: needs.check-version.outputs.is_prerelease != 'true'
+        uses: actions/github-script@v7
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        with:
+          script: |
+            const fs = require('fs');
+            const props = fs.readFileSync('gradle.properties', 'utf8');
+            const get = key => {
+              const match = props.match(new RegExp(`^${key}\\s*=\\s*(\\S+)`, 'm'));
+              if (!match) throw new Error(`Missing ${key} in gradle.properties`);
+              return match[1];
+            };
+            const project = get('curseForgeProjectId');
+            if (!/^\d+$/.test(project)) throw new Error('Invalid CurseForge project ID');
+            const filename = `lootgamesolver-${get('modVersion')}.jar`;
+            let offset = 0;
+            let exists = false;
+            for (;;) {
+              const url = `https://api.curseforge.com/v1/mods/${project}/files?pageSize=50&index=${offset}`;
+              const response = await fetch(url, { headers: { 'x-api-key': process.env.CURSEFORGE_API_KEY } });
+              if (!response.ok) throw new Error(`CurseForge file lookup failed (HTTP ${response.status})`);
+              const page = await response.json();
+              if (!Array.isArray(page.data) || !page.pagination || !Number.isInteger(page.pagination.totalCount))
+                throw new Error('CurseForge returned an invalid file list');
+              if (page.data.some(file => file.fileName === filename)) { exists = true; break; }
+              if (page.data.length === 0 && offset < page.pagination.totalCount)
+                throw new Error('CurseForge returned an incomplete file list');
+              offset += page.data.length;
+              if (offset >= page.pagination.totalCount) break;
+            }
+            core.setOutput('exists', String(exists));
       - name: Publish to CurseForge
-
+        if: needs.check-version.outputs.is_prerelease != 'true' && steps.curseforge-check.outputs.exists != 'true'
         run: |
           test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
           ./gradlew publishCurseforge --no-configuration-cache

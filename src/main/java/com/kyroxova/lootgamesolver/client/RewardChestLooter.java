@@ -609,8 +609,9 @@ final class RewardChestLooter {
                 }
         }
         if (backpackSlot < 0) {
-            if (collecting && queueIndex >= queue.size()) status = "Reward chests collected";
+            if (!collecting && index >= chests.size()) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
+            packing = false;
             active = false;
             return;
         }

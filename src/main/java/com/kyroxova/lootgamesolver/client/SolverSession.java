@@ -117,19 +117,7 @@ public final class SolverSession {
         }
         if (currentSnapshot.type == MiniGame.MINESWEEPER && activeAction != null
             && !currentSnapshot.minesweeper.contains(activeAction.position)) resetForNewRound();
-        if (currentSnapshot.type == MiniGame.SUDOKU) {
-            StringBuilder puzzle = new StringBuilder(81);
-            for (int r = 0; r < 9; r++)
-                for (int c = 0; c < 9; c++) puzzle.append((char) ('0' + currentSnapshot.sudoku.get(r, c)));
-            String signature = puzzle.toString();
-            if (!signature.equals(sudokuPuzzleSignature)) {
-                activeAction = null;
-                sudokuValueBeforeClick = -1;
-                interactionPending = false;
-                lastActionAt = 0L;
-                sudokuPuzzleSignature = signature;
-            }
-        }
+        updateSudokuSignature(currentSnapshot);
 
         if (cachedRenderActions == null || !currentSnapshot.signature.equals(lastSnapshotSignature)) {
             cachedRenderActions = computeActionsForGame(currentSnapshot);
@@ -146,6 +134,22 @@ public final class SolverSession {
             advanceAuto(currentSnapshot);
         } else {
             send(currentSnapshot);
+        }
+    }
+
+    private void updateSudokuSignature(DetectedGame snapshot) {
+        if (snapshot.type == MiniGame.SUDOKU) {
+            StringBuilder puzzle = new StringBuilder(81);
+            for (int r = 0; r < 9; r++)
+                for (int c = 0; c < 9; c++) puzzle.append((char) ('0' + snapshot.sudoku.get(r, c)));
+            String signature = puzzle.toString();
+            if (sudokuPuzzleSignature != null && !signature.equals(sudokuPuzzleSignature)) {
+                activeAction = null;
+                sudokuValueBeforeClick = -1;
+                interactionPending = false;
+                lastActionAt = 0L;
+            }
+            sudokuPuzzleSignature = signature;
         }
     }
 
@@ -179,6 +183,7 @@ public final class SolverSession {
             return;
         }
         game = snapshot.type;
+        updateSudokuSignature(snapshot);
 
         if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
             for (int r = 0; r < 9; r++) {

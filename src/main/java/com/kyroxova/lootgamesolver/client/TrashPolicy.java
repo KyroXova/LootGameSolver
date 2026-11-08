@@ -13,8 +13,7 @@ final class TrashPolicy {
     static boolean discard(String id, int metadata, boolean ore, boolean blockItem) {
         if (id == null) return false;
         String name = id.toLowerCase(Locale.ROOT);
-        return ore || blockItem
-            || buildingReserve(name)
+        return ore || buildingReserve(name)
             || name.equals("minecraft:stone")
             || name.equals("minecraft:gravel")
             || name.equals("minecraft:sand")
