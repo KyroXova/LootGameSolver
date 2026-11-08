@@ -155,7 +155,10 @@ final class RewardChestLooter {
                 status = "Restoring hotbar";
             } else {
                 status = "Hotbar changed; bag kept";
-                active = false;
+                temporaryBag = false;
+                temporaryBagUsed = false;
+                restoringBag = false;
+                backpackSlot = -1;
             }
             return;
         }

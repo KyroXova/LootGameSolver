@@ -48,6 +48,7 @@ public final class ClientHooks {
     private boolean exploreHoldActionDone;
     private int exploreHoldTicks;
     private int checkpointClearDoneTicks;
+    private boolean wasInsideRoom;
 
     private enum AutoPuzzleState {
         IDLE,
@@ -197,6 +198,7 @@ public final class ClientHooks {
         checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
+            wasInsideRoom = false;
             trashCleanup.reset();
             rewardLooter.cancel(mc);
             rewardReturnPending = false;
@@ -210,6 +212,11 @@ public final class ClientHooks {
             }
         }
         trashCleanup.advanceCooldown();
+        if (exploration != null && mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
+            boolean inside = exploration.inDungeonRoom(mc);
+            if (inside && !wasInsideRoom) LootGameSolverConfig.setOverlayVisible(true);
+            wasInsideRoom = inside;
+        }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (rewardReturnPending) {
@@ -513,6 +520,7 @@ public final class ClientHooks {
             && mc.currentScreen == null
             && mc.thePlayer != null
             && mc.theWorld != null) {
+            LootGameSolverConfig.setOverlayVisible(!exploration.navigating() && !rewardReturnPending);
             if (rewardReturnPending) {
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
@@ -564,6 +572,7 @@ public final class ClientHooks {
                 session.cancel("Auto-Solver Stopped");
                 if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
+                LootGameSolverConfig.setOverlayVisible(true);
                 session.start(ActionPlanner.Mode.SOLVE);
                 Object game = puzzleBridge.nearbyGame(true);
                 int level = puzzleBridge.currentMinesweeperLevel(game);
@@ -593,7 +602,7 @@ public final class ClientHooks {
 
         if (overlayPressed) {
             session.invalidateDormantCache();
-            LootGameSolverConfig.showOverlay = !LootGameSolverConfig.showOverlay;
+            LootGameSolverConfig.setOverlayVisible(!LootGameSolverConfig.showOverlay);
         }
     }
 
@@ -703,6 +712,10 @@ public final class ClientHooks {
     @SubscribeEvent
     public void overlay(RenderGameOverlayEvent.Text event) {
         if (!LootGameSolverConfig.enabled) return;
+        if (!LootGameSolverConfig.showOverlay && !session.isActive()
+            && !rewardReturnPending
+            && (exploration == null || !exploration.navigating())
+            && (autoPuzzleState == AutoPuzzleState.IDLE || autoPuzzleState == AutoPuzzleState.FAILED)) return;
         DetectedGame cur = session.getCurrentDetectedGame();
         if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
 

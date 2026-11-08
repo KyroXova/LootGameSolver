@@ -16,6 +16,7 @@ public final class LootGameSolverConfig {
     public static boolean allowProbabilityMoves = true;
     public static double probabilityThreshold = 0.90D;
     public static boolean showOverlay = true;
+    private static Configuration configuration;
     public static boolean showDebugInfo = false;
     public static int renderStyle = 0; // 0 = Minimal Outline & Text, 1 = Text Only
     public static int exploreKey = Keyboard.KEY_G;
@@ -29,6 +30,7 @@ public final class LootGameSolverConfig {
 
     public static void load(File file) {
         Configuration cfg = new Configuration(file);
+        configuration = cfg;
         enabled = cfg.getBoolean("enabled", Configuration.CATEGORY_GENERAL, enabled, "Master switch.");
         explorationEnabled = cfg
             .getBoolean("enabled", "explorationBeta", true, "Enable experimental nearby finder and walking.");
@@ -81,5 +83,15 @@ public final class LootGameSolverConfig {
         showOverlay = cfg.getBoolean("showOverlay", "display", showOverlay, "Show compact solver status.");
         showDebugInfo = cfg.getBoolean("showDebugInfo", "display", showDebugInfo, "Show debug information.");
         if (cfg.hasChanged()) cfg.save();
+    }
+
+    public static void setOverlayVisible(boolean visible) {
+        if (showOverlay == visible) return;
+        showOverlay = visible;
+        if (configuration != null) {
+            configuration.get("display", "showOverlay", true)
+                .set(visible);
+            configuration.save();
+        }
     }
 }
