@@ -29,7 +29,7 @@ final class NavigationOverlayRenderer {
             double[] start = { mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ };
             if (waypoint != null) {
                 double ground = Math.max(0D, exploration.waypointLabelY() - 3D);
-                double top = Math.max(ground + 32D, mc.theWorld.getHeight() + 31D);
+                double top = Math.max(ground + 1D, mc.theWorld.getHeight() - 1D);
                 drawWaypointBeam(
                     t,
                     waypoint[0] + 0.5D,
@@ -68,13 +68,14 @@ final class NavigationOverlayRenderer {
         double rotation = time * 0.06D;
         GL11.glDisable(GL11.GL_CULL_FACE);
         t.startDrawingQuads();
-        int segments = Math.max(16, (int) Math.ceil(height / 1.5D) * 16);
+        double coilHeight = 2.2D;
+        int segments = Math.max(16, (int) Math.ceil(height / coilHeight) * 16);
         double radius = 0.42D;
         for (int segment = 0; segment < segments; segment++) {
             double progress = segment / (double) segments;
             double nextProgress = (segment + 1D) / segments;
-            double angle = progress * height / 1.5D * Math.PI * 2D + rotation;
-            double next = nextProgress * height / 1.5D * Math.PI * 2D + rotation;
+            double angle = progress * height / coilHeight * Math.PI * 2D + rotation;
+            double next = nextProgress * height / coilHeight * Math.PI * 2D + rotation;
             float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * Math.sin(angle - rotation * 3D)));
             t.setColorRGBA_F(0.28F, 0.72F, 1F, pulse);
             t.addVertex(
