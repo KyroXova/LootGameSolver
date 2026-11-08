@@ -2,7 +2,6 @@ name: Release
 
 on:
   push:
-    branches: [ master, main ]
     tags: [ '*' ]
   workflow_dispatch:
     inputs:
@@ -190,48 +189,8 @@ jobs:
           target_commitish: ${{ needs.check-version.outputs.release_commit_sha }}
           generate_release_notes: false
           files: ${{ steps.release-notes.outputs.jar }}
-      - name: Check CurseForge credentials
-        if: needs.check-version.outputs.is_prerelease != 'true'
-        env:
-          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
-        run: |
-          test -n "$CURSEFORGE_API_KEY" || { echo "Missing read-only CURSEFORGE_API_KEY secret; cannot check for duplicate uploads"; exit 1; }
-      - name: Check for existing CurseForge file
-        id: curseforge-check
-        if: needs.check-version.outputs.is_prerelease != 'true'
-        uses: actions/github-script@v7
-        env:
-          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
-        with:
-          script: |
-            const fs = require('fs');
-            const props = fs.readFileSync('gradle.properties', 'utf8');
-            const get = key => {
-              const match = props.match(new RegExp(`^${key}\\s*=\\s*(\\S+)`, 'm'));
-              if (!match) throw new Error(`Missing ${key} in gradle.properties`);
-              return match[1];
-            };
-            const project = get('curseForgeProjectId');
-            if (!/^\d+$/.test(project)) throw new Error('Invalid CurseForge project ID');
-            const filename = `lootgamesolver-${get('modVersion')}.jar`;
-            let offset = 0;
-            let exists = false;
-            for (;;) {
-              const url = `https://api.curseforge.com/v1/mods/${project}/files?pageSize=50&index=${offset}`;
-              const response = await fetch(url, { headers: { 'x-api-key': process.env.CURSEFORGE_API_KEY } });
-              if (!response.ok) throw new Error(`CurseForge file lookup failed (HTTP ${response.status})`);
-              const page = await response.json();
-              if (!Array.isArray(page.data) || !page.pagination || !Number.isInteger(page.pagination.totalCount))
-                throw new Error('CurseForge returned an invalid file list');
-              if (page.data.some(file => file.fileName === filename)) { exists = true; break; }
-              if (page.data.length === 0 && offset < page.pagination.totalCount)
-                throw new Error('CurseForge returned an incomplete file list');
-              offset += page.data.length;
-              if (offset >= page.pagination.totalCount) break;
-            }
-            core.setOutput('exists', String(exists));
       - name: Publish to CurseForge
-        if: needs.check-version.outputs.is_prerelease != 'true' && steps.curseforge-check.outputs.exists != 'true'
+        if: needs.check-version.outputs.is_prerelease != 'true'
         run: |
           test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
           ./gradlew publishCurseforge --no-configuration-cache
