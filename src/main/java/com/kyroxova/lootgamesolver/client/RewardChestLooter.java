@@ -494,8 +494,9 @@ final class RewardChestLooter {
         }
         if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
             if (packPendingSlot >= 0) {
-                ItemStack remaining = container.getSlot(packPendingSlot)
-                    .getStack();
+                Slot pending = packPendingSlot < container.inventorySlots.size() ? container.getSlot(packPendingSlot)
+                    : null;
+                ItemStack remaining = pending == null ? null : pending.getStack();
                 if (remaining == null || remaining.stackSize < packPendingCount) {
                     packMoved = true;
                 } else {
@@ -520,12 +521,14 @@ final class RewardChestLooter {
             for (Object obj : container.inventorySlots) {
                 Slot slot = (Slot) obj;
                 int playerSlot = slot.getSlotIndex();
+                ItemStack stack = slot.getStack();
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0
                     || playerSlot >= 36
                     || temporaryBag && playerSlot == bagSource
-                    || baseline.protects(playerSlot, slot.getStack())
-                    || InventoryProtection.essential(slot.getStack())
-                    || isReservedBuildingStack(mc, playerSlot, slot.getStack())) continue;
+                    || stack == null
+                    || baseline.protects(playerSlot, stack)
+                    || InventoryProtection.essential(stack)
+                    || isReservedBuildingStack(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
                 packPendingSlot = slot.slotNumber;
                 packPendingCount = slot.getStack().stackSize;
