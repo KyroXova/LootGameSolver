@@ -89,6 +89,7 @@ public final class ExplorationBeta {
     private boolean returning, returnAvailable;
     private int cameraPitchDirection;
     private static final java.util.Map<net.minecraft.block.Block, Boolean> QUICKSAND_BLOCKS = new java.util.IdentityHashMap<net.minecraft.block.Block, Boolean>();
+    private static final java.util.Map<net.minecraft.block.Block, Boolean> OIL_BLOCKS = new java.util.IdentityHashMap<net.minecraft.block.Block, Boolean>();
     private int pitchLastY;
     private double pitchLandingX, pitchLandingZ;
     private boolean returnDigging;
@@ -1328,13 +1329,14 @@ public final class ExplorationBeta {
 
     private boolean insideDungeonRoom(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null) return false;
+        int roomY = knownStructure != null ? knownStructure[1] : target == null ? Integer.MIN_VALUE : target.yCoord;
+        if (roomY == Integer.MIN_VALUE) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = dungeonRoomBounds(mc.theWorld, x, y, z);
         if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
-        int roomY = knownStructure != null ? knownStructure[1] : target == null ? Integer.MIN_VALUE : target.yCoord;
-        return roomY != Integer.MIN_VALUE && y <= roomY + 3;
+        return y <= roomY + 3;
     }
 
     private boolean planRoofEscape(Minecraft mc) {
@@ -4410,9 +4412,7 @@ public final class ExplorationBeta {
             for (int dy = -1; dy <= 1; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
                 net.minecraft.block.Block nearby = world.getBlock(x + dx, y + dy, z + dz);
-                net.minecraftforge.fluids.Fluid fluid = net.minecraftforge.fluids.FluidRegistry
-                    .lookupFluidForBlock(nearby);
-                if (fluid != null && OilAvoidance.isOil(fluid.getName())) return false;
+                if (isOilBlock(nearby)) return false;
             }
         }
         for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
@@ -4459,6 +4459,16 @@ public final class ExplorationBeta {
             QUICKSAND_BLOCKS.put(block, quicksand);
         }
         return quicksand;
+    }
+
+    private static boolean isOilBlock(net.minecraft.block.Block block) {
+        Boolean oil = OIL_BLOCKS.get(block);
+        if (oil == null) {
+            net.minecraftforge.fluids.Fluid fluid = net.minecraftforge.fluids.FluidRegistry.lookupFluidForBlock(block);
+            oil = fluid != null && OilAvoidance.isOil(fluid.getName());
+            OIL_BLOCKS.put(block, oil);
+        }
+        return oil;
     }
 
     private static boolean solidCheckpoint(World world, int x, int y, int z) {

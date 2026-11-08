@@ -71,29 +71,27 @@ final class NavigationOverlayRenderer {
         double coilHeight = 2.2D;
         int segments = Math.max(16, (int) Math.ceil(height / coilHeight) * 16);
         double radius = 0.42D;
+        double cosine = Math.cos(rotation), sine = Math.sin(rotation);
+        double phaseCosine = Math.cos(rotation * 3D), phaseSine = Math.sin(rotation * 3D);
         for (int segment = 0; segment < segments; segment++) {
             double progress = segment / (double) segments;
             double nextProgress = (segment + 1D) / segments;
-            double angle = progress * height / coilHeight * Math.PI * 2D + rotation;
             double next = nextProgress * height / coilHeight * Math.PI * 2D + rotation;
-            float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * Math.sin(angle - rotation * 3D)));
+            double nextCosine = Math.cos(next), nextSine = Math.sin(next);
+            float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * (sine * phaseCosine - cosine * phaseSine)));
             t.setColorRGBA_F(0.28F, 0.72F, 1F, pulse);
+            t.addVertex(x + cosine * (radius - 0.08D), ground + progress * height, z + sine * (radius - 0.08D));
+            t.addVertex(x + cosine * (radius + 0.08D), ground + progress * height, z + sine * (radius + 0.08D));
             t.addVertex(
-                x + Math.cos(angle) * (radius - 0.08D),
-                ground + progress * height,
-                z + Math.sin(angle) * (radius - 0.08D));
-            t.addVertex(
-                x + Math.cos(angle) * (radius + 0.08D),
-                ground + progress * height,
-                z + Math.sin(angle) * (radius + 0.08D));
-            t.addVertex(
-                x + Math.cos(next) * (radius + 0.08D),
+                x + nextCosine * (radius + 0.08D),
                 ground + nextProgress * height,
-                z + Math.sin(next) * (radius + 0.08D));
+                z + nextSine * (radius + 0.08D));
             t.addVertex(
-                x + Math.cos(next) * (radius - 0.08D),
+                x + nextCosine * (radius - 0.08D),
                 ground + nextProgress * height,
-                z + Math.sin(next) * (radius - 0.08D));
+                z + nextSine * (radius - 0.08D));
+            cosine = nextCosine;
+            sine = nextSine;
         }
         t.draw();
         GL11.glLineWidth(2F);

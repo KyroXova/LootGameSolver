@@ -244,9 +244,8 @@ public final class ClientHooks {
             }
             return;
         }
-        boolean inventoryCleanupSafe = exploration != null && exploration.inventoryCleanupSafe(mc);
-        if (!session.isActive()
-            && (trashCleanup.active() || inventoryCleanupSafe && trashCleanup.inventoryPressure(mc))) {
+        if (!session.isActive() && (trashCleanup.active()
+            || exploration != null && trashCleanup.inventoryPressure(mc) && exploration.inventoryCleanupSafe(mc))) {
             if (trashCleanup.tick(mc, true)) {
                 if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
                 return;
