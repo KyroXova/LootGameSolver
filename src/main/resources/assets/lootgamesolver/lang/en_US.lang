@@ -1,3 +1,4 @@
 key.categories.lootgamesolver=LootGameSolver
 key.lootgamesolver.toggle_overlay=Toggle Solver Holograms
 key.lootgamesolver.toggle_auto_solve=Toggle Auto-Solver
+key.lootgamesolver.explore=Beta: Start/Stop Autonomous Exploration

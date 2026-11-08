@@ -9,9 +9,6 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperBoard;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard;
 
-/**
- * A fresh, client-synchronised board snapshot plus its opaque LootGames object.
- */
 public final class DetectedGame {
 
     public final MiniGame type;

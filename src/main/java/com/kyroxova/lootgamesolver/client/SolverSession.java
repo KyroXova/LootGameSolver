@@ -17,9 +17,6 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightSolver;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperSolver;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuSolver;
 
-/**
- * Event-driven, single-action automation state machine. It never clicks in a busy loop.
- */
 public final class SolverSession {
 
     private final LootGamesBridge bridge = new LootGamesBridge();
@@ -28,25 +25,42 @@ public final class SolverSession {
     private final GameOfLightSolver golSolver = new GameOfLightSolver();
     private final ActionPlanner planner = new ActionPlanner();
     private final int[][] optimisticSudokuValues = new int[9][9];
+    private final PuzzleSessionIdentity puzzleIdentity = new PuzzleSessionIdentity();
     private ActionPlanner.Mode mode;
     private SolverAction activeAction;
     private List<SolverAction> activeActions;
     private List<SolverAction> cachedRenderActions;
     private DetectedGame currentSnapshot;
     private String lastSnapshotSignature;
-    private String beforeActionSignature;
+    private String sudokuPuzzleSignature;
+    private int sudokuValueBeforeClick = -1;
     private long lastActionAt;
     private String status = "Idle";
     private MiniGame game = MiniGame.UNKNOWN;
     private int queued;
     private int remainingClicksForActiveAction = 0;
+    private boolean sudokuReverseClick;
+    private boolean interactionPending;
+    private int sudokuPreviousSlot = -1;
+    private int sudokuAutomaticSlot = -1;
+    private final InventoryToolTransfer sudokuTransfer = new InventoryToolTransfer();
 
     public static int calculateClicksNeeded(int curVal, int targetVal) {
         if (curVal == targetVal) return 0;
-        if (curVal == 0) return targetVal;
-        int diff = targetVal - curVal;
-        if (diff < 0) diff += 9;
-        return diff;
+        int forward = (targetVal - curVal + 10) % 10;
+        int reverse = (curVal - targetVal + 10) % 10;
+        return Math.min(forward, reverse);
+    }
+
+    public static boolean shouldUseReverseSudokuClicks(int curVal, int targetVal) {
+        if (curVal < 0 || curVal > 9 || targetVal <= 0 || targetVal > 9 || curVal == targetVal) return false;
+        int forward = (targetVal - curVal + 10) % 10;
+        int reverse = (curVal - targetVal + 10) % 10;
+        return reverse < forward;
+    }
+
+    static boolean shouldUseReverseSudokuClicks(int curVal, int targetVal, boolean canSneakInteract) {
+        return canSneakInteract && shouldUseReverseSudokuClicks(curVal, targetVal);
     }
 
     public void invalidateDormantCache() {
@@ -67,7 +81,24 @@ public final class SolverSession {
     }
 
     public void tick() {
-        currentSnapshot = bridge.detect(mode != null);
+        bridge.tick();
+        Minecraft client = Minecraft.getMinecraft();
+        if (sudokuTransfer.active()) {
+            if (!sudokuTransfer.tick(client)) cancel("Could not prepare an empty Sudoku slot");
+            return;
+        }
+        DetectedGame detected = bridge.detect(mode != null);
+        if (mode != null && detected != null) {
+            PuzzleSessionIdentity.Change change = puzzleIdentity
+                .update(detected.type, detected.game, minesweeperRound(detected));
+            if (change == PuzzleSessionIdentity.Change.GAME) {
+                currentSnapshot = detected;
+                cancel("Puzzle changed; solver stopped");
+                return;
+            }
+            if (change == PuzzleSessionIdentity.Change.ROUND) resetForNewRound();
+        }
+        currentSnapshot = detected;
         if (currentSnapshot == null) {
             cachedRenderActions = null;
             lastSnapshotSignature = null;
@@ -78,8 +109,16 @@ public final class SolverSession {
         }
 
         game = currentSnapshot.type;
+        if (currentSnapshot.type == MiniGame.MINESWEEPER
+            && MinesweeperActionGuard.complete(currentSnapshot.minesweeper)) {
+            resetForNewRound();
+            status = "Board complete; waiting for next stage";
+            return;
+        }
+        if (currentSnapshot.type == MiniGame.MINESWEEPER && activeAction != null
+            && !currentSnapshot.minesweeper.contains(activeAction.position)) resetForNewRound();
+        updateSudokuSignature(currentSnapshot);
 
-        // Recompute cached actions only when snapshot signature changes or if cache is empty
         if (cachedRenderActions == null || !currentSnapshot.signature.equals(lastSnapshotSignature)) {
             cachedRenderActions = computeActionsForGame(currentSnapshot);
             lastSnapshotSignature = currentSnapshot.signature;
@@ -91,16 +130,50 @@ public final class SolverSession {
         if (now - lastActionAt < LootGameSolverConfig.clickDelayMs) return;
 
         if (activeAction == null || isActionComplete(currentSnapshot)) {
+            interactionPending = false;
             advanceAuto(currentSnapshot);
         } else {
             send(currentSnapshot);
         }
     }
 
+    private void updateSudokuSignature(DetectedGame snapshot) {
+        if (snapshot.type == MiniGame.SUDOKU) {
+            StringBuilder puzzle = new StringBuilder(81);
+            for (int r = 0; r < 9; r++)
+                for (int c = 0; c < 9; c++) puzzle.append((char) ('0' + snapshot.sudoku.get(r, c)));
+            String signature = puzzle.toString();
+            if (sudokuPuzzleSignature != null && !signature.equals(sudokuPuzzleSignature)) {
+                activeAction = null;
+                sudokuValueBeforeClick = -1;
+                interactionPending = false;
+                lastActionAt = 0L;
+            }
+            sudokuPuzzleSignature = signature;
+        }
+    }
+
     private void advance() {
         DetectedGame detected = bridge.detect(true);
         currentSnapshot = detected;
+        if (detected != null) puzzleIdentity.update(detected.type, detected.game, minesweeperRound(detected));
         advanceAuto(detected);
+    }
+
+    private int minesweeperRound(DetectedGame snapshot) {
+        return snapshot.type == MiniGame.MINESWEEPER ? bridge.currentMinesweeperLevel(snapshot.game) : -1;
+    }
+
+    private void resetForNewRound() {
+        activeAction = null;
+        activeActions = null;
+        cachedRenderActions = null;
+        lastSnapshotSignature = null;
+        sudokuValueBeforeClick = -1;
+        interactionPending = false;
+        lastActionAt = 0L;
+        remainingClicksForActiveAction = 0;
+        sudokuReverseClick = false;
     }
 
     private void advanceAuto(DetectedGame snapshot) {
@@ -110,6 +183,7 @@ public final class SolverSession {
             return;
         }
         game = snapshot.type;
+        updateSudokuSignature(snapshot);
 
         if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
             for (int r = 0; r < 9; r++) {
@@ -120,7 +194,7 @@ public final class SolverSession {
                         snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
                     }
                     if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
-                        snapshot.sudoku.set(r, c, snapshot.sudokuPlayerValues[r][c]);
+                        snapshot.sudoku.setPlayerValue(r, c, snapshot.sudokuPlayerValues[r][c]);
                     }
                 }
             }
@@ -132,7 +206,6 @@ public final class SolverSession {
         List<SolverAction> actions = planner
             .plan(result, mode, LootGameSolverConfig.allowProbabilityMoves, LootGameSolverConfig.probabilityThreshold);
 
-        // Sort actions by distance to player so nearest target block is always executed first
         Minecraft mc = Minecraft.getMinecraft();
         if (snapshot.type != MiniGame.GAME_OF_LIGHT && mc.thePlayer != null && actions.size() > 1) {
             final double px = mc.thePlayer.posX;
@@ -160,25 +233,10 @@ public final class SolverSession {
         queued = actions.size();
 
         if (actions.isEmpty()) {
-            if (snapshot.type == MiniGame.SUDOKU) {
-                bridge.submitSudokuCheck(snapshot);
+            if (snapshot.type == MiniGame.SUDOKU && result.getStatus() == SolveResult.Status.SOLVED) {
                 activeAction = null;
-                status = "Stage complete! Waiting for next stage...";
+                status = "All Sudoku numbers confirmed. Waiting for next stage...";
                 return;
-            }
-            if (snapshot.type == MiniGame.MINESWEEPER && snapshot.minesweeper != null) {
-                // If Minesweeper is reset for new stage, click center cell to start next stage
-                int cx = snapshot.minesweeper.getWidth() / 2;
-                int cy = snapshot.minesweeper.getHeight() / 2;
-                com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell centerCell = snapshot.minesweeper
-                    .get(cx, cy);
-                if (centerCell != null
-                    && centerCell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.UNKNOWN) {
-                    actions = new java.util.ArrayList<SolverAction>();
-                    actions.add(new SolverAction(SolverAction.Type.REVEAL, new CellPosition(cx, cy), 0, 1.0D));
-                    activeActions = actions;
-                    cachedRenderActions = actions;
-                }
             }
             if (actions.isEmpty()) {
                 if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
@@ -191,8 +249,12 @@ public final class SolverSession {
                     mode = null;
                 }
                 activeAction = null;
-                status = result.getMessage()
-                    + (result.getStatus() == SolveResult.Status.PROBABILISTIC ? " (guess disabled)" : "");
+                if (result.getStatus() == SolveResult.Status.PROBABILISTIC) {
+                    status = !LootGameSolverConfig.allowProbabilityMoves ? "Guess: Disabled"
+                        : "Guess: Below safety threshold";
+                } else {
+                    status = result.getMessage();
+                }
                 return;
             }
         }
@@ -200,14 +262,74 @@ public final class SolverSession {
         SolverAction nextAction = actions.get(0);
         if (activeAction == null || !nextAction.position.equals(activeAction.position)
             || remainingClicksForActiveAction <= 0) {
+            sudokuValueBeforeClick = -1;
             activeAction = nextAction;
             if (activeAction.type == SolverAction.Type.SET_VALUE) {
                 int curVal = (snapshot.sudokuPlayerValues != null)
                     ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
                     : 0;
                 remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
+                int[] block = getBlockPos(activeAction.position);
+                if (mc.thePlayer != null && shouldUseReverseSudokuClicks(curVal, activeAction.value)) {
+                    int suitable = -1;
+                    for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+                        suitable = i;
+                        break;
+                    }
+                    if (suitable < 0 && block != null && mc.theWorld != null) {
+                        for (int i = 0; i < 9; i++) {
+                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                            if (stack != null && stack.getItem()
+                                .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
+                                suitable = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (suitable < 0) {
+                        int empty = -1;
+                        for (int i = 9; i < 36; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+                            empty = i;
+                            break;
+                        }
+                        if (empty >= 0) for (int i = 0; i < 9; i++) {
+                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                            if (stack == null || stack.isItemStackDamageable()
+                                || stack.getItem() instanceof net.minecraft.item.ItemTool
+                                || stack.getItem() instanceof net.minecraft.item.ItemSword
+                                || stack.getItem() instanceof net.minecraft.item.ItemArmor
+                                || stack.getItem() instanceof net.minecraft.item.ItemFood
+                                || stack.getItem()
+                                    .getClass()
+                                    .getName()
+                                    .toLowerCase(java.util.Locale.ROOT)
+                                    .contains("backpack"))
+                                continue;
+                            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+                            if (sudokuTransfer.clearHotbar(mc, i, empty)) {
+                                sudokuAutomaticSlot = i;
+                                activeAction = null;
+                                status = "Preparing an empty hand for Sudoku";
+                                return;
+                            }
+                        }
+                    }
+                    if (suitable >= 0 && suitable != mc.thePlayer.inventory.currentItem) {
+                        if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+                        sudokuAutomaticSlot = suitable;
+                        mc.thePlayer.inventory.currentItem = suitable;
+                        mc.playerController.updateController();
+                    }
+                }
+                net.minecraft.item.ItemStack held = mc.thePlayer == null ? null : mc.thePlayer.getHeldItem();
+                boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
+                    && held.getItem()
+                        .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
+                sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
+                if (!sudokuReverseClick) remainingClicksForActiveAction = (activeAction.value - curVal + 10) % 10;
             } else {
                 remainingClicksForActiveAction = 1;
+                sudokuReverseClick = false;
             }
         } else {
             activeAction = nextAction;
@@ -221,41 +343,91 @@ public final class SolverSession {
     }
 
     private void send(DetectedGame snapshot) {
+        if (snapshot.type == MiniGame.MINESWEEPER
+            && !MinesweeperActionGuard.valid(snapshot.minesweeper, activeAction)) {
+            resetForNewRound();
+            status = "Waiting for board update";
+            return;
+        }
         if (activeAction.type == SolverAction.Type.SET_VALUE && remainingClicksForActiveAction <= 0) {
             return;
         }
-        if (!bridge.interact(snapshot, activeAction)) {
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT && bridge.isGameOfLightActionPending()) {
+            if (System.currentTimeMillis() - lastActionAt >= LootGameSolverConfig.boardUpdateTimeoutMs) {
+                cancel("Game of Light action timed out; solver stopped");
+                return;
+            }
+            status = "Waiting: GoL";
+            return;
+        }
+        if (interactionPending) {
+            boolean sudokuProgress = activeAction.type == SolverAction.Type.SET_VALUE && sudokuValueBeforeClick >= 0
+                && snapshot.sudokuPlayerValues != null
+                && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
+                    != sudokuValueBeforeClick;
+            ActionAckWatchdog.Decision decision = ActionAckWatchdog.decide(
+                interactionPending,
+                sudokuProgress,
+                lastActionAt,
+                System.currentTimeMillis(),
+                LootGameSolverConfig.boardUpdateTimeoutMs);
+            if (decision == ActionAckWatchdog.Decision.SEND) {
+                // Advance a multi-click number cycle only after the visible digit changes.
+                interactionPending = false;
+            } else if (decision == ActionAckWatchdog.Decision.WAIT) {
+                status = "Waiting: Board";
+                return;
+            } else {
+                cancel("Action timed out; solver stopped");
+                return;
+            }
+        }
+        if (!bridge.interact(snapshot, activeAction, sudokuReverseClick)) {
             status = "Navigating to " + activeAction.position;
             return;
         }
-        if (activeAction.type == SolverAction.Type.SET_VALUE) {
-            remainingClicksForActiveAction--;
-            if (remainingClicksForActiveAction <= 0 && snapshot.type == MiniGame.SUDOKU) {
-                optimisticSudokuValues[activeAction.position.y][activeAction.position.x] = activeAction.value;
-            }
-        }
         bridge.recordSubmittedAction(snapshot);
-        beforeActionSignature = snapshot.signature;
+        interactionPending = snapshot.type != MiniGame.GAME_OF_LIGHT;
+        if (activeAction.type == SolverAction.Type.SET_VALUE) {
+            sudokuValueBeforeClick = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
+        }
         lastActionAt = System.currentTimeMillis();
     }
 
     public boolean isActionComplete(DetectedGame snapshot) {
         if (activeAction == null) return true;
         if (activeAction.type == SolverAction.Type.SET_VALUE) {
-            return remainingClicksForActiveAction <= 0;
+            return snapshot.sudokuPlayerValues != null
+                && snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x] == activeAction.value;
         }
         return bridge.actionComplete(snapshot, activeAction);
     }
 
     public void cancel(String reason) {
+        bridge.releaseSneak();
+        Minecraft mc = Minecraft.getMinecraft();
+        sudokuTransfer.cancel(mc);
+        if (mc.thePlayer != null && sudokuPreviousSlot >= 0
+            && mc.thePlayer.inventory.currentItem == sudokuAutomaticSlot) {
+            mc.thePlayer.inventory.currentItem = sudokuPreviousSlot;
+            if (mc.playerController != null) mc.playerController.updateController();
+        }
+        sudokuPreviousSlot = -1;
+        sudokuAutomaticSlot = -1;
+        bridge.resetGameOfLightPendingAction();
+        puzzleIdentity.clear();
+        interactionPending = false;
+        lastActionAt = 0L;
         mode = null;
         activeAction = null;
         activeActions = null;
         cachedRenderActions = null;
         lastSnapshotSignature = null;
-        beforeActionSignature = null;
+        sudokuPuzzleSignature = null;
+        sudokuValueBeforeClick = -1;
         queued = 0;
         remainingClicksForActiveAction = 0;
+        sudokuReverseClick = false;
         for (int r = 0; r < 9; r++) {
             java.util.Arrays.fill(optimisticSudokuValues[r], 0);
         }
@@ -264,6 +436,14 @@ public final class SolverSession {
 
     public boolean isActive() {
         return mode != null;
+    }
+
+    boolean inventoryTransferActive() {
+        return sudokuTransfer.active();
+    }
+
+    void pauseForScreen() {
+        bridge.releaseSneak();
     }
 
     public String getStatus() {
@@ -290,7 +470,7 @@ public final class SolverSession {
                     int val = optimisticSudokuValues[r][c] != 0 ? optimisticSudokuValues[r][c]
                         : snapshot.sudokuPlayerValues[r][c];
                     if (snapshot.sudoku != null && val != 0) {
-                        snapshot.sudoku.set(r, c, val);
+                        snapshot.sudoku.setPlayerValue(r, c, val);
                     }
                 }
             }
@@ -305,6 +485,7 @@ public final class SolverSession {
     }
 
     public List<SolverAction> getActiveActions() {
+        if (currentSnapshot != null && currentSnapshot.type == MiniGame.GAME_OF_LIGHT) return cachedRenderActions;
         if (activeActions != null && !activeActions.isEmpty()) {
             return activeActions;
         }

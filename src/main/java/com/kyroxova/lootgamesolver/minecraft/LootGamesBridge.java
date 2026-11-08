@@ -22,11 +22,10 @@ import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperBoard;
 import com.kyroxova.lootgamesolver.solver.minesweeper.MinesweeperCell;
 import com.kyroxova.lootgamesolver.solver.sudoku.SudokuBoard;
 
-/**
- * Optional, reflection-only adapter for LootGames 2.x. No LootGames classes
- * appear in this mod's bytecode, so a missing or newer jar fails closed.
- */
 public final class LootGamesBridge implements MiniGameDetector {
+
+    private boolean pendingSneakRelease;
+    private boolean restoreSneaking;
 
     private static final String LOOTGAMES_PKG = "ru.timeconqueror.lootgames.";
     private static final String MS_GAME = "ru.timeconqueror.lootgames.minigame.minesweeper.GameMineSweeper";
@@ -36,10 +35,17 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private Object golGame;
     private Object golStage;
+    private Object golPendingStage;
+    private Object golPendingAppearance;
+    private String golPendingAppearanceState;
+    private int golPendingSymbol;
+    private boolean golActionPending;
+    private boolean golActionRejected;
+    private boolean golAcceptedAwaitingRefresh;
+    private String golRejectedStageId;
     private List<CellPosition> golSequence = new ArrayList<CellPosition>();
     private int golSubmitted;
 
-    // Reflection caches
     private static boolean subordinateReflectionInitialized = false;
     private static Class<?> cachedSubordinateClass = null;
     private static Method cachedGetMasterPosMethod = null;
@@ -97,7 +103,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
         player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
 
-        // Auto-walk / auto-fly towards target block if out of reach range (> 4.2 blocks)
         if (distSq > 17.64D) {
             double speed = 0.15D;
             if (distXZ > 0.1D) {
@@ -112,7 +117,32 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             return false;
         }
-        return true;
+        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
+            && Math.abs(pitch - player.rotationPitch) < 2F;
+    }
+
+    private static boolean prepareExactCenterAndAim(EntityPlayer player, int x, int y, int z) {
+        if (player == null) return false;
+        double dx = x + 0.5D - player.posX, dz = z + 0.5D - player.posZ;
+        double horizontal = Math.sqrt(dx * dx + dz * dz);
+        int footY = (int) Math.floor(player.boundingBox.minY);
+        if (!player.onGround || footY != y + 1 || horizontal > 0.18D) {
+            if (horizontal > 0.18D) {
+                double step = Math.min(0.045D, (horizontal - 0.12D) * 0.12D);
+                player.motionX += dx / horizontal * step;
+                player.motionZ += dz / horizontal * step;
+            } else if (footY < y + 1 && player.onGround) {
+                player.jump();
+            }
+            return false;
+        }
+        float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+        double dy = y + 0.5D - player.posY - player.getEyeHeight();
+        float pitch = (float) (-Math.atan2(dy, horizontal) * 180.0D / Math.PI);
+        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
+        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
+        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
+            && Math.abs(pitch - player.rotationPitch) < 2F;
     }
 
     private static Object invoke(Object target, String name, Object... args) throws Exception {
@@ -134,8 +164,31 @@ public final class LootGamesBridge implements MiniGameDetector {
         return ((Number) value).intValue();
     }
 
-    public void invalidateDormantCache() {
-        // Kept for backward compatibility
+    static boolean minesweeperGenerated(Object game) throws Exception {
+        try {
+            return game.getClass()
+                .getField("cIsGenerated")
+                .getBoolean(game);
+        } catch (NoSuchFieldException absent) {
+            return bool(game, "isBoardGenerated");
+        }
+    }
+
+    public void invalidateDormantCache() {}
+
+    public void resetGameOfLightPendingAction() {
+        golActionPending = false;
+        golActionRejected = false;
+        golAcceptedAwaitingRefresh = false;
+        golPendingStage = null;
+        golPendingAppearance = null;
+        golPendingAppearanceState = null;
+        golPendingSymbol = 0;
+        golRejectedStageId = null;
+    }
+
+    public boolean isGameOfLightActionPending() {
+        return golActionPending || golActionRejected || golAcceptedAwaitingRefresh;
     }
 
     public DetectedGame detect() {
@@ -161,8 +214,7 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     @SuppressWarnings("unchecked")
     private Object findNearbyGame(World world, EntityPlayer player, boolean forceScan) {
-        // Strategy 1: Check crosshair targeted block (instant detection when directly looking at puzzle/master within
-        // 16 blocks)
+        // Check the targeted block first for immediate detection.
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.objectMouseOver != null
             && mc.objectMouseOver.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
@@ -172,7 +224,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             double dx = bx + 0.5D - player.posX;
             double dy = by + 0.5D - player.posY;
             double dz = bz + 0.5D - player.posZ;
-            if (Math.abs(dx) <= 16.0D && Math.abs(dz) <= 16.0D && Math.abs(dy) <= 8.0D) {
+            if (Math.abs(dx) <= 32.0D && Math.abs(dz) <= 32.0D && Math.abs(dy) <= 8.0D) {
                 net.minecraft.block.Block hitBlock = world.getBlock(bx, by, bz);
                 if (hitBlock != null && hitBlock.getClass()
                     .getName()
@@ -184,13 +236,11 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
         }
 
-        // Strategy 2: If not forced and not physically standing inside/near a LootGames structure, DO NOT scan
         if (!forceScan && !isPlayerInsideOrNearStructure(world, player)) {
             return null;
         }
 
-        // Strategy 3: Player is confirmed inside a structure or forceScan was requested.
-        // Search loaded tile entities strictly filtered by LootGames package.
+        // Search loaded tile entities only after confirming proximity to LootGames.
         Object selected = null;
         double selectedDistance = Double.MAX_VALUE;
         List<TileEntity> tiles = world.loadedTileEntityList;
@@ -198,7 +248,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             TileEntity tile = tiles.get(i);
             if (tile == null || tile.isInvalid()) continue;
 
-            // Fast-path: Skip all non-LootGames tile entities immediately
             if (!tile.getClass()
                 .getName()
                 .startsWith(LOOTGAMES_PKG)) continue;
@@ -206,7 +255,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             double tdx = tile.xCoord + 0.5D - player.posX;
             double tdy = tile.yCoord + 0.5D - player.posY;
             double tdz = tile.zCoord + 0.5D - player.posZ;
-            if (Math.abs(tdx) > 16.0D || Math.abs(tdz) > 16.0D || Math.abs(tdy) > 8.0D) continue;
+            if (Math.abs(tdx) > 32.0D || Math.abs(tdz) > 32.0D || Math.abs(tdy) > 8.0D) continue;
 
             Object game = extractGameFromTile(world, tile, tile.xCoord, tile.yCoord, tile.zCoord);
             if (game == null) continue;
@@ -219,11 +268,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         return selected;
     }
 
-    /**
-     * Fast check to test if the player is physically standing inside or adjacent to a LootGames
-     * structure.
-     * Uses direct chunk block array lookups without touching tile entities or reflection.
-     */
     private boolean isPlayerInsideOrNearStructure(World world, EntityPlayer player) {
         int px = (int) Math.floor(player.posX);
         int py = (int) Math.floor(player.posY);
@@ -260,7 +304,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             } catch (Exception ignored) {}
         }
 
-        // Check if block at position is SmartSubordinateBlock
         net.minecraft.block.Block b = world.getBlock(x, y, z);
         if (b != null && b.getClass()
             .getName()
@@ -298,7 +341,7 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     private DetectedGame readMinesweeper(Object game) throws Exception {
-        if (!bool(game, "isBoardGenerated")) return null;
+        if (!minesweeperGenerated(game)) return null;
         Object rawBoard = invoke(game, "getBoard");
         if (rawBoard == null) return null;
         int size = number(invoke(rawBoard, "size"));
@@ -341,8 +384,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             for (int x = 0; x < 9; x++) {
                 int puzzleVal = number(invoke(rawBoard, "getPuzzleValue", Integer.valueOf(x), Integer.valueOf(y)));
                 int playerVal = number(invoke(rawBoard, "getPlayerValue", Integer.valueOf(x), Integer.valueOf(y)));
-                int effectiveVal = playerVal != 0 ? playerVal : puzzleVal;
-                board.set(y, x, effectiveVal);
+                board.set(y, x, puzzleVal);
+                board.setPlayerValue(y, x, playerVal);
                 playerValues[y][x] = playerVal;
                 sig.append((char) ('0' + puzzleVal))
                     .append((char) ('0' + playerVal));
@@ -366,6 +409,14 @@ public final class LootGamesBridge implements MiniGameDetector {
         if (golGame != game || (golStage != stage && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
             golSequence.clear();
             golSubmitted = 0;
+            golActionPending = false;
+            golActionRejected = false;
+            golAcceptedAwaitingRefresh = false;
+            golRejectedStageId = null;
+            golPendingStage = null;
+            golPendingAppearance = null;
+            golPendingAppearanceState = null;
+            golPendingSymbol = 0;
         }
         golGame = game;
         golStage = stage;
@@ -422,6 +473,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             sequence = new ArrayList<CellPosition>(golSequence);
             currentSymbol = golSubmitted;
         }
+        if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+            // The mark animation may be the only client-visible acknowledgement.
+            currentSymbol = Math.max(currentSymbol, golSubmitted);
+        }
         if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && currentSymbol > 0
             && currentSymbol <= sequence.size()) {
             sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
@@ -458,23 +513,49 @@ public final class LootGamesBridge implements MiniGameDetector {
         return map;
     }
 
-    /**
-     * Executes exactly one normal Minecraft interaction. Caller waits for a packet-driven board update.
-     */
     public boolean interact(DetectedGame detected, SolverAction action) {
+        return interact(detected, action, false);
+    }
+
+    public boolean interact(DetectedGame detected, SolverAction action, boolean sudokuReverseClick) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+            releasePendingSneak(mc);
             int[] block = boardBlock(detected.game, action.position);
 
-            // Realistic player interaction: auto-walk/fly into range, aim camera at block, and swing arm
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
                 return false;
             }
             mc.thePlayer.swingItem();
 
-            if (action.type == SolverAction.Type.REVEAL) {
-                if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+            boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
+                && action.type == SolverAction.Type.SET_VALUE
+                && sudokuReverseClick;
+            boolean wasSneaking = mc.thePlayer.isSneaking();
+            if (shouldSneak && !wasSneaking) {
+                mc.getNetHandler()
+                    .addToSendQueue(
+                        new net.minecraft.network.play.client.C0BPacketEntityAction(mc.thePlayer, shouldSneak ? 1 : 2));
+                mc.thePlayer.setSneaking(shouldSneak);
+            }
+            try {
+                if (action.type == SolverAction.Type.REVEAL) {
+                    if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+                        ItemStack held = mc.thePlayer.getHeldItem();
+                        mc.playerController.onPlayerRightClick(
+                            mc.thePlayer,
+                            mc.theWorld,
+                            held,
+                            block[0],
+                            block[1],
+                            block[2],
+                            1,
+                            Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+                    } else {
+                        mc.playerController.clickBlock(block[0], block[1], block[2], 1);
+                    }
+                } else {
                     ItemStack held = mc.thePlayer.getHeldItem();
                     mc.playerController.onPlayerRightClick(
                         mc.thePlayer,
@@ -485,20 +566,13 @@ public final class LootGamesBridge implements MiniGameDetector {
                         block[2],
                         1,
                         Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
-                } else {
-                    mc.playerController.clickBlock(block[0], block[1], block[2], 1);
                 }
-            } else {
-                ItemStack held = mc.thePlayer.getHeldItem();
-                mc.playerController.onPlayerRightClick(
-                    mc.thePlayer,
-                    mc.theWorld,
-                    held,
-                    block[0],
-                    block[1],
-                    block[2],
-                    1,
-                    Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
+            } finally {
+                // Keep reverse-cycle sneak active through the click's network tick.
+                if (shouldSneak && !wasSneaking) {
+                    pendingSneakRelease = true;
+                    restoreSneaking = wasSneaking;
+                }
             }
             return true;
         } catch (Exception e) {
@@ -507,14 +581,254 @@ public final class LootGamesBridge implements MiniGameDetector {
         }
     }
 
+    public void tick() {
+        releasePendingSneak(Minecraft.getMinecraft());
+    }
+
+    public void releaseSneak() {
+        releasePendingSneak(Minecraft.getMinecraft());
+    }
+
+    private void releasePendingSneak(Minecraft mc) {
+        if (!pendingSneakRelease) return;
+        pendingSneakRelease = false;
+        if (mc.thePlayer == null || mc.getNetHandler() == null) return;
+        mc.getNetHandler()
+            .addToSendQueue(
+                new net.minecraft.network.play.client.C0BPacketEntityAction(mc.thePlayer, restoreSneaking ? 1 : 2));
+        mc.thePlayer.setSneaking(restoreSneaking);
+    }
+
+    public boolean activateMaster(int x, int y, int z) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
+        net.minecraft.block.Block master = mc.theWorld.getBlock(x, y, z);
+        if (master == null || !master.getClass()
+            .getName()
+            .endsWith(".PuzzleMasterBlock")) return false;
+        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+            || hit.blockX != x
+            || hit.blockY != y
+            || hit.blockZ != z) return false;
+        mc.thePlayer.swingItem();
+        return mc.playerController.onPlayerRightClick(
+            mc.thePlayer,
+            mc.theWorld,
+            mc.thePlayer.getHeldItem(),
+            x,
+            y,
+            z,
+            hit.sideHit,
+            hit.hitVec);
+    }
+
+    public Object nearbyGame(boolean forceScan) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.thePlayer == null || mc.currentScreen != null) return null;
+        return findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
+    }
+
+    public int[] nearbyFloorActivator() {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null) return null;
+        int px = (int) Math.floor(mc.thePlayer.posX), py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        int[] closest = null;
+        double best = Double.MAX_VALUE;
+        for (int dy = -4; dy <= 2; dy++) for (int dx = -16; dx <= 16; dx++) for (int dz = -16; dz <= 16; dz++) {
+            int x = px + dx, y = py + dy, z = pz + dz;
+            if (!mc.theWorld.blockExists(x, y, z) || !isFloorActivator(mc.theWorld.getBlock(x, y, z))) continue;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance < best) {
+                closest = new int[] { x, y, z };
+                best = distance;
+            }
+        }
+        return closest;
+    }
+
+    private static boolean isFloorActivator(net.minecraft.block.Block block) {
+        if (block == null) return false;
+        return isFloorActivatorName(
+            block.getClass()
+                .getName());
+    }
+
+    static boolean isFloorActivatorName(String name) {
+        return name.equals(LOOTGAMES_PKG + "common.block.GOLActivatorBlock")
+            || name.equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock")
+            || name.equals(LOOTGAMES_PKG + "common.block.SudokuActivatorBlock");
+    }
+
+    public boolean activateFloorActivator(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null)
+            return false;
+        int x = position[0], y = position[1], z = position[2];
+        if (!isFloorActivator(mc.theWorld.getBlock(x, y, z))) return false;
+        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+            || hit.blockX != x
+            || hit.blockY != y
+            || hit.blockZ != z) return false;
+        mc.thePlayer.swingItem();
+        return mc.playerController.onPlayerRightClick(
+            mc.thePlayer,
+            mc.theWorld,
+            mc.thePlayer.getHeldItem(),
+            x,
+            y,
+            z,
+            hit.sideHit,
+            hit.hitVec);
+    }
+
+    public Object gameAtMaster(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || position.length < 3
+            || mc.theWorld == null
+            || !mc.theWorld.blockExists(position[0], position[1], position[2])) return null;
+        TileEntity tile = mc.theWorld.getTileEntity(position[0], position[1], position[2]);
+        return tile == null || tile.isInvalid() ? null
+            : extractGameFromTile(mc.theWorld, tile, position[0], position[1], position[2]);
+    }
+
+    public boolean activateBoardCenter(Object game) {
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (game == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null)
+                return false;
+            int[] position = gameCenter(game);
+            if (position == null) return false;
+            int x = position[0], y = position[1], z = position[2];
+            if (!prepareExactCenterAndAim(mc.thePlayer, x, y, z)) return false;
+            net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
+            if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+                || hit.blockX != x
+                || hit.blockY != y
+                || hit.blockZ != z) return false;
+            mc.thePlayer.swingItem();
+            return mc.playerController.onPlayerRightClick(
+                mc.thePlayer,
+                mc.theWorld,
+                mc.thePlayer.getHeldItem(),
+                x,
+                y,
+                z,
+                hit.sideHit,
+                hit.hitVec);
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);
+            return false;
+        }
+    }
+
+    public boolean requiresMinesweeperOpeningClick(DetectedGame detected) {
+        return detected != null && detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER;
+    }
+
+    public int currentMinesweeperLevel(Object game) {
+        if (game == null || !MS_GAME.equals(
+            game.getClass()
+                .getName()))
+            return -1;
+        try {
+            Field level = getFieldRecursive(game.getClass(), "currentLevel");
+            return level == null ? -1 : level.getInt(game);
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the Minesweeper stage", e);
+            return -1;
+        }
+    }
+
+    public boolean canOpenMinesweeperBoard(Object game) {
+        if (game == null || !MS_GAME.equals(
+            game.getClass()
+                .getName()))
+            return false;
+        try {
+            if (minesweeperGenerated(game)) return false;
+            Object stage = invoke(game, "getStage");
+            return "waiting".equals(String.valueOf(invoke(stage, "getID")));
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the Minesweeper attempt state", e);
+            return false;
+        }
+    }
+
+    public int[] gameCenter(Object game) {
+        try {
+            if (game != null) {
+                try {
+                    int size = number(invoke(game, "getCurrentBoardSize"));
+                    if (size > 0) return boardBlock(game, new CellPosition(size / 2, size / 2));
+                } catch (Exception ignored) {}
+            }
+            if (game != null && MS_GAME.equals(
+                game.getClass()
+                    .getName())) {
+                Object board = invoke(game, "getBoard");
+                int size = number(invoke(board, "size"));
+                if (size > 0) {
+                    return boardBlock(game, new CellPosition(size / 2, size / 2));
+                }
+            }
+            Object center = invoke(game, "getGameCenter");
+            int x = number(invoke(center, "getX"));
+            int y = number(invoke(center, "getY"));
+            int z = number(invoke(center, "getZ"));
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.theWorld != null) {
+                // Resolve the clickable floor block below LootGames' logical center.
+                for (int floorY = y; floorY >= y - 5; floorY--) {
+                    if (!mc.theWorld.blockExists(x, floorY, z)) break;
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(x, floorY, z);
+                    if (block != null && block != net.minecraft.init.Blocks.air
+                        && block.getMaterial()
+                            .isSolid())
+                        return new int[] { x, floorY, z };
+                }
+            }
+            return new int[] { x, y, z };
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not read the LootGames board center", e);
+            return null;
+        }
+    }
+
     public void recordSubmittedAction(DetectedGame snapshot) {
-        if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
-            golSubmitted++;
+        if (snapshot.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT && !golActionPending
+            && (!golActionRejected || snapshot.gol == null || !golRejectedStageId.equals(snapshot.gol.getStageId()))) {
+            if (golActionRejected && snapshot.gol != null && !golRejectedStageId.equals(snapshot.gol.getStageId())) {
+                golActionRejected = false;
+                golRejectedStageId = null;
+            }
+            golPendingStage = readGameStage(snapshot.game);
+            golPendingAppearance = readMarkAppearance(snapshot.game);
+            golPendingAppearanceState = readMarkStateName(golPendingAppearance);
+            golPendingSymbol = snapshot.gol != null ? snapshot.gol.getCurrentSymbol() : golSubmitted;
+            golActionPending = true;
+            // Keep the playback index locally when LootGames provides no intermediate acknowledgement.
+            if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
+                try {
+                    Field sequence = getFieldRecursive(golPendingStage.getClass(), "sequence");
+                    if (sequence != null && ((List<?>) sequence.get(golPendingStage)).isEmpty()) {
+                        golSubmitted = golPendingSymbol + 1;
+                        clearGameOfLightAction();
+                    }
+                } catch (Exception e) {
+                    LootGameSolver.LOG.debug("Could not read client sequence progress", e);
+                }
+            }
         }
     }
 
     public boolean actionComplete(DetectedGame current, SolverAction action) {
         if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER) {
+            if (!current.minesweeper.contains(action.position)) return true;
             MinesweeperCell cell = current.minesweeper.get(action.position);
             return action.type == SolverAction.Type.REVEAL
                 ? cell.getState() == com.kyroxova.lootgamesolver.solver.minesweeper.CellState.REVEALED
@@ -529,8 +843,89 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             return true;
         }
-        if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) return true;
+        if (current.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
+            if (current.gol == null) return false;
+            Object liveStage = readGameStage(current.game);
+            if (liveStage != null && golPendingStage != null && liveStage != golPendingStage) {
+                clearGameOfLightAction();
+                return true;
+            }
+            int currentSymbol = current.gol.getCurrentSymbol();
+            if (currentSymbol > golPendingSymbol) {
+                golSubmitted = Math.max(golSubmitted, currentSymbol);
+                clearGameOfLightAction();
+                return true;
+            }
+            if (golActionRejected && golRejectedStageId != null && golRejectedStageId.equals(current.gol.getStageId()))
+                return false;
+            if (!golActionPending) return true;
+            if (golActionRejected) return false;
+            if (!GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(current.gol.getStageId())) return false;
+
+            Object appearance = readMarkAppearance(current.game);
+            String stateName = readMarkStateName(appearance);
+            boolean appearanceChanged = appearance != golPendingAppearance
+                || !java.util.Objects.equals(stateName, golPendingAppearanceState);
+            if (appearanceChanged && "ACCEPTED".equalsIgnoreCase(stateName)) {
+                golSubmitted = Math.max(golSubmitted + 1, golPendingSymbol + 1);
+                clearGameOfLightAction();
+                golSubmitted = Math.max(golSubmitted, currentSymbol);
+                return false;
+            }
+            if (appearanceChanged && "DENIED".equalsIgnoreCase(stateName)) {
+                // Keep the sequence index unchanged after a rejected symbol.
+                golActionPending = false;
+                golActionRejected = true;
+                golRejectedStageId = current.gol.getStageId();
+                return false;
+            }
+            return false;
+        }
         return false;
+    }
+
+    private static Object readGameStage(Object game) {
+        if (game == null) return null;
+        try {
+            return invoke(game, "getStage");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object readMarkAppearance(Object game) {
+        if (game == null) return null;
+        try {
+            Field field = getFieldRecursive(game.getClass(), "specialMarkAppearance");
+            return field != null ? field.get(game) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object readMarkState(Object appearance) {
+        if (appearance == null) return null;
+        try {
+            return invoke(appearance, "getState");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String readMarkStateName(Object appearance) {
+        Object state = readMarkState(appearance);
+        return state != null ? String.valueOf(state) : null;
+    }
+
+    private void clearGameOfLightAction() {
+        golActionPending = false;
+        golActionRejected = false;
+        golAcceptedAwaitingRefresh = false;
+        golPendingStage = null;
+        golPendingAppearance = null;
+        golPendingAppearanceState = null;
+        golPendingSymbol = 0;
+        golRejectedStageId = null;
     }
 
     public void submitSudokuCheck(DetectedGame snapshot) {

@@ -12,12 +12,16 @@ public final class Keybinds {
 
     public static KeyBinding toggleOverlay;
     public static KeyBinding toggleAutoSolve;
+    public static KeyBinding explore;
 
     private Keybinds() {}
 
     public static void register() {
         toggleOverlay = register("key.lootgamesolver.toggle_overlay", LootGameSolverConfig.overlayKey);
         toggleAutoSolve = register("key.lootgamesolver.toggle_auto_solve", LootGameSolverConfig.solveKey);
+        if (Explorer.ENABLED) {
+            explore = register("key.lootgamesolver.explore", LootGameSolverConfig.exploreKey);
+        }
     }
 
     private static KeyBinding register(String name, int configuredKey) {

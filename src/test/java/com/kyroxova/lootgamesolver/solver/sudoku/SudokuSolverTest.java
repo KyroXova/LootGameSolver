@@ -1,6 +1,8 @@
 package com.kyroxova.lootgamesolver.solver.sudoku;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -48,7 +50,6 @@ public class SudokuSolverTest {
 
     @Test
     public void rejectsUnsolvablePuzzle() {
-        // Given that leads to no valid completion
         int[][] puzzle = new int[9][9];
         puzzle[0][0] = 1;
         puzzle[0][1] = 2;
@@ -79,10 +80,16 @@ public class SudokuSolverTest {
     public void testClickPlanning() {
         assertEquals(1, SolverSession.calculateClicksNeeded(0, 1));
         assertEquals(5, SolverSession.calculateClicksNeeded(0, 5));
-        assertEquals(6, SolverSession.calculateClicksNeeded(0, 6));
-        assertEquals(9, SolverSession.calculateClicksNeeded(0, 9));
-        assertEquals(7, SolverSession.calculateClicksNeeded(2, 9));
+        assertEquals(4, SolverSession.calculateClicksNeeded(0, 6));
+        assertEquals(1, SolverSession.calculateClicksNeeded(0, 9));
+        assertEquals(3, SolverSession.calculateClicksNeeded(2, 9));
         assertEquals(0, SolverSession.calculateClicksNeeded(4, 4));
+        assertEquals(2, SolverSession.calculateClicksNeeded(9, 1));
+        assertEquals(3, SolverSession.calculateClicksNeeded(8, 5));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(8, 5));
+        assertFalse(SolverSession.shouldUseReverseSudokuClicks(9, 1));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(0, 6));
+        assertTrue(SolverSession.shouldUseReverseSudokuClicks(0, 9));
     }
 
     @Test
@@ -91,18 +98,15 @@ public class SudokuSolverTest {
             { 8, 0, 0, 0, 6, 0, 0, 0, 3 }, { 4, 0, 0, 8, 0, 3, 0, 0, 1 }, { 7, 0, 0, 0, 2, 0, 0, 0, 6 },
             { 0, 6, 0, 0, 0, 0, 2, 8, 0 }, { 0, 0, 0, 4, 1, 9, 0, 0, 5 }, { 0, 0, 0, 0, 8, 0, 0, 7, 9 } };
         SudokuBoard board = new SudokuBoard(puzzle);
-        // Correct value for (0, 2) is 4. Set a wrong player value of 1.
-        board.setPlayerValue(0, 2, 1);
+        board.setPlayerValue(0, 2, 5);
 
         SolveResult result = new SudokuSolver().solve(board);
         assertEquals(SolveResult.Status.GUARANTEED_SAFE, result.getStatus());
-        // Should still generate actions for all 51 open cells (including the cell with wrong value 1)
         assertEquals(
             51,
             result.getActions()
                 .size());
 
-        // Find action for (col 2, row 0) and verify it specifies correct target 4
         com.kyroxova.lootgamesolver.core.SolverAction action = null;
         for (com.kyroxova.lootgamesolver.core.SolverAction a : result.getActions()) {
             if (a.position.x == 2 && a.position.y == 0) {

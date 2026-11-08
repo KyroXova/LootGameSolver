@@ -2,21 +2,15 @@ name: Release
 
 on:
   push:
-    branches: [ master, main ]
     tags: [ '*' ]
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for release (e.g. 2.0.1-hotfix, or leave empty for version from gradle.properties)'
+        description: 'Tag matching modVersion, or leave empty to use modVersion'
         required: false
         default: ''
       prerelease:
         description: 'Mark as prerelease'
-        required: false
-        default: false
-        type: boolean
-      force_release:
-        description: 'Force release even if version matches latest release'
         required: false
         default: false
         type: boolean
@@ -25,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -37,6 +31,8 @@ jobs:
       release_title: ${{ steps.check.outputs.release_title }}
       is_prerelease: ${{ steps.check.outputs.is_prerelease }}
       make_latest: ${{ steps.check.outputs.make_latest }}
+      github_release_exists: ${{ steps.check.outputs.github_release_exists }}
+      release_commit_sha: ${{ steps.check.outputs.release_commit_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,16 +44,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANUAL_TAG: ${{ inputs.tag_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+          REF_NAME: ${{ github.ref_name }}
+          MANUAL_PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          MANUAL_TAG="${{ inputs.tag_name }}"
-          FORCE_RELEASE="${{ inputs.force_release }}"
-          IS_TAG="${{ startsWith(github.ref, 'refs/tags/') }}"
-          REF_NAME="${{ github.ref_name }}"
+          set -euo pipefail
           MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
-
-          LATEST_RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name 2>/dev/null || echo "")
           echo "Current modVersion: '$MOD_VERSION'"
-          echo "Latest release tag: '$LATEST_RELEASE_TAG'"
 
           SHOULD_RELEASE="true"
           TARGET_TAG=""
@@ -68,7 +62,7 @@ jobs:
           if [[ -n "$MANUAL_TAG" ]]; then
             TARGET_TAG="$MANUAL_TAG"
             RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
-            IS_PRE="${{ inputs.prerelease }}"
+            IS_PRE="${MANUAL_PRERELEASE:-false}"
             MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
           elif [[ "$IS_TAG" == "true" ]]; then
             TARGET_TAG="$REF_NAME"
@@ -92,17 +86,36 @@ jobs:
               MAKE_LATEST="true"
             fi
 
-            if [[ "$FORCE_RELEASE" != "true" && -n "$LATEST_RELEASE_TAG" && "$MOD_VERSION" == "$LATEST_RELEASE_TAG" ]]; then
-              echo "Version '$MOD_VERSION' already matches latest release '$LATEST_RELEASE_TAG'. Skipping release."
-              SHOULD_RELEASE="false"
-            fi
           fi
 
+          if [[ "$MANUAL_PRERELEASE" == "true" ]]; then
+            IS_PRE="true"
+            MAKE_LATEST="false"
+          fi
+
+          if [[ "${TARGET_TAG#v}" != "$MOD_VERSION" ]]; then
+            echo "Release tag must match modVersion" >&2
+            exit 1
+          fi
+          if git rev-parse --quiet --verify "refs/tags/${TARGET_TAG}^{commit}" >/dev/null; then
+            RELEASE_COMMIT_SHA=$(git rev-parse "refs/tags/${TARGET_TAG}^{commit}")
+          else
+            RELEASE_COMMIT_SHA=$(git rev-parse HEAD)
+          fi
+          GITHUB_RELEASE_EXISTS="false"
+          if RELEASE_RESULT=$(gh api "repos/${{ github.repository }}/releases/tags/$TARGET_TAG" 2>&1); then
+            GITHUB_RELEASE_EXISTS="true"
+          elif [[ "$RELEASE_RESULT" != *"HTTP 404"* ]]; then
+            echo "Could not verify the GitHub release: $RELEASE_RESULT" >&2
+            exit 1
+          fi
           echo "should_release=${SHOULD_RELEASE}" >> $GITHUB_OUTPUT
           echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
           echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
           echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
           echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
+          echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> $GITHUB_OUTPUT
+          echo "release_commit_sha=${RELEASE_COMMIT_SHA}" >> $GITHUB_OUTPUT
 
   release:
     needs: check-version
@@ -114,6 +127,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ needs.check-version.outputs.release_commit_sha }}
 
       - name: Determine JDK versions
         id: list-jdk-versions
@@ -146,32 +160,24 @@ jobs:
         run: ./gradlew setupCIWorkspace
 
       - name: Build mod
-        run: ./gradlew assemble
+        run: ./gradlew build --parallel --max-workers=4
 
       - name: Prepare release changelog notes
         id: release-notes
         shell: bash
         run: |
-          mkdir -p build
-          if git rev-parse -q --verify HEAD^2 >/dev/null 2>&1; then
-            COMMIT_BODY=$(git log -1 --format=%b HEAD^2)
-          else
-            COMMIT_BODY=$(git log -1 --format=%b HEAD)
-          fi
-
-          TARGET_TAG="${{ needs.check-version.outputs.target_tag }}"
-
-          {
-            echo "## LootGameSolver ${TARGET_TAG}"
-            echo ""
-            if [[ -n "$COMMIT_BODY" ]]; then
-              echo "### Changes in this Release"
-              echo "$COMMIT_BODY"
-              echo ""
-            fi
-          } > build/release_body.md
-
+          set -euo pipefail
+          VERSION=$(sed -n 's/^[[:space:]]*modVersion[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+          NOTES=$(sed -n 's/^[[:space:]]*releaseChangelog[[:space:]]*=[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' gradle.properties | tr -d '\r')
+          test -s "$NOTES"
+          JAR="build/libs/lootgamesolver-${VERSION}.jar"
+          test -f "$JAR"
+          unzip -p "$JAR" META-INF/CHANGELOG.md > build/release_body.md
+          cmp "$NOTES" build/release_body.md
+          echo "jar=$JAR" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_FILE=$GITHUB_WORKSPACE/$NOTES" >> "$GITHUB_ENV"
       - name: Publish GitHub Release
+        if: needs.check-version.outputs.github_release_exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -180,12 +186,13 @@ jobs:
           body_path: build/release_body.md
           prerelease: ${{ needs.check-version.outputs.is_prerelease == 'true' }}
           make_latest: ${{ needs.check-version.outputs.make_latest }}
-          generate_release_notes: true
-          files: build/libs/*.jar
-
+          target_commitish: ${{ needs.check-version.outputs.release_commit_sha }}
+          generate_release_notes: false
+          files: ${{ steps.release-notes.outputs.jar }}
       - name: Publish to CurseForge
         if: needs.check-version.outputs.is_prerelease != 'true'
-        run: ./gradlew curseforge -x test
+        run: |
+          test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
+          ./gradlew publishCurseforge --no-configuration-cache
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-        continue-on-error: true

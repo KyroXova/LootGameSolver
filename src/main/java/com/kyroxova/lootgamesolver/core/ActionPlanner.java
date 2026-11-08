@@ -3,16 +3,18 @@ package com.kyroxova.lootgamesolver.core;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Keeps all policy choices (mark-only, one step and optional guessing) out of solvers.
- */
 public final class ActionPlanner {
 
     public List<SolverAction> plan(SolveResult result, Mode mode, boolean allowProbabilityMoves, double threshold) {
         List<SolverAction> planned = new ArrayList<SolverAction>();
         if (result.getStatus() == SolveResult.Status.PROBABILISTIC) {
-            boolean allow = (mode == Mode.SOLVE) || allowProbabilityMoves;
-            if (!allow) return planned;
+            double safety = result.getBestSafetyProbability();
+            if (!allowProbabilityMoves || Double.isNaN(threshold)
+                || Double.isInfinite(threshold)
+                || Double.isNaN(safety)
+                || safety < 0D
+                || safety > 1D
+                || safety < threshold) return planned;
         }
         for (SolverAction action : result.getActions()) {
             if (mode != Mode.MARK_MINES || action.type == SolverAction.Type.FLAG) planned.add(action);

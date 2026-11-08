@@ -1,6 +1,8 @@
 package com.kyroxova.lootgamesolver.client;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -8,11 +10,13 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 
 import org.lwjgl.opengl.GL11;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
@@ -20,19 +24,36 @@ import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
-/**
- * Ultra-optimized 3D overlay renderer.
- * Renders ONLY when a LootGames puzzle is actively detected. Reads cached solver actions
- * without performing any solver or world inspection work on the render thread.
- * Fully isolates OpenGL states using glPushAttrib / glPopAttrib so world and chest lighting
- * are completely unaffected.
- */
 public final class WorldOverlayRenderer {
 
-    private final SolverSession session;
+    private static final ResourceLocation RED_FLAG = new ResourceLocation(
+        "lootgamesolver",
+        "textures/minesweeper/red_flag.png");
+    private static final ResourceLocation SAFE_FLAG = new ResourceLocation(
+        "lootgamesolver",
+        "textures/minesweeper/safe_flag.png");
 
-    public WorldOverlayRenderer(SolverSession session) {
+    private final SolverSession session;
+    private final Explorer exploration;
+
+    static Map<CellPosition, String> sequenceLabels(List<SolverAction> actions, int completed) {
+        Map<CellPosition, String> labels = new LinkedHashMap<CellPosition, String>();
+        for (int i = 0; i < actions.size(); i++) {
+            CellPosition position = actions.get(i).position;
+            String label = labels.get(position);
+            labels.put(position, (label == null ? "" : label + ", ") + "#" + (completed + i + 1));
+        }
+        return labels;
+    }
+
+    public WorldOverlayRenderer(SolverSession session, Explorer exploration) {
         this.session = session;
+        this.exploration = exploration;
+    }
+
+    @Deprecated
+    public WorldOverlayRenderer(SolverSession session, ExplorationBeta exploration) {
+        this(session, (Explorer) exploration);
     }
 
     private static void drawWireframe(AxisAlignedBB box, float r, float g, float b) {
@@ -69,10 +90,13 @@ public final class WorldOverlayRenderer {
         tessellator.draw();
     }
 
-    private static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc) {
+    static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc) {
+        drawFloatingText(text, x, y, z, color, mc, 0.025F);
+    }
+
+    static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc, float scale) {
         FontRenderer font = mc.fontRenderer;
         RenderManager rm = RenderManager.instance;
-        float scale = 0.025F;
 
         GL11.glPushMatrix();
         GL11.glTranslated(x, y, z);
@@ -91,9 +115,34 @@ public final class WorldOverlayRenderer {
         GL11.glPopMatrix();
     }
 
+    private static void drawFlag(ResourceLocation texture, double x, double y, double z, Minecraft mc) {
+        RenderManager manager = RenderManager.instance;
+        mc.getTextureManager()
+            .bindTexture(texture);
+        GL11.glPushMatrix();
+        GL11.glTranslated(x, y, z);
+        GL11.glRotatef(-manager.playerViewY, 0.0F, 1.0F, 0.0F);
+        GL11.glRotatef(manager.playerViewX, 1.0F, 0.0F, 0.0F);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1F, 1F, 1F, 1F);
+        Tessellator tessellator = Tessellator.instance;
+        tessellator.startDrawingQuads();
+        tessellator.addVertexWithUV(-0.36D, -0.36D, 0D, 0D, 1D);
+        tessellator.addVertexWithUV(0.36D, -0.36D, 0D, 1D, 1D);
+        tessellator.addVertexWithUV(0.36D, 0.36D, 0D, 1D, 0D);
+        tessellator.addVertexWithUV(-0.36D, 0.36D, 0D, 0D, 0D);
+        tessellator.draw();
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glPopMatrix();
+    }
+
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
+        if (exploration != null) NavigationOverlayRenderer.render(exploration, event.partialTicks);
         DetectedGame current = session.getCurrentDetectedGame();
         if (current == null) return;
 
@@ -119,14 +168,16 @@ public final class WorldOverlayRenderer {
             GL11.glDepthMask(false);
             GL11.glLineWidth(1.5F);
 
-            int index = 1;
             int maxRender = actions.size();
+            Map<CellPosition, String> lightLabels = current.type == MiniGame.GAME_OF_LIGHT
+                ? sequenceLabels(actions, current.gol == null ? 0 : current.gol.getCurrentSymbol())
+                : null;
             for (int i = 0; i < maxRender; i++) {
                 SolverAction action = actions.get(i);
+                if (lightLabels != null && !lightLabels.containsKey(action.position)) continue;
                 int[] block = session.getBlockPos(action.position);
                 if (block == null) continue;
 
-                // Distance Restriction (32.0 block radius)
                 double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
                 double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
                 double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
@@ -139,10 +190,10 @@ public final class WorldOverlayRenderer {
                 if (current.type == MiniGame.MINESWEEPER) {
                     if (action.type == SolverAction.Type.FLAG) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
-                        drawFloatingText("FLAG", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFF4444, mc);
+                        drawFlag(RED_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
                     } else if (action.type == SolverAction.Type.REVEAL) {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                        drawFloatingText("SAFE", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x44FF44, mc);
+                        drawFlag(SAFE_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
                     }
                 } else if (current.type == MiniGame.SUDOKU) {
                     if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
@@ -159,10 +210,16 @@ public final class WorldOverlayRenderer {
                         drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
                     } else {
                         if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
-                        drawFloatingText("#" + index, minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
+                        drawFloatingText(
+                            lightLabels.get(action.position),
+                            minX + 0.5D,
+                            minY + 1.25D,
+                            minZ + 0.5D,
+                            0x00FFFF,
+                            mc);
                     }
+                    lightLabels.remove(action.position);
                 }
-                index++;
             }
         } finally {
             GL11.glDepthMask(true);
