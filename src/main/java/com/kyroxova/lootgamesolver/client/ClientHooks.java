@@ -715,6 +715,7 @@ public final class ClientHooks {
         if (!LootGameSolverConfig.showOverlay && !session.isActive()
             && !rewardReturnPending
             && (exploration == null || !exploration.navigating())
+            && !wasInsideRoom
             && (autoPuzzleState == AutoPuzzleState.IDLE || autoPuzzleState == AutoPuzzleState.FAILED)) return;
         DetectedGame cur = session.getCurrentDetectedGame();
         if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;

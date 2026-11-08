@@ -14,7 +14,7 @@ final class NavigationOverlayRenderer {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null) return;
         int[] waypoint = exploration.structureWaypoint();
-        if (!exploration.navigating() && waypoint == null) return;
+        if (!exploration.navigating()) return;
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
         try {
@@ -54,7 +54,8 @@ final class NavigationOverlayRenderer {
                     exploration.waypointLabelY(),
                     waypoint[2] + 0.5D,
                     0x5599FF,
-                    mc);
+                    mc,
+                    (float) Math.min(0.18D, 0.025D + distance * 0.0005D));
             }
         } finally {
             GL11.glPopMatrix();
@@ -68,19 +69,17 @@ final class NavigationOverlayRenderer {
         GL11.glLineWidth(4F);
         // Explicit line pairs avoid rendering glitches in legacy 1.7 drivers.
         t.startDrawing(GL11.GL_LINES);
-        for (int ring = 0; ring < 36; ring++) {
-            double progress = (ring / 36D + time * 0.006D) % 1D;
-            double y = ground + progress * height;
-            double radius = 0.26D + 0.05D * Math.sin(progress * Math.PI * 2D + rotation);
-            for (int segment = 0; segment < 32; segment++) {
-                double angle = Math.PI * 2D * segment / 32D + rotation;
-                float pulse = (float) (0.48D + 0.42D * (0.5D + 0.5D * Math.sin(angle * 2D - rotation * 3D)));
-                float alpha = pulse * (float) (0.55D + 0.35D * Math.sin(progress * Math.PI));
-                t.setColorRGBA_F(0.28F, 0.72F, 1F, alpha);
-                t.addVertex(x + Math.cos(angle) * radius, y, z + Math.sin(angle) * radius);
-                double next = Math.PI * 2D * (segment + 1) / 32D + rotation;
-                t.addVertex(x + Math.cos(next) * radius, y, z + Math.sin(next) * radius);
-            }
+        int segments = Math.max(16, (int) Math.ceil(height / 1.5D) * 16);
+        double radius = 0.42D;
+        for (int segment = 0; segment < segments; segment++) {
+            double progress = segment / (double) segments;
+            double nextProgress = (segment + 1D) / segments;
+            double angle = progress * height / 1.5D * Math.PI * 2D + rotation;
+            double next = nextProgress * height / 1.5D * Math.PI * 2D + rotation;
+            float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * Math.sin(angle - rotation * 3D)));
+            t.setColorRGBA_F(0.28F, 0.72F, 1F, pulse);
+            t.addVertex(x + Math.cos(angle) * radius, ground + progress * height, z + Math.sin(angle) * radius);
+            t.addVertex(x + Math.cos(next) * radius, ground + nextProgress * height, z + Math.sin(next) * radius);
         }
         t.draw();
         GL11.glLineWidth(2F);

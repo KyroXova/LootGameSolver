@@ -86,9 +86,12 @@ public final class WorldOverlayRenderer {
     }
 
     static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc) {
+        drawFloatingText(text, x, y, z, color, mc, 0.025F);
+    }
+
+    static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc, float scale) {
         FontRenderer font = mc.fontRenderer;
         RenderManager rm = RenderManager.instance;
-        float scale = 0.025F;
 
         GL11.glPushMatrix();
         GL11.glTranslated(x, y, z);
