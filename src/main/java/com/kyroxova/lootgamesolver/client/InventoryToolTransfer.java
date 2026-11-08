@@ -31,6 +31,10 @@ final class InventoryToolTransfer {
     }
 
     boolean start(Minecraft mc, int inventorySlot) {
+        return start(mc, inventorySlot, null);
+    }
+
+    boolean start(Minecraft mc, int inventorySlot, InventoryBaseline baseline) {
         if (active() || mc.currentScreen != null
             || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null) return false;
@@ -45,7 +49,8 @@ final class InventoryToolTransfer {
             break;
         }
         if (hotbar < 0) for (int i = 0; i < 9; i++) {
-            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))) {
+            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))
+                && (baseline == null || !baseline.protects(i, mc.thePlayer.inventory.getStackInSlot(i)))) {
                 hotbar = i;
                 break;
             }

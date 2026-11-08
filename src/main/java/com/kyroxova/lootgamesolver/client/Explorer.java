@@ -108,6 +108,7 @@ public class Explorer {
     private boolean roomExitPlanning;
     private boolean roomExitNeedsResume;
     private boolean roomExitCrossing;
+    private int roomExitJumpRetries;
     private boolean walkingSearchNeedsResume;
     private boolean roomEntrySearchNeedsResume;
     private List<int[]> roomEntryCandidates;
@@ -1941,6 +1942,7 @@ public class Explorer {
                     if (activeRoomExit.length >= 9) appendRoomExitWaypoint(activeRoomExit, 6);
                     appendRoomExitWaypoint(activeRoomExit, 3);
                     roomExitCrossing = true;
+                    roomExitJumpRetries = 0;
                     roomExitNeedsResume = false;
                     status = "Walking to room exit";
                 } else if (!join.isEmpty()) {
@@ -2472,6 +2474,7 @@ public class Explorer {
             segmentZ = next[2] + 0.5D;
             if (!returning && trailTarget != null) recordAccessPoint(px, py, pz);
             route.remove(0);
+            if (roomExitCrossing) roomExitJumpRetries = 0;
             if (returning && !insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(px, py, pz)) {
                 continueProgressiveSearch(mc, true);
                 return;
@@ -2578,6 +2581,21 @@ public class Explorer {
         if (stalled > 40) {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
+            if (returning && roomExitCrossing
+                && mc.thePlayer.onGround
+                && next[1] == py + 1
+                && distance < 1.8D
+                && distance > 0.02D
+                && safe(mc.theWorld, next[0], next[1], next[2])
+                && roomExitJumpRetries++ < 3
+                && navigationInput != null) {
+                double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
+                navigationInput.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance);
+                navigationInput.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance);
+                navigationInput.hop = true;
+                status = "Climbing exit step";
+                return;
+            }
             if (!route.isEmpty()) {
                 int[] failed = route.get(0);
                 markBlockedWalkNode(failed[0], failed[1], failed[2]);

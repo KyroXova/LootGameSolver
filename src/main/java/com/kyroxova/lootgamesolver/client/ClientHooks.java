@@ -43,6 +43,8 @@ public final class ClientHooks {
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private boolean rewardReturnPending;
+    private boolean rewardPreCleanupPending;
+    private InventoryBaseline inventoryBaseline;
     private int[] rewardCenter;
     private boolean exploreKeyHeld;
     private boolean exploreHoldActionDone;
@@ -202,6 +204,10 @@ public final class ClientHooks {
             trashCleanup.reset();
             rewardLooter.cancel(mc);
             rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            inventoryBaseline = null;
+            trashCleanup.setBaseline(null);
+            rewardLooter.setBaseline(null);
             rewardCenter = null;
             puzzleWorld = mc.theWorld;
             if (autoPuzzleState != AutoPuzzleState.IDLE) {
@@ -227,6 +233,15 @@ public final class ClientHooks {
                 rewardReturnPending = false;
                 exploration.finishPuzzle(mc, true);
                 return;
+            }
+            if (rewardPreCleanupPending) {
+                if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
+                    if (trashCleanup.tick(mc, true)) {
+                        if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                        return;
+                    }
+                }
+                rewardPreCleanupPending = false;
             }
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
@@ -467,6 +482,7 @@ public final class ClientHooks {
                 if (exploration != null) {
                     exploration.prepareRewardCollection(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition);
                     rewardLooter.start(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition, completedGame);
+                    rewardPreCleanupPending = true;
                     rewardReturnPending = true;
                 }
                 autoPuzzlePosition = null;
@@ -520,6 +536,11 @@ public final class ClientHooks {
             && mc.thePlayer != null
             && mc.theWorld != null) {
             LootGameSolverConfig.setOverlayVisible(!exploration.navigating() && !rewardReturnPending);
+            if (!exploration.navigating() && !rewardReturnPending) {
+                inventoryBaseline = InventoryBaseline.capture(mc);
+                trashCleanup.setBaseline(inventoryBaseline);
+                rewardLooter.setBaseline(inventoryBaseline);
+            }
             if (rewardReturnPending) {
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
@@ -544,6 +565,7 @@ public final class ClientHooks {
                     exploration.prepareRewardCollection(mc, rewards);
                     rewardCenter = rewards;
                     rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
+                    rewardPreCleanupPending = true;
                     rewardReturnPending = true;
                     exploration.setAutomationStatus("Collecting reward chests");
                     return;

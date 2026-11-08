@@ -17,6 +17,11 @@ final class TrashCleanup {
     private int wait, timeout, retryDelay;
     private int pendingIndex = -1, pendingSize;
     private String status = "";
+    private InventoryBaseline baseline;
+
+    void setBaseline(InventoryBaseline value) {
+        baseline = value;
+    }
 
     String status() {
         return status;
@@ -132,7 +137,7 @@ final class TrashCleanup {
         return true;
     }
 
-    private static int nextTrash(Minecraft mc) {
+    private int nextTrash(Minecraft mc) {
         int reserve = -1, reserveSize = -1;
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
@@ -146,6 +151,7 @@ final class TrashCleanup {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
             if (i == reserve || stack == null
+                || baseline != null && baseline.protects(i, stack)
                 || InventoryProtection.essential(stack)
                 || stack.hasDisplayName()
                 || stack.hasTagCompound()) continue;
