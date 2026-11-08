@@ -28,7 +28,9 @@
 
 ## Experimental explorer
 
-The explorer is a beta feature and may still require player intervention.
+Explorer is still in early beta and may fail to find or reach some structures, complete a puzzle, or collect every reward. Supervise it and be ready to take control; it can change blocks and inventory contents while active.
+
+Structure discovery is progressive: the explorer checks loaded LootGames structures and, in single-player, can inspect saved region data. If no target is available, it explores outward in expanding search legs and checks newly loaded terrain. It navigates and digs in the world rather than teleporting.
 
 ### Finding and reaching structures
 

@@ -50,7 +50,9 @@ The explorer can:
 
 Reward collection uses known local loot-table weights when available; on servers, item weights may be unknown. Inventory cleanup can remove ores and excess blocks.
 
-**Experimental:** Navigation, digging, placement, and looting may still require player intervention. The explorer can change blocks and inventory contents while active.
+**Early beta:** Explorer automation is experimental and may fail to find a structure, navigate a route, solve a board, or collect every reward. Supervise it and be ready to take control; it can change blocks and inventory contents while active.
+
+Structure discovery is progressive. The explorer checks loaded LootGames structures first and can also inspect saved region data in single-player worlds. When it has no known target, it explores outward in expanding search legs and checks newly loaded terrain. It navigates and digs in the world rather than teleporting.
 
 ## Controls
 
