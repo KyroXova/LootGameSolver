@@ -45,6 +45,7 @@ final class RewardChestLooter {
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
     private int packPendingSlot = -1, packPendingCount;
+    private int backpackTransferAttempts;
     private float backpackOldYaw, backpackOldPitch;
     private boolean active, opened, collecting, packing, packOpening, packMoved, packingExisting;
     private boolean existingInventoryPackRequested;
@@ -76,6 +77,7 @@ final class RewardChestLooter {
         existingInventoryPackRequested = false;
         queueIndex = 0;
         backpackSlot = -1;
+        backpackTransferAttempts = 0;
         oldSlot = -1;
         packPendingSlot = -1;
         backpackAimSaved = false;
@@ -139,8 +141,14 @@ final class RewardChestLooter {
         if (exploration != null) exploration.consumePuzzleCenterArrival();
         if (backpackTransfer.active()) {
             if (!backpackTransfer.tick(mc)) {
-                status = "Backpack transfer interrupted";
-                active = false;
+                if (bagSource >= 0 && bagSource < backpackTried.length) backpackTried[bagSource] = true;
+                if (bagHotbar >= 0 && bagHotbar < backpackTried.length) backpackTried[bagHotbar] = true;
+                temporaryBag = false;
+                temporaryBagUsed = false;
+                restoringBag = false;
+                backpackSlot = -1;
+                waiting = 10;
+                status = "Trying another backpack";
             } else if (!backpackTransfer.active() && restoringBag) {
                 temporaryBag = false;
                 temporaryBagUsed = false;
@@ -488,6 +496,9 @@ final class RewardChestLooter {
             mc.thePlayer.closeScreen();
             restoreBackpackAim(mc);
             packOpening = false;
+            int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
+            if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
+            backpackSlot = -1;
             openWait = 0;
             waiting = 5;
             status = "Avoiding chest while opening backpack";
@@ -576,7 +587,8 @@ final class RewardChestLooter {
                 }
                 return;
             }
-            if (backpackSlot >= 0 && backpackSlot < backpackTried.length) backpackTried[backpackSlot] = true;
+            int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
+            if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
             backpackSlot = -1;
         }
         if (packOpening) {
@@ -584,7 +596,8 @@ final class RewardChestLooter {
                 restoreBackpackAim(mc);
                 if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
                 oldSlot = -1;
-                if (backpackSlot >= 0 && backpackSlot < backpackTried.length) backpackTried[backpackSlot] = true;
+                int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
+                if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
                 backpackSlot = -1;
                 packOpening = false;
                 openWait = 0;
@@ -622,6 +635,7 @@ final class RewardChestLooter {
             int selected = backpackSlot;
             backpackSlot = -1;
             if (backpackTransfer.start(mc, selected)) {
+                backpackTransferAttempts = 0;
                 bagSource = selected;
                 bagHotbar = backpackTransfer.hotbarSlot();
                 ItemStack displaced = mc.thePlayer.inventory.getStackInSlot(bagHotbar);
@@ -629,6 +643,11 @@ final class RewardChestLooter {
                 temporaryBag = true;
                 temporaryBagUsed = false;
                 return;
+            }
+            if (++backpackTransferAttempts >= 20) {
+                backpackTried[selected] = true;
+                backpackTransferAttempts = 0;
+                status = "Backpack unavailable";
             }
             waiting = 2;
             return;

@@ -12,6 +12,7 @@ final class StatusText {
         if (detail == null || detail.isEmpty()) return "Idle";
         String text = detail.toLowerCase(Locale.ROOT);
 
+        if (text.contains("full") && text.contains("rewards remain")) return "Inventory Full";
         if (text.contains("backpack") || text.contains("packing")) return "Packing Rewards";
         if (text.contains("chest") || text.contains("reward")) {
             if (text.contains("jump") || text.contains("clear of")) return "Leaving Chests";
