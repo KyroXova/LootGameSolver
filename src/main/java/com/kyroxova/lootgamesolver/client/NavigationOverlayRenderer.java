@@ -29,7 +29,7 @@ final class NavigationOverlayRenderer {
             double[] start = { mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ };
             if (waypoint != null) {
                 double ground = Math.max(0D, exploration.waypointLabelY() - 3D);
-                double top = Math.max(ground + 1D, mc.theWorld.getHeight() - 1D);
+                double top = Math.max(ground + 32D, mc.theWorld.getHeight() + 31D);
                 drawWaypointBeam(
                     t,
                     waypoint[0] + 0.5D,
