@@ -175,7 +175,7 @@ public final class ExplorationBeta {
             if (hit != null && hit.blockX == x
                 && hit.blockY == y
                 && hit.blockZ == z
-                && hit.sideHit == face
+                && (hit.sideHit == face || isFoliage(block))
                 && eye.squareDistanceTo(hit.hitVec)
                     <= Math.pow(Math.min(4.2D, mc.playerController.getBlockReachDistance()), 2))
                 return point;
@@ -2511,6 +2511,32 @@ public final class ExplorationBeta {
             puzzleArrivalPending = true;
             return;
         }
+        if (!digging && !returning
+            && !roomExitCrossing
+            && !roomEntryCrossing
+            && route.size() >= 3
+            && mc.thePlayer.onGround) {
+            int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int cz = (int) Math.floor(mc.thePlayer.posZ);
+            for (int i = Math.min(route.size() - 1, 8); i >= 2; i--) {
+                int[] step = route.get(i);
+                int dx = Math.abs(step[0] - cx), dz = Math.abs(step[2] - cz);
+                if (step.length > 3 && step[3] != 0 || step[1] != cy
+                    || dx > 1
+                    || dz > 1
+                    || dx + dz == 0
+                    || !safe(mc.theWorld, step[0], cy, step[2])
+                    || dx == 1 && dz == 1
+                        && (!safe(mc.theWorld, step[0], cy, cz) || !safe(mc.theWorld, cx, cy, step[2])))
+                    continue;
+                boolean special = false;
+                for (int j = 0; j < i; j++) if (route.get(j).length > 3 && route.get(j)[3] != 0) special = true;
+                if (special) continue;
+                route.subList(0, i)
+                    .clear();
+                break;
+            }
+        }
         if (!digging && !roomExitCrossing && !roomEntryCrossing && route.size() >= 2) {
             int[] first = route.get(0), second = route.get(1);
             int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -3413,6 +3439,11 @@ public final class ExplorationBeta {
             }
 
             public boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
+                if (terrainWorld.getBlock(x, y, z)
+                    .getMaterial() == net.minecraft.block.material.Material.water
+                    && terrainWorld.getBlock(nx, ny, nz)
+                        .getMaterial() != net.minecraft.block.material.Material.water
+                    && ny > y) return false;
                 return NavigationSurfacePolicy
                     .reachableRise(walkSurfaceY(terrainWorld, x, y, z), walkSurfaceY(terrainWorld, nx, ny, nz));
             }
@@ -3554,9 +3585,11 @@ public final class ExplorationBeta {
     }
 
     private static boolean passable(World world, int x, int y, int z) {
-        return world.blockExists(x, y, z) && !world.getBlock(x, y, z)
-            .getMaterial()
-            .isLiquid()
+        return world.blockExists(x, y, z) && world.getBlock(x, y, z)
+            .getMaterial() != net.minecraft.block.material.Material.leaves
+            && !world.getBlock(x, y, z)
+                .getMaterial()
+                .isLiquid()
             && world.getBlock(x, y, z)
                 .getCollisionBoundingBoxFromPool(world, x, y, z) == null;
     }
@@ -4288,6 +4321,11 @@ public final class ExplorationBeta {
     }
 
     private static boolean safe(World world, int x, int y, int z) {
+        if (world.getBlock(x, y, z)
+            .getMaterial() == net.minecraft.block.material.Material.leaves
+            || world.getBlock(x, y + 1, z)
+                .getMaterial() == net.minecraft.block.material.Material.leaves)
+            return false;
         for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
             for (int dy = -1; dy <= 1; dy++) {
                 if (!world.blockExists(x + dx, y + dy, z + dz)) return false;

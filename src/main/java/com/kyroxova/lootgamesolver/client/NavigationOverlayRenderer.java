@@ -66,9 +66,8 @@ final class NavigationOverlayRenderer {
     private static void drawWaypointBeam(Tessellator t, double x, double z, double ground, double top, double time) {
         double height = top - ground;
         double rotation = time * 0.06D;
-        GL11.glLineWidth(4F);
-        // Explicit line pairs avoid rendering glitches in legacy 1.7 drivers.
-        t.startDrawing(GL11.GL_LINES);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+        t.startDrawingQuads();
         int segments = Math.max(16, (int) Math.ceil(height / 1.5D) * 16);
         double radius = 0.42D;
         for (int segment = 0; segment < segments; segment++) {
@@ -78,8 +77,22 @@ final class NavigationOverlayRenderer {
             double next = nextProgress * height / 1.5D * Math.PI * 2D + rotation;
             float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * Math.sin(angle - rotation * 3D)));
             t.setColorRGBA_F(0.28F, 0.72F, 1F, pulse);
-            t.addVertex(x + Math.cos(angle) * radius, ground + progress * height, z + Math.sin(angle) * radius);
-            t.addVertex(x + Math.cos(next) * radius, ground + nextProgress * height, z + Math.sin(next) * radius);
+            t.addVertex(
+                x + Math.cos(angle) * (radius - 0.08D),
+                ground + progress * height,
+                z + Math.sin(angle) * (radius - 0.08D));
+            t.addVertex(
+                x + Math.cos(angle) * (radius + 0.08D),
+                ground + progress * height,
+                z + Math.sin(angle) * (radius + 0.08D));
+            t.addVertex(
+                x + Math.cos(next) * (radius + 0.08D),
+                ground + nextProgress * height,
+                z + Math.sin(next) * (radius + 0.08D));
+            t.addVertex(
+                x + Math.cos(next) * (radius - 0.08D),
+                ground + nextProgress * height,
+                z + Math.sin(next) * (radius - 0.08D));
         }
         t.draw();
         GL11.glLineWidth(2F);
