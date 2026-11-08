@@ -4323,7 +4323,8 @@ public final class ExplorationBeta {
             return true;
         }
         miningAttack.hold(mc.gameSettings.keyBindAttack);
-        if (b instanceof net.minecraft.block.BlockFalling) {
+        if (b instanceof net.minecraft.block.BlockFalling
+            || w.getBlock(mineX, mineY + 1, mineZ) instanceof net.minecraft.block.BlockFalling) {
             fallingMinedBlock = new int[] { mineX, mineY, mineZ };
             fallingMinedType = b;
             fallingSettleTicks = 0;
@@ -4342,17 +4343,17 @@ public final class ExplorationBeta {
     private boolean waitingForFallingBlock(Minecraft mc) {
         if (fallingMinedBlock == null) return false;
         int x = fallingMinedBlock[0], y = fallingMinedBlock[1], z = fallingMinedBlock[2];
-        if (fallingSettleTicks == 0 && mc.theWorld.getBlock(x, y, z) == fallingMinedType) return false;
-        releaseMiningWhileSandFalls(mc);
         boolean falling = false;
         for (Object entity : mc.theWorld.loadedEntityList) {
             if (!(entity instanceof net.minecraft.entity.item.EntityFallingBlock)) continue;
             net.minecraft.entity.Entity block = (net.minecraft.entity.Entity) entity;
-            if ((int) Math.floor(block.posX) == x && (int) Math.floor(block.posZ) == z && block.posY >= y) {
+            if ((int) Math.floor(block.posX) == x && (int) Math.floor(block.posZ) == z && block.posY >= y - 2) {
                 falling = true;
                 break;
             }
         }
+        if (!falling && fallingSettleTicks == 0 && mc.theWorld.getBlock(x, y, z) == fallingMinedType) return false;
+        releaseMiningWhileSandFalls(mc);
         fallingSettleTicks = falling ? 1 : fallingSettleTicks + 1;
         if (fallingSettleTicks < 8) {
             status = "Waiting for sand";

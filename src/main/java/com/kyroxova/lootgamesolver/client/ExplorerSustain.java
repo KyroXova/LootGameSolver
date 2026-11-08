@@ -3,6 +3,8 @@ package com.kyroxova.lootgamesolver.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.EnumAction;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemStack;
 
 import org.lwjgl.input.Keyboard;
@@ -86,9 +88,25 @@ final class ExplorerSustain {
     private static int findFood(Minecraft mc, int start, int end) {
         for (int i = start; i < end; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (stack != null && stack.stackSize > 0 && stack.getItemUseAction() == EnumAction.eat) return i;
+            if (stack != null && stack.stackSize > 0
+                && stack.getItem() instanceof ItemFood
+                && stack.getItemUseAction() == EnumAction.eat
+                && safeFood(String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())), stack.getItemDamage()))
+                return i;
         }
         return -1;
+    }
+
+    static boolean safeFood(String id, int metadata) {
+        String name = id.toLowerCase(java.util.Locale.ROOT);
+        if (name.equals("minecraft:golden_apple") || name.equals("minecraft:rotten_flesh")
+            || name.equals("minecraft:spider_eye")
+            || name.equals("minecraft:poisonous_potato")
+            || name.equals("minecraft:chicken")
+            || name.equals("minecraft:fish") && metadata == 3) return false;
+        return !name.contains("poison") && !name.contains("rotten")
+            && !name.contains("spider_eye")
+            && !name.contains("golden_apple");
     }
 
     private static boolean isHealingAxe(ItemStack stack) {

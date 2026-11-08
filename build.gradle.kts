@@ -5,15 +5,18 @@ plugins {
 version = providers.gradleProperty("modVersion").get()
 
 val releaseChangelog = layout.projectDirectory.file(providers.gradleProperty("releaseChangelog").get())
+val releaseVersion = version.toString()
 tasks.named<ProcessResources>("processResources") {
     from(releaseChangelog) { into("META-INF"); rename { "CHANGELOG.md" } }
 }
 val verifyReleaseContent by tasks.registering {
-    inputs.file(releaseChangelog)
-    inputs.property("releaseVersion", version.toString())
+    val changelogFile = releaseChangelog.asFile
+    val currentVersion = releaseVersion
+    inputs.file(changelogFile)
+    inputs.property("releaseVersion", currentVersion)
     doLast {
-        val notes = inputs.files.singleFile.readText()
-        check(notes.isNotBlank() && notes.lineSequence().first().contains(inputs.properties["releaseVersion"].toString())) {
+        val notes = changelogFile.readText()
+        check(notes.isNotBlank() && notes.lineSequence().first().contains(currentVersion)) {
             "Release changelog must exist, contain release notes, and name the current version"
         }
     }

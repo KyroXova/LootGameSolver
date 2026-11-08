@@ -160,8 +160,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=$(sed -n 's/^modVersion=//p' gradle.properties | tr -d '\r')
-          NOTES=$(sed -n 's/^releaseChangelog=//p' gradle.properties | tr -d '\r')
+          VERSION=$(sed -n 's/^[[:space:]]*modVersion[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+          NOTES=$(sed -n 's/^[[:space:]]*releaseChangelog[[:space:]]*=[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' gradle.properties | tr -d '\r')
           test -s "$NOTES"
           JAR="build/libs/lootgamesolver-${VERSION}.jar"
           test -f "$JAR"

@@ -185,6 +185,16 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         for (int i = 0; i < count; i++) {
             Enumeration component = components.get(i);
             BigInteger[] otherComponents = convolve(prefix[i], suffix[i + 1], maxMines);
+            BigInteger[] weights = new BigInteger[Math.min(component.solutionsByMineCount.length, maxMines + 1)];
+            for (int componentMines = 0; componentMines < weights.length; componentMines++) {
+                BigInteger weight = BigInteger.ZERO;
+                for (int otherMines = 0; otherMines + componentMines <= maxMines; otherMines++) {
+                    int freeMines = remainingMines - componentMines - otherMines;
+                    if (freeMines >= 0 && freeMines <= unconstrained.size()) weight = weight
+                        .add(otherComponents[otherMines].multiply(binomial.choose(unconstrained.size(), freeMines)));
+                }
+                weights[componentMines] = weight;
+            }
             for (CellPosition variable : component.variables) {
                 BigInteger safeWorlds = BigInteger.ZERO;
                 int[] occurrences = component.mineOccurrencesByMineCount.get(variable);
@@ -192,14 +202,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
                     && componentMines <= maxMines; componentMines++) {
                     int safeAssignments = component.solutionsByMineCount[componentMines] - occurrences[componentMines];
                     if (safeAssignments <= 0) continue;
-                    for (int otherMines = 0; otherMines + componentMines <= maxMines; otherMines++) {
-                        int freeMines = remainingMines - componentMines - otherMines;
-                        if (freeMines >= 0 && freeMines <= unconstrained.size()) {
-                            BigInteger layouts = otherComponents[otherMines]
-                                .multiply(binomial.choose(unconstrained.size(), freeMines));
-                            safeWorlds = safeWorlds.add(layouts.multiply(BigInteger.valueOf(safeAssignments)));
-                        }
-                    }
+                    safeWorlds = safeWorlds.add(weights[componentMines].multiply(BigInteger.valueOf(safeAssignments)));
                 }
                 probabilities.put(variable, Double.valueOf(probabilityMine(safeWorlds, totalWorlds)));
             }
