@@ -40,7 +40,8 @@ final class DigToolSelector {
             if (stack == null || stack.stackSize <= 0) continue;
             if (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10) continue;
             try {
-                usable[i] = ForgeHooks.canToolHarvestBlock(block, metadata, stack);
+                usable[i] = block.getHarvestTool(metadata) == null
+                    || ForgeHooks.canToolHarvestBlock(block, metadata, stack);
                 speeds[i] = stack.getItem()
                     .getDigSpeed(stack, block, metadata);
             } catch (RuntimeException ignored) {

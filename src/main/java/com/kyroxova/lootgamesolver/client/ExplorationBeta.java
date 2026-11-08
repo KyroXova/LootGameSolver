@@ -1931,7 +1931,7 @@ public final class ExplorationBeta {
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return;
         }
-        if (sustain.tick(mc, true, !route.isEmpty())) {
+        if (sustain.tick(mc, true, !route.isEmpty() && !digging && !returnDigging)) {
             status = "Eating or preparing food";
             return;
         }
@@ -3459,7 +3459,7 @@ public final class ExplorationBeta {
         }
         boolean finished = continuationSearch.advance(3_000_000L);
         List<int[]> continuation = continuationSearch.path();
-        if (!finished && (route.size() > 8 || continuation.size() < 6)) return;
+        if (!finished && (route.size() > 8 || continuation.size() < (route.isEmpty() ? 1 : 6))) return;
         continuationSearch = null;
         if (continuation.isEmpty()) {
             extendedFrom = null;
