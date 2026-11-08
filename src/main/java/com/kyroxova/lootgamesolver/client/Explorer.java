@@ -3,6 +3,7 @@ package com.kyroxova.lootgamesolver.client;
 import static com.kyroxova.lootgamesolver.client.ExplorerGeometry.*;
 import static com.kyroxova.lootgamesolver.client.ExplorerMiningTarget.visibleMiningPoint;
 import static com.kyroxova.lootgamesolver.client.ExplorerTerrain.*;
+import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.*;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -32,9 +33,7 @@ public class Explorer {
     private boolean digging;
     private int savedSlot = -1;
     private int digTicks;
-    private int[] fallingMinedBlock;
-    private net.minecraft.block.Block fallingMinedType;
-    private int fallingSettleTicks;
+    private final FallingBlockWaiter fallingBlocks = new FallingBlockWaiter();
     private int toolWaitTicks;
     private boolean waitingForTool;
     private String status = "Scanning loaded terrain";
@@ -66,9 +65,7 @@ public class Explorer {
     private int exitRecoveryAttempts;
     private OpenExitSearch openExitSearch;
     private boolean followingOpenExit;
-    private boolean cameraActive;
-    private float cameraYaw, cameraPitch;
-    private long cameraFrame;
+    private final ExplorerCamera camera = new ExplorerCamera();
     private int searchGoalX, searchGoalZ;
     private int[] extendedFrom;
     private int approachAttempts;
@@ -1027,10 +1024,6 @@ public class Explorer {
         escapingChestPit = false;
     }
 
-    private static boolean isRewardChest(World world, int x, int y, int z) {
-        return world.blockExists(x, y, z) && world.getBlock(x, y, z) instanceof net.minecraft.block.BlockChest;
-    }
-
     private boolean startRoomExitSearch(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
@@ -1361,23 +1354,11 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        long now = System.nanoTime();
-        double seconds = cameraFrame == 0 ? 1D / 60D : (now - cameraFrame) / 1_000_000_000D;
-        cameraFrame = now;
-        if (!walking || !cameraActive
-            || mc.thePlayer == null
-            || mc.theWorld != world
-            || mc.currentScreen != null
-            || mc.isGamePaused()) return;
-        float yaw = NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, cameraYaw, seconds);
-        float pitch = NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, cameraPitch, seconds);
-        mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
+        camera.render(mc, world, walking);
     }
 
     private void look(float yaw, float pitch) {
-        cameraYaw = yaw;
-        cameraPitch = pitch;
-        cameraActive = true;
+        camera.look(yaw, pitch);
     }
 
     private void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
@@ -1617,7 +1598,7 @@ public class Explorer {
 
     public void tick(Minecraft mc, boolean solverActive) {
         releaseMiningInput(mc);
-        cameraActive = false;
+        camera.clear();
         if (walking && mc.thePlayer != null && navigationInput == null) {
             navigationInput = new NavigationInput(mc.thePlayer.movementInput);
             mc.thePlayer.movementInput = navigationInput;
@@ -2702,42 +2683,13 @@ public class Explorer {
         }
     }
 
-    private boolean rewardChestAhead(Minecraft mc, double dx, double dz) {
-        if (!mc.thePlayer.onGround || dx * dx + dz * dz < 0.001D) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) {
-            net.minecraft.block.Block block = mc.theWorld.getBlock(x + ox, y, z + oz);
-            if (!(block instanceof net.minecraft.block.BlockChest)) continue;
-            double cx = x + ox + 0.5D - mc.thePlayer.posX, cz = z + oz + 0.5D - mc.thePlayer.posZ;
-            if (cx * dx + cz * dz <= 0 || cx * cx + cz * cz > 2.25D) continue;
-            net.minecraft.util.AxisAlignedBB box = block
-                .getCollisionBoundingBoxFromPool(mc.theWorld, x + ox, y, z + oz);
-            if (box != null && box.maxY - mc.thePlayer.boundingBox.minY > 0.45D
-                && box.maxY - mc.thePlayer.boundingBox.minY <= 1D) return true;
-        }
-        return false;
-    }
-
     private boolean jumpOutOfRewardPit(Minecraft mc) {
         if (navigationInput == null || mc.thePlayer == null || mc.theWorld == null) return false;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int nearest = accessTrail.nearestIndex(x, y, z, 128);
         int[] goal = nearest < 0 ? null : accessTrail.pointAt(nearest);
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-        int[] best = null;
-        double bestScore = Double.MAX_VALUE;
-        for (int[] direction : directions) {
-            int nx = x + direction[0], nz = z + direction[1];
-            if (!isRewardChest(mc.theWorld, nx, y, nz) || !passable(mc.theWorld, nx, y + 1, nz)
-                || !passable(mc.theWorld, x, y + 2, z)) continue;
-            double score = goal == null ? 0D : Math.hypot(nx - goal[0], nz - goal[2]);
-            if (score < bestScore) {
-                best = direction;
-                bestScore = score;
-            }
-        }
+        int[] best = RewardChestGeometry.exitDirection(mc.theWorld, x, y, z, goal);
         if (best == null) return false;
         float yaw = NavigationSteering.heading(
             mc.thePlayer.posX,
@@ -2756,27 +2708,6 @@ public class Explorer {
         lastDistance = Double.MAX_VALUE;
         status = "Jumping clear of reward chests";
         return true;
-    }
-
-    private boolean isRewardChestPit(Minecraft mc) {
-        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        int sides = 0;
-        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
-        for (int[] direction : directions) {
-            boolean chest = false;
-            for (int dy = 0; dy <= 1 && !chest; dy++) {
-                int cx = x + direction[0], cy = y + dy, cz = z + direction[1];
-                if (!isRewardChest(mc.theWorld, cx, cy, cz)) continue;
-                net.minecraft.util.AxisAlignedBB box = mc.theWorld.getBlock(cx, cy, cz)
-                    .getCollisionBoundingBoxFromPool(mc.theWorld, cx, cy, cz);
-                chest = box != null && box.maxY > mc.thePlayer.boundingBox.minY + 0.3D;
-            }
-            if (chest) sides++;
-        }
-        return sides >= 3;
     }
 
     private boolean tryPlaceReturnStep(Minecraft mc, int[] next) {
@@ -3070,9 +3001,7 @@ public class Explorer {
             return;
         }
         sustain.stop(mc);
-        fallingMinedBlock = null;
-        fallingMinedType = null;
-        fallingSettleTicks = 0;
+        fallingBlocks.reset();
         snowRecoveryTarget = null;
         exitRecoveryTicks = 0;
         exitRecoveryAttempts = 0;
@@ -3129,8 +3058,7 @@ public class Explorer {
         pausedForControl = false;
         approachPlan = null;
         approachAnchor = null;
-        cameraActive = false;
-        cameraFrame = 0;
+        camera.reset();
         cameraPitchDirection = 0;
         excavationSearch = null;
         excavationRoute.clear();
@@ -3284,62 +3212,16 @@ public class Explorer {
             || roomExitCrossing;
         final boolean structureApproach = knownStructure != null && !searching;
         final int gx = target == null ? px : target.xCoord, gz = target == null ? pz : target.zCoord;
-        return new GroundPathfinder.Terrain() {
-
-            public boolean stand(int x, int y, int z) {
-                return !blockedWalkNodes.contains(supportKey(x, y, z)) && terrainWorld.blockExists(x, y, z)
-                    && NavigationSurfacePolicy.allow(
-                        surfaceStart,
-                        protectedJourney,
-                        structureApproach,
-                        terrainWorld.getHeightValue(x, z),
-                        y,
-                        x,
-                        z,
-                        gx,
-                        gz)
-                    && (safe(terrainWorld, x, y, z) || movingToPuzzleCenter && target != null
-                        && x == target.xCoord
-                        && y == target.yCoord + 1
-                        && z == target.zCoord
-                        && puzzleCenterStandable(terrainWorld, x, y, z));
-            }
-
-            public boolean clear(int x, int y, int z) {
-                return passable(terrainWorld, x, y, z);
-            }
-
-            public boolean checkpoint(int x, int y, int z) {
-                return solidCheckpoint(terrainWorld, x, y, z);
-            }
-
-            public int extraCost(int x, int y, int z) {
-                return terrainWorld.getBlock(x, y, z)
-                    .getMaterial() == net.minecraft.block.material.Material.water ? 12 : 0;
-            }
-
-            public int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
-                int cost = Math.abs(ny - y) == 1 ? 4 : 0;
-                if (terrainWorld.getBlock(nx, ny - 1, nz)
-                    .getMaterial()
-                    .isLiquid()) cost += 8;
-                return cost;
-            }
-
-            public boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
-                boolean waterAtFeet = terrainWorld.getBlock(x, y, z)
-                    .getMaterial() == net.minecraft.block.material.Material.water;
-                boolean waterBelow = terrainWorld.getBlock(x, y - 1, z)
-                    .getMaterial() == net.minecraft.block.material.Material.water;
-                boolean destinationWater = terrainWorld.getBlock(nx, ny, nz)
-                    .getMaterial() == net.minecraft.block.material.Material.water
-                    || terrainWorld.getBlock(nx, ny - 1, nz)
-                        .getMaterial() == net.minecraft.block.material.Material.water;
-                if ((waterAtFeet || waterBelow) && !destinationWater && ny > (waterAtFeet ? y + 1 : y)) return false;
-                return NavigationSurfacePolicy
-                    .reachableRise(walkSurfaceY(terrainWorld, x, y, z), walkSurfaceY(terrainWorld, nx, ny, nz));
-            }
-        };
+        return new ExplorerWalkingTerrain(
+            terrainWorld,
+            blockedWalkNodes,
+            surfaceStart,
+            protectedJourney,
+            structureApproach,
+            gx,
+            gz,
+            () -> movingToPuzzleCenter,
+            () -> target);
     }
 
     private int existingWalkCost(World w, int x, int y, int z, int nx, int ny, int nz) {
@@ -3512,7 +3394,10 @@ public class Explorer {
     }
 
     private boolean stairStep(Minecraft mc) {
-        if (waitingForFallingBlock(mc)) return true;
+        if (fallingBlocks.waiting(mc, () -> releaseMiningWhileSandFalls(mc))) {
+            status = "Waiting for sand";
+            return true;
+        }
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
@@ -4155,9 +4040,7 @@ public class Explorer {
         miningAttack.hold(mc.gameSettings.keyBindAttack);
         if (b instanceof net.minecraft.block.BlockFalling
             || w.getBlock(mineX, mineY + 1, mineZ) instanceof net.minecraft.block.BlockFalling) {
-            fallingMinedBlock = new int[] { mineX, mineY, mineZ };
-            fallingMinedType = b;
-            fallingSettleTicks = 0;
+            fallingBlocks.record(b, mineX, mineY, mineZ);
         }
         status = "Mining a safe path";
         return true;
@@ -4168,31 +4051,6 @@ public class Explorer {
         mc.playerController.resetBlockRemoving();
         miningAim.reset();
         digTicks = 0;
-    }
-
-    private boolean waitingForFallingBlock(Minecraft mc) {
-        if (fallingMinedBlock == null) return false;
-        int x = fallingMinedBlock[0], y = fallingMinedBlock[1], z = fallingMinedBlock[2];
-        boolean falling = false;
-        for (Object entity : mc.theWorld.loadedEntityList) {
-            if (!(entity instanceof net.minecraft.entity.item.EntityFallingBlock)) continue;
-            net.minecraft.entity.Entity block = (net.minecraft.entity.Entity) entity;
-            if ((int) Math.floor(block.posX) == x && (int) Math.floor(block.posZ) == z && block.posY >= y - 2) {
-                falling = true;
-                break;
-            }
-        }
-        if (!falling && fallingSettleTicks == 0 && mc.theWorld.getBlock(x, y, z) == fallingMinedType) return false;
-        releaseMiningWhileSandFalls(mc);
-        fallingSettleTicks = falling ? 1 : fallingSettleTicks + 1;
-        if (fallingSettleTicks < 8) {
-            status = "Waiting for sand";
-            return true;
-        }
-        fallingMinedBlock = null;
-        fallingMinedType = null;
-        fallingSettleTicks = 0;
-        return false;
     }
 
     public String hud(Minecraft mc) {
