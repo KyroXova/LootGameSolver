@@ -481,6 +481,7 @@ public final class ClientHooks {
                 autoPuzzleState = AutoPuzzleState.IDLE;
                 if (exploration != null) {
                     exploration.prepareRewardCollection(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition);
+                    ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition, completedGame);
                     rewardPreCleanupPending = true;
                     rewardReturnPending = true;
@@ -496,6 +497,8 @@ public final class ClientHooks {
             int level = puzzleBridge.currentMinesweeperLevel(game);
             if (level >= 1) activeMinesweeperLevel = level;
         }
+        if (autoPuzzleState != AutoPuzzleState.REVEALING_NEXT_STAGE || inventoryBaseline == null)
+            captureInventoryBaseline(Minecraft.getMinecraft());
         session.start(ActionPlanner.Mode.SOLVE);
         if (session.isActive()) autoPuzzleState = AutoPuzzleState.SOLVING;
         else autoPuzzleState = AutoPuzzleState.FAILED;
@@ -564,6 +567,7 @@ public final class ClientHooks {
                 if (rewards != null) {
                     exploration.prepareRewardCollection(mc, rewards);
                     rewardCenter = rewards;
+                    ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
                     rewardPreCleanupPending = true;
                     rewardReturnPending = true;
@@ -594,6 +598,7 @@ public final class ClientHooks {
                 if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
                 LootGameSolverConfig.setOverlayVisible(true);
+                captureInventoryBaseline(mc);
                 session.start(ActionPlanner.Mode.SOLVE);
                 Object game = puzzleBridge.nearbyGame(true);
                 int level = puzzleBridge.currentMinesweeperLevel(game);
@@ -625,6 +630,16 @@ public final class ClientHooks {
             session.invalidateDormantCache();
             LootGameSolverConfig.setOverlayVisible(!LootGameSolverConfig.showOverlay);
         }
+    }
+
+    private void captureInventoryBaseline(Minecraft mc) {
+        inventoryBaseline = InventoryBaseline.capture(mc);
+        trashCleanup.setBaseline(inventoryBaseline);
+        rewardLooter.setBaseline(inventoryBaseline);
+    }
+
+    private void ensureInventoryBaseline(Minecraft mc) {
+        if (inventoryBaseline == null) captureInventoryBaseline(mc);
     }
 
     static int[] nearbyRewardCenter(Minecraft mc) {

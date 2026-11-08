@@ -21,6 +21,7 @@ final class ExplorerReturnStep {
     private final ExplorerCamera camera;
     private final MiningAimGate placementAim = new MiningAimGate();
     private int[] pendingReturnPlacement, pendingReturnWaypoint;
+    private int[] activeReturnWaypoint;
     private int returnPlacementTicks, returnPlacementAimTicks;
     private int returnPlacementSlot = -1;
     private String status;
@@ -31,7 +32,12 @@ final class ExplorerReturnStep {
     }
 
     Outcome tick(Minecraft mc, boolean returning, List<int[]> route) {
-        if (pendingReturnPlacement == null) return Outcome.NONE;
+        if (pendingReturnPlacement == null) {
+            if (returnPlacementSlot >= 0 && (!returning || route.isEmpty()
+                || activeReturnWaypoint == null
+                || !samePosition(route.get(0), activeReturnWaypoint))) abandonAttempt(mc);
+            return Outcome.NONE;
+        }
         int px = pendingReturnPlacement[0], py = pendingReturnPlacement[1], pz = pendingReturnPlacement[2];
         if (mc.theWorld.getBlock(px, py, pz) != Blocks.air && mc.theWorld.getBlock(px, py, pz)
             .getMaterial()
@@ -44,17 +50,14 @@ final class ExplorerReturnStep {
                     route.add(0, pendingReturnWaypoint);
                 pendingReturnWaypoint = null;
             }
-            if (returnPlacementSlot >= 0) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
-            mc.playerController.updateController();
             pendingReturnPlacement = null;
-            returnPlacementSlot = -1;
+            restoreReturnPlacementSlot(mc);
             return Outcome.COMPLETE;
         }
         if (++returnPlacementTicks > 30) {
-            if (returnPlacementSlot >= 0) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
             pendingReturnPlacement = null;
             pendingReturnWaypoint = null;
-            returnPlacementSlot = -1;
+            restoreReturnPlacementSlot(mc);
             return Outcome.FAILED;
         }
         return Outcome.WAITING;
@@ -69,16 +72,19 @@ final class ExplorerReturnStep {
     }
 
     void reset(Minecraft mc) {
-        if (returnPlacementSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = returnPlacementSlot;
-        pendingReturnPlacement = null;
-        pendingReturnWaypoint = null;
-        returnPlacementAimTicks = 0;
-        returnPlacementSlot = -1;
+        abandonAttempt(mc);
     }
 
     boolean tryPlaceReturnStep(Minecraft mc, int[] next, boolean returning) {
         status = null;
-        if (!returning || mc.thePlayer == null || !mc.thePlayer.onGround || next == null) return false;
+        if (pendingReturnPlacement != null) return true;
+        if (returnPlacementSlot >= 0
+            && (next == null || activeReturnWaypoint == null || !samePosition(next, activeReturnWaypoint)))
+            abandonAttempt(mc);
+        if (!returning || mc.thePlayer == null || !mc.thePlayer.onGround || next == null) {
+            abandonAttempt(mc);
+            return false;
+        }
         int playerX = (int) Math.floor(mc.thePlayer.posX);
         int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int playerZ = (int) Math.floor(mc.thePlayer.posZ);
@@ -86,16 +92,23 @@ final class ExplorerReturnStep {
             || Math.abs(next[0] - playerX) > 1
             || Math.abs(next[2] - playerZ) > 1
             || Math.abs(next[0] - playerX) + Math.abs(next[2] - playerZ) == 0
-            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D)
+            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D) {
+            abandonAttempt(mc);
             return false;
+        }
         if (next[0] != playerX && next[2] != playerZ
-            && (!safe(mc.theWorld, next[0], playerY, playerZ) || !safe(mc.theWorld, playerX, playerY, next[2])))
+            && (!safe(mc.theWorld, next[0], playerY, playerZ) || !safe(mc.theWorld, playerX, playerY, next[2]))) {
+            abandonAttempt(mc);
             return false;
+        }
         boolean needsIntermediateStep = next[1] == playerY + 2;
         int x = next[0], y = needsIntermediateStep ? playerY : next[1] - 1, z = next[2];
         net.minecraft.block.Block targetBlock = mc.theWorld.getBlock(x, y, z);
-        if (pendingReturnPlacement != null) return true;
-        if (!targetBlock.isReplaceable(mc.theWorld, x, y, z)) return false;
+        if (!targetBlock.isReplaceable(mc.theWorld, x, y, z)) {
+            abandonAttempt(mc);
+            return false;
+        }
+        if (activeReturnWaypoint == null) activeReturnWaypoint = next.clone();
         int slot = findPlaceableBlock(mc, true);
         if (slot < 0) {
             int inventorySlot = findPlaceableBlock(mc, false);
@@ -105,6 +118,7 @@ final class ExplorerReturnStep {
                 return true;
             }
             status = "Return step needs cobblestone or dirt";
+            abandonAttempt(mc);
             return false;
         }
         if (returnPlacementSlot < 0) returnPlacementSlot = mc.thePlayer.inventory.currentItem;
@@ -115,8 +129,10 @@ final class ExplorerReturnStep {
             status = "Preparing return step";
             return true;
         }
-        if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z))
+        if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z)) {
+            abandonAttempt(mc);
             return false;
+        }
         // Prefer a support block directly below the placement target.
         int[][] adjacent = { { x, y - 1, z, 1 }, { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 },
             { x, y, z + 1, 2 } };
@@ -190,7 +206,7 @@ final class ExplorerReturnStep {
                 return true;
             }
         }
-        restoreReturnPlacementSlot(mc);
+        abandonAttempt(mc);
         return false;
     }
 
@@ -199,8 +215,17 @@ final class ExplorerReturnStep {
         if (returnPlacementSlot >= 0) {
             mc.thePlayer.inventory.currentItem = returnPlacementSlot;
             mc.playerController.updateController();
-            returnPlacementSlot = -1;
         }
+        returnPlacementSlot = -1;
+        activeReturnWaypoint = null;
+        returnPlacementAimTicks = 0;
+    }
+
+    private void abandonAttempt(Minecraft mc) {
+        pendingReturnPlacement = null;
+        pendingReturnWaypoint = null;
+        returnPlacementTicks = 0;
+        restoreReturnPlacementSlot(mc);
     }
 
     private int findPlaceableBlock(Minecraft mc, boolean hotbarOnly) {

@@ -33,6 +33,7 @@ jobs:
       is_prerelease: ${{ steps.check.outputs.is_prerelease }}
       make_latest: ${{ steps.check.outputs.make_latest }}
       github_release_exists: ${{ steps.check.outputs.github_release_exists }}
+      release_commit_sha: ${{ steps.check.outputs.release_commit_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -97,6 +98,11 @@ jobs:
             echo "Release tag must match modVersion" >&2
             exit 1
           fi
+          if git rev-parse --quiet --verify "refs/tags/${TARGET_TAG}^{commit}" >/dev/null; then
+            RELEASE_COMMIT_SHA=$(git rev-parse "refs/tags/${TARGET_TAG}^{commit}")
+          else
+            RELEASE_COMMIT_SHA=$(git rev-parse HEAD)
+          fi
           GITHUB_RELEASE_EXISTS="false"
           if RELEASE_RESULT=$(gh api "repos/${{ github.repository }}/releases/tags/$TARGET_TAG" 2>&1); then
             GITHUB_RELEASE_EXISTS="true"
@@ -110,6 +116,7 @@ jobs:
           echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
           echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
           echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> $GITHUB_OUTPUT
+          echo "release_commit_sha=${RELEASE_COMMIT_SHA}" >> $GITHUB_OUTPUT
 
   release:
     needs: check-version
@@ -121,6 +128,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ needs.check-version.outputs.release_commit_sha }}
 
       - name: Determine JDK versions
         id: list-jdk-versions
@@ -179,7 +187,7 @@ jobs:
           body_path: build/release_body.md
           prerelease: ${{ needs.check-version.outputs.is_prerelease == 'true' }}
           make_latest: ${{ needs.check-version.outputs.make_latest }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.check-version.outputs.release_commit_sha }}
           generate_release_notes: false
           files: ${{ steps.release-notes.outputs.jar }}
       - name: Check CurseForge credentials

@@ -16,11 +16,14 @@ final class ExplorerRoomGeometry {
     }
 
     private int[] cachedRoomBounds;
-    private int roomBoundsCacheX, roomBoundsCacheZ, roomBoundsCacheTick = -1000;
+    private int roomBoundsCacheX, roomBoundsCacheY, roomBoundsCacheZ, roomBoundsCacheTick = -1000;
+    private long roomBoundsCacheNanos, roomBoundsChunkSignature;
+    private boolean roomBoundsCacheInitialized;
 
     void reset() {
         cachedRoomBounds = null;
         roomBoundsCacheTick = -1000;
+        roomBoundsCacheInitialized = false;
     }
 
     List<int[]> findRoomExitCandidates(Minecraft mc, int[] bounds, ClearableColumn clearable) {
@@ -86,9 +89,15 @@ final class ExplorerRoomGeometry {
     }
 
     int[] dungeonRoomBounds(World world, int x, int y, int z, int ticks) {
-        if (cachedRoomBounds != null && ticks - roomBoundsCacheTick < 200
-            && Math.abs(x - roomBoundsCacheX) <= 32
-            && Math.abs(z - roomBoundsCacheZ) <= 32) return cachedRoomBounds;
+        boolean nearby = roomBoundsCacheInitialized && Math.abs(x - roomBoundsCacheX) <= 32
+            && Math.abs(z - roomBoundsCacheZ) <= 32;
+        if (nearby && cachedRoomBounds != null && ticks - roomBoundsCacheTick < 200) return cachedRoomBounds;
+        if (nearby && cachedRoomBounds == null
+            && y == roomBoundsCacheY
+            && System.nanoTime() - roomBoundsCacheNanos < 250_000_000L
+            && loadedChunkSignature(world, roomBoundsCacheX, roomBoundsCacheY, roomBoundsCacheZ)
+                == roomBoundsChunkSignature)
+            return null;
         int[] xWallCounts = new int[65], zWallCounts = new int[65];
         for (int dx = -32; dx <= 32; dx++) for (int dz = -32; dz <= 32; dz++) {
             for (int dy = -3; dy <= 4; dy++) {
@@ -112,8 +121,12 @@ final class ExplorerRoomGeometry {
             }
         }
         roomBoundsCacheX = x;
+        roomBoundsCacheY = y;
         roomBoundsCacheZ = z;
         roomBoundsCacheTick = ticks;
+        roomBoundsCacheNanos = System.nanoTime();
+        roomBoundsChunkSignature = loadedChunkSignature(world, x, y, z);
+        roomBoundsCacheInitialized = true;
         cachedRoomBounds = minX == Integer.MAX_VALUE || maxX - minX < 8
             || maxZ - minZ < 8
             || minX <= x - 31
@@ -121,5 +134,15 @@ final class ExplorerRoomGeometry {
             || minZ <= z - 31
             || maxZ >= z + 31 ? null : new int[] { minX, maxX, minZ, maxZ };
         return cachedRoomBounds;
+    }
+
+    private long loadedChunkSignature(World world, int x, int y, int z) {
+        long signature = 0L;
+        int minChunkX = (x - 32) >> 4, maxChunkX = (x + 32) >> 4;
+        int minChunkZ = (z - 32) >> 4, maxChunkZ = (z + 32) >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++)
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++)
+                signature = (signature << 1) | (world.blockExists(chunkX << 4, y, chunkZ << 4) ? 1L : 0L);
+        return signature;
     }
 }
