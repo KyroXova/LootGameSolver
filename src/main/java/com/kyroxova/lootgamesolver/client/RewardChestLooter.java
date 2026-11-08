@@ -126,7 +126,7 @@ final class RewardChestLooter {
         opened = false;
     }
 
-    void tick(Minecraft mc, ExplorationBeta exploration) {
+    void tick(Minecraft mc, Explorer exploration) {
         if (!active || mc.thePlayer == null || mc.theWorld == null) return;
         if (exploration != null && exploration.navigating()) {
             status = "Moving toward reward chests";
@@ -206,8 +206,7 @@ final class RewardChestLooter {
             return;
         }
         while (!collecting && index < chests.size()
-            && lootedChests
-                .contains(ExplorationBeta.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
+            && lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
             index++;
         if (!collecting && index >= chests.size()) {
             if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
@@ -248,7 +247,7 @@ final class RewardChestLooter {
                     }
                 }
                 if (!lootedChests
-                    .mark(ExplorationBeta.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index))) {
+                    .mark(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index))) {
                     status = "Could not save chest progress";
                     return;
                 }
@@ -445,7 +444,7 @@ final class RewardChestLooter {
         return null;
     }
 
-    private boolean moveToChestView(Minecraft mc, ExplorationBeta exploration, int[] chest) {
+    private boolean moveToChestView(Minecraft mc, Explorer exploration, int[] chest) {
         int playerFloorY = (int) Math.floor(mc.thePlayer.boundingBox.minY) - 1;
         java.util.List<int[]> positions = new java.util.ArrayList<>();
         for (int floorY = Math.min(playerFloorY, chest[1] - 1); floorY <= Math.max(playerFloorY, chest[1]); floorY++)

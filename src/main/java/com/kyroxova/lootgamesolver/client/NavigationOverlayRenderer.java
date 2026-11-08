@@ -10,7 +10,7 @@ import org.lwjgl.opengl.GL11;
 
 final class NavigationOverlayRenderer {
 
-    static void render(ExplorationBeta exploration, float partialTicks) {
+    static void render(Explorer exploration, float partialTicks) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null) return;
         int[] waypoint = exploration.structureWaypoint();

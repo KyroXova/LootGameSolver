@@ -34,7 +34,7 @@ public final class WorldOverlayRenderer {
         "textures/minesweeper/safe_flag.png");
 
     private final SolverSession session;
-    private final ExplorationBeta exploration;
+    private final Explorer exploration;
 
     static Map<CellPosition, String> sequenceLabels(List<SolverAction> actions, int completed) {
         Map<CellPosition, String> labels = new LinkedHashMap<CellPosition, String>();
@@ -46,9 +46,14 @@ public final class WorldOverlayRenderer {
         return labels;
     }
 
-    public WorldOverlayRenderer(SolverSession session, ExplorationBeta exploration) {
+    public WorldOverlayRenderer(SolverSession session, Explorer exploration) {
         this.session = session;
         this.exploration = exploration;
+    }
+
+    @Deprecated
+    public WorldOverlayRenderer(SolverSession session, ExplorationBeta exploration) {
+        this(session, (Explorer) exploration);
     }
 
     private static void drawWireframe(AxisAlignedBB box, float r, float g, float b) {

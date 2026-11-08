@@ -33,7 +33,7 @@ public final class ClientHooks {
         "lootgamesolver",
         "textures/gui/ui_9slice.png");
     private final SolverSession session = new SolverSession();
-    private final ExplorationBeta exploration = ExplorationBeta.ENABLED ? new ExplorationBeta() : null;
+    private final Explorer exploration = Explorer.ENABLED ? new Explorer() : null;
     private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session, exploration);
     private boolean lastAutoSolveKey = false;
     private boolean lastOverlayKey = false;
