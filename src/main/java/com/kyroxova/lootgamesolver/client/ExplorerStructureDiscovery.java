@@ -4,6 +4,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.chunk.Chunk;
 
 final class ExplorerStructureDiscovery {
 
@@ -19,7 +20,9 @@ final class ExplorerStructureDiscovery {
                 continue;
             double distance = mc.thePlayer.getDistanceSq(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
             if (distance < nearest) {
-                if (mc.theWorld.blockExists(position[0], position[1], position[2])
+                Chunk chunk = mc.theWorld.getChunkProvider()
+                    .provideChunk(position[0] >> 4, position[2] >> 4);
+                if (chunk != null && !chunk.isEmpty()
                     && !(mc.theWorld.getTileEntity(position[0], position[1], position[2]) instanceof TileEntity))
                     continue;
                 nearest = distance;

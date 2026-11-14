@@ -465,7 +465,12 @@ final class RewardChestLooter {
                 return;
             }
             if (++backpackAimTicks < 2) return;
-            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+            if (!BaritoneInventoryBridge.useHotbarItem(mc, backpackSlot)) {
+                backpackAiming = false;
+                restoreBackpackAim(mc);
+                status = "Backpack interaction unavailable";
+                return;
+            }
             if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
             backpackAiming = false;
             packOpening = true;
