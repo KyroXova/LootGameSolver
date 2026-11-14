@@ -636,6 +636,26 @@ public class Explorer {
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
             LootGameSolverConfig.explorationSearchLimit);
+        int[] first = search.next();
+        if (first != null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(first[0], first[1]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneSearchX = first[0];
+                baritoneSearchZ = first[1];
+                baritoneSearchTicks = 0;
+                baritoneSearchHandoff = false;
+                baritoneSearchMove = true;
+                searching = true;
+                walking = true;
+                status = solved ? "Puzzle solved; searching for the next structure" : "Searching for structures";
+                return;
+            }
+            if (started != BaritoneNavigationBridge.Start.ABSENT) {
+                walking = false;
+                status = "Baritone navigation unavailable or busy";
+                return;
+            }
+        }
         walking = nextSearchLeg(mc);
         if (!walking) stop(mc, solved ? "Puzzle solved; nearby search finished" : "Puzzle ended; search paused");
         else status = solved ? "Puzzle solved; searching for the next structure" : "Puzzle ended; continuing search";
