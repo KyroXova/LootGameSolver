@@ -1557,6 +1557,20 @@ public class Explorer {
 
     private void resumeCurrentTarget(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null || target == null) return;
+        if (!searching && navigationInput == null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation
+                .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneStructureMove = true;
+                walking = true;
+                status = "Walking to LootGame";
+                return;
+            }
+            if (started != BaritoneNavigationBridge.Start.ABSENT) {
+                status = "Baritone navigation unavailable or busy";
+                return;
+            }
+        }
         routeRetryTicks = 0;
         routeRetryStatus = "";
         stalled = 0;
