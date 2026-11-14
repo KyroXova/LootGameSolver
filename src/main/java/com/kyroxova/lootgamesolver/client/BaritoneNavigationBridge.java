@@ -25,14 +25,18 @@ final class BaritoneNavigationBridge {
     private Class<?> goalApi;
 
     Start start(int x, int y, int z) {
-        return start(x, y, z, false);
+        return start(x, y, z, 0);
     }
 
     Start startAdjacent(int x, int y, int z) {
-        return start(x, y, z, true);
+        return start(x, y, z, 1);
     }
 
-    private Start start(int x, int y, int z, boolean adjacent) {
+    Start startHorizontal(int x, int z) {
+        return start(x, 0, z, 2);
+    }
+
+    private Start start(int x, int y, int z, int kind) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -61,13 +65,17 @@ final class BaritoneNavigationBridge {
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
             Class<?> goalType = Class.forName("baritone.api.pathing.goals.Goal");
             Object next;
-            if (adjacent) {
+            if (kind == 1) {
                 Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
                 Object pos = posType.getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
                 next = Class.forName("baritone.api.pathing.goals.GoalGetToBlock")
                     .getConstructor(posType)
                     .newInstance(pos);
+            } else if (kind == 2) {
+                next = Class.forName("baritone.api.pathing.goals.GoalXZ")
+                    .getConstructor(int.class, int.class)
+                    .newInstance(x, z);
             } else {
                 next = Class.forName("baritone.api.pathing.goals.GoalBlock")
                     .getConstructor(int.class, int.class, int.class)
@@ -82,6 +90,18 @@ final class BaritoneNavigationBridge {
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
+        }
+    }
+
+    boolean completed() {
+        if (process == null) return false;
+        try {
+            return processApi.getMethod("getGoal")
+                .invoke(process) == null
+                && processApi.getMethod("mostRecentGoal")
+                    .invoke(process) == goal;
+        } catch (ReflectiveOperationException | LinkageError failure) {
+            return false;
         }
     }
 

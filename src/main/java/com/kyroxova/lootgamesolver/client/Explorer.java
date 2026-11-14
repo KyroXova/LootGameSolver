@@ -167,6 +167,10 @@ public class Explorer {
     private final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
     private boolean baritoneCenterMove;
     private boolean baritoneStructureMove;
+    private boolean baritoneSearchMove;
+    private boolean baritoneSearchHandoff;
+    private boolean baritoneSearchNext;
+    private int baritoneSearchX, baritoneSearchZ, baritoneSearchTicks, baritoneHandoffTicks;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
     private boolean resumeSearchAfterReturn;
@@ -1347,7 +1351,7 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (!baritoneCenterMove && !baritoneStructureMove) camera.render(mc, world, walking);
+        if (!baritoneCenterMove && !baritoneStructureMove && !baritoneSearchMove) camera.render(mc, world, walking);
     }
 
     private void look(float yaw, float pitch) {
@@ -1507,6 +1511,25 @@ public class Explorer {
         entranceCandidates.clear();
         scan(mc);
         if (target == null) {
+            int[] next = search.next();
+            if (next != null) {
+                BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(next[0], next[1]);
+                if (started == BaritoneNavigationBridge.Start.STARTED) {
+                    baritoneSearchX = next[0];
+                    baritoneSearchZ = next[1];
+                    baritoneSearchTicks = 0;
+                    baritoneSearchHandoff = false;
+                    baritoneSearchMove = true;
+                    searching = true;
+                    walking = true;
+                    status = "Exploring for structures";
+                    return;
+                }
+                if (started != BaritoneNavigationBridge.Start.ABSENT) {
+                    status = "Baritone navigation unavailable or busy";
+                    return;
+                }
+            }
             walking = nextSearchLeg(mc);
             if (!walking) stop(mc, "No safe exploration route available");
             return;
@@ -1617,6 +1640,66 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (baritoneSearchMove) {
+            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+                baritoneNavigation.stop();
+                baritoneSearchMove = false;
+                walking = false;
+            } else {
+                if (!baritoneSearchHandoff && ++baritoneSearchTicks % 20 == 0) {
+                    scan(mc);
+                    if (target != null) {
+                        baritoneNavigation.stop();
+                        baritoneSearchHandoff = true;
+                        baritoneSearchNext = false;
+                        baritoneHandoffTicks = 0;
+                    }
+                }
+                if (baritoneSearchHandoff) {
+                    BaritoneNavigationBridge.Start started = baritoneSearchNext
+                        ? baritoneNavigation.startHorizontal(baritoneSearchX, baritoneSearchZ)
+                        : baritoneNavigation.startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+                    if (started == BaritoneNavigationBridge.Start.STARTED) {
+                        baritoneSearchHandoff = false;
+                        if (baritoneSearchNext) {
+                            baritoneSearchNext = false;
+                            status = "Exploring for structures";
+                        } else {
+                            baritoneSearchMove = false;
+                            baritoneStructureMove = true;
+                            searching = false;
+                            status = "Walking to LootGame";
+                        }
+                    } else if (started != BaritoneNavigationBridge.Start.BUSY || ++baritoneHandoffTicks > 40) {
+                        stop(mc, "Baritone could not start structure navigation");
+                    }
+                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                    boolean arrived = baritoneNavigation.completed()
+                        && (int) Math.floor(mc.thePlayer.posX) == baritoneSearchX
+                        && (int) Math.floor(mc.thePlayer.posZ) == baritoneSearchZ;
+                    baritoneNavigation.stop();
+                    if (arrived) {
+                        scan(mc);
+                        if (target != null) {
+                            baritoneSearchHandoff = true;
+                            baritoneSearchNext = false;
+                            baritoneHandoffTicks = 0;
+                        } else {
+                            int[] next = search.next();
+                            if (next == null) stop(mc, "No structures found in search range");
+                            else {
+                                baritoneSearchX = next[0];
+                                baritoneSearchZ = next[1];
+                                baritoneSearchNext = true;
+                                baritoneSearchHandoff = true;
+                                baritoneHandoffTicks = 0;
+                            }
+                        }
+                    } else stop(mc, "Baritone exploration stopped before reaching its target");
+                }
+                return;
+            }
+        }
         if (baritoneStructureMove) {
             if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
                 baritoneNavigation.stop();
@@ -2864,10 +2947,13 @@ public class Explorer {
             queueRouteRetry(mc, message);
             return;
         }
-        if (baritoneCenterMove || baritoneStructureMove) {
+        if (baritoneCenterMove || baritoneStructureMove || baritoneSearchMove) {
             baritoneNavigation.stop();
             baritoneCenterMove = false;
             baritoneStructureMove = false;
+            baritoneSearchMove = false;
+            baritoneSearchHandoff = false;
+            baritoneSearchNext = false;
         }
         sustain.stop(mc);
         fallingBlocks.reset();
