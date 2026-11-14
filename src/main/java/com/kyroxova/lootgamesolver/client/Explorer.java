@@ -166,6 +166,7 @@ public class Explorer {
     private boolean movingToRewardView;
     private final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
     private boolean baritoneCenterMove;
+    private boolean baritoneStructureMove;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
     private boolean resumeSearchAfterReturn;
@@ -1346,7 +1347,7 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (!baritoneCenterMove) camera.render(mc, world, walking);
+        if (!baritoneCenterMove && !baritoneStructureMove) camera.render(mc, world, walking);
     }
 
     private void look(float yaw, float pitch) {
@@ -1510,6 +1511,19 @@ public class Explorer {
             if (!walking) stop(mc, "No safe exploration route available");
             return;
         }
+        BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
+            .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+        if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
+            baritoneStructureMove = true;
+            walking = true;
+            searching = false;
+            status = "Walking to LootGame";
+            return;
+        }
+        if (baritoneStart != BaritoneNavigationBridge.Start.ABSENT) {
+            status = "Baritone navigation unavailable or busy";
+            return;
+        }
         beginAccessTrail(mc);
         // Preserve the saved entrance while inside so a restart resumes the current route.
         int playerX = (int) Math.floor(mc.thePlayer.posX);
@@ -1589,6 +1603,25 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (baritoneStructureMove) {
+            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+                baritoneNavigation.stop();
+                baritoneStructureMove = false;
+                walking = false;
+            } else {
+                if (target != null && reachableBoard(mc)) {
+                    baritoneNavigation.stop();
+                    baritoneStructureMove = false;
+                    stop(mc, "Arrived at LootGame; opening puzzle");
+                    puzzleArrivalPending = true;
+                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                    baritoneNavigation.stop();
+                    baritoneStructureMove = false;
+                    stop(mc, "Baritone could not reach the structure");
+                }
+                return;
+            }
+        }
         if (baritoneCenterMove) {
             if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
                 baritoneNavigation.stop();
@@ -2817,9 +2850,10 @@ public class Explorer {
             queueRouteRetry(mc, message);
             return;
         }
-        if (baritoneCenterMove) {
+        if (baritoneCenterMove || baritoneStructureMove) {
             baritoneNavigation.stop();
             baritoneCenterMove = false;
+            baritoneStructureMove = false;
         }
         sustain.stop(mc);
         fallingBlocks.reset();

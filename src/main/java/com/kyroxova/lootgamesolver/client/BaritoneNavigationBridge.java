@@ -25,6 +25,14 @@ final class BaritoneNavigationBridge {
     private Class<?> goalApi;
 
     Start start(int x, int y, int z) {
+        return start(x, y, z, false);
+    }
+
+    Start startAdjacent(int x, int y, int z) {
+        return start(x, y, z, true);
+    }
+
+    private Start start(int x, int y, int z, boolean adjacent) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -52,9 +60,19 @@ final class BaritoneNavigationBridge {
                 .invoke(candidate)) return Start.BUSY;
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
             Class<?> goalType = Class.forName("baritone.api.pathing.goals.Goal");
-            Object next = Class.forName("baritone.api.pathing.goals.GoalBlock")
-                .getConstructor(int.class, int.class, int.class)
-                .newInstance(x, y, z);
+            Object next;
+            if (adjacent) {
+                Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
+                Object pos = posType.getConstructor(int.class, int.class, int.class)
+                    .newInstance(x, y, z);
+                next = Class.forName("baritone.api.pathing.goals.GoalGetToBlock")
+                    .getConstructor(posType)
+                    .newInstance(pos);
+            } else {
+                next = Class.forName("baritone.api.pathing.goals.GoalBlock")
+                    .getConstructor(int.class, int.class, int.class)
+                    .newInstance(x, y, z);
+            }
             customApi.getMethod("setGoalAndPath", goalType)
                 .invoke(candidate, next);
             process = candidate;
