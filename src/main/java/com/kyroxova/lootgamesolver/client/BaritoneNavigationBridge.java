@@ -25,18 +25,22 @@ final class BaritoneNavigationBridge {
     private Class<?> goalApi;
 
     Start start(int x, int y, int z) {
-        return start(x, y, z, 0);
+        return start(x, y, z, 0, false);
+    }
+
+    Start startWithoutBreaking(int x, int y, int z) {
+        return start(x, y, z, 0, true);
     }
 
     Start startAdjacent(int x, int y, int z) {
-        return start(x, y, z, 1);
+        return start(x, y, z, 1, false);
     }
 
     Start startHorizontal(int x, int z) {
-        return start(x, 0, z, 2);
+        return start(x, 0, z, 2, false);
     }
 
-    private Start start(int x, int y, int z, int kind) {
+    private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -81,7 +85,7 @@ final class BaritoneNavigationBridge {
                     .getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
             }
-            customApi.getMethod("setGoalAndPath", goalType)
+            customApi.getMethod(forbidBreaking ? "setGoalAndPathWithoutBreaking" : "setGoalAndPath", goalType)
                 .invoke(candidate, next);
             process = candidate;
             goal = next;

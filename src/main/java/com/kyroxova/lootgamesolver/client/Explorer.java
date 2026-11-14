@@ -346,8 +346,10 @@ public class Explorer {
 
     private boolean moveToPosition(Minecraft mc, int[] center, boolean allowDigging) {
         if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
-        if (allowDigging && LootGameSolverConfig.staircaseEnabled && !walking && navigationInput == null) {
-            BaritoneNavigationBridge.Start started = baritoneNavigation.start(center[0], center[1] + 1, center[2]);
+        if (!walking && navigationInput == null) {
+            BaritoneNavigationBridge.Start started = allowDigging && LootGameSolverConfig.staircaseEnabled
+                ? baritoneNavigation.start(center[0], center[1] + 1, center[2])
+                : baritoneNavigation.startWithoutBreaking(center[0], center[1] + 1, center[2]);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 puzzleMasterTarget = target;
                 TileEntity point = new TileEntity();
@@ -357,7 +359,7 @@ public class Explorer {
                 target = point;
                 baritoneCenterMove = true;
                 movingToPuzzleCenter = true;
-                movingToRewardView = false;
+                movingToRewardView = !allowDigging;
                 puzzleCenterArrivalPending = false;
                 walking = true;
                 status = "Moving to board center";
@@ -1727,7 +1729,7 @@ public class Explorer {
             } else {
                 boolean arrived = target != null && mc.thePlayer.onGround
                     && Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D)
-                        <= 0.35D
+                        <= (movingToRewardView ? 0.75D : 0.35D)
                     && (int) Math.floor(mc.thePlayer.boundingBox.minY) == target.yCoord + 1;
                 if (arrived) {
                     baritoneNavigation.stop();
