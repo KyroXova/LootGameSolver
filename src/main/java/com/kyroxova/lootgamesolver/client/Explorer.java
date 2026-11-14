@@ -164,6 +164,8 @@ public class Explorer {
     private boolean existingAccessChecked;
     private boolean movingToPuzzleCenter;
     private boolean movingToRewardView;
+    private final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
+    private boolean baritoneCenterMove;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
     private boolean resumeSearchAfterReturn;
@@ -339,6 +341,28 @@ public class Explorer {
 
     private boolean moveToPosition(Minecraft mc, int[] center, boolean allowDigging) {
         if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
+        if (allowDigging && LootGameSolverConfig.staircaseEnabled && !walking && navigationInput == null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation.start(center[0], center[1] + 1, center[2]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                puzzleMasterTarget = target;
+                TileEntity point = new TileEntity();
+                point.xCoord = center[0];
+                point.yCoord = center[1];
+                point.zCoord = center[2];
+                target = point;
+                baritoneCenterMove = true;
+                movingToPuzzleCenter = true;
+                movingToRewardView = false;
+                puzzleCenterArrivalPending = false;
+                walking = true;
+                status = "Moving to board center";
+                return true;
+            }
+            if (started != BaritoneNavigationBridge.Start.ABSENT) {
+                status = "Baritone navigation unavailable or busy";
+                return false;
+            }
+        }
         puzzleMasterTarget = target;
         TileEntity point = new TileEntity();
         point.xCoord = center[0];
@@ -1322,7 +1346,7 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        camera.render(mc, world, walking);
+        if (!baritoneCenterMove) camera.render(mc, world, walking);
     }
 
     private void look(float yaw, float pitch) {
@@ -1565,6 +1589,29 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (baritoneCenterMove) {
+            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+                baritoneNavigation.stop();
+                baritoneCenterMove = false;
+                walking = false;
+            } else {
+                boolean arrived = target != null && mc.thePlayer.onGround
+                    && Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D)
+                        <= 0.35D
+                    && (int) Math.floor(mc.thePlayer.boundingBox.minY) == target.yCoord + 1;
+                if (arrived) {
+                    baritoneNavigation.stop();
+                    baritoneCenterMove = false;
+                    stop(mc, "At LootGames board center");
+                    puzzleCenterArrivalPending = true;
+                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                    baritoneNavigation.stop();
+                    baritoneCenterMove = false;
+                    stop(mc, "Baritone could not reach the board center");
+                }
+                return;
+            }
+        }
         releaseMiningInput(mc);
         camera.clear();
         if (walking && mc.thePlayer != null && navigationInput == null) {
@@ -2769,6 +2816,10 @@ public class Explorer {
         if (recoverableRouteFailure(message)) {
             queueRouteRetry(mc, message);
             return;
+        }
+        if (baritoneCenterMove) {
+            baritoneNavigation.stop();
+            baritoneCenterMove = false;
         }
         sustain.stop(mc);
         fallingBlocks.reset();
