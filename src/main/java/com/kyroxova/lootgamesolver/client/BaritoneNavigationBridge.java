@@ -94,6 +94,10 @@ final class BaritoneNavigationBridge {
             }
             customApi.getMethod(forbidBreaking ? "setGoalAndPathWithoutBreaking" : "setGoalAndPath", goalType)
                 .invoke(candidate, next);
+            try {
+                candidatePathingApi.getMethod("setNavigationChatOverride", Boolean.class)
+                    .invoke(candidatePathing, false);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             process = candidate;
             goal = next;
             processApi = customApi;
@@ -165,23 +169,51 @@ final class BaritoneNavigationBridge {
     }
 
     void stop() {
-        if (process == null) return;
         try {
-            if (processApi.getMethod("getGoal")
-                .invoke(process) == goal) {
-                Method setGoal = processApi.getMethod("setGoal", goalApi);
-                setGoal.invoke(process, new Object[] { null });
+            if (process != null && processApi != null) {
+                if (processApi.getMethod("getGoal").invoke(process) == goal) {
+                    Method setGoal = processApi.getMethod("setGoal", goalApi);
+                    setGoal.invoke(process, new Object[] { null });
+                }
             }
-        } catch (ReflectiveOperationException | LinkageError ignored) {} finally {
-            if (pathing != null) {
-                try {
-                    pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
-                        .invoke(pathing, null, null, null);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            }
-            process = null;
-            goal = null;
-            pathing = null;
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        if (pathing != null && pathingApi != null) {
+            try {
+                pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
+                    .invoke(pathing, (Boolean) null);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            try {
+                pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                    .invoke(pathing, null, null, null);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            try {
+                pathingApi.getMethod("cancelEverything")
+                    .invoke(pathing);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } else {
+            cancelPrimaryBaritone();
         }
+        process = null;
+        goal = null;
+        processApi = null;
+        goalApi = null;
+        pathing = null;
+        pathingApi = null;
+    }
+
+    private static void cancelPrimaryBaritone() {
+        try {
+            Class<?> api = Class.forName("baritone.api.BaritoneAPI");
+            Object provider = api.getMethod("getProvider").invoke(null);
+            Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
+            Object baritone = providerApi.getMethod("getPrimaryBaritone").invoke(provider);
+            Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
+            Object pathing = baritoneApi.getMethod("getPathingBehavior").invoke(baritone);
+            Class<?> pathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
+            pathingApi.getMethod("cancelEverything").invoke(pathing);
+            pathingApi.getMethod("setNavigationChatOverride", Boolean.class).invoke(pathing, (Boolean) null);
+            pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                .invoke(pathing, null, null, null);
+        } catch (Throwable ignored) {}
     }
 }

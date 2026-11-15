@@ -544,7 +544,6 @@ public class Explorer {
     }
 
     void finishPuzzle(Minecraft mc, boolean solved) {
-        persistAccessTrail(true);
         if (solved && knownStructure != null && mc.theWorld != null) {
             try {
                 solvedStructures
@@ -557,27 +556,11 @@ public class Explorer {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
-            continueProgressiveSearch(mc, solved);
-            return;
-        }
-        if (baritoneReturnPoint != null && baritoneReturnWorld == mc.theWorld) {
-            baritoneReturnWaiting = true;
-            baritoneReturnMove = false;
-            baritoneReturnSolved = solved;
-            baritoneReturnWait = 0;
-            walking = true;
-            returning = true;
-            status = "Returning to the surface";
-            return;
-        }
-        if (startChestPitReturn(mc, true)) return;
-        if (insideDungeonRoom(mc) && startRoomExitSearch(mc)) return;
-        if (startSavedReturn(mc, true, 128)) return;
-        if (startRoomExitSearch(mc)) return;
-        retryExitLater(mc);
+        baritoneReturnPoint = null;
+        baritoneReturnWorld = null;
+        baritoneReturnWaiting = false;
+        baritoneReturnMove = false;
+        continueProgressiveSearch(mc, solved);
     }
 
     private void retryExitLater(Minecraft mc) {
@@ -697,40 +680,7 @@ public class Explorer {
     }
 
     private boolean reuseSavedAccessPath(Minecraft mc) {
-        if (mc.thePlayer == null || target == null || trail.points.size() < 2) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        int index = trail.points.nearestIndex(x, y, z, 1);
-        if (index < 0) return false;
-        if (index == trail.points.size() - 1 && safe(mc.theWorld, x, y, z)) {
-            route.clear();
-            digging = true;
-            walking = true;
-            searching = false;
-            returning = false;
-            entranceSelected = true;
-            status = "Continuing excavation from saved tunnel";
-            return true;
-        }
-        List<int[]> saved = trail.points.forwardFrom(index);
-        if (saved.size() < 2) return false;
-        route.clear();
-        route.addAll(saved);
-        segmentX = mc.thePlayer.posX;
-        segmentZ = mc.thePlayer.posZ;
-        walkingSearch = null;
-        continuationSearch = null;
-        extendedFrom = null;
-        existingAccessChecked = true;
-        planningExistingAccess = false;
-        existingAccessPlan = null;
-        digging = false;
-        returning = false;
-        searching = false;
-        walking = true;
-        status = "Following saved entrance route";
-        return true;
+        return false;
     }
 
     private boolean beginExistingAccessSearch(Minecraft mc) {
@@ -758,81 +708,19 @@ public class Explorer {
     }
 
     private void recordAccessPoint(int x, int y, int z) {
-        if (!trail.excavating) return;
-        if (trail.points.record(x, y, z)) {
-            trail.dirty = true;
-            persistAccessTrail(false);
-        }
+        trail.points.clear();
+        trail.dirty = false;
     }
 
-    private void persistAccessTrail(boolean force) {
-        if (!trail.persist(force, ticks)) status = "Could not save the structure return route";
-    }
+    private void persistAccessTrail(boolean force) {}
 
     private void removePersistedTrail() {
-        if (!trail.removePersisted()) status = "Returned; could not clear the saved route";
+        trail.points.clear();
+        trail.dirty = false;
     }
 
     private boolean startSavedReturn(Minecraft mc, boolean resumeSearch, int maxJoinDistance) {
-        if (mc.thePlayer == null || mc.theWorld == null) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        List<int[]> back = trail.points.reverse(x, y, z);
-        returnJoinSearch = null;
-        returnTrailRoute = null;
-        roomEntryCandidates = null;
-        activeRoomEntry = null;
-        roomEntryPlanning = false;
-        roomEntryCrossing = false;
-        roomEntrySearchNeedsResume = false;
-        walkingSearchNeedsResume = false;
-        if (!back.isEmpty() && savedRouteWalkable(mc, back)) {
-            route.clear();
-            route.addAll(back);
-            rejoiningSavedTrail = false;
-        } else {
-            int nearest = trail.points.nearestIndex(x, y, z, maxJoinDistance);
-            int[] join = null;
-            List<int[]> saved = null;
-            for (int candidate = nearest; candidate >= 0; candidate--) {
-                List<int[]> candidateRoute = trail.points.reverseFrom(candidate);
-                if (candidateRoute.size() < 2 || !savedRouteWalkable(mc, candidateRoute)) continue;
-                join = trail.points.pointAt(candidate);
-                saved = candidateRoute;
-                break;
-            }
-            if (join == null || saved == null) return false;
-            returnTrailRoute = saved;
-            returnJoinX = join[0];
-            returnJoinY = join[1];
-            returnJoinZ = join[2];
-            rejoiningSavedTrail = true;
-            returning = true;
-            returnJoinSearch = new GroundPathfinder.Search(
-                walkingTerrain(mc.theWorld),
-                x,
-                y,
-                z,
-                join[0],
-                join[1],
-                join[2],
-                Math.max(maxJoinDistance, LootGameSolverConfig.explorationRange));
-            route.clear();
-        }
-        segmentX = mc.thePlayer.posX;
-        segmentZ = mc.thePlayer.posZ;
-        cameraPitchDirection = 0;
-        returning = true;
-        returnAvailable = false;
-        resumeSearchAfterReturn = resumeSearch;
-        walking = true;
-        searching = false;
-        digging = false;
-        walkingSearch = null;
-        continuationSearch = null;
-        status = returnJoinSearch == null ? "Returning along saved access route" : "Rejoining saved access route";
-        return true;
+        return false;
     }
 
     private boolean savedRouteWalkable(Minecraft mc, List<int[]> points) {
@@ -1401,14 +1289,8 @@ public class Explorer {
     }
 
     private void rememberBaritoneReturnPoint(Minecraft mc) {
-        if (mc.thePlayer == null || mc.theWorld == null) return;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (mc.thePlayer.onGround && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
-            baritoneReturnPoint = new int[] { x, y, z };
-            baritoneReturnWorld = mc.theWorld;
-        }
+        baritoneReturnPoint = null;
+        baritoneReturnWorld = null;
     }
 
     private void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
@@ -1527,27 +1409,8 @@ public class Explorer {
             stop(mc, "Walk stopped");
             return;
         }
-        if (returnAvailable) {
-            blockedWalkNodes.clear();
-            if (startChestPitReturn(mc, true)) return;
-            if (startSavedReturn(mc, true, 64)) return;
-            if (trail.points.size() >= 2) {
-                returning = true;
-                walking = true;
-                resumeSearchAfterReturn = true;
-                if (digTowardSavedExit(mc)) return;
-                retryExitLater(mc);
-                return;
-            }
-        }
-        // Resume the current destination before starting a new exit search.
-        if (target != null && !target.isInvalid()) {
-            resumeCurrentTarget(mc);
-            return;
-        }
-        if (startChestPitReturn(mc, true)) return;
-        if (startRoomExitSearch(mc)) return;
         returnAvailable = false;
+        returning = false;
         puzzleArrivalPending = false;
         planningExistingAccess = false;
         existingAccessPlan = null;

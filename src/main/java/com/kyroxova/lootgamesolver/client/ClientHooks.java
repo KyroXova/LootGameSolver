@@ -44,6 +44,7 @@ public final class ClientHooks {
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private boolean rewardReturnPending;
     private boolean rewardPreCleanupPending;
+    private boolean explorationDriven;
     private InventoryBaseline inventoryBaseline;
     private int[] rewardCenter;
     private boolean exploreKeyHeld;
@@ -205,6 +206,7 @@ public final class ClientHooks {
             rewardLooter.cancel(mc);
             rewardReturnPending = false;
             rewardPreCleanupPending = false;
+            explorationDriven = false;
             inventoryBaseline = null;
             trashCleanup.setBaseline(null);
             rewardLooter.setBaseline(null);
@@ -212,6 +214,7 @@ public final class ClientHooks {
             puzzleWorld = mc.theWorld;
             if (autoPuzzleState != AutoPuzzleState.IDLE) {
                 session.cancel("World changed during puzzle automation");
+                releaseMovementKeys(mc);
                 puzzleCompletion.clear();
                 autoPuzzleState = AutoPuzzleState.IDLE;
                 autoPuzzlePosition = null;
@@ -230,7 +233,9 @@ public final class ClientHooks {
             if (exploration != null && !exploration.inDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
-                exploration.finishPuzzle(mc, true);
+                if (explorationDriven && exploration != null) {
+                    exploration.finishPuzzle(mc, true);
+                }
                 return;
             }
             if (rewardPreCleanupPending) {
@@ -253,7 +258,9 @@ public final class ClientHooks {
                         }
                     }
                     rewardReturnPending = false;
-                    if (exploration != null) exploration.finishPuzzle(mc, true);
+                    if (explorationDriven && exploration != null) {
+                        exploration.finishPuzzle(mc, true);
+                    }
                 }
             }
             return;
@@ -271,6 +278,7 @@ public final class ClientHooks {
             return;
         }
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzleState == AutoPuzzleState.IDLE) {
+            explorationDriven = true;
             autoPuzzlePosition = exploration.puzzlePosition();
             floorActivatorPosition = null;
             floorActivatorClicked = false;
@@ -476,14 +484,18 @@ public final class ClientHooks {
             if (puzzleCompletion.won(mc.theWorld != null)) {
                 com.kyroxova.lootgamesolver.core.MiniGame completedGame = session.getGame();
                 session.cancel("Puzzle solved");
+                releaseMovementKeys(mc);
                 puzzleCompletion.clear();
                 autoPuzzleState = AutoPuzzleState.IDLE;
-                if (exploration != null) {
+                if (explorationDriven && exploration != null) {
                     exploration.prepareRewardCollection(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition);
                     ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, rewardCenter != null ? rewardCenter : autoPuzzlePosition, completedGame);
                     rewardPreCleanupPending = true;
                     rewardReturnPending = true;
+                } else {
+                    rewardReturnPending = false;
+                    rewardPreCleanupPending = false;
                 }
                 autoPuzzlePosition = null;
             }
@@ -550,9 +562,11 @@ public final class ClientHooks {
                 return;
             }
             session.cancel("Exploration selected");
+            releaseMovementKeys(mc);
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
             if (!exploration.navigating() && exploration.inDungeonRoom(mc)) {
+                explorationDriven = true;
                 int[] floor = puzzleBridge.nearbyFloorActivator();
                 Object nearbyGame = puzzleBridge.nearbyGame(true);
                 DetectedGame board = puzzleBridge.detect(true);
@@ -590,9 +604,11 @@ public final class ClientHooks {
         boolean overlayPressed = isKeyJustPressed(Keybinds.toggleOverlay, LootGameSolverConfig.overlayKey);
 
         if (autoSolvePressed) {
+            explorationDriven = false;
             session.invalidateDormantCache();
             if (session.isActive()) {
                 session.cancel("Auto-Solver Stopped");
+                releaseMovementKeys(mc);
                 if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
                 captureInventoryBaseline(mc);
