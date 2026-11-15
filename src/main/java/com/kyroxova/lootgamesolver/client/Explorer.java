@@ -113,6 +113,7 @@ public class Explorer {
     private String routeRetryStatus = "";
     private List<int[]> chestPitExits;
     private int chestPitExitIndex;
+    private int[] entrySurfacePoint;
     private int chestPitTrailIndex = -1;
     private int[] chestPitSource;
     private List<int[]> chestPitApproach;
@@ -687,6 +688,10 @@ public class Explorer {
 
     private void beginAccessTrail(Minecraft mc) {
         if (knownStructure == null || mc.thePlayer == null) return;
+        if (entrySurfacePoint == null && mc.theWorld != null) {
+            int sy = mc.theWorld.getHeightValue(knownStructure[0], knownStructure[2]);
+            entrySurfacePoint = new int[] { knownStructure[0], sy + 1, knownStructure[2] };
+        }
         if (trail.target == null || !samePosition(trail.target, knownStructure)) {
             persistAccessTrail(true);
             existingAccessChecked = false;
@@ -974,6 +979,24 @@ public class Explorer {
 
     private boolean startRoomExitSearch(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null) return false;
+        if (entrySurfacePoint == null && target != null) {
+            int sy = mc.theWorld.getHeightValue(target.xCoord, target.zCoord);
+            entrySurfacePoint = new int[] { target.xCoord, sy + 1, target.zCoord };
+        }
+        if (entrySurfacePoint != null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation.start(entrySurfacePoint[0], entrySurfacePoint[1], entrySurfacePoint[2]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneStructureMove = false;
+                baritoneSearchMove = false;
+                baritoneReturnMove = true;
+                baritoneReturnPoint = entrySurfacePoint.clone();
+                baritoneReturnWorld = mc.theWorld;
+                returning = true;
+                walking = true;
+                status = "Following Exit";
+                return true;
+            }
+        }
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
@@ -1191,6 +1214,16 @@ public class Explorer {
 
     private boolean digTowardSavedExit(Minecraft mc) {
         if (!returning || returnDigging || mc.thePlayer == null) return false;
+        if (entrySurfacePoint != null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation.start(entrySurfacePoint[0], entrySurfacePoint[1], entrySurfacePoint[2]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneReturnMove = true;
+                baritoneReturnPoint = entrySurfacePoint.clone();
+                baritoneReturnWorld = mc.theWorld;
+                status = "Following Exit";
+                return true;
+            }
+        }
         if (insideDungeonRoom(mc)) return roomExitCandidates == null && startRoomExitSearch(mc);
         List<int[]> savedRoute = new ArrayList<int[]>(route.size());
         for (int[] point : route) savedRoute.add(point.clone());
@@ -1629,9 +1662,15 @@ public class Explorer {
                 }
                 return;
             } else {
-                boolean arrived = mc.thePlayer.onGround && (int) Math.floor(mc.thePlayer.posX) == baritoneReturnPoint[0]
-                    && (int) Math.floor(mc.thePlayer.boundingBox.minY) == baritoneReturnPoint[1]
-                    && (int) Math.floor(mc.thePlayer.posZ) == baritoneReturnPoint[2];
+                double distToExit = baritoneReturnPoint == null ? 0D
+                    : Math.hypot(mc.thePlayer.posX - baritoneReturnPoint[0] - 0.5D, mc.thePlayer.posZ - baritoneReturnPoint[2] - 0.5D);
+                boolean onSurface = mc.theWorld.canBlockSeeTheSky(
+                    (int) Math.floor(mc.thePlayer.posX),
+                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                    (int) Math.floor(mc.thePlayer.posZ));
+                boolean arrived = onSurface
+                    || (mc.thePlayer.onGround && distToExit <= 2.5D && Math.abs(mc.thePlayer.boundingBox.minY - baritoneReturnPoint[1]) <= 2)
+                    || (baritoneNavigation.completed() && distToExit <= 4.0D);
                 if (arrived) {
                     baritoneNavigation.stop();
                     baritoneReturnMove = false;
@@ -1639,6 +1678,7 @@ public class Explorer {
                     baritoneReturnWait = 0;
                     walking = false;
                     returning = false;
+                    entrySurfacePoint = null;
                 } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                     stop(mc, "Baritone could not complete the return route");
                 }
@@ -1863,12 +1903,13 @@ public class Explorer {
             status = "Puzzle in progress";
             return;
         }
-        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled
-            || (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 100)) {
-            stop(
-                mc,
-                !LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled ? "Exploration disabled"
-                    : "Stopped: low air underwater");
+        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) {
+            stop(mc, "Exploration disabled");
+            return;
+        }
+        if (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 150) {
+            if (swimToNearestShore(mc)) return;
+            stop(mc, "Low Air");
             return;
         }
         boolean manual = NavigationControlPolicy.hasManualMovement(
@@ -2186,8 +2227,7 @@ public class Explorer {
             && !roomEntryPlanning
             && !roomEntrySearchNeedsResume
             && !roomEntryCrossing
-            && route.size() >= 1
-            && route.size() <= 32) extendRoute(mc);
+            && route.size() <= 48) extendRoute(mc);
         prepareApproach(mc);
         if (digging && !returnDigging && !route.isEmpty() && excavationRoute.isEmpty() && target != null) {
             int[] end = route.get(route.size() - 1);
@@ -2952,7 +2992,52 @@ public class Explorer {
         }
     }
 
+    private boolean swimToNearestShore(Minecraft mc) {
+        if (mc.thePlayer == null || mc.theWorld == null || !mc.thePlayer.isInWater()) return false;
+        int px = (int) Math.floor(mc.thePlayer.posX);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        int[] best = null;
+        double bestDistSq = Double.MAX_VALUE;
+        for (int r = 1; r <= 24; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
+                    int x = px + dx, z = pz + dz;
+                    int y = mc.theWorld.getHeightValue(x, z);
+                    if (y <= 0) continue;
+                    net.minecraft.block.Block b = mc.theWorld.getBlock(x, y - 1, z);
+                    net.minecraft.block.Block above = mc.theWorld.getBlock(x, y, z);
+                    net.minecraft.block.Block above2 = mc.theWorld.getBlock(x, y + 1, z);
+                    if (b.isNormalCube() && !b.getMaterial().isLiquid()
+                        && !above.getMaterial().isLiquid() && !above2.getMaterial().isLiquid()) {
+                        double dsq = (x - px) * (x - px) + (z - pz) * (z - pz);
+                        if (dsq < bestDistSq) {
+                            bestDistSq = dsq;
+                            best = new int[] { x, y, z };
+                        }
+                    }
+                }
+            }
+            if (best != null) break;
+        }
+        if (best != null) {
+            route.clear();
+            route.add(best);
+            walking = true;
+            status = "Swimming: Shore";
+            if (navigationInput != null) {
+                navigationInput.forward = 1F;
+                navigationInput.hop = true;
+            }
+            return true;
+        }
+        return false;
+    }
+
     private void stop(Minecraft mc, String message) {
+        if (mc.thePlayer != null && mc.thePlayer.isInWater() && !message.contains("Shore")) {
+            if (swimToNearestShore(mc)) return;
+        }
         if (!baritoneCenterMove && !baritoneStructureMove
             && !baritoneSearchMove
             && !baritoneReturnMove
@@ -3091,7 +3176,7 @@ public class Explorer {
             if (length < 4) continue;
             searchGoalX = goal[0];
             searchGoalZ = goal[1];
-            double step = Math.min(8D, length);
+            double step = Math.min(64D, length);
             target = new TileEntity();
             target.xCoord = x + (int) Math.round(dx / length * step);
             target.yCoord = y;
@@ -3180,7 +3265,7 @@ public class Explorer {
         }
         boolean finished = continuationSearch.advance(3_000_000L);
         List<int[]> continuation = continuationSearch.path();
-        if (!finished && (route.size() > 8 || continuation.size() < (route.isEmpty() ? 1 : 6))) return;
+        if (!finished && (route.size() > 32 || continuation.size() < (route.isEmpty() ? 1 : 6))) return;
         continuationSearch = null;
         if (continuation.isEmpty()) {
             extendedFrom = null;
@@ -3474,6 +3559,9 @@ public class Explorer {
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (entrySurfacePoint == null) {
+            entrySurfacePoint = new int[] { x, y, z };
+        }
         if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, target.xCoord, target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {

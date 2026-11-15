@@ -55,8 +55,10 @@ final class ExplorerRouteFollower {
             && Math.abs(turn) < 45F
             && distance < 4D;
         if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
-        input.hop = ((next[1] > footY || climbRewardChest || climbSurface) && Math.abs(turn) < 35F && distance < 1.4D)
-            || escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D
+        boolean stepUp = next[1] > footY || climbRewardChest || climbSurface || mc.thePlayer.isCollidedHorizontally;
+        boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
+        input.hop = (stepUp && Math.abs(turn) < 45F && jumpDistance && mc.thePlayer.onGround)
+            || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)
             || chestPitJump
             || mc.thePlayer.isInWater();
         if (distance > 0.02D) {

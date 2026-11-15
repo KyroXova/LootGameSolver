@@ -20,8 +20,8 @@ public final class LootGameSolverConfig {
     public static boolean showDebugInfo = false;
     public static int renderStyle = 0; // 0 = Minimal Outline & Text, 1 = Text Only
     public static int exploreKey = Keyboard.KEY_G;
-    public static int explorationRange = 32;
-    public static int explorationSearchLimit = 256;
+    public static int explorationRange = 256;
+    public static int explorationSearchLimit = 400;
     public static boolean explorationEnabled = true;
     public static boolean staircaseEnabled = true;
     public static int spiralWidth = 3;
@@ -47,14 +47,14 @@ public final class LootGameSolverConfig {
             4,
             "Outer spiral footprint: 3 gives two steps per turn; 4 gives three steps per turn.");
         explorationRange = cfg
-            .getInt("routeRange", "explorationBeta", 32, 8, 48, "Maximum horizontal route search radius.");
+            .getInt("routeRange", "explorationBeta", 256, 16, 512, "Maximum horizontal route search radius.");
         explorationSearchLimit = cfg.getInt(
             "searchLimit",
             "explorationBeta",
-            256,
+            400,
             16,
             1024,
-            "Maximum progressive search distance from its starting point. Travel only uses verified loaded ground.");
+            "Progressive search radius limit for discovering unopened structures.");
         exploreKey = cfg
             .getInt("exploreKey", "keybinds", exploreKey, 0, 255, "Default walk toggle; also rebind in Controls.");
         overlayKey = cfg.getInt("overlayKey", "keybinds", overlayKey, 0, 255, "LWJGL key code for toggling holograms.");
