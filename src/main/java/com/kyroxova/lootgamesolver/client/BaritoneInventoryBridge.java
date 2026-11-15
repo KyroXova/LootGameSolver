@@ -37,11 +37,24 @@ final class BaritoneInventoryBridge {
     }
 
     static boolean quickMove(Minecraft mc, int slot) {
+        return click(mc, slot, true, 0);
+    }
+
+    static boolean swapOpenContainer(Minecraft mc, int slot, int hotbar) {
+        return click(mc, slot, false, hotbar);
+    }
+
+    private static boolean click(Minecraft mc, int slot, boolean quick, int button) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
         } catch (ClassNotFoundException absent) {
-            mc.playerController.windowClick(mc.thePlayer.openContainer.windowId, slot, 0, 1, mc.thePlayer);
+            mc.playerController.windowClick(
+                mc.thePlayer.openContainer.windowId,
+                slot,
+                quick ? 0 : button,
+                quick ? 1 : 2,
+                mc.thePlayer);
             return true;
         } catch (LinkageError failure) {
             return false;
@@ -61,10 +74,10 @@ final class BaritoneInventoryBridge {
             if (snapshot == null) return false;
             Class<?> snapshotType = Class.forName("baritone.api.utils.IInventoryControl$ContainerSnapshot");
             Class<?> clickType = Class.forName("baritone.api.utils.IInventoryControl$Click");
-            Object quickMove = clickType.getField("QUICK_MOVE")
+            Object clickTypeValue = clickType.getField(quick ? "QUICK_MOVE" : "HOTBAR_SWAP")
                 .get(null);
             Object result = inventoryApi.getMethod("clickContainerSlot", snapshotType, int.class, clickType, int.class)
-                .invoke(inventory, snapshot, slot, quickMove, 0);
+                .invoke(inventory, snapshot, slot, clickTypeValue, button);
             return "ATTEMPTED".equals(String.valueOf(result));
         } catch (ReflectiveOperationException | LinkageError failure) {
             return false;

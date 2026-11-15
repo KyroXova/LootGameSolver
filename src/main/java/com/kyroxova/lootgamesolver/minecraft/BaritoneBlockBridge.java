@@ -4,11 +4,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.common.util.ForgeDirection;
 
-final class BaritoneBlockBridge {
+public final class BaritoneBlockBridge {
 
     private BaritoneBlockBridge() {}
 
-    static boolean click(Minecraft mc, int x, int y, int z, int side, Vec3 hit, boolean attack) {
+    public static boolean click(Minecraft mc, int x, int y, int z, int side, Vec3 hit, boolean attack) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");

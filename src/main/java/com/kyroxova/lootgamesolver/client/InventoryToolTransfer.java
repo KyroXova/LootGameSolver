@@ -14,9 +14,10 @@ final class InventoryToolTransfer {
             super(mc.thePlayer);
         }
 
-        void swap(Minecraft mc, int source, int hotbar) {
+        boolean swap(Minecraft mc, int source, int hotbar) {
             Slot slot = inventorySlots.getSlotFromInventory(mc.thePlayer.inventory, source);
-            if (slot != null && slot.canTakeStack(mc.thePlayer)) handleMouseClick(slot, slot.slotNumber, hotbar, 2);
+            return slot != null && slot.canTakeStack(mc.thePlayer)
+                && BaritoneInventoryBridge.swapOpenContainer(mc, slot.slotNumber, hotbar);
         }
     }
 
@@ -132,8 +133,11 @@ final class InventoryToolTransfer {
                 cancel(mc);
                 return false;
             }
-            screen.swap(mc, source, hotbar);
-            swapped = true;
+            swapped = screen.swap(mc, source, hotbar);
+            if (!swapped) {
+                cancel(mc);
+                return false;
+            }
         }
         if (ticks >= 12) {
             boolean valid = swapped && (clearing

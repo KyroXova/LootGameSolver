@@ -430,15 +430,11 @@ final class RewardChestLooter {
             status = "Release sneak to open reward chest";
             return;
         }
-        mc.playerController.onPlayerRightClick(
-            mc.thePlayer,
-            mc.theWorld,
-            mc.thePlayer.getHeldItem(),
-            pos[0],
-            pos[1],
-            pos[2],
-            aimed.sideHit,
-            aimed.hitVec);
+        if (!com.kyroxova.lootgamesolver.minecraft.BaritoneBlockBridge
+            .click(mc, pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec, false)) {
+            status = "Chest interaction unavailable";
+            return;
+        }
         chestAim.reset();
         opened = true;
         waiting = 12;

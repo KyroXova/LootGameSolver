@@ -591,16 +591,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             || hit.blockX != x
             || hit.blockY != y
             || hit.blockZ != z) return false;
-        mc.thePlayer.swingItem();
-        return mc.playerController.onPlayerRightClick(
-            mc.thePlayer,
-            mc.theWorld,
-            mc.thePlayer.getHeldItem(),
-            x,
-            y,
-            z,
-            hit.sideHit,
-            hit.hitVec);
+        return BaritoneBlockBridge.click(mc, x, y, z, hit.sideHit, hit.hitVec, false);
     }
 
     public Object nearbyGame(boolean forceScan) {
@@ -653,16 +644,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             || hit.blockX != x
             || hit.blockY != y
             || hit.blockZ != z) return false;
-        mc.thePlayer.swingItem();
-        return mc.playerController.onPlayerRightClick(
-            mc.thePlayer,
-            mc.theWorld,
-            mc.thePlayer.getHeldItem(),
-            x,
-            y,
-            z,
-            hit.sideHit,
-            hit.hitVec);
+        return BaritoneBlockBridge.click(mc, x, y, z, hit.sideHit, hit.hitVec, false);
     }
 
     public Object gameAtMaster(int[] position) {
@@ -689,16 +671,7 @@ public final class LootGamesBridge implements MiniGameDetector {
                 || hit.blockX != x
                 || hit.blockY != y
                 || hit.blockZ != z) return false;
-            mc.thePlayer.swingItem();
-            return mc.playerController.onPlayerRightClick(
-                mc.thePlayer,
-                mc.theWorld,
-                mc.thePlayer.getHeldItem(),
-                x,
-                y,
-                z,
-                hit.sideHit,
-                hit.hitVec);
+            return BaritoneBlockBridge.click(mc, x, y, z, hit.sideHit, hit.hitVec, false);
         } catch (Exception e) {
             LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);
             return false;
