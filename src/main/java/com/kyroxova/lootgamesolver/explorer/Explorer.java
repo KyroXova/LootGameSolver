@@ -31,84 +31,87 @@ public class Explorer {
     TileEntity target;
     int ticks;
     int stalled;
-    private int stallRecoveries;
-    private final java.util.Set<Long> blockedWalkNodes = new java.util.LinkedHashSet<Long>();
+    int stallRecoveries;
+    final java.util.Set<Long> blockedWalkNodes = new java.util.LinkedHashSet<Long>();
     double lastDistance = Double.MAX_VALUE;
     boolean walking;
     boolean digging;
-    private int savedSlot = -1;
-    private int digTicks;
-    private final FallingBlockWaiter fallingBlocks = new FallingBlockWaiter();
-    private int toolWaitTicks;
-    private boolean waitingForTool;
+    int savedSlot = -1;
+    int digTicks;
+    final FallingBlockWaiter fallingBlocks = new FallingBlockWaiter();
+    int toolWaitTicks;
+    boolean waitingForTool;
     String status = "Scanning loaded terrain";
-    private ProgressiveSearch search;
+    ProgressiveSearch search;
     boolean searching;
-    private NavigationInput navigationInput;
-    private int stairX;
-    private int stairZ;
-    private int stairSteps;
-    private boolean seekingDryEntrance;
+    NavigationInput navigationInput;
+    int stairX;
+    int stairZ;
+    int stairSteps;
+    boolean seekingDryEntrance;
     boolean entranceSelected;
-    private final List<int[]> entranceCandidates = new ArrayList<int[]>();
-    private int entranceCandidate;
+    final List<int[]> entranceCandidates = new ArrayList<int[]>();
+    int entranceCandidate;
     double segmentX;
     double segmentZ;
-    private final MiningAimGate miningAim = new MiningAimGate();
+    final MiningAimGate miningAim = new MiningAimGate();
 
-    private final ExplorerSustain sustain = new ExplorerSustain();
-    private int settlingTicks;
+    final ExplorerSustain sustain = new ExplorerSustain();
+    int settlingTicks;
     ExcavationPathfinder excavationSearch;
     int[] roofEscapeGoal;
     final List<int[]> excavationRoute = new ArrayList<int[]>();
-    private final List<int[]> rejectedSteps = new ArrayList<int[]>();
-    private final List<int[]> navigationPreview = new ArrayList<int[]>();
+    final List<int[]> rejectedSteps = new ArrayList<int[]>();
+    final List<int[]> navigationPreview = new ArrayList<int[]>();
     private int[] previewHead;
     private int previewSize = -1;
     int excavationReplans;
-    private int exitRecoveryTicks;
-    private int exitRecoveryAttempts;
-    private OpenExitSearch openExitSearch;
-    private boolean followingOpenExit;
-    private final ExplorerCamera camera = new ExplorerCamera();
-    private int searchGoalX, searchGoalZ;
-    private int[] extendedFrom;
-    private int approachAttempts;
+    int exitRecoveryTicks;
+    int exitRecoveryAttempts;
+    OpenExitSearch openExitSearch;
+    boolean followingOpenExit;
+    final ExplorerCamera camera = new ExplorerCamera();
+    int searchGoalX, searchGoalZ;
+    int[] extendedFrom;
+    int approachAttempts;
     int[] knownStructure;
-    private ExcavationPathfinder approachPlan;
-    private int[] approachAnchor;
-    private boolean approachReady;
-    private final InventoryToolTransfer toolTransfer = new InventoryToolTransfer();
+    ExcavationPathfinder approachPlan;
+    int[] approachAnchor;
+    boolean approachReady;
+    final InventoryToolTransfer toolTransfer = new InventoryToolTransfer();
     final BlockPlacer blockPlacer = new BlockPlacer(toolTransfer, camera);
-    private final MiningAttackInput miningAttack = new MiningAttackInput();
-    private long miningTarget = Long.MIN_VALUE;
-    private int miningSlot = -1;
-    private int aimTicks;
+    final MiningAttackInput miningAttack = new MiningAttackInput();
+    long miningTarget = Long.MIN_VALUE;
+    int miningSlot = -1;
+    int aimTicks;
     final ExplorerTrailSession trail = new ExplorerTrailSession(
         new File(new File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"), "access-trails.json"));
     boolean returning, returnAvailable;
-    private int cameraPitchDirection;
-    private int pitchLastY;
-    private double pitchLandingX, pitchLandingZ;
+    int cameraPitchDirection;
+    int pitchLastY;
+    double pitchLandingX, pitchLandingZ;
     boolean returnDigging;
-    private TileEntity returnOriginalTarget;
-    private List<int[]> returnAfterDig;
-    private boolean returnDigResumeSearch;
-    private boolean rejoiningSavedTrail;
-    private int returnJoinX, returnJoinY, returnJoinZ;
-    private List<int[]> returnDigSource;
-    private int returnDigAnchorIndex;
+    TileEntity returnOriginalTarget;
+    List<int[]> returnAfterDig;
+    boolean returnDigResumeSearch;
+    boolean rejoiningSavedTrail;
+    int returnJoinX, returnJoinY, returnJoinZ;
+    List<int[]> returnDigSource;
+    int returnDigAnchorIndex;
     final ExplorerRoomGeometry roomGeometry = new ExplorerRoomGeometry();
-    private String excavationMode = "Access route";
-    private int routeRetryTicks;
-    private String routeRetryStatus = "";
+    String excavationMode = "Access route";
+    int routeRetryTicks;
+    String routeRetryStatus = "";
     int[] entrySurfacePoint;
-    private final ExplorerRouteFollower routeFollower = new ExplorerRouteFollower();
-    private boolean escapingChestPit;
-    private final ExplorerChestPitNav chestPitNav = new ExplorerChestPitNav();
+    final ExplorerRouteFollower routeFollower = new ExplorerRouteFollower();
+    boolean escapingChestPit;
+    final ExplorerChestPitNav chestPitNav = new ExplorerChestPitNav();
     final RoomEntry roomEntry = new RoomEntry();
     final RoomExit roomExit = new RoomExit();
     final WalkPathfinder walkPathfinder = new WalkPathfinder();
+    final PuzzleCenterNavigator puzzleCenter = new PuzzleCenterNavigator();
+    final ExcavationPlanner excavationPlanner = new ExcavationPlanner();
+    final ReturnNavigator returnNav = new ReturnNavigator();
     final List<int[]> staircaseDugPath = new ArrayList<int[]>();
     int entranceSurfaceY = 64;
     boolean resumeSearchAfterReturn;
@@ -158,19 +161,19 @@ public class Explorer {
     GroundPathfinder.Search walkingSearch;
     private int[] snowRecoveryTarget;
     private boolean walkingPlanFailed;
-    private GroundPathfinder.Search continuationSearch;
+    GroundPathfinder.Search continuationSearch;
     final ExcavationTerrain excavationTerrain = new ExcavationTerrain();
     private int continuationX, continuationZ;
     private final SolvedStructureStore solvedStructures = new SolvedStructureStore(
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "solved-structures.json"));
-    private boolean puzzleArrivalPending;
+    boolean puzzleArrivalPending;
     private ExcavationPathfinder existingAccessPlan;
     private boolean planningExistingAccess;
     private boolean existingAccessChecked;
-    private boolean movingToPuzzleCenter;
-    private boolean movingToRewardView;
+    boolean movingToPuzzleCenter;
+    boolean movingToRewardView;
     final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
     boolean baritoneCenterMove;
     boolean baritoneStructureMove;
@@ -186,7 +189,7 @@ public class Explorer {
     private int baritonePreviewTick;
     private int baritoneSearchX, baritoneSearchZ, baritoneSearchTicks, baritoneHandoffTicks;
     private boolean puzzleCenterArrivalPending;
-    private TileEntity puzzleMasterTarget;
+    TileEntity puzzleMasterTarget;
     GroundPathfinder.Search returnJoinSearch;
     List<int[]> returnTrailRoute;
 
@@ -334,246 +337,23 @@ public class Explorer {
     }
 
     public boolean resumePuzzleInCurrentRoom(Minecraft mc, int[] center) {
-        if (walking || center == null || mc.thePlayer == null || mc.theWorld == null) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        int[] bounds = roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, ticks);
-        if (bounds != null) {
-            if (x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]
-                || center[0] <= bounds[0] || center[0] >= bounds[1] || center[2] <= bounds[2] || center[2] >= bounds[3]
-                || Math.abs(y - center[1] - 1) > 3) {
-                return false;
-            }
-        } else {
-            if (Math.hypot(x - center[0], z - center[2]) > 16.0D || Math.abs(y - center[1] - 1) > 5) {
-                return false;
-            }
-        }
-        knownStructure = center.clone();
-        TileEntity current = new TileEntity();
-        current.xCoord = knownStructure[0];
-        current.yCoord = knownStructure[1];
-        current.zCoord = knownStructure[2];
-        target = current;
-        beginAccessTrail(mc);
-        returnAvailable = false;
-        puzzleArrivalPending = true;
-        status = "Resuming unfinished puzzle in current room";
-        return true;
+        return puzzleCenter.resumePuzzleInCurrentRoom(mc, this, center);
     }
 
     public boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
-        return moveToPosition(mc, center, true);
+        return puzzleCenter.moveToPuzzleCenter(mc, this, center);
     }
 
     public boolean moveToRewardView(Minecraft mc, int[] center) {
-        return moveToPosition(mc, center, false);
-    }
-
-    private boolean moveToPosition(Minecraft mc, int[] center, boolean allowDigging) {
-        if (mc.thePlayer == null || center == null || center.length < 3 || movingToPuzzleCenter) return false;
-        if (!walking && navigationInput == null) {
-            BaritoneNavigationBridge.Start started = allowDigging && LootGameSolverConfig.staircaseEnabled
-                ? baritoneNavigation.start(center[0], center[1] + 1, center[2])
-                : baritoneNavigation.startWithoutBreaking(center[0], center[1] + 1, center[2]);
-            if (started == BaritoneNavigationBridge.Start.STARTED) {
-                puzzleMasterTarget = target;
-                TileEntity point = new TileEntity();
-                point.xCoord = center[0];
-                point.yCoord = center[1];
-                point.zCoord = center[2];
-                target = point;
-                baritoneCenterMove = true;
-                movingToPuzzleCenter = true;
-                movingToRewardView = !allowDigging;
-                puzzleCenterArrivalPending = false;
-                walking = true;
-                status = "Moving to board center";
-                return true;
-            }
-            if (started != BaritoneNavigationBridge.Start.ABSENT) {
-                status = "Baritone navigation unavailable or busy";
-                return false;
-            }
-        }
-        puzzleMasterTarget = target;
-        TileEntity point = new TileEntity();
-        point.xCoord = center[0];
-        point.yCoord = center[1];
-        point.zCoord = center[2];
-        target = point;
-        movingToPuzzleCenter = true;
-        movingToRewardView = !allowDigging;
-        puzzleCenterArrivalPending = false;
-        cameraPitchDirection = 0;
-        route.clear();
-        entranceCandidates.clear();
-        entranceCandidate = 0;
-        digging = false;
-        searching = false;
-        walkingSearch = null;
-        continuationSearch = null;
-        segmentX = mc.thePlayer.posX;
-        segmentZ = mc.thePlayer.posZ;
-        walkingSearch = new GroundPathfinder.Search(
-            walkingTerrain(mc.theWorld),
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.boundingBox.minY),
-            (int) Math.floor(mc.thePlayer.posZ),
-            center[0],
-            center[1] + 1,
-            center[2],
-            LootGameSolverConfig.explorationRange);
-        if (walkingSearch.advance(3_000_000L)) {
-            boolean reachedCenter = walkingSearch.reachedGoal();
-            route.addAll(walkingSearch.path());
-            walkingSearch = null;
-            if (reachedCenter) appendPuzzleCenterWaypoint(center);
-        }
-        if (walkingSearch == null && route.isEmpty()) {
-            double distance = Math
-                .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
-                movingToPuzzleCenter = false;
-                target = puzzleMasterTarget;
-                puzzleMasterTarget = null;
-                puzzleCenterArrivalPending = true;
-                return true;
-            }
-            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
-                if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
-                    walking = true;
-                    status = digging ? "Planning board entry" : "Moving to board entrance";
-                    return true;
-                }
-                if (!allowDigging) {
-                    target = puzzleMasterTarget;
-                    puzzleMasterTarget = null;
-                    movingToPuzzleCenter = false;
-                } else abandonPuzzleCenterMove(mc);
-                return false;
-            }
-        }
-        walking = walkingSearch != null || !route.isEmpty();
-        if (!walking) {
-            double distance = Math
-                .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
-                movingToPuzzleCenter = false;
-                target = puzzleMasterTarget;
-                puzzleMasterTarget = null;
-                puzzleCenterArrivalPending = true;
-                return true;
-            }
-            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
-                if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
-                    walking = true;
-                    status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
-                    return true;
-                }
-                if (!allowDigging) {
-                    target = puzzleMasterTarget;
-                    puzzleMasterTarget = null;
-                    movingToPuzzleCenter = false;
-                } else abandonPuzzleCenterMove(mc);
-                return false;
-            }
-            movingToPuzzleCenter = false;
-            target = puzzleMasterTarget;
-            puzzleMasterTarget = null;
-            puzzleCenterArrivalPending = true;
-        }
-        status = "Moving to board center";
-        return true;
-    }
-
-    private void appendPuzzleCenterWaypoint(int[] center) {
-        int[] stand = new int[] { center[0], center[1] + 1, center[2], movingToRewardView ? 0 : 2 };
-        if (route.isEmpty() || !samePosition(route.get(route.size() - 1), stand)) route.add(stand);
-        else route.set(route.size() - 1, stand);
+        return puzzleCenter.moveToRewardView(mc, this, center);
     }
 
     private boolean reachPuzzleCenter(Minecraft mc) {
-        int[] center = target == null ? null : new int[] { target.xCoord, target.yCoord, target.zCoord };
-        if (center == null) {
-            abandonPuzzleCenterMove(mc);
-            return true;
-        }
-        double distance = center == null ? Double.MAX_VALUE
-            : Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-        boolean atFloor = center != null && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) < 0.01D;
-        if (distance <= (movingToRewardView ? 0.75D : 0.35D) && atFloor && mc.thePlayer.onGround) {
-            target = puzzleMasterTarget;
-            puzzleMasterTarget = null;
-            movingToPuzzleCenter = false;
-            stop(mc, "At LootGames board center");
-            puzzleCenterArrivalPending = true;
-            return true;
-        }
-        walkingSearch = new GroundPathfinder.Search(
-            walkingTerrain(mc.theWorld),
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.boundingBox.minY),
-            (int) Math.floor(mc.thePlayer.posZ),
-            center[0],
-            center[2],
-            LootGameSolverConfig.explorationRange);
-        if (walkingSearch.advance(3_000_000L)) {
-            boolean reachedCenter = walkingSearch.reachedGoal();
-            route.clear();
-            route.addAll(walkingSearch.path());
-            walkingSearch = null;
-            if (reachedCenter) appendPuzzleCenterWaypoint(center);
-            if (!route.isEmpty()) {
-                walking = true;
-                segmentX = mc.thePlayer.posX;
-                segmentZ = mc.thePlayer.posZ;
-                status = "Moving to board center";
-                return true;
-            }
-        } else {
-            route.clear();
-            walking = true;
-            status = "Checking route to board center";
-            return true;
-        }
-        if (movingToRewardView) {
-            stop(mc, "Chest view unreachable");
-            return true;
-        }
-        if (seekingDryEntrance) {
-            seekingDryEntrance = false;
-            digging = true;
-            entranceSelected = true;
-            savedSlot = mc.thePlayer.inventory.currentItem;
-        }
-        if (digging) {
-            if (stairStep(mc)) return true;
-            digging = false;
-            entranceSelected = false;
-            excavationRoute.clear();
-            excavationSearch = null;
-        }
-        if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
-            walking = true;
-            status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
-            return true;
-        }
-        abandonPuzzleCenterMove(mc);
-        return true;
-    }
-
-    private void abandonPuzzleCenterMove(Minecraft mc) {
-        if (puzzleMasterTarget != null) target = puzzleMasterTarget;
-        puzzleMasterTarget = null;
-        movingToPuzzleCenter = false;
-        stop(mc, "Board center has no verified safe route; explorer held");
+        return puzzleCenter.reachPuzzleCenter(mc, this);
     }
 
     public boolean consumePuzzleCenterArrival() {
-        if (!puzzleCenterArrivalPending) return false;
-        puzzleCenterArrivalPending = false;
-        return true;
+        return puzzleCenter.consumeArrival();
     }
 
     public void finishPuzzle(Minecraft mc, boolean solved) {
@@ -700,7 +480,7 @@ public class Explorer {
         else status = solved ? "Puzzle solved; searching for the next structure" : "Puzzle ended; continuing search";
     }
 
-    private void beginAccessTrail(Minecraft mc) {
+    void beginAccessTrail(Minecraft mc) {
         if (knownStructure == null || mc.thePlayer == null) return;
         if (entrySurfacePoint == null && mc.theWorld != null) {
             int sy = mc.theWorld.getHeightValue(knownStructure[0], knownStructure[2]);
@@ -750,12 +530,12 @@ public class Explorer {
         return true;
     }
 
-    private void recordAccessPoint(int x, int y, int z) {
+    void recordAccessPoint(int x, int y, int z) {
         trail.points.clear();
         trail.dirty = false;
     }
 
-    private void persistAccessTrail(boolean force) {}
+    void persistAccessTrail(boolean force) {}
 
     private void removePersistedTrail() {
         trail.points.clear();
@@ -767,31 +547,11 @@ public class Explorer {
     }
 
     boolean savedRouteWalkable(Minecraft mc, List<int[]> points) {
-        if (mc == null || mc.theWorld == null || points == null || points.isEmpty()) return false;
-        int[] endpoint = points.get(points.size() - 1);
-        if (!solidCheckpoint(mc.theWorld, endpoint[0], endpoint[1], endpoint[2])) return false;
-        for (int i = 0; i < points.size(); i++) {
-            int[] point = points.get(i);
-            if (!safe(mc.theWorld, point[0], point[1], point[2])
-                || blockedWalkNodes.contains(supportKey(point[0], point[1], point[2]))) return false;
-            if (i == 0) continue;
-            int[] previous = points.get(i - 1);
-            if (Math.abs(point[0] - previous[0]) > 1 || Math.abs(point[1] - previous[1]) > 1
-                || Math.abs(point[2] - previous[2]) > 1) return false;
-            if (point[0] != previous[0] && point[2] != previous[2]
-                && (!safe(mc.theWorld, point[0], previous[1], previous[2])
-                    || !safe(mc.theWorld, previous[0], previous[1], point[2])))
-                return false;
-        }
-        return true;
+        return returnNav.savedRouteWalkable(mc, this, points);
     }
 
     void clearReturnTransits() {
-        returnJoinSearch = null;
-        returnTrailRoute = null;
-        roomEntry.reset();
-        roomExit.reset();
-        chestPitNav.reset();
+        returnNav.clearReturnTransits(this);
     }
 
     private boolean startChestPitReturn(Minecraft mc, boolean resumeSearch) {
@@ -844,132 +604,27 @@ public class Explorer {
     }
 
     private boolean rerouteSavedReturn(Minecraft mc, int firstCheckpoint) {
-        if (!returning || returnJoinSearch != null || route.size() < 2) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        int checkpointIndex = ReturnRoutePolicy.nextSafeCheckpoint(
-            route,
-            firstCheckpoint,
-            point -> solidCheckpoint(mc.theWorld, point[0], point[1], point[2])
-                && !blockedWalkNodes.contains(supportKey(point[0], point[1], point[2])));
-        if (checkpointIndex < 0) return false;
-        int[] join = route.get(checkpointIndex);
-        returnTrailRoute = new ArrayList<int[]>();
-        for (int p = checkpointIndex; p < route.size(); p++) returnTrailRoute.add(
-            route.get(p)
-                .clone());
-        returnJoinSearch = new GroundPathfinder.Search(
-            walkingTerrain(mc.theWorld),
-            x,
-            y,
-            z,
-            join[0],
-            join[1],
-            join[2],
-            Math.max(16, LootGameSolverConfig.explorationRange));
-        returnJoinX = join[0];
-        returnJoinY = join[1];
-        returnJoinZ = join[2];
-        rejoiningSavedTrail = true;
-        route.clear();
-        segmentX = mc.thePlayer.posX;
-        segmentZ = mc.thePlayer.posZ;
-        status = "Finding a clear way back to the saved tunnel";
-        return true;
+        return returnNav.rerouteSavedReturn(mc, this, firstCheckpoint);
     }
 
     private boolean digTowardSavedExit(Minecraft mc) {
-        if (!returning || returnDigging || mc.thePlayer == null) return false;
-        if (insideDungeonRoom(mc)) return startRoomExitSearch(mc);
-        List<int[]> savedRoute = new ArrayList<int[]>(route.size());
-        for (int[] point : route) savedRoute.add(point.clone());
-        if (savedRoute.size() < 2 && trail.points.size() >= 2) {
-            int nearest = trail.points.nearestIndex(
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ),
-                128);
-            savedRoute = trail.points.reverseFrom(nearest);
-        }
-        if (savedRoute.size() >= 2 && startReturnDig(mc, savedRoute)) return true;
-        return insideDungeonRoom(mc) && roomExitCandidates == null && startRoomExitSearch(mc);
+        return returnNav.digTowardSavedExit(mc, this);
     }
 
     private boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
-        if (mc.thePlayer == null || mc.theWorld == null || savedRoute == null || savedRoute.size() < 2) return false;
-        returnDigSource = new ArrayList<int[]>(savedRoute.size());
-        for (int[] point : savedRoute) returnDigSource.add(point.clone());
-        returnDigAnchorIndex = Math.min(3, returnDigSource.size() - 1);
-        return planReturnDigToAnchor(mc, returnDigAnchorIndex);
+        return returnNav.startReturnDig(mc, this, savedRoute);
     }
 
     private boolean planReturnDigToAnchor(Minecraft mc, int anchorIndex) {
-        if (mc.thePlayer == null || mc.theWorld == null
-            || returnDigSource == null
-            || anchorIndex < 1
-            || anchorIndex >= returnDigSource.size()) return false;
-        int[] anchor = returnDigSource.get(anchorIndex);
-        TileEntity digGoal = new TileEntity();
-        digGoal.xCoord = anchor[0];
-        digGoal.yCoord = anchor[1];
-        digGoal.zCoord = anchor[2];
-        if (!returnDigging) returnOriginalTarget = target;
-        if (savedSlot < 0) savedSlot = mc.thePlayer.inventory.currentItem;
-        target = digGoal;
-        returnAfterDig = new ArrayList<int[]>();
-        for (int i = anchorIndex; i < returnDigSource.size(); i++) returnAfterDig.add(
-            returnDigSource.get(i)
-                .clone());
-        returnDigAnchorIndex = anchorIndex;
-        returnDigResumeSearch = resumeSearchAfterReturn;
-        returnDigging = true;
-        returnJoinSearch = null;
-        returnTrailRoute = null;
-        rejoiningSavedTrail = false;
-        route.clear();
-        excavationRoute.clear();
-        excavationReplans = 0;
-        approachPlan = null;
-        approachAnchor = null;
-        stairX = 0;
-        stairZ = 0;
-        settlingTicks = 0;
-        excavationSearch = new ExcavationPathfinder(
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.boundingBox.minY),
-            (int) Math.floor(mc.thePlayer.posZ),
-            anchor[0],
-            anchor[1],
-            anchor[2]);
-        digging = true;
-        returning = false;
-        searching = false;
-        entranceSelected = true;
-        walking = true;
-        status = "Planning a checked exit link to saved checkpoint " + (anchorIndex + 1);
-        return true;
+        return returnNav.planReturnDigToAnchor(mc, this, anchorIndex);
     }
 
     private boolean tryNextReturnDigAnchor(Minecraft mc) {
-        if (returnDigSource == null) return false;
-        int next = Math.min(returnDigSource.size() - 1, returnDigAnchorIndex + 3);
-        return next > returnDigAnchorIndex && planReturnDigToAnchor(mc, next);
+        return returnNav.tryNextReturnDigAnchor(mc, this);
     }
 
     private void resumeSavedReturnAfterDig() {
-        target = returnOriginalTarget;
-        returnOriginalTarget = null;
-        route.clear();
-        if (returnAfterDig != null) route.addAll(returnAfterDig);
-        returnAfterDig = null;
-        returnDigSource = null;
-        returnDigSource = null;
-        returnDigging = false;
-        digging = false;
-        returning = true;
-        resumeSearchAfterReturn = returnDigResumeSearch;
-        status = "Exit opened; continuing along saved access route";
+        returnNav.resumeSavedReturnAfterDig(this);
     }
 
     public static String worldIdentity(Minecraft mc) {
@@ -1890,7 +1545,7 @@ public class Explorer {
                     walkingSearch = null;
                     walkingSearchNeedsResume = !movingToPuzzleCenter && !reachedGoal && !route.isEmpty();
                     if (movingToPuzzleCenter && reachedCenter && target != null)
-                        appendPuzzleCenterWaypoint(new int[] { target.xCoord, target.yCoord, target.zCoord });
+                        puzzleCenter.appendPuzzleCenterWaypoint(this, new int[] { target.xCoord, target.yCoord, target.zCoord });
                     walkingPlanFailed = !reachedGoal;
                 }
             }
@@ -3015,518 +2670,35 @@ public class Explorer {
     }
 
     private boolean beginDiggingAtCurrentPosition(Minecraft mc) {
-        if (!LootGameSolverConfig.staircaseEnabled || mc.thePlayer.isInWater() || !mc.thePlayer.onGround) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!safe(mc.theWorld, x, y, z) || !dryShore(mc.theWorld, x, y, z)) return false;
-        route.clear();
-        walkingSearch = null;
-        continuationSearch = null;
-        excavationSearch = null;
-        excavationRoute.clear();
-        digging = true;
-        entranceSelected = true;
-        seekingDryEntrance = false;
-        savedSlot = mc.thePlayer.inventory.currentItem;
-        status = "Planning a safe tunnel from the current checkpoint";
-        return true;
+        return excavationPlanner.beginDiggingAtCurrentPosition(mc, this);
     }
 
     private List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
-        int goalY = target.yCoord + 1;
-        ExcavationPathfinder.Terrain terrain = (a, b, c, nx, ny, nz) -> excavationTerrain
-            .excavationCost(mc.theWorld, a, b, c, nx, ny, nz);
-        if (goalY == y) {
-            List<int[]> proposal = ExcavationPatterns.straight(x, y, z, target.xCoord, goalY, target.zCoord);
-            List<int[]> checked = ExcavationPatterns
-                .checked(proposal.subList(0, Math.min(16, proposal.size())), terrain, x, y, z);
-            if (!checked.isEmpty() && checked.size() >= Math.min(4, proposal.size())) {
-                excavationMode = goalY == y ? "Straight tunnel" : goalY > y ? "Upward staircase" : "Downward staircase";
-                return checked;
-            }
-        }
-        if (goalY != y) {
-            int orientation = Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z) ? target.xCoord >= x ? 0 : 2
-                : target.zCoord >= z ? 1 : 3;
-            for (int turn = 0; turn < 4; turn++) {
-                List<int[]> proposal = ExcavationPatterns
-                    .spiral(x, y, z, goalY, LootGameSolverConfig.spiralWidth, (orientation + turn) % 4);
-                int section = 8 * (LootGameSolverConfig.spiralWidth - 1);
-                List<int[]> checked = ExcavationPatterns
-                    .checked(proposal.subList(0, Math.min(section, proposal.size())), terrain, x, y, z);
-                if (checked.size() < proposal.size()) {
-                    int lap = 4 * (LootGameSolverConfig.spiralWidth - 1);
-                    checked = new ArrayList<int[]>(checked.subList(0, checked.size() / lap * lap));
-                }
-                if (!checked.isEmpty()) {
-                    excavationMode = goalY > y ? "Spiral staircase up" : "Spiral staircase down";
-                    return checked;
-                }
-            }
-        }
-        return new ArrayList<int[]>();
+        return excavationPlanner.patternedAccess(mc, this, x, y, z);
     }
 
-    private boolean stairStep(Minecraft mc) {
-        if (fallingBlocks.waiting(mc, () -> releaseMiningWhileSandFalls(mc))) {
-            status = "Waiting for sand";
-            return true;
-        }
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!mc.thePlayer.onGround) return ++settlingTicks <= 40;
-        settlingTicks = 0;
-        if (roofEscapeGoal != null && Math.abs(x - roofEscapeGoal[0]) + Math.abs(z - roofEscapeGoal[2]) <= 2) {
-            roofEscapeGoal = null;
-            excavationRoute.clear();
-            excavationSearch = null;
-            status = "Reached roof edge; planning side access";
-        }
-        if (roofEscapeGoal == null) planRoofEscape(mc);
-        excavationTerrain.protectSupport(supportKey(x, y - 1, z));
-        if (!returnDigging) {
-            if (staircaseDugPath.isEmpty() || !samePosition(staircaseDugPath.get(staircaseDugPath.size() - 1), new int[] { x, y, z })) {
-                staircaseDugPath.add(new int[] { x, y, z });
-            }
-            if (trail.target == null || trail.target[0] != target.xCoord
-                || trail.target[1] != target.yCoord
-                || trail.target[2] != target.zCoord) {
-                persistAccessTrail(true);
-                trail.points.clear();
-                trail.target = new int[] { target.xCoord, target.yCoord, target.zCoord };
-                trail.worldId = worldIdentity(mc);
-                trail.dimension = mc.theWorld.provider.dimensionId;
-                trail.points.replace(
-                    trail.store
-                        .load(trail.worldId, trail.dimension, trail.target[0], trail.target[1], trail.target[2]));
-                trail.dirty = false;
-                trail.excavating = trail.points.size() > 1;
-            }
-            if (!trail.excavating) {
-                // Save the return trail from the excavation mouth, not the old start.
-                trail.points.clear();
-                trail.dirty = false;
-                trail.excavating = true;
-            }
-            recordAccessPoint(x, y, z);
-        }
-        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
-            singleStep(mc, x, y, z, true);
-            return true;
-        }
-        if (snowRecoveryTarget != null) {
-            int[] snow = snowRecoveryTarget;
-            if (Math.abs(snow[0] - x) + Math.abs(snow[2] - z) == 1
-                && mc.theWorld.getBlock(snow[0], snow[1], snow[2]) == Blocks.snow_layer
-                && minePlannedBlock(mc, snow[0], snow[1], snow[2], snow[1])) return true;
-            snowRecoveryTarget = null;
-        }
-        if (excavationRoute.isEmpty() && excavationSearch == null
-            && trail.points.size() <= 1
-            && roofEscapeGoal == null
-            && excavationReplans == 0) {
-            excavationRoute.addAll(patternedAccess(mc, x, y, z));
-            if (!excavationRoute.isEmpty()) {
-                approachPlan = null;
-                approachAnchor = null;
-            }
-        }
-        if (approachPlan != null) {
-            if (approachAnchor[0] == x && approachAnchor[1] == y && approachAnchor[2] == z) {
-                if (approachReady) excavationRoute.addAll(approachPlan.path);
-                else excavationSearch = approachPlan;
-            }
-            approachPlan = null;
-            approachAnchor = null;
-        }
-        if (excavationRoute.isEmpty()) {
-            if (excavationSearch == null) {
-                excavationSearch = new ExcavationPathfinder(
-                    x,
-                    y,
-                    z,
-                    roofEscapeGoal == null ? target.xCoord : roofEscapeGoal[0],
-                    roofEscapeGoal == null ? target.yCoord + 1 : roofEscapeGoal[1],
-                    roofEscapeGoal == null ? target.zCoord : roofEscapeGoal[2],
-                    true);
-                rejectedSteps.clear();
-            }
-            boolean complete = excavationSearch.advance(
-                (a, b, c, nx, ny, nz) -> a == x && b == y && c == z && blockedWalkNodes.contains(supportKey(nx, ny, nz))
-                    ? -1
-                    : excavationTerrain.excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
-                24,
-                System.nanoTime() + 3_000_000L);
-            rejectedSteps.clear();
-            rejectedSteps.addAll(excavationSearch.rejected);
-            status = "Planning a safe tunnel";
-            if (!complete) return true;
-            rejectedSteps.clear();
-            excavationRoute.addAll(excavationSearch.path);
-            excavationSearch = null;
-            if (excavationRoute.isEmpty()) return clearSnowForExcavation(mc, x, y, z);
-            excavationMode = "Checked access route";
-        }
-        if (excavationRoute.size() >= 2) {
-            int[] first = excavationRoute.get(0), second = excavationRoute.get(1);
-            if (first[1] == y && second[1] == y
-                && Math.abs(second[0] - x) == 1
-                && Math.abs(second[2] - z) == 1
-                && safe(mc.theWorld, second[0], y, z)
-                && safe(mc.theWorld, x, y, second[2])
-                && safe(mc.theWorld, second[0], y, second[2])) {
-                singleStep(mc, second[0], y, second[2], false);
-                excavationRoute.remove(0);
-                excavationRoute.remove(0);
-                return true;
-            }
-        }
-        int[] next = excavationRoute.get(0);
-        stairX = next[0] - x;
-        stairZ = next[2] - z;
-        if (!ExcavationPolicy.beside(x, z, next[0], next[2])
-            || excavationTerrain.excavationCost(mc.theWorld, x, y, z, next[0], next[1], next[2]) < 0) {
-            markBlockedWalkNode(next[0], next[1], next[2]);
-            excavationRoute.clear();
-            miningAim.reset();
-            return ++excavationReplans <= 12;
-        }
-        if (attemptStairStep(mc, next[1])) return true;
-        markBlockedWalkNode(next[0], next[1], next[2]);
-        excavationRoute.clear();
-        miningAim.reset();
-        aimTicks = 0;
-        return ++excavationReplans <= 12;
+    boolean stairStep(Minecraft mc) {
+        return excavationPlanner.stairStep(mc, this);
     }
 
-    private boolean clearSnowForExcavation(Minecraft mc, int x, int y, int z) {
-        if (target == null || !dryShore(mc.theWorld, x, y, z)) return false;
-        for (int[] direction : ExcavationPolicy.approachDirections(x, z, target.xCoord, target.zCoord)) {
-            int nx = x + direction[0], nz = z + direction[1];
-            for (int by = y + 1; by >= y - 1; by--) {
-                if (!mc.theWorld.blockExists(nx, by, nz) || mc.theWorld.getBlock(nx, by, nz) != Blocks.snow_layer
-                    || !excavationTerrain.excavatable(mc.theWorld, nx, by, nz)
-                    || visibleMiningPoint(mc, nx, by, nz) == null) continue;
-                if (by < y && !mc.theWorld.getBlock(nx, by - 1, nz)
-                    .isNormalCube()) continue;
-                boolean hazard = false;
-                for (int dy = -1; dy <= 2; dy++) {
-                    if (!mc.theWorld.blockExists(nx, y + dy, nz)) {
-                        hazard = true;
-                        break;
-                    }
-                    net.minecraft.block.Block block = mc.theWorld.getBlock(nx, y + dy, nz);
-                    if (block.getMaterial()
-                        .isLiquid() || ContactHazards.dangerous(block, mc.theWorld.getBlockMetadata(nx, y + dy, nz))) {
-                        hazard = true;
-                        break;
-                    }
-                }
-                if (hazard) continue;
-                snowRecoveryTarget = new int[] { nx, by, nz };
-                return minePlannedBlock(mc, nx, by, nz, by);
-            }
-        }
-        return false;
+    boolean clearSnowForExcavation(Minecraft mc, int x, int y, int z) {
+        return excavationPlanner.clearSnowForExcavation(mc, this, x, y, z);
     }
 
-    private boolean selectDigEntrance(Minecraft mc) {
-        if (mc.thePlayer == null || mc.theWorld == null || target == null) return false;
-        int x = (int) Math.floor(mc.thePlayer.posX);
-        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (entrySurfacePoint == null) {
-            entrySurfacePoint = new int[] { x, y, z };
-        }
-        if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, target.xCoord, target.zCoord)
-            && dryShore(mc.theWorld, x, y, z)
-            && safe(mc.theWorld, x, y, z)) {
-            entranceSurfaceY = y;
-            entrySurfacePoint = new int[] { x, y, z };
-            staircaseDugPath.clear();
-            staircaseDugPath.add(new int[] { x, y, z });
-            route.clear();
-            extendedFrom = null;
-            approachPlan = null;
-            walkingSearch = null;
-            continuationSearch = null;
-            excavationSearch = null;
-            excavationRoute.clear();
-            digging = true;
-            seekingDryEntrance = false;
-            entranceSelected = true;
-            savedSlot = mc.thePlayer.inventory.currentItem;
-            status = "Planning access from the nearest safe structure wall";
-            return true;
-        }
-        digging = false;
-        if (findDryEntrance(mc)) {
-            walking = true;
-            return true;
-        }
-        return false;
+    boolean selectDigEntrance(Minecraft mc) {
+        return excavationPlanner.selectDigEntrance(mc, this);
     }
 
-    private boolean findDryEntrance(final Minecraft mc) {
-        final World w = mc.theWorld;
-        final GroundPathfinder.Terrain approachTerrain = walkingTerrain(w);
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (entranceCandidates.isEmpty()) {
-            entranceCandidate = 0;
-            int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
-                { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
-            for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
-                <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2) for (int[] direction : directions) {
-                    double norm = Math.hypot(direction[0], direction[1]);
-                    int gx = target.xCoord + (int) Math.round(direction[0] * radius / norm);
-                    int gz = target.zCoord + (int) Math.round(direction[1] * radius / norm);
-                    if (!ExcavationPolicy.preferredEntrance(gx, gz, target.xCoord, target.zCoord)) continue;
-                    if (!w.blockExists(gx, y, gz)) continue;
-                    int surface = w.getHeightValue(gx, gz);
-                    int[] heights = { surface - 2, surface - 1, surface, surface + 1, y - 1, y, y + 1 };
-                    for (int i = 0; i < heights.length; i++) {
-                        int gy = heights[i];
-                        boolean duplicate = false;
-                        for (int j = 0; j < i; j++) if (heights[j] == gy) duplicate = true;
-                        if (!duplicate && gy > 0 && gy < w.getHeight() - 2 && dryShore(w, gx, gy, gz))
-                            entranceCandidates.add(new int[] { gx, gy, gz });
-                    }
-                }
-            final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
-            final int tx = target.xCoord, tz = target.zCoord;
-            entranceCandidates
-                .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
-        }
-        for (int attempts = 0; attempts < 1 && entranceCandidate < entranceCandidates.size(); attempts++) {
-            int[] goal = entranceCandidates.get(entranceCandidate++);
-            if (Math.abs(goal[0] - x) + Math.abs(goal[2] - z) <= 1 && Math.abs(goal[1] - y) <= 1) {
-                if (mc.thePlayer.onGround && dryShore(w, x, y, z) && safe(w, x, y, z)) {
-                    digging = true;
-                    seekingDryEntrance = false;
-                    entranceSelected = true;
-                    savedSlot = mc.thePlayer.inventory.currentItem;
-                    entranceCandidates.clear();
-                    status = "Planning access from the nearest safe structure wall";
-                    return true;
-                }
-            }
-            List<int[]> candidate = new GroundPathfinder().find(new GroundPathfinder.Terrain() {
-
-                public boolean stand(int a, int b, int c) {
-                    return approachTerrain.stand(a, b, c);
-                }
-
-                public boolean clear(int a, int b, int c) {
-                    return passable(w, a, b, c);
-                }
-
-                public boolean checkpoint(int a, int b, int c) {
-                    return solidCheckpoint(w, a, b, c);
-                }
-            }, x, y, z, goal[0], goal[2], 48);
-            if (candidate.isEmpty()) continue;
-            int[] last = candidate.get(candidate.size() - 1);
-            if (last[1] != goal[1] || Math.abs(last[0] - goal[0]) + Math.abs(last[2] - goal[2]) > 1
-                || !dryShore(w, last[0], last[1], last[2])) continue;
-            if (candidate.size() > Math.max(12D, 2D * Math.hypot(goal[0] - x, goal[2] - z))) continue;
-            route.clear();
-            route.addAll(candidate);
-            walkingSearch = null;
-            walkingSearchNeedsResume = false;
-            continuationSearch = null;
-            extendedFrom = null;
-            approachPlan = null;
-            approachAnchor = null;
-            approachReady = false;
-            segmentX = mc.thePlayer.posX;
-            segmentZ = mc.thePlayer.posZ;
-            seekingDryEntrance = true;
-            searching = false;
-            entranceCandidates.clear();
-            stairX = 0;
-            stairZ = 0;
-            status = "Moving to selected dry entrance";
-            return true;
-        }
-        if (entranceCandidate < entranceCandidates.size()) {
-            status = "Checking alternate dry entrances";
-            return true;
-        }
-        entranceCandidates.clear();
-        return false;
+    boolean findDryEntrance(Minecraft mc) {
+        return excavationPlanner.findDryEntrance(mc, this);
     }
 
-    private boolean attemptStairStep(Minecraft mc, int destinationY) {
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (!mc.thePlayer.onGround) {
-            status = "Waiting to land on the next stair";
-            return ++settlingTicks <= 40;
-        }
-        settlingTicks = 0;
-        if (!safe(mc.theWorld, x, y, z)) return false;
-        if (Math.abs(mc.thePlayer.posX - x - 0.5D) > 0.2D || Math.abs(mc.thePlayer.posZ - z - 0.5D) > 0.2D) {
-            singleStep(mc, x, y, z, true);
-            return true;
-        }
-        if (stairX == 0 && stairZ == 0) {
-            stairX = Integer.signum(target.xCoord - x);
-            stairZ = Integer.signum(target.zCoord - z);
-            if (Math.abs(target.xCoord - x) >= Math.abs(target.zCoord - z)) stairZ = 0;
-            else stairX = 0;
-            if (stairX == 0 && stairZ == 0) stairX = 1;
-        }
-        int nx = x + stairX, nz = z + stairZ;
-        if (!ExcavationPolicy.beside(x, z, nx, nz)) return false;
-        World w = mc.theWorld;
-        for (int by = y; by <= y + 1; by++) {
-            net.minecraft.block.Block plant = w.getBlock(x, by, z);
-            if (FoliagePolicy.canClear(
-                isFoliage(plant),
-                w.getTileEntity(x, by, z) != null,
-                plant.getBlockHardness(w, x, by, z),
-                x,
-                by,
-                z,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                plant == Blocks.snow_layer)) return minePlannedBlock(mc, x, by, z, destinationY);
-        }
-        if (excavationTerrain.excavationCost(w, x, y, z, nx, destinationY, nz) < 0) return false;
-        if (destinationY > y && !passable(w, x, y + 2, z)) return minePlannedBlock(mc, x, y + 2, z, y + 2);
-        int clearTop = Math.max(y, destinationY) + 1;
-        if (!w.blockExists(nx, clearTop + 1, nz)) return false;
-        if (clearTop > y + 4) return false;
-        for (Object entity : w.loadedEntityList) {
-            if (entity instanceof net.minecraft.entity.item.EntityFallingBlock) {
-                net.minecraft.entity.Entity falling = (net.minecraft.entity.Entity) entity;
-                if ((int) Math.floor(falling.posX) == nx && (int) Math.floor(falling.posZ) == nz
-                    && falling.posY >= destinationY
-                    && falling.posY <= clearTop + 12) {
-                    releaseMiningWhileSandFalls(mc);
-                    status = "Waiting for sand";
-                    return true;
-                }
-            }
-        }
-        for (int by = destinationY; by <= clearTop; by++) {
-            if (w.getBlock(nx, by, nz) == Blocks.snow_layer && FoliagePolicy.canClear(
-                true,
-                w.getTileEntity(nx, by, nz) != null,
-                w.getBlock(nx, by, nz)
-                    .getBlockHardness(w, nx, by, nz),
-                nx,
-                by,
-                nz,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                true)) return minePlannedBlock(mc, nx, by, nz, destinationY);
-            if (w.getBlock(nx, by, nz) instanceof net.minecraft.block.BlockFalling)
-                return minePlannedBlock(mc, nx, by, nz, destinationY);
-        }
-        for (int by = clearTop; by >= destinationY; by--) {
-            net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-            if (passable(w, nx, by, nz)) continue;
-            if (FoliagePolicy.canClear(
-                isFoliage(b),
-                w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz),
-                nx,
-                by,
-                nz,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                b == Blocks.snow_layer)) continue;
-            if (!excavationTerrain.excavatable(w, nx, by, nz)) return false;
-            if (w.getTileEntity(nx, by, nz) != null || b.getBlockHardness(w, nx, by, nz) < 0) return false;
-        }
-        for (int by = clearTop; by >= destinationY; by--) {
-            net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-            if (isFoliage(b) && FoliagePolicy.canClear(
-                true,
-                w.getTileEntity(nx, by, nz) != null,
-                b.getBlockHardness(w, nx, by, nz),
-                nx,
-                by,
-                nz,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                b == Blocks.snow_layer)) return minePlannedBlock(mc, nx, by, nz, destinationY);
-            if (passable(w, nx, by, nz)) continue;
-            return minePlannedBlock(mc, nx, by, nz, destinationY);
-        }
-        digTicks = 0;
-        miningAim.reset();
-        if (!safe(w, nx, destinationY, nz)) return false;
-        singleStep(mc, nx, destinationY, nz, false);
-        excavationTerrain.protectSupport(supportKey(nx, destinationY - 1, nz));
-        if (!excavationRoute.isEmpty()) excavationRoute.remove(0);
-        int lastX = nx, lastY = destinationY, lastZ = nz;
-        while (!excavationRoute.isEmpty() && route.size() < 6) {
-            int[] following = excavationRoute.get(0);
-            if (!ExcavationPolicy.beside(lastX, lastZ, following[0], following[2]) || Math.abs(following[1] - lastY) > 1
-                || !safe(w, following[0], following[1], following[2])
-                || excavationTerrain.excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2])
-                    < 0)
-                break;
-            boolean clear = true;
-            for (int by = following[1]; by <= Math.max(lastY, following[1]) + 1; by++) {
-                if (isFoliage(w.getBlock(following[0], by, following[2]))
-                    || !passable(w, following[0], by, following[2])) clear = false;
-            }
-            if (!clear) break;
-            route.add(new int[] { following[0], following[1], following[2], 0 });
-            excavationTerrain.protectSupport(supportKey(following[0], following[1] - 1, following[2]));
-            lastX = following[0];
-            lastY = following[1];
-            lastZ = following[2];
-            excavationRoute.remove(0);
-        }
-        excavationReplans = 0;
-        stairSteps++;
-        lastDistance = Double.MAX_VALUE;
-        stalled = 0;
-        return true;
+    boolean attemptStairStep(Minecraft mc, int destinationY) {
+        return excavationPlanner.attemptStairStep(mc, this, destinationY);
     }
 
-    private int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ,
-        int destinationY) {
-        net.minecraft.block.Block foliage = w.getBlock(x, foliageY, z);
-        if (!FoliagePolicy.canClear(
-            isFoliage(foliage),
-            w.getTileEntity(x, foliageY, z) != null,
-            foliage.getBlockHardness(w, x, foliageY, z),
-            x,
-            foliageY,
-            z,
-            playerX,
-            footY,
-            playerZ,
-            x,
-            z,
-            foliage == Blocks.snow_layer)) return -1;
-        int supportY = foliageY;
-        for (int scan = 0; scan < 8 && supportY > destinationY - 1; scan++) {
-            if (!isFoliage(w.getBlock(x, supportY, z))) break;
-            supportY--;
-        }
-        if (supportY < destinationY || supportY > Math.max(footY, destinationY) + 1
-            || !excavationTerrain.excavatable(w, x, supportY, z)) return -1;
-        return supportY;
+    int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ, int destinationY) {
+        return excavationPlanner.foliageSupportY(w, this, x, foliageY, z, playerX, footY, playerZ, destinationY);
     }
 
     boolean minePlannedBlock(Minecraft mc, int nx, int by, int nz, int destinationY) {
@@ -3660,7 +2832,7 @@ public class Explorer {
         return true;
     }
 
-    private void releaseMiningWhileSandFalls(Minecraft mc) {
+    void releaseMiningWhileSandFalls(Minecraft mc) {
         miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
         mc.playerController.resetBlockRemoving();
         miningAim.reset();
