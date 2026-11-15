@@ -1,6 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
 import com.kyroxova.lootgamesolver.explorer.Explorer;
+import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.passable;
 
 import java.util.List;
 
@@ -32,7 +33,6 @@ final class RewardChestView {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
                     int x = chest[0] + dx, z = chest[2] + dz;
                     if (dx * dx + dz * dz > 4) continue;
-                    if (center != null && x == center[0] && z == center[2]) continue;
                     boolean failed = false;
                     for (int[] view : failedChestViews) if (view[0] == x && view[1] == floorY && view[2] == z) {
                         failed = true;
@@ -42,8 +42,8 @@ final class RewardChestView {
                         || !mc.theWorld.getBlock(x, floorY, z)
                             .getMaterial()
                             .isSolid()
-                        || !mc.theWorld.isAirBlock(x, floorY + 1, z)
-                        || !mc.theWorld.isAirBlock(x, floorY + 2, z)) continue;
+                        || !passable(mc.theWorld, x, floorY + 1, z)
+                        || !passable(mc.theWorld, x, floorY + 2, z)) continue;
                     Vec3 eye = Vec3.createVectorHelper(x + 0.5D, floorY + 1D + mc.thePlayer.getEyeHeight(), z + 0.5D);
                     if (visibleChest(mc, eye, chest) != null) positions.add(new int[] { x, floorY, z });
                 }

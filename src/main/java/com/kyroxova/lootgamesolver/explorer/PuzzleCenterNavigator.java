@@ -72,7 +72,7 @@ public final class PuzzleCenterNavigator {
                 point.yCoord = center[1];
                 point.zCoord = center[2];
                 explorer.target = point;
-                explorer.baritoneCenterMove = true;
+                explorer.baritoneCoordinator.centerMove = true;
                 explorer.movingToPuzzleCenter = true;
                 explorer.movingToRewardView = !allowDigging;
                 puzzleCenterArrivalPending = false;

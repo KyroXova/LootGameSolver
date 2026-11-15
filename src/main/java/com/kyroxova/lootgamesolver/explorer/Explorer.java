@@ -26,7 +26,7 @@ public class Explorer {
 
     public static final boolean ENABLED = true;
     final List<int[]> route = new ArrayList<int[]>();
-    private World world;
+    World world;
     private SavedStructureFinder savedFinder;
     TileEntity target;
     int ticks;
@@ -145,7 +145,7 @@ public class Explorer {
         miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
     }
 
-    private boolean reachableBoard(Minecraft mc) {
+    boolean reachableBoard(Minecraft mc) {
         if (returning || searching || movingToPuzzleCenter || knownStructure == null) return false;
         net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
@@ -175,19 +175,7 @@ public class Explorer {
     boolean movingToPuzzleCenter;
     boolean movingToRewardView;
     final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
-    boolean baritoneCenterMove;
-    boolean baritoneStructureMove;
-    boolean baritoneSearchMove;
-    private boolean baritoneSearchHandoff;
-    private boolean baritoneSearchNext;
-    int[] baritoneReturnPoint;
-    World baritoneReturnWorld;
-    boolean baritoneReturnMove, baritoneReturnWaiting, baritoneResumeSearch;
-    private boolean baritoneReturnSolved;
-    private int baritoneReturnWait;
-    private final List<int[]> baritoneRoutePreview = new ArrayList<int[]>();
-    private int baritonePreviewTick;
-    private int baritoneSearchX, baritoneSearchZ, baritoneSearchTicks, baritoneHandoffTicks;
+    final BaritoneTransitCoordinator baritoneCoordinator = new BaritoneTransitCoordinator();
     private boolean puzzleCenterArrivalPending;
     TileEntity puzzleMasterTarget;
     GroundPathfinder.Search returnJoinSearch;
@@ -369,10 +357,7 @@ public class Explorer {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
-        baritoneReturnPoint = null;
-        baritoneReturnWorld = null;
-        baritoneReturnWaiting = false;
-        baritoneReturnMove = false;
+        baritoneCoordinator.reset();
         continueProgressiveSearch(mc, solved);
     }
 
@@ -404,7 +389,7 @@ public class Explorer {
         status = "Exit blocked; retrying saved tunnel and safe alternatives";
     }
 
-    private void continueProgressiveSearch(Minecraft mc, boolean solved) {
+    void continueProgressiveSearch(Minecraft mc, boolean solved) {
         snowRecoveryTarget = null;
         removePersistedTrail();
         route.clear();
@@ -459,11 +444,11 @@ public class Explorer {
         if (first != null) {
             BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(first[0], first[1]);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
-                baritoneSearchX = first[0];
-                baritoneSearchZ = first[1];
-                baritoneSearchTicks = 0;
-                baritoneSearchHandoff = false;
-                baritoneSearchMove = true;
+                baritoneCoordinator.searchX = first[0];
+                baritoneCoordinator.searchZ = first[1];
+                baritoneCoordinator.searchTicks = 0;
+                baritoneCoordinator.searchHandoff = false;
+                baritoneCoordinator.searchMove = true;
                 searching = true;
                 walking = true;
                 status = solved ? "Puzzle solved; searching for the next structure" : "Searching for structures";
@@ -647,9 +632,7 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (!baritoneCenterMove && !baritoneStructureMove
-            && !baritoneReturnMove
-            && !baritoneReturnWaiting) camera.render(mc, world, true);
+        if (!baritoneCoordinator.active()) camera.render(mc, world, true);
     }
 
     public void look(float yaw, float pitch) {
@@ -665,8 +648,7 @@ public class Explorer {
     }
 
     private void rememberBaritoneReturnPoint(Minecraft mc) {
-        baritoneReturnPoint = null;
-        baritoneReturnWorld = null;
+        baritoneCoordinator.rememberReturnPoint(mc);
     }
 
     void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
@@ -680,19 +662,15 @@ public class Explorer {
     }
 
     public List<int[]> navigationRoute() {
-        return usingBaritoneNavigation() ? baritoneRoutePreview : navigationPreview;
+        return baritoneCoordinator.active() ? baritoneCoordinator.routePreview : navigationPreview;
     }
 
     public List<int[]> excavationPreview() {
-        return digging && !usingBaritoneNavigation() ? excavationRoute : java.util.Collections.emptyList();
+        return digging && !baritoneCoordinator.active() ? excavationRoute : java.util.Collections.emptyList();
     }
 
     private boolean usingBaritoneNavigation() {
-        return baritoneCenterMove || baritoneStructureMove
-            || baritoneSearchMove
-            || baritoneReturnMove
-            || baritoneReturnWaiting
-            || baritoneResumeSearch;
+        return baritoneCoordinator.active();
     }
 
     List<int[]> rejectedPreview() {
@@ -820,11 +798,11 @@ public class Explorer {
             if (next != null) {
                 BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(next[0], next[1]);
                 if (started == BaritoneNavigationBridge.Start.STARTED) {
-                    baritoneSearchX = next[0];
-                    baritoneSearchZ = next[1];
-                    baritoneSearchTicks = 0;
-                    baritoneSearchHandoff = false;
-                    baritoneSearchMove = true;
+                    baritoneCoordinator.searchX = next[0];
+                    baritoneCoordinator.searchZ = next[1];
+                    baritoneCoordinator.searchTicks = 0;
+                    baritoneCoordinator.searchHandoff = false;
+                    baritoneCoordinator.searchMove = true;
                     searching = true;
                     walking = true;
                     status = "Exploring for structures";
@@ -843,7 +821,7 @@ public class Explorer {
             .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
         if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
             rememberBaritoneReturnPoint(mc);
-            baritoneStructureMove = true;
+            baritoneCoordinator.structureMove = true;
             walking = true;
             searching = false;
             status = "Walking to LootGame";
@@ -891,7 +869,7 @@ public class Explorer {
                 .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 rememberBaritoneReturnPoint(mc);
-                baritoneStructureMove = true;
+                baritoneCoordinator.structureMove = true;
                 walking = true;
                 status = "Walking to LootGame";
                 return;
@@ -947,175 +925,8 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
-        if (usingBaritoneNavigation() && baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
-            baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
-            if (++baritonePreviewTick % 5 == 0) {
-                baritoneRoutePreview.clear();
-                if (LootGameSolverConfig.showOverlay) baritoneRoutePreview.addAll(baritoneNavigation.route());
-            }
-        } else if (!baritoneRoutePreview.isEmpty()) {
-            baritoneRoutePreview.clear();
-        }
         sustain.tick(mc, walking, walking && !digging && !returnDigging);
-        if (baritoneReturnWaiting || baritoneReturnMove || baritoneResumeSearch) {
-            if (mc.thePlayer == null || mc.theWorld == null || baritoneReturnWorld != mc.theWorld) {
-                baritoneNavigation.stop();
-                baritoneReturnWaiting = false;
-                baritoneReturnMove = false;
-                baritoneResumeSearch = false;
-                baritoneReturnPoint = null;
-                baritoneReturnWorld = null;
-                walking = false;
-                returning = false;
-            } else if (baritoneResumeSearch) {
-                if (++baritoneReturnWait >= 3) {
-                    baritoneResumeSearch = false;
-                    baritoneReturnPoint = null;
-                    baritoneReturnWorld = null;
-                    continueProgressiveSearch(mc, baritoneReturnSolved);
-                }
-                return;
-            } else if (baritoneReturnWaiting) {
-                BaritoneNavigationBridge.Start started = baritoneNavigation
-                    .start(baritoneReturnPoint[0], baritoneReturnPoint[1], baritoneReturnPoint[2]);
-                if (started == BaritoneNavigationBridge.Start.STARTED) {
-                    baritoneReturnWaiting = false;
-                    baritoneReturnMove = true;
-                } else if (started != BaritoneNavigationBridge.Start.BUSY || ++baritoneReturnWait > 40) {
-                    stop(mc, "Baritone could not start the return route");
-                }
-                return;
-            } else {
-                double distToExit = baritoneReturnPoint == null ? 0D
-                    : Math.hypot(mc.thePlayer.posX - baritoneReturnPoint[0] - 0.5D, mc.thePlayer.posZ - baritoneReturnPoint[2] - 0.5D);
-                boolean onSurface = mc.theWorld.canBlockSeeTheSky(
-                    (int) Math.floor(mc.thePlayer.posX),
-                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                    (int) Math.floor(mc.thePlayer.posZ));
-                boolean arrived = onSurface
-                    || (mc.thePlayer.onGround && distToExit <= 2.5D && Math.abs(mc.thePlayer.boundingBox.minY - baritoneReturnPoint[1]) <= 2)
-                    || (baritoneNavigation.completed() && distToExit <= 4.0D);
-                if (arrived) {
-                    baritoneNavigation.stop();
-                    baritoneReturnMove = false;
-                    baritoneResumeSearch = true;
-                    baritoneReturnWait = 0;
-                    walking = false;
-                    returning = false;
-                    entrySurfacePoint = null;
-                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    stop(mc, "Baritone could not complete the return route");
-                }
-                return;
-            }
-        }
-        if (baritoneSearchMove) {
-            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
-                baritoneNavigation.stop();
-                baritoneSearchMove = false;
-                walking = false;
-            } else {
-                double aimDx = (baritoneSearchX + 0.5D) - mc.thePlayer.posX;
-                double aimDz = (baritoneSearchZ + 0.5D) - mc.thePlayer.posZ;
-                float aimYaw = (float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F;
-                look(aimYaw, 0F);
-                if (!baritoneSearchHandoff && ++baritoneSearchTicks % 20 == 0) {
-                    scan(mc);
-                    if (target != null) {
-                        baritoneNavigation.stop();
-                        baritoneSearchHandoff = true;
-                        baritoneSearchNext = false;
-                        baritoneHandoffTicks = 0;
-                    }
-                }
-                if (baritoneSearchHandoff) {
-                    BaritoneNavigationBridge.Start started = baritoneSearchNext
-                        ? baritoneNavigation.startHorizontal(baritoneSearchX, baritoneSearchZ)
-                        : baritoneNavigation.startAdjacent(target.xCoord, target.yCoord, target.zCoord);
-                    if (started == BaritoneNavigationBridge.Start.STARTED) {
-                        baritoneSearchHandoff = false;
-                        if (baritoneSearchNext) {
-                            baritoneSearchNext = false;
-                            status = "Exploring for structures";
-                        } else {
-                            baritoneSearchMove = false;
-                            rememberBaritoneReturnPoint(mc);
-                            baritoneStructureMove = true;
-                            searching = false;
-                            status = "Walking to LootGame";
-                        }
-                    } else if (started != BaritoneNavigationBridge.Start.BUSY || ++baritoneHandoffTicks > 40) {
-                        stop(mc, "Baritone could not start structure navigation");
-                    }
-                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    double distToGoal = Math.hypot(mc.thePlayer.posX - baritoneSearchX - 0.5D, mc.thePlayer.posZ - baritoneSearchZ - 0.5D);
-                    boolean arrived = (baritoneNavigation.completed() && distToGoal <= 4.0D) || distToGoal <= 2.5D;
-                    baritoneNavigation.stop();
-                    if (arrived) {
-                        scan(mc);
-                        if (target != null) {
-                            baritoneSearchHandoff = true;
-                            baritoneSearchNext = false;
-                            baritoneHandoffTicks = 0;
-                        } else {
-                            int[] next = search.next();
-                            if (next == null) stop(mc, "No structures found in search range");
-                            else {
-                                baritoneSearchX = next[0];
-                                baritoneSearchZ = next[1];
-                                baritoneSearchNext = true;
-                                baritoneSearchHandoff = true;
-                                baritoneHandoffTicks = 0;
-                            }
-                        }
-                    } else stop(mc, "Baritone exploration stopped before reaching its target");
-                }
-                return;
-            }
-        }
-        if (baritoneStructureMove) {
-            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
-                baritoneNavigation.stop();
-                baritoneStructureMove = false;
-                walking = false;
-            } else {
-                if (target != null && reachableBoard(mc)) {
-                    baritoneNavigation.stop();
-                    baritoneStructureMove = false;
-                    stop(mc, "Arrived at LootGame; opening puzzle");
-                    puzzleArrivalPending = true;
-                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    baritoneNavigation.stop();
-                    baritoneStructureMove = false;
-                    stop(mc, "Baritone could not reach the structure");
-                }
-                return;
-            }
-        }
-        if (baritoneCenterMove) {
-            if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
-                baritoneNavigation.stop();
-                baritoneCenterMove = false;
-                walking = false;
-            } else {
-                double distToCenter = Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D);
-                boolean arrived = target != null
-                    && ((distToCenter <= (movingToRewardView ? 0.75D : 1.5D)
-                        && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - target.yCoord - 1) <= 2)
-                        || (baritoneNavigation.completed() && distToCenter <= (movingToRewardView ? 1.0D : 3.0D)));
-                if (arrived) {
-                    baritoneNavigation.stop();
-                    baritoneCenterMove = false;
-                    stop(mc, "At LootGames board center");
-                    puzzleCenterArrivalPending = true;
-                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    baritoneNavigation.stop();
-                    baritoneCenterMove = false;
-                    stop(mc, "Baritone could not reach the board center");
-                }
-                return;
-            }
-        }
+        if (baritoneCoordinator.tick(mc, this)) return;
         if (!digging && !returnDigging) releaseMiningInput(mc);
         camera.clear();
         if (walking && mc.thePlayer != null && navigationInput == null) {
@@ -2367,29 +2178,13 @@ public class Explorer {
         if (mc.thePlayer != null && mc.thePlayer.isInWater() && !message.contains("Shore")) {
             if (swimToNearestShore(mc)) return;
         }
-        if (!baritoneCenterMove && !baritoneStructureMove
-            && !baritoneSearchMove
-            && !baritoneReturnMove
-            && !baritoneReturnWaiting
-            && !baritoneResumeSearch
-            && recoverableRouteFailure(message)) {
+        if (!baritoneCoordinator.active() && recoverableRouteFailure(message)) {
             queueRouteRetry(mc, message);
             return;
         }
-        if (baritoneCenterMove || baritoneStructureMove
-            || baritoneSearchMove
-            || baritoneReturnMove
-            || baritoneReturnWaiting
-            || baritoneResumeSearch) {
+        if (baritoneCoordinator.active()) {
             baritoneNavigation.stop();
-            baritoneCenterMove = false;
-            baritoneStructureMove = false;
-            baritoneSearchMove = false;
-            baritoneSearchHandoff = false;
-            baritoneSearchNext = false;
-            baritoneReturnMove = false;
-            baritoneReturnWaiting = false;
-            baritoneResumeSearch = false;
+            baritoneCoordinator.reset();
         }
         sustain.stop(mc);
         fallingBlocks.reset();
@@ -2482,7 +2277,7 @@ public class Explorer {
         status = compactStatus(message);
     }
 
-    private void scan(Minecraft mc) {
+    void scan(Minecraft mc) {
         target = null;
         knownStructure = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;

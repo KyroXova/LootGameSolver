@@ -376,7 +376,8 @@ final class RewardChestLooter {
         double dx = pos[0] + 0.5D - mc.thePlayer.posX, dz = pos[2] + 0.5D - mc.thePlayer.posZ;
         double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
-        if (dx * dx + dy * dy + dz * dz > 16D || horizontal > 1.6D) {
+        double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
+        if (dx * dx + dy * dy + dz * dz > reach * reach || horizontal > 2.8D) {
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
             else status = "Finding a safe position beside the reward chest";
