@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import net.minecraft.client.Minecraft;
+
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
 public final class BaritoneNavigationBridge {
 
@@ -154,13 +156,29 @@ public final class BaritoneNavigationBridge {
     public boolean completed() {
         if (process == null) return false;
         try {
-            return processApi.getMethod("getGoal")
-                .invoke(process) == null
-                && processApi.getMethod("mostRecentGoal")
-                    .invoke(process) == goal;
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.thePlayer == null || goal == null || goalApi == null) return false;
+            return completedAt(
+                process,
+                processApi,
+                goal,
+                goalApi,
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ));
         } catch (ReflectiveOperationException | LinkageError failure) {
             return false;
         }
+    }
+
+    static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y, int z)
+        throws ReflectiveOperationException {
+        return processApi.getMethod("getGoal")
+            .invoke(process) == null
+            && processApi.getMethod("mostRecentGoal")
+                .invoke(process) == goal
+            && (Boolean) goalApi.getMethod("isInGoal", int.class, int.class, int.class)
+                .invoke(goal, x, y, z);
     }
 
     public State state() {

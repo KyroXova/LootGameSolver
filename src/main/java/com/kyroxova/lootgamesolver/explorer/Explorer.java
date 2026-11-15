@@ -913,6 +913,18 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (baritoneCoordinator.active() && mc.thePlayer != null && mc.theWorld != null) {
+            if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled || solverActive) {
+                stop(mc, solverActive ? "Puzzle in progress" : "Exploration disabled");
+                return;
+            }
+            if (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 150) {
+                baritoneNavigation.stop();
+                baritoneCoordinator.reset();
+                if (!swimToNearestShore(mc)) stop(mc, "Low Air");
+                return;
+            }
+        }
         sustain.tick(mc, walking, walking && !digging && !returnDigging);
         if (baritoneCoordinator.tick(mc, this)) return;
         if (!digging && !returnDigging) releaseMiningInput(mc);
@@ -2167,9 +2179,6 @@ public class Explorer {
     }
 
     public void stop(Minecraft mc, String message) {
-        if (mc.thePlayer != null && mc.thePlayer.isInWater() && !message.contains("Shore")) {
-            if (swimToNearestShore(mc)) return;
-        }
         if (!baritoneCoordinator.active() && recoverableRouteFailure(message)) {
             queueRouteRetry(mc, message);
             return;
