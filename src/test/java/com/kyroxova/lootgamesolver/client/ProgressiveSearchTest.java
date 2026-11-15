@@ -13,19 +13,18 @@ import org.junit.Test;
 public class ProgressiveSearchTest {
 
     @Test
-    public void expandsAfterEachRingAndStopsAtLimit() {
-        ProgressiveSearch search = new ProgressiveSearch(-100, 200, 32);
-        assertArrayEquals(new int[] { -84, 200 }, search.next());
-        for (int i = 1; i < 8; i++) search.next();
-        assertArrayEquals(new int[] { -68, 200 }, search.next());
-        for (int i = 9; i < 16; i++) search.next();
+    public void expandsStraightAlongFacingDirectionAndStopsAtLimit() {
+        // yaw 0 = South (+Z)
+        ProgressiveSearch search = new ProgressiveSearch(0, 0, 0.0F, 128);
+        assertArrayEquals(new int[] { 0, 64 }, search.next());
+        assertArrayEquals(new int[] { 0, 128 }, search.next());
         assertNull(search.next());
         assertNull(search.next());
     }
 
     @Test
     public void goalsAreUniqueAndStayWithinConfiguredBoundary() {
-        ProgressiveSearch search = new ProgressiveSearch(-19, -53, 256);
+        ProgressiveSearch search = new ProgressiveSearch(-19, -53, 90.0F, 256);
         Set<String> visited = new HashSet<String>();
         int[] goal;
         while ((goal = search.next()) != null) {
@@ -33,6 +32,6 @@ public class ProgressiveSearchTest {
             assertTrue(Math.abs(goal[1] + 53) <= 256);
             assertTrue(visited.add(goal[0] + ":" + goal[1]));
         }
-        assertEquals(128, visited.size());
+        assertEquals(4, visited.size());
     }
 }

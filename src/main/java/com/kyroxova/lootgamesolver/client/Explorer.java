@@ -298,7 +298,19 @@ public class Explorer {
     }
 
     int[] structureWaypoint() {
-        return knownStructure;
+        if (knownStructure != null) return knownStructure;
+        if (target != null) return new int[] { target.xCoord, target.yCoord, target.zCoord };
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc != null && mc.theWorld != null && mc.thePlayer != null) {
+            net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery.find(mc, savedFinder, solvedStructures, worldIdentity(mc));
+            if (found != null) {
+                target = found;
+                knownStructure = new int[] { found.xCoord, found.yCoord, found.zCoord };
+                waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, target);
+                return knownStructure;
+            }
+        }
+        return null;
     }
 
     boolean consumePuzzleArrival() {
@@ -316,21 +328,18 @@ public class Explorer {
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, ticks);
-        if (bounds == null || x <= bounds[0]
-            || x >= bounds[1]
-            || z <= bounds[2]
-            || z >= bounds[3]
-            || center[0] <= bounds[0]
-            || center[0] >= bounds[1]
-            || center[2] <= bounds[2]
-            || center[2] >= bounds[3]
-            || Math.abs(y - center[1] - 1) > 2) return false;
-        if (knownStructure == null || knownStructure[0] <= bounds[0]
-            || knownStructure[0] >= bounds[1]
-            || knownStructure[2] <= bounds[2]
-            || knownStructure[2] >= bounds[3]) {
-            knownStructure = center.clone();
+        if (bounds != null) {
+            if (x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]
+                || center[0] <= bounds[0] || center[0] >= bounds[1] || center[2] <= bounds[2] || center[2] >= bounds[3]
+                || Math.abs(y - center[1] - 1) > 3) {
+                return false;
+            }
+        } else {
+            if (Math.hypot(x - center[0], z - center[2]) > 16.0D || Math.abs(y - center[1] - 1) > 5) {
+                return false;
+            }
         }
+        knownStructure = center.clone();
         TileEntity current = new TileEntity();
         current.xCoord = knownStructure[0];
         current.yCoord = knownStructure[1];
@@ -414,7 +423,14 @@ public class Explorer {
         if (walkingSearch == null && route.isEmpty()) {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
+            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
+                movingToPuzzleCenter = false;
+                target = puzzleMasterTarget;
+                puzzleMasterTarget = null;
+                puzzleCenterArrivalPending = true;
+                return true;
+            }
+            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
                 if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
                     walking = true;
                     status = digging ? "Planning board entry" : "Moving to board entrance";
@@ -432,7 +448,14 @@ public class Explorer {
         if (!walking) {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance > 0.35D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 0) {
+            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
+                movingToPuzzleCenter = false;
+                target = puzzleMasterTarget;
+                puzzleMasterTarget = null;
+                puzzleCenterArrivalPending = true;
+                return true;
+            }
+            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
                 if (allowDigging && LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
                     walking = true;
                     status = digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
@@ -635,6 +658,7 @@ public class Explorer {
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
+            mc.thePlayer.rotationYaw,
             LootGameSolverConfig.explorationSearchLimit);
         int[] first = search.next();
         if (first != null) {
@@ -1279,7 +1303,6 @@ public class Explorer {
 
     public void renderCamera(Minecraft mc) {
         if (!baritoneCenterMove && !baritoneStructureMove
-            && !baritoneSearchMove
             && !baritoneReturnMove
             && !baritoneReturnWaiting) camera.render(mc, world, walking);
     }
@@ -1420,6 +1443,7 @@ public class Explorer {
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
+            mc.thePlayer.rotationYaw,
             LootGameSolverConfig.explorationSearchLimit);
         entranceSelected = false;
         excavationSearch = null;
@@ -1575,6 +1599,7 @@ public class Explorer {
         } else if (!baritoneRoutePreview.isEmpty()) {
             baritoneRoutePreview.clear();
         }
+        sustain.tick(mc, walking, walking && !digging && !returnDigging);
         if (baritoneReturnWaiting || baritoneReturnMove || baritoneResumeSearch) {
             if (mc.thePlayer == null || mc.theWorld == null || baritoneReturnWorld != mc.theWorld) {
                 baritoneNavigation.stop();
@@ -1626,6 +1651,10 @@ public class Explorer {
                 baritoneSearchMove = false;
                 walking = false;
             } else {
+                double aimDx = (baritoneSearchX + 0.5D) - mc.thePlayer.posX;
+                double aimDz = (baritoneSearchZ + 0.5D) - mc.thePlayer.posZ;
+                float aimYaw = (float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F;
+                look(aimYaw, 0F);
                 if (!baritoneSearchHandoff && ++baritoneSearchTicks % 20 == 0) {
                     scan(mc);
                     if (target != null) {
@@ -1655,9 +1684,8 @@ public class Explorer {
                         stop(mc, "Baritone could not start structure navigation");
                     }
                 } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    boolean arrived = baritoneNavigation.completed()
-                        && (int) Math.floor(mc.thePlayer.posX) == baritoneSearchX
-                        && (int) Math.floor(mc.thePlayer.posZ) == baritoneSearchZ;
+                    double distToGoal = Math.hypot(mc.thePlayer.posX - baritoneSearchX - 0.5D, mc.thePlayer.posZ - baritoneSearchZ - 0.5D);
+                    boolean arrived = (baritoneNavigation.completed() && distToGoal <= 4.0D) || distToGoal <= 2.5D;
                     baritoneNavigation.stop();
                     if (arrived) {
                         scan(mc);
@@ -1706,10 +1734,11 @@ public class Explorer {
                 baritoneCenterMove = false;
                 walking = false;
             } else {
-                boolean arrived = target != null && mc.thePlayer.onGround
-                    && Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D)
-                        <= (movingToRewardView ? 0.75D : 0.35D)
-                    && (int) Math.floor(mc.thePlayer.boundingBox.minY) == target.yCoord + 1;
+                double distToCenter = Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D);
+                boolean arrived = target != null
+                    && ((distToCenter <= (movingToRewardView ? 1.8D : 1.5D)
+                        && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - target.yCoord - 1) <= 2)
+                        || (baritoneNavigation.completed() && distToCenter <= 3.0D));
                 if (arrived) {
                     baritoneNavigation.stop();
                     baritoneCenterMove = false;
@@ -1723,7 +1752,7 @@ public class Explorer {
                 return;
             }
         }
-        releaseMiningInput(mc);
+        if (!digging && !returnDigging) releaseMiningInput(mc);
         camera.clear();
         if (walking && mc.thePlayer != null && navigationInput == null) {
             navigationInput = new NavigationInput(mc.thePlayer.movementInput);
@@ -3870,8 +3899,9 @@ public class Explorer {
     }
 
     public String hud(Minecraft mc) {
-        if (target == null) return "Next Structure";
-        int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(target.xCoord, target.yCoord, target.zCoord));
-        return target.xCoord + ", " + target.yCoord + ", " + target.zCoord + " (" + distance + "m)";
+        int[] pos = structureWaypoint();
+        if (pos == null) return "Next Structure";
+        int distance = (int) Math.sqrt(mc.thePlayer.getDistanceSq(pos[0] + 0.5D, pos[1] + 0.5D, pos[2] + 0.5D));
+        return pos[0] + ", " + pos[1] + ", " + pos[2] + " (" + distance + "m)";
     }
 }

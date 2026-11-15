@@ -385,9 +385,19 @@ public final class ClientHooks {
                 centerClickAttempts = 0;
                 lastCenterClickTick = -40;
             } else if (exploration == null || !exploration.navigating()) {
-                autoPuzzleState = AutoPuzzleState.FAILED;
-                if (exploration != null)
-                    exploration.setAutomationStatus("Could not reach the board center; explorer held");
+                int[] center = floorActivatorPosition != null ? floorActivatorPosition
+                    : rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+                if (center != null && mc.thePlayer != null
+                    && mc.thePlayer.getDistanceSq(center[0] + 0.5D, center[1] + 0.5D, center[2] + 0.5D) <= 9.0D) {
+                    autoPuzzleState = AutoPuzzleState.REVEALING;
+                    puzzleWaitTicks = 0;
+                    centerClickAttempts = 0;
+                    lastCenterClickTick = -40;
+                } else {
+                    autoPuzzleState = AutoPuzzleState.FAILED;
+                    if (exploration != null)
+                        exploration.setAutomationStatus("Could not reach the board center; explorer held");
+                }
             }
             return;
         }
@@ -461,8 +471,8 @@ public final class ClientHooks {
                 startPuzzleSolver();
                 return;
             }
-            if (centerClickAttempts == 0 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
-                && puzzleWaitTicks - lastCenterClickTick >= 1
+            if (centerClickAttempts < 4 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
+                && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
                 && puzzleBridge.activateBoardCenter(activeGame)) {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
@@ -565,16 +575,37 @@ public final class ClientHooks {
             releaseMovementKeys(mc);
             puzzleCompletion.clear();
             autoPuzzleState = AutoPuzzleState.IDLE;
-            if (!exploration.navigating() && exploration.inDungeonRoom(mc)) {
+            if (!exploration.navigating() && (exploration.inDungeonRoom(mc) || puzzleBridge.nearbyFloorActivator() != null || puzzleBridge.nearbyGame(true) != null)) {
                 explorationDriven = true;
                 int[] floor = puzzleBridge.nearbyFloorActivator();
                 Object nearbyGame = puzzleBridge.nearbyGame(true);
                 DetectedGame board = puzzleBridge.detect(true);
                 int[] boardCenter = floor != null ? floor
                     : nearbyGame == null ? null : puzzleBridge.gameCenter(nearbyGame);
-                if ((floor != null || board != null || puzzleBridge.canOpenMinesweeperBoard(nearbyGame))
-                    && boardCenter != null
-                    && exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
+                if (board != null) {
+                    if (boardCenter != null) rewardCenter = boardCenter;
+                    startPuzzleSolver();
+                    exploration.setAutomationStatus("Solving active puzzle in room");
+                    return;
+                }
+                if (boardCenter != null) {
+                    if (exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
+                    autoPuzzlePosition = boardCenter.clone();
+                    rewardCenter = boardCenter.clone();
+                    floorActivatorPosition = floor;
+                    floorActivatorClicked = false;
+                    autoPuzzleState = AutoPuzzleState.OPENING;
+                    puzzleWaitTicks = 0;
+                    masterClickAttempts = 0;
+                    centerClickAttempts = 0;
+                    minesweeperOpeningClickSent = false;
+                    lastMasterClickTick = -40;
+                    lastCenterClickTick = -40;
+                    puzzleCompletion.begin();
+                    exploration.moveToPuzzleCenter(mc, boardCenter);
+                    exploration.setAutomationStatus("Opening puzzle in current room");
+                    return;
+                }
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
                     exploration.prepareRewardCollection(mc, rewards);
@@ -586,7 +617,7 @@ public final class ClientHooks {
                     exploration.setAutomationStatus("Collecting reward chests");
                     return;
                 }
-                exploration.setAutomationStatus("Checking room board");
+                exploration.toggle(mc);
                 return;
             }
             if (!exploration.navigating() && exploration.hasPendingReturn()) {

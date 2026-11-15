@@ -44,8 +44,9 @@ final class ExplorerSustain {
         }
         if (cooldown > 0) cooldown--;
         if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
-        if (mc.thePlayer.getFoodStats()
-            .getFoodLevel() <= 8 && cooldown == 0) {
+        boolean needsFood = mc.thePlayer.getFoodStats().getFoodLevel() <= 14
+            || (mc.thePlayer.shouldHeal() && mc.thePlayer.getFoodStats().getFoodLevel() < 20);
+        if (needsFood && cooldown == 0) {
             int food = findFood(mc, 0, 9);
             if (food < 0) {
                 int inventoryFood = findFood(mc, 9, 36);
@@ -110,10 +111,19 @@ final class ExplorerSustain {
     }
 
     private static boolean isHealingAxe(ItemStack stack) {
-        return stack != null && stack.getItem()
-            .getClass()
-            .getName()
-            .equals("com.rwtema.extrautils.item.ItemHealingAxe");
+        if (stack == null || stack.getItem() == null) return false;
+        String className = stack.getItem().getClass().getName();
+        if (className.equals("com.rwtema.extrautils.item.ItemHealingAxe")) return true;
+        String name = String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())).toLowerCase(java.util.Locale.ROOT);
+        if (name.contains("healingaxe") || name.contains("healing_axe")) return true;
+        try {
+            String unloc = stack.getItem().getUnlocalizedName(stack);
+            if (unloc != null && (unloc.toLowerCase(java.util.Locale.ROOT).contains("healingaxe")
+                || unloc.toLowerCase(java.util.Locale.ROOT).contains("healing_axe"))) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     private void select(Minecraft mc, int slot) {

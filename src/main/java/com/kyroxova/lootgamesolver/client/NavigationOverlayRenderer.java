@@ -14,7 +14,8 @@ final class NavigationOverlayRenderer {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null) return;
         int[] waypoint = exploration.structureWaypoint();
-        if (!exploration.navigating()) return;
+        boolean navigating = exploration.navigating();
+        if (waypoint == null && !navigating) return;
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
         try {
@@ -38,13 +39,13 @@ final class NavigationOverlayRenderer {
                     top,
                     mc.theWorld.getTotalWorldTime() + partialTicks);
             }
-            GL11.glLineWidth(2F);
-            t.startDrawing(GL11.GL_LINES);
-            if (exploration.navigating()) {
+            if (navigating) {
+                GL11.glLineWidth(2F);
+                t.startDrawing(GL11.GL_LINES);
                 double[] end = draw(t, exploration.navigationRoute(), start, false);
                 draw(t, exploration.excavationPreview(), end, true);
+                t.draw();
             }
-            t.draw();
             if (waypoint != null) {
                 int distance = (int) Math.ceil(
                     Math.sqrt(mc.thePlayer.getDistanceSq(waypoint[0] + 0.5D, waypoint[1] + 0.5D, waypoint[2] + 0.5D)));
@@ -98,11 +99,23 @@ final class NavigationOverlayRenderer {
     }
 
     private static double[] draw(Tessellator t, List<int[]> route, double[] start, boolean excavation) {
+        if (route == null || route.isEmpty()) return start;
         double x = start[0], y = start[1], z = start[2];
-        for (int i = 0; i < Math.min(96, route.size()); i++) {
+        int startIndex = 0;
+        while (startIndex < route.size() - 1) {
+            int[] first = route.get(startIndex);
+            double dx = (first[0] + 0.5D) - x;
+            double dz = (first[2] + 0.5D) - z;
+            if (dx * dx + dz * dz < 0.64D) {
+                startIndex++;
+            } else {
+                break;
+            }
+        }
+        for (int i = startIndex; i < Math.min(startIndex + 96, route.size()); i++) {
             int[] step = route.get(i);
-            boolean caution = excavation || (step.length > 3 && step[3] != 0) || Math.abs(step[1] + 0.15D - y) > 0.2D;
-            t.setColorRGBA_F(caution ? 1F : 0.15F, 0.9F, 0.15F, 0.8F);
+            boolean caution = excavation || (step.length > 3 && step[3] != 0);
+            t.setColorRGBA_F(caution ? 1F : 0.15F, caution ? 0.75F : 0.9F, 0.15F, 0.8F);
             t.addVertex(x, y, z);
             x = step[0] + 0.5D;
             y = step[1] + 0.15D;
