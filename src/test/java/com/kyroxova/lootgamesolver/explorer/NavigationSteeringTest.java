@@ -1,11 +1,25 @@
 package com.kyroxova.lootgamesolver.explorer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 public class NavigationSteeringTest {
+
+    @Test
+    public void pathHeadingFollowsSegmentInsteadOfPlayerPosition() {
+        assertEquals(
+            -90F,
+            NavigationSteering.pathHeading(java.util.Arrays.asList(new int[] { 10, 64, 10 }, new int[] { 11, 64, 10 })),
+            0F);
+        assertEquals(
+            -45F,
+            NavigationSteering.pathHeading(java.util.Arrays.asList(new int[] { 10, 64, 10 }, new int[] { 11, 64, 11 })),
+            0F);
+        assertNull(NavigationSteering.pathHeading(java.util.Collections.singletonList(new int[] { 10, 64, 10 })));
+    }
 
     @Test
     public void continuationRemovesDetourWhenItRejoinsEarlierWaypoint() {

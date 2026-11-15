@@ -639,15 +639,11 @@ public class Explorer {
     public void renderCamera(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (baritoneCoordinator.active() && !baritoneCoordinator.breaking) {
-            for (int[] point : baritoneCoordinator.routePreview) {
-                double dx = point[0] + 0.5D - mc.thePlayer.posX;
-                double dz = point[2] + 0.5D - mc.thePlayer.posZ;
-                if (dx * dx + dz * dz > 0.36D) {
-                    camera.look((float) Math.toDegrees(Math.atan2(dz, dx)) - 90F, 0F);
-                    break;
-                }
+            Float heading = NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
+            if (heading != null) {
+                camera.look(heading, 0F);
+                camera.render(mc, world, true);
             }
-            camera.render(mc, world, true);
         } else if (!baritoneCoordinator.active()) camera.render(mc, world, true);
     }
 

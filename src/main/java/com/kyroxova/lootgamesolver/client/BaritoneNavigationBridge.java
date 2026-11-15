@@ -155,6 +155,13 @@ public final class BaritoneNavigationBridge {
     public boolean isBreaking() {
         if (inputHandler == null || clickLeft == null) return false;
         try {
+            try {
+                Object executor = pathingApi.getMethod("getCurrent")
+                    .invoke(pathing);
+                if (executor != null && (Boolean) Class.forName("baritone.api.pathing.path.IPathExecutor")
+                    .getMethod("isAimingForInteraction")
+                    .invoke(executor)) return true;
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             Method forced = inputHandlerApi.getMethod("isInputForcedDown", clickLeft.getClass());
             return (Boolean) forced.invoke(inputHandler, clickLeft)
                 || (clickRight != null && (Boolean) forced.invoke(inputHandler, clickRight));

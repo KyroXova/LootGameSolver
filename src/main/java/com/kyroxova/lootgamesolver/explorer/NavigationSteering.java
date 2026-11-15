@@ -2,6 +2,15 @@ package com.kyroxova.lootgamesolver.explorer;
 
 final class NavigationSteering {
 
+    static Float pathHeading(java.util.List<int[]> route) {
+        for (int i = 1; i < route.size(); i++) {
+            int[] previous = route.get(i - 1), next = route.get(i);
+            int dx = next[0] - previous[0], dz = next[2] - previous[2];
+            if (dx != 0 || dz != 0) return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+        }
+        return null;
+    }
+
     static void appendWithoutLoops(java.util.List<int[]> route, java.util.List<int[]> continuation) {
         for (int[] step : continuation) {
             int match = -1;
