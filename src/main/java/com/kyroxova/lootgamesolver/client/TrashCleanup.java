@@ -122,9 +122,13 @@ final class TrashCleanup {
             Slot slot = (Slot) obj;
             if (slot.inventory == mc.thePlayer.inventory && slot.getSlotIndex() == playerIndex
                 && slot.canTakeStack(mc.thePlayer)) {
+                int beforeCount = slot.getStack().stackSize;
+                if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
+                    status = "Trash transfer unavailable; items kept";
+                    return true;
+                }
                 pendingIndex = playerIndex;
-                pendingSize = slot.getStack().stackSize;
-                mc.playerController.windowClick(container.windowId, slot.slotNumber, 0, 1, mc.thePlayer);
+                pendingSize = beforeCount;
                 wait = 5;
                 status = "Clearing unwanted items";
                 return true;

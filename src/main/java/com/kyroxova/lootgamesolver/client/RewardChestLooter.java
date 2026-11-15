@@ -347,9 +347,13 @@ final class RewardChestLooter {
                 cancel(mc);
                 return;
             }
+            int beforeCount = stack.stackSize;
+            if (!BaritoneInventoryBridge.quickMove(mc, best)) {
+                status = "Reward transfer unavailable";
+                return;
+            }
             pendingSlot = best;
-            pendingCount = stack.stackSize;
-            mc.playerController.windowClick(container.windowId, best, 0, 1, mc.thePlayer);
+            pendingCount = beforeCount;
             waiting = 5;
             status = "Collecting reward items";
             return;
@@ -535,9 +539,13 @@ final class RewardChestLooter {
                     || InventoryProtection.essential(stack)
                     || isReservedBuildingStack(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
+                int beforeCount = stack.stackSize;
+                if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
+                    status = "Backpack transfer unavailable";
+                    return;
+                }
                 packPendingSlot = slot.slotNumber;
-                packPendingCount = slot.getStack().stackSize;
-                mc.playerController.windowClick(container.windowId, slot.slotNumber, 0, 1, mc.thePlayer);
+                packPendingCount = beforeCount;
                 waiting = 5;
                 return;
             }
