@@ -114,6 +114,10 @@ public final class BaritoneTransitCoordinator {
                 routePreview.clear();
                 routePreview.addAll(explorer.baritoneNavigation.route());
             }
+            if (surfaceMove || returnMove) explorer.status = "Ascending to Surface";
+            else if (structureMove) explorer.status = "Walking to LootGame";
+            else if (centerMove) explorer.status = "Moving to board center";
+            else if (searchMove) explorer.status = "Exploring for structures";
         } else if (!routePreview.isEmpty()) {
             routePreview.clear();
         }
@@ -140,13 +144,26 @@ public final class BaritoneTransitCoordinator {
                 BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
                     .start(surfaceGoal[0], surfaceGoal[1], surfaceGoal[2]);
                 if (started == BaritoneNavigationBridge.Start.STARTED) surfaceWaiting = false;
-                else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40)
-                    explorer.stop(mc, "Could not start a safe surface route");
+                else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40) {
+                    surfaceWaiting = false;
+                    surfaceMove = false;
+                    resumeSearch = true;
+                    returnWorld = mc.theWorld;
+                    returnSolved = true;
+                    returnWait = 0;
+                    explorer.status = "Continuing exploration";
+                }
             } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                 explorer.baritoneNavigation.stop();
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
-                if (routeFailures > 3 || surfaceGoal == null) explorer.stop(mc, "Could not reach the surface safely");
-                else {
+                if (routeFailures > 3 || surfaceGoal == null) {
+                    surfaceMove = false;
+                    resumeSearch = true;
+                    returnWorld = mc.theWorld;
+                    returnSolved = true;
+                    returnWait = 0;
+                    explorer.status = "Continuing exploration";
+                } else {
                     surfaceWaiting = true;
                     surfaceWait = 0;
                     explorer.status = "Replanning the surface route";
@@ -175,7 +192,10 @@ public final class BaritoneTransitCoordinator {
                     returnWaiting = false;
                     returnMove = true;
                 } else if (started != BaritoneNavigationBridge.Start.BUSY || ++returnWait > 40) {
-                    explorer.stop(mc, "Baritone could not start the return route");
+                    returnWaiting = false;
+                    resumeSearch = true;
+                    returnWait = 0;
+                    explorer.status = "Continuing exploration";
                 }
                 return true;
             } else {
@@ -198,7 +218,10 @@ public final class BaritoneTransitCoordinator {
                     explorer.returning = false;
                     explorer.entrySurfacePoint = null;
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    explorer.stop(mc, "Baritone could not complete the return route");
+                    returnMove = false;
+                    resumeSearch = true;
+                    returnWait = 0;
+                    explorer.status = "Continuing exploration";
                 }
                 return true;
             }
@@ -240,7 +263,10 @@ public final class BaritoneTransitCoordinator {
                             explorer.status = "Walking to LootGame";
                         }
                     } else if (started != BaritoneNavigationBridge.Start.BUSY || ++handoffTicks > 40) {
-                        explorer.stop(mc, "Baritone could not start structure navigation");
+                        searchHandoff = false;
+                        explorer.rotateSearch(mc);
+                        searchNext = true;
+                        explorer.status = "Replanning search";
                     }
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                     double distToGoal = Math
@@ -255,9 +281,12 @@ public final class BaritoneTransitCoordinator {
                             searchNext = false;
                             handoffTicks = 0;
                         } else {
-                            int[] next = explorer.search.next();
-                            if (next == null) explorer.stop(mc, "No structures found in search range");
-                            else {
+                            int[] next = explorer.search == null ? null : explorer.search.next();
+                            if (next == null) {
+                                explorer.rotateSearch(mc);
+                                next = explorer.search == null ? null : explorer.search.next();
+                            }
+                            if (next != null) {
                                 searchX = next[0];
                                 searchZ = next[1];
                                 searchNext = true;
@@ -272,8 +301,11 @@ public final class BaritoneTransitCoordinator {
                         explorer.status = "Replanning exploration route";
                     } else {
                         int[] next = explorer.search == null ? null : explorer.search.next();
-                        if (next == null) explorer.stop(mc, "No reachable exploration route remains");
-                        else {
+                        if (next == null) {
+                            explorer.rotateSearch(mc);
+                            next = explorer.search == null ? null : explorer.search.next();
+                        }
+                        if (next != null) {
                             routeFailures = 0;
                             searchX = next[0];
                             searchZ = next[1];
@@ -307,7 +339,17 @@ public final class BaritoneTransitCoordinator {
                         handoffTicks = 0;
                         explorer.status = "Replanning route to LootGame";
                     } else {
-                        explorer.stop(mc, "Baritone could not reach the structure");
+                        if (explorer.target != null) {
+                            explorer.markStructureSolved(mc, new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord });
+                        }
+                        explorer.target = null;
+                        explorer.rotateSearch(mc);
+                        searchMove = true;
+                        searchNext = true;
+                        searchHandoff = true;
+                        handoffTicks = 0;
+                        routeFailures = 0;
+                        explorer.status = "Exploring for structures";
                     }
                 }
                 return true;

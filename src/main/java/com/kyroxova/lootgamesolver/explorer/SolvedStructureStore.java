@@ -46,7 +46,7 @@ final class SolvedStructureStore {
             try {
                 if (Integer.parseInt(parts[0]) != dimension) continue;
                 int sx = Integer.parseInt(parts[1]), sy = Integer.parseInt(parts[2]), sz = Integer.parseInt(parts[3]);
-                if (Math.abs((long) sx - x) <= 24 && Math.abs((long) sy - y) <= 16 && Math.abs((long) sz - z) <= 24)
+                if (Math.abs((long) sx - x) <= 48 && Math.abs((long) sy - y) <= 36 && Math.abs((long) sz - z) <= 48)
                     return true;
             } catch (NumberFormatException ignored) {}
         }

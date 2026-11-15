@@ -373,9 +373,28 @@ public class Explorer {
     }
 
     public void markStructureSolved(Minecraft mc, int[] position) {
-        if (position == null || mc.theWorld == null) return;
+        if (mc == null || mc.theWorld == null) return;
         try {
-            solvedStructures.mark(worldIdentity(mc), mc.theWorld.provider.dimensionId, position, position);
+            String world = worldIdentity(mc);
+            int dim = mc.theWorld.provider.dimensionId;
+            if (position != null) {
+                solvedStructures.mark(world, dim, position, position);
+            }
+            if (knownStructure != null) {
+                solvedStructures.mark(world, dim, knownStructure, knownStructure);
+            }
+            if (target != null) {
+                int[] tPos = new int[] { target.xCoord, target.yCoord, target.zCoord };
+                solvedStructures.mark(world, dim, tPos, tPos);
+            }
+            if (mc.thePlayer != null) {
+                int[] playerPos = new int[] {
+                    (int) Math.floor(mc.thePlayer.posX),
+                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                    (int) Math.floor(mc.thePlayer.posZ)
+                };
+                solvedStructures.mark(world, dim, playerPos, playerPos);
+            }
         } catch (java.io.IOException ignored) {}
     }
 
@@ -502,8 +521,7 @@ public class Explorer {
             }
         }
         walking = nextSearchLeg(mc);
-        if (!walking) stop(mc, solved ? "Puzzle solved; nearby search finished" : "Puzzle ended; search paused");
-        else status = solved ? "Puzzle solved; searching for the next structure" : "Puzzle ended; continuing search";
+        status = solved ? "Puzzle solved; searching for the next structure" : "Searching for structures";
     }
 
     void beginAccessTrail(Minecraft mc) {
@@ -659,10 +677,27 @@ public class Explorer {
     }
 
     public String navigationStatus() {
+        if (baritoneCoordinator.active() && baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
+            if (baritoneCoordinator.surfaceMove || baritoneCoordinator.returnMove) return "Ascending to Surface";
+            if (baritoneCoordinator.structureMove) return "Navigating to Puzzle";
+            if (baritoneCoordinator.centerMove) return "Moving to Board";
+            if (baritoneCoordinator.searchMove) return "Searching Structures";
+            return "Following Route";
+        }
+        if (walking && !inventoryMaintenance) {
+            String lower = status == null ? "" : status.toLowerCase(java.util.Locale.ROOT);
+            if (lower.contains("packing") || lower.contains("trash")) {
+                return searching ? "Searching Structures" : "Following Route";
+            }
+        }
         return compactStatus(status);
     }
 
     public void setAutomationStatus(String message) {
+        if (message == null || message.isEmpty()) {
+            status = searching ? "Searching for the next structure" : "Following checked route";
+            return;
+        }
         status = compactStatus(message);
     }
 
@@ -800,6 +835,43 @@ public class Explorer {
             && (baritoneCoordinator.active() ? !baritoneCoordinator.breaking : route.size() >= 2);
     }
 
+    private float searchYaw;
+
+    public void rotateSearch(Minecraft mc) {
+        searchYaw = (searchYaw + 45.0F) % 360.0F;
+        int px = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posX) : 0;
+        int pz = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posZ) : 0;
+        search = new ProgressiveSearch(
+            px,
+            pz,
+            searchYaw,
+            LootGameSolverConfig.explorationSearchLimit);
+    }
+
+    public boolean nextSearchGoal(Minecraft mc) {
+        if (search == null) rotateSearch(mc);
+        int[] next = search.next();
+        if (next == null) {
+            rotateSearch(mc);
+            next = search.next();
+        }
+        if (next != null) {
+            BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(next[0], next[1]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneCoordinator.searchX = next[0];
+                baritoneCoordinator.searchZ = next[1];
+                baritoneCoordinator.searchTicks = 0;
+                baritoneCoordinator.searchHandoff = false;
+                baritoneCoordinator.searchMove = true;
+                searching = true;
+                walking = true;
+                status = "Exploring for structures";
+                return true;
+            }
+        }
+        return nextSearchLeg(mc);
+    }
+
     public void toggle(Minecraft mc) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) return;
         if (walking) {
@@ -814,10 +886,11 @@ public class Explorer {
         existingAccessChecked = false;
         stallRecoveries = 0;
         blockedWalkNodes.clear();
+        searchYaw = mc.thePlayer.rotationYaw;
         search = new ProgressiveSearch(
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
-            mc.thePlayer.rotationYaw,
+            searchYaw,
             LootGameSolverConfig.explorationSearchLimit);
         entranceSelected = false;
         excavationSearch = null;
@@ -853,7 +926,6 @@ public class Explorer {
                 }
             }
             walking = nextSearchLeg(mc);
-            if (!walking) stop(mc, "No safe exploration route available");
             return;
         }
         BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
@@ -1704,7 +1776,10 @@ public class Explorer {
                         return;
                     }
                 }
-                if (!nextSearchLeg(mc)) stop(mc, "Search limit reached or no safe route remains");
+                if (!nextSearchLeg(mc)) {
+                    rotateSearch(mc);
+                    nextSearchLeg(mc);
+                }
                 return;
             }
             if (digging && (Math.abs(target.yCoord + 1 - mc.thePlayer.boundingBox.minY) > 1
@@ -2026,7 +2101,8 @@ public class Explorer {
                     }
                 }
             }
-            stop(mc, "No safe route after alternate paths were checked");
+            rotateSearch(mc);
+            nextSearchLeg(mc);
             return;
         }
         routeFollower.follow(
@@ -2374,10 +2450,14 @@ public class Explorer {
     }
 
     private boolean nextSearchLeg(Minecraft mc) {
-        if (search == null) return false;
-        for (int attempt = 0; attempt < 8; attempt++) {
+        for (int attempt = 0; attempt < 16; attempt++) {
+            if (search == null) rotateSearch(mc);
             int[] goal = search.next();
-            if (goal == null) return false;
+            if (goal == null) {
+                rotateSearch(mc);
+                goal = search.next();
+            }
+            if (goal == null) continue;
             int x = (int) Math.floor(mc.thePlayer.posX), z = (int) Math.floor(mc.thePlayer.posZ);
             int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             double dx = goal[0] - x, dz = goal[1] - z;
@@ -2397,13 +2477,13 @@ public class Explorer {
             walking = true;
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
-            status = route.isEmpty() && walkingSearch == null ? "Checking another safe exploration direction"
+            status = route.isEmpty() && walkingSearch == null ? "Checking safe direction"
                 : "Exploring outward";
             return true;
         }
         searching = true;
         walking = true;
-        status = "Waiting for more loaded terrain to continue exploration";
+        status = "Waiting for loaded terrain";
         return true;
     }
 

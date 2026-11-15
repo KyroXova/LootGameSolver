@@ -220,7 +220,10 @@ public final class ClientHooks {
                 || rewardReturnPending
                 || !LootGameSolverConfig.enabled
                 || !LootGameSolverConfig.explorationEnabled) {
-                if (exploration != null) exploration.setInventoryMaintenance(false);
+                if (exploration != null) {
+                    exploration.setInventoryMaintenance(false);
+                    exploration.setAutomationStatus(null);
+                }
                 if (rewardLooter.active()) rewardLooter.cancel(mc);
                 inventoryMaintenanceStage = 0;
                 inventoryMaintenanceCooldown = 200;
@@ -235,21 +238,8 @@ public final class ClientHooks {
                         return;
                     }
                 }
-                inventoryMaintenanceStage = 2;
-            }
-            if (inventoryMaintenanceStage == 2) {
-                if (mc.currentScreen != null) return;
-                if (rewardLooter.startInventoryPacking(mc)) inventoryMaintenanceStage = 3;
-                else inventoryMaintenanceStage = 4;
-            }
-            if (inventoryMaintenanceStage == 3) {
-                rewardLooter.tick(mc, null);
-                exploration.setAutomationStatus(rewardLooter.status());
-                if (rewardLooter.active()) return;
-                inventoryMaintenanceStage = 4;
-            }
-            if (inventoryMaintenanceStage == 4) {
                 exploration.setInventoryMaintenance(false);
+                exploration.setAutomationStatus(null);
                 inventoryMaintenanceStage = 0;
                 inventoryMaintenanceCooldown = 600;
             }
@@ -262,6 +252,7 @@ public final class ClientHooks {
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
                 if (explorationDriven && exploration != null) {
+                    if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
                     exploration.finishPuzzle(mc, true);
                 }
                 return;
@@ -300,6 +291,7 @@ public final class ClientHooks {
                     rewardReturnPending = false;
                     rewardPreCleanupPending = false;
                     if (explorationDriven && exploration != null) {
+                        if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
                         exploration.finishPuzzle(mc, true);
                     }
                 }

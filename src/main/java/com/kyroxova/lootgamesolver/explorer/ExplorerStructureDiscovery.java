@@ -27,8 +27,12 @@ final class ExplorerStructureDiscovery {
                     if (existing == null || existing.isInvalid()
                         || !isLootGamesTile(
                             existing.getClass()
-                                .getName()))
+                                .getName())) {
+                        try {
+                            solved.mark(worldId, mc.theWorld.provider.dimensionId, position, position);
+                        } catch (java.io.IOException ignored) {}
                         continue;
+                    }
                 }
                 nearest = distance;
                 target = new TileEntity();

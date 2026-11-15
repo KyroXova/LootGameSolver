@@ -350,9 +350,11 @@ final class AutoPuzzleCoordinator {
                 hooks.releaseMovementKeys(mc);
                 puzzleCompletion.clear();
                 state = State.IDLE;
-                if (hooks.isExplorationDriven() && exploration != null) {
-                    int[] solvedPos = rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+                int[] solvedPos = rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+                if (exploration != null) {
                     exploration.markStructureSolved(mc, solvedPos);
+                }
+                if (hooks.isExplorationDriven() && exploration != null) {
                     exploration.prepareRewardCollection(mc, solvedPos);
                     hooks.ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, solvedPos, completedGame);
