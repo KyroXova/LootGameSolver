@@ -125,6 +125,17 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
+    public void setPaused(boolean paused) {
+        if (process == null || processApi == null) return;
+        try {
+            if (processApi.getMethod("getGoal")
+                .invoke(process) == goal) {
+                processApi.getMethod("setPaused", boolean.class)
+                    .invoke(process, paused);
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
     public List<int[]> route() {
         List<int[]> result = new ArrayList<>();
         if (pathing == null) return result;

@@ -924,8 +924,30 @@ public class Explorer {
                 if (!swimToNearestShore(mc)) stop(mc, "Low Air");
                 return;
             }
+            boolean manual = NavigationControlPolicy.hasManualMovement(
+                GameSettings.isKeyDown(mc.gameSettings.keyBindForward),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindBack),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindLeft),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindRight),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindSneak),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindJump));
+            boolean interrupted = manual || mc.currentScreen != null
+                || mc.thePlayer.hurtTime > 0
+                || mc.thePlayer.capabilities.isFlying;
+            boolean sustaining = sustain.busy();
+            if (!interrupted || sustaining) sustaining = sustain.tick(mc, walking, false);
+            baritoneNavigation.setPaused(interrupted || sustaining);
+            if (interrupted || sustaining) {
+                status = sustaining ? "Eating or preparing food"
+                    : manual ? "Paused: release movement keys to resume"
+                        : mc.currentScreen != null ? "Paused: close menu to resume"
+                            : mc.thePlayer.hurtTime > 0 ? "Paused after damage"
+                                : "Paused: land and disable flight to resume";
+                return;
+            }
+        } else {
+            sustain.tick(mc, walking, walking && !digging && !returnDigging);
         }
-        sustain.tick(mc, walking, walking && !digging && !returnDigging);
         if (baritoneCoordinator.tick(mc, this)) return;
         if (!digging && !returnDigging) releaseMiningInput(mc);
         camera.clear();
