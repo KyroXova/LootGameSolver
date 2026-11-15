@@ -22,9 +22,14 @@ final class ExplorerStructureDiscovery {
             if (distance < nearest) {
                 Chunk chunk = mc.theWorld.getChunkProvider()
                     .provideChunk(position[0] >> 4, position[2] >> 4);
-                if (chunk != null && !chunk.isEmpty()
-                    && !(mc.theWorld.getTileEntity(position[0], position[1], position[2]) instanceof TileEntity))
-                    continue;
+                if (chunk != null && !chunk.isEmpty()) {
+                    TileEntity existing = mc.theWorld.getTileEntity(position[0], position[1], position[2]);
+                    if (existing == null || existing.isInvalid()
+                        || !isLootGamesTile(
+                            existing.getClass()
+                                .getName()))
+                        continue;
+                }
                 nearest = distance;
                 target = new TileEntity();
                 target.xCoord = position[0];
@@ -35,9 +40,10 @@ final class ExplorerStructureDiscovery {
         for (Object entry : mc.theWorld.loadedTileEntityList) {
             if (!(entry instanceof TileEntity)) continue;
             TileEntity tile = (TileEntity) entry;
-            if (tile.isInvalid() || !tile.getClass()
-                .getName()
-                .startsWith("ru.timeconqueror.lootgames.")) continue;
+            if (tile.isInvalid() || !isLootGamesTile(
+                tile.getClass()
+                    .getName()))
+                continue;
             if (solved.contains(worldId, mc.theWorld.provider.dimensionId, tile.xCoord, tile.yCoord, tile.zCoord))
                 continue;
             try {
@@ -58,6 +64,10 @@ final class ExplorerStructureDiscovery {
             } catch (ReflectiveOperationException ignored) {}
         }
         return target;
+    }
+
+    static boolean isLootGamesTile(String className) {
+        return className.startsWith("ru.timeconqueror.lootgames.");
     }
 
     static double labelHeight(Minecraft mc, TileEntity target) {
