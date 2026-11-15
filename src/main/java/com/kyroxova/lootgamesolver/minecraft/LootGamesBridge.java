@@ -8,7 +8,6 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
@@ -527,8 +526,6 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
                 return false;
             }
-            mc.thePlayer.swingItem();
-
             boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
                 && action.type == SolverAction.Type.SET_VALUE
                 && sudokuReverseClick;
@@ -540,33 +537,16 @@ public final class LootGamesBridge implements MiniGameDetector {
                 mc.thePlayer.setSneaking(shouldSneak);
             }
             try {
-                if (action.type == SolverAction.Type.REVEAL) {
-                    if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) {
-                        ItemStack held = mc.thePlayer.getHeldItem();
-                        mc.playerController.onPlayerRightClick(
-                            mc.thePlayer,
-                            mc.theWorld,
-                            held,
-                            block[0],
-                            block[1],
-                            block[2],
-                            1,
-                            Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
-                    } else {
-                        mc.playerController.clickBlock(block[0], block[1], block[2], 1);
-                    }
-                } else {
-                    ItemStack held = mc.thePlayer.getHeldItem();
-                    mc.playerController.onPlayerRightClick(
-                        mc.thePlayer,
-                        mc.theWorld,
-                        held,
-                        block[0],
-                        block[1],
-                        block[2],
-                        1,
-                        Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D));
-                }
+                boolean attack = action.type == SolverAction.Type.REVEAL
+                    && detected.type != com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT;
+                return BaritoneBlockBridge.click(
+                    mc,
+                    block[0],
+                    block[1],
+                    block[2],
+                    1,
+                    Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D),
+                    attack);
             } finally {
                 // Keep reverse-cycle sneak active through the click's network tick.
                 if (shouldSneak && !wasSneaking) {
@@ -574,7 +554,6 @@ public final class LootGamesBridge implements MiniGameDetector {
                     restoreSneaking = wasSneaking;
                 }
             }
-            return true;
         } catch (Exception e) {
             LootGameSolver.LOG.warn("LootGames interaction failed; automation stopped", e);
             return false;
