@@ -25,6 +25,7 @@ import net.minecraftforge.common.ChestGenHooks;
 
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
 import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
 
 final class RewardChestLooter {
@@ -555,11 +556,7 @@ final class RewardChestLooter {
                 ItemStack stack = slot.getStack();
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0
                     || playerSlot >= 36
-                    || temporaryBag && playerSlot == bagSource
-                    || stack == null
-                    || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, playerSlot))
-                    || InventoryProtection.essential(stack)
-                    || isReservedBuildingStack(mc, playerSlot, stack)) continue;
+                    || !isPackable(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
                 int beforeCount = stack.stackSize;
                 if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
@@ -720,36 +717,28 @@ final class RewardChestLooter {
         return InventoryProtection.bag(stack);
     }
 
-    private static boolean safeToStore(ItemStack stack) {
-        return stack != null && !InventoryProtection.essential(stack);
+    private boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack) {
+        if (stack == null || stack.stackSize <= 0) return false;
+        if (temporaryBag && slotIndex == bagSource) return false;
+        if (InventoryProtection.bag(stack)) return false;
+        if (ExplorerSustain.isHealingAxe(stack)) return false;
+        if (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, slotIndex)) return false;
+        if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
+        return true;
     }
 
     private boolean hasPackableItems(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return false;
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (stack == null || InventoryProtection.essential(stack)
-                || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i))
-                || temporaryBag && i == bagSource) continue;
-            if (safeToStore(stack) && !isReservedBuildingStack(mc, i, stack)) return true;
+            if (isPackable(mc, i, stack)) return true;
         }
         return false;
     }
 
     private static boolean isReservedBuildingStack(Minecraft mc, int slot, ItemStack stack) {
         if (mc == null || stack == null) return false;
-        String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-        if (!TrashPolicy.buildingReserve(id)) return false;
-        int largest = -1, largestSize = -1;
-        for (int i = 0; i < 36; i++) {
-            ItemStack candidate = mc.thePlayer.inventory.getStackInSlot(i);
-            if (candidate == null) continue;
-            String candidateId = (String) Item.itemRegistry.getNameForObject(candidate.getItem());
-            if (TrashPolicy.buildingReserve(candidateId) && candidate.stackSize > largestSize) {
-                largest = i;
-                largestSize = candidate.stackSize;
-            }
-        }
-        return slot == largest;
+        return slot == TrashCleanup.findBuildingReserveSlot(mc);
     }
 
     private static long slotKey(int chest, int slot) {

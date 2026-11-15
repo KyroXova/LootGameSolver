@@ -154,38 +154,52 @@ final class TrashCleanup {
         return true;
     }
 
-    private int nextTrash(Minecraft mc) {
-        int reserve = -1, reserveSize = -1;
+    static int findBuildingReserveSlot(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return -1;
+        int bestCobble = -1, cobbleSize = -1;
+        int bestDirt = -1, dirtSize = -1;
+        int bestStone = -1, stoneSize = -1;
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (stack == null || stack.hasDisplayName() || stack.hasTagCompound()) continue;
+            if (stack == null || !(stack.getItem() instanceof ItemBlock)) continue;
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-            if (TrashPolicy.buildingReserve(id) && stack.stackSize > reserveSize) {
-                reserve = i;
-                reserveSize = stack.stackSize;
-            }
-        }
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (i == reserve || stack == null
-                || baseline == null
-                || baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i)
-                || InventoryProtection.essential(stack)
-                || stack.hasDisplayName()
-                || stack.hasTagCompound()) continue;
-            String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-            boolean ore = false;
-            for (int oreId : OreDictionary.getOreIDs(stack)) {
-                if (OreDictionary.getOreName(oreId)
-                    .startsWith("ore")) {
-                    ore = true;
-                    break;
+            if (id == null) continue;
+            String name = id.toLowerCase(java.util.Locale.ROOT);
+            if (name.contains("cobblestone")) {
+                if (stack.stackSize > cobbleSize) {
+                    bestCobble = i;
+                    cobbleSize = stack.stackSize;
+                }
+            } else if (name.contains("dirt")) {
+                if (stack.stackSize > dirtSize) {
+                    bestDirt = i;
+                    dirtSize = stack.stackSize;
+                }
+            } else if (name.contains("stone")) {
+                if (stack.stackSize > stoneSize) {
+                    bestStone = i;
+                    stoneSize = stack.stackSize;
                 }
             }
-            boolean unwantedOre = TrashPolicy
-                .discardOre(id, ore, LootGameSolverConfig.discardAllMinedOres, LootGameSolverConfig.discardOreItems);
-            if (TrashPolicy.discard(id, stack.getItemDamage(), unwantedOre, stack.getItem() instanceof ItemBlock))
+        }
+        if (bestCobble >= 0) return bestCobble;
+        if (bestDirt >= 0) return bestDirt;
+        return bestStone;
+    }
+
+    private int nextTrash(Minecraft mc) {
+        int reserve = findBuildingReserveSlot(mc);
+        for (int i = 0; i < 36; i++) {
+            if (i == reserve) continue;
+            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack == null
+                || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i))
+                || InventoryProtection.essential(stack)) continue;
+
+            String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
+            if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())) {
                 return i;
+            }
         }
         return -1;
     }

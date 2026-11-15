@@ -78,8 +78,20 @@ public final class ExplorerTerrain {
                     || block == Blocks.portal) return false;
             }
         }
-        if (world.getBlock(x, y, z).getMaterial().isLiquid()
-            || world.getBlock(x, y - 1, z).getMaterial().isLiquid()) return false;
+        boolean liquidAtFeet = world.getBlock(x, y, z).getMaterial().isLiquid();
+        boolean liquidBelow = world.getBlock(x, y - 1, z).getMaterial().isLiquid();
+        if (liquidAtFeet || liquidBelow) {
+            boolean waterAtFeet = world.getBlock(x, y, z).getMaterial() == net.minecraft.block.material.Material.water;
+            boolean waterBelow = world.getBlock(x, y - 1, z).getMaterial() == net.minecraft.block.material.Material.water;
+            if (waterAtFeet && !liquidBelow && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) {
+                return true;
+            }
+            if (!liquidAtFeet && waterBelow && passable(world, x, y, z) && passable(world, x, y + 1, z)
+                && world.getBlock(x, y - 2, z).getMaterial().isSolid()) {
+                return true;
+            }
+            return false;
+        }
         double surfaceY = walkSurfaceY(world, x, y, z);
         if (surfaceY < y) return false;
         return world

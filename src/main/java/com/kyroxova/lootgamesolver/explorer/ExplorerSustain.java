@@ -18,6 +18,8 @@ public final class ExplorerSustain {
     private boolean eating;
     private int eatingTicks, restoreSlot = -1, automaticSlot = -1, cooldown;
     private int mineDelayTicks;
+    private int manualDelayTicks;
+    private int lastObservedSlot = -1;
 
     public void notifyBlockMined() {
         mineDelayTicks = 50;
@@ -33,6 +35,16 @@ public final class ExplorerSustain {
             stop(mc);
             return false;
         }
+        int currentSlot = mc.thePlayer.inventory.currentItem;
+        if (lastObservedSlot >= 0 && currentSlot != lastObservedSlot) {
+            if (currentSlot != automaticSlot) {
+                manualDelayTicks = 40;
+            }
+        }
+        lastObservedSlot = currentSlot;
+        if (manualDelayTicks > 0) manualDelayTicks--;
+        if (mineDelayTicks > 0) mineDelayTicks--;
+
         if (transfer.active()) {
             if (!transfer.tick(mc)) cooldown = 100;
             else if (!transfer.active()) automaticSlot = mc.thePlayer.inventory.currentItem;
@@ -50,7 +62,6 @@ public final class ExplorerSustain {
             return true;
         }
         if (cooldown > 0) cooldown--;
-        if (mineDelayTicks > 0) mineDelayTicks--;
         if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
         boolean needsFood = mc.thePlayer.getFoodStats()
             .getFoodLevel() <= 14
@@ -75,36 +86,23 @@ public final class ExplorerSustain {
             }
             cooldown = 100;
         }
-        if (moving && mineDelayTicks == 0) {
-            boolean found = false;
-            for (int i = 0; i < 9; i++) {
-                ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                if (isHealingAxe(stack)) {
-                    select(mc, i);
-                    found = true;
-                    break;
+        if (mineDelayTicks == 0 && manualDelayTicks == 0) {
+            boolean holdingAxe = isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem));
+            if (!holdingAxe) {
+                boolean found = false;
+                for (int i = 0; i < 9; i++) {
+                    ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                    if (isHealingAxe(stack)) {
+                        select(mc, i);
+                        found = true;
+                        break;
+                    }
                 }
-            }
-            if (!found && cooldown == 0) for (int i = 9; i < 36; i++) {
-                if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
-                    if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
-                    if (transfer.start(mc, i)) return true;
-                    break;
-                }
-            }
-        } else {
-            if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem))) {
-                if (restoreSlot >= 0 && restoreSlot < 9
-                    && !isHealingAxe(mc.thePlayer.inventory.getStackInSlot(restoreSlot))) {
-                    int slot = restoreSlot;
-                    restoreSlot = -1;
-                    select(mc, slot);
-                } else {
-                    for (int i = 0; i < 9; i++) {
-                        if (!isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
-                            select(mc, i);
-                            break;
-                        }
+                if (!found && cooldown == 0) for (int i = 9; i < 36; i++) {
+                    if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
+                        if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
+                        if (transfer.start(mc, i)) return true;
+                        break;
                     }
                 }
             }

@@ -57,12 +57,13 @@ final class ExplorerRouteFollower {
             && Math.abs(turn) < 45F
             && distance < 4D;
         if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
+        boolean inWater = mc.thePlayer.isInWater();
         boolean stepUp = next[1] > footY || climbRewardChest || climbSurface || mc.thePlayer.isCollidedHorizontally;
         boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
-        input.hop = (stepUp && Math.abs(turn) < 45F && jumpDistance && mc.thePlayer.onGround)
+        input.hop = (stepUp && Math.abs(turn) < 45F && jumpDistance && (mc.thePlayer.onGround || inWater))
             || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)
             || chestPitJump
-            || mc.thePlayer.isInWater();
+            || inWater;
         if (distance > 0.02D) {
             double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
             double speed = Math.min(
@@ -72,11 +73,16 @@ final class ExplorerRouteFollower {
             input.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
         }
         boolean wantSprint = !centering && !digging
-            && !mc.thePlayer.isInWater()
+            && !inWater
             && Math.abs(turn) < 55F
             && input.forward > 0.1F
             && mc.thePlayer.getFoodStats()
                 .getFoodLevel() > 6;
+        if (wantSprint) {
+            input.forward = 1.0F;
+        } else if (inWater && Math.abs(turn) < 60F) {
+            input.forward = 1.0F;
+        }
         mc.thePlayer.setSprinting(wantSprint);
         if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
             KeyBinding.setKeyBindState(

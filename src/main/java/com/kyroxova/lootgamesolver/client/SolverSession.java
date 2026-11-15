@@ -387,7 +387,10 @@ public final class SolverSession {
                 cancel("Could not clear foliage blocking the board");
                 return;
             }
-            status = bridge.isClearingFoliage() ? "Clearing foliage" : "Navigating to " + activeAction.position;
+            String actionDesc = activeAction.type == SolverAction.Type.SET_VALUE ? "Setting Number " + activeAction.value
+                : activeAction.type == SolverAction.Type.REVEAL ? "Revealing Tile"
+                    : activeAction.type == SolverAction.Type.FLAG ? "Flagging Tile" : "Interacting";
+            status = bridge.isClearingFoliage() ? "Clearing Foliage" : "Navigating to " + actionDesc;
             return;
         }
         bridge.recordSubmittedAction(snapshot);

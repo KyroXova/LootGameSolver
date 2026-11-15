@@ -645,13 +645,19 @@ public final class ClientHooks {
             String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
             String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
 
-            String gameTitle = cur == null ? "Explore Beta"
+            String gameTitle = cur == null ? "Explorer"
                 : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
                     : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
                         : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
-            String statusStr = cur == null ? exploration.hud(mc)
-                : session.isActive() ? compactStatus(session.getStatus()) : "Ready";
+            String statusStr;
+            if (cur != null) {
+                statusStr = session.isActive() ? compactStatus(session.getStatus()) : "Ready";
+            } else if (exploration != null) {
+                statusStr = (exploration.navigating() || rewardReturnPending) ? exploration.navigationStatus() : "Ready";
+            } else {
+                statusStr = "Ready";
+            }
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
@@ -673,9 +679,6 @@ public final class ClientHooks {
                 + "["
                 + holoKeyStr
                 + "] Holograms";
-            String navigationLine = exploration != null && (cur == null || explorerActive)
-                ? "\u00A77" + exploration.navigationStatus()
-                : null;
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
                 line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77")
                     + " ["
@@ -683,17 +686,14 @@ public final class ClientHooks {
                     + "] "
                     + exploration.explorationAction();
             }
-            if (explorerActive && navigationLine != null) navigationLine = "\u00A7a" + exploration.navigationStatus();
             int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
             int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
             int width3 = mc.fontRenderer.getStringWidth(line3);
             int maxWidth = Math.max(width1, Math.max(width2, width3));
-            int navigationWidth = navigationLine == null ? 0 : mc.fontRenderer.getStringWidth(navigationLine);
-            maxWidth = Math.max(maxWidth, navigationWidth);
 
             int panelWidth = maxWidth + 32;
             boolean showCheckpointProgress = exploreKeyHeld || checkpointClearDoneTicks > 0;
-            int panelHeight = (navigationLine == null ? 44 : 54) + (showCheckpointProgress ? 10 : 0);
+            int panelHeight = 44 + (showCheckpointProgress ? 10 : 0);
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -702,8 +702,6 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
-            if (navigationLine != null) mc.fontRenderer
-                .drawStringWithShadow(navigationLine, x + (panelWidth - navigationWidth) / 2, y + 37, 0xFFFFFF);
             if (showCheckpointProgress) {
                 float progress = checkpointClearDoneTicks > 0 ? 1F : Math.min(1F, exploreHoldTicks / 20F);
                 int barX = x + 14, barY = y + panelHeight - 8, barWidth = panelWidth - 28;
