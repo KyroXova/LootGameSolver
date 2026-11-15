@@ -37,6 +37,10 @@ final class TrashCleanup {
         if (retryDelay > 0) retryDelay--;
     }
 
+    void clearCooldown() {
+        retryDelay = 0;
+    }
+
     boolean inventoryPressure(Minecraft mc) {
         if (mc == null || mc.thePlayer == null) return false;
         int empty = 0;

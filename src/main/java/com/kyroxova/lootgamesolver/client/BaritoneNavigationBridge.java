@@ -85,8 +85,12 @@ public final class BaritoneNavigationBridge {
             Object candidate = baritoneApi.getMethod("getCustomGoalProcess")
                 .invoke(baritone);
             Class<?> baseProcessApi = Class.forName("baritone.api.process.IBaritoneProcess");
-            if (owner.isPresent() || (Boolean) baseProcessApi.getMethod("isActive")
-                .invoke(candidate)) return Start.BUSY;
+            if (owner.isPresent() && owner.get() != candidate) return Start.BUSY;
+            if ((Boolean) baseProcessApi.getMethod("isActive").invoke(candidate)) {
+                try {
+                    candidatePathingApi.getMethod("cancelEverything").invoke(candidatePathing);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            }
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
             Class<?> goalType = Class.forName("baritone.api.pathing.goals.Goal");
             Object next;

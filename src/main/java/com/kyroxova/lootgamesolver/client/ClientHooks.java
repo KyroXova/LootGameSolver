@@ -267,18 +267,30 @@ public final class ClientHooks {
                 return;
             }
             if (rewardPreCleanupPending) {
+                trashCleanup.clearCooldown();
                 if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
                     if (trashCleanup.tick(mc, true)) {
                         if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
                         return;
                     }
                 }
+                if (!rewardLooter.active() && rewardLooter.startInventoryPacking(mc)) {
+                    if (exploration != null) exploration.setAutomationStatus("Packing inventory before looting");
+                    return;
+                }
+                if (rewardLooter.active() && "Packing inventory".equals(rewardLooter.status())) {
+                    rewardLooter.tick(mc, null);
+                    if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
+                    if (rewardLooter.active()) return;
+                }
                 rewardPreCleanupPending = false;
             }
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
-                if (rewardLooter.completed()) {
+                if (rewardLooter.completed()
+                    || "Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+                    || "No available backpack; items kept".equals(rewardLooter.status())) {
                     if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
                         if (trashCleanup.tick(mc, true)) {
                             if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
@@ -286,6 +298,7 @@ public final class ClientHooks {
                         }
                     }
                     rewardReturnPending = false;
+                    rewardPreCleanupPending = false;
                     if (explorationDriven && exploration != null) {
                         exploration.finishPuzzle(mc, true);
                     }

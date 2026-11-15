@@ -372,14 +372,19 @@ public class Explorer {
         return puzzleCenter.consumeArrival();
     }
 
+    public void markStructureSolved(Minecraft mc, int[] position) {
+        if (position == null || mc.theWorld == null) return;
+        try {
+            solvedStructures.mark(worldIdentity(mc), mc.theWorld.provider.dimensionId, position, position);
+        } catch (java.io.IOException ignored) {}
+    }
+
     public void finishPuzzle(Minecraft mc, boolean solved) {
-        if (solved && knownStructure != null && mc.theWorld != null) {
-            try {
-                solvedStructures
-                    .mark(worldIdentity(mc), mc.theWorld.provider.dimensionId, knownStructure, knownStructure);
-            } catch (java.io.IOException e) {
-                status = "Solved; could not save local structure history";
-            }
+        if (solved && mc.theWorld != null) {
+            int[] pos = knownStructure != null ? knownStructure
+                : new int[] { (int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                    (int) Math.floor(mc.thePlayer.posZ) };
+            markStructureSolved(mc, pos);
         }
         segmentX = mc.thePlayer.posX;
         segmentZ = mc.thePlayer.posZ;
@@ -989,6 +994,7 @@ public class Explorer {
             boolean interrupted = manual || mc.currentScreen != null
                 || mc.thePlayer.hurtTime > 0
                 || mc.thePlayer.capabilities.isFlying;
+            if (baritoneCoordinator.breaking) sustain.notifyBlockMined();
             boolean sustaining = sustain.busy();
             if (!interrupted || sustaining) sustaining = sustain.tick(mc, walking, !baritoneCoordinator.breaking);
             baritoneNavigation.setPaused(interrupted || sustaining);
@@ -1001,6 +1007,7 @@ public class Explorer {
                 return;
             }
         } else {
+            if (digging || returnDigging) sustain.notifyBlockMined();
             sustain.tick(mc, walking, walking && !digging && !returnDigging);
         }
         if (baritoneCoordinator.tick(mc, this)) return;

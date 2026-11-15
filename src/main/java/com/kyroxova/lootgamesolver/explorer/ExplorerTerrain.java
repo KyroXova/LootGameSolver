@@ -71,20 +71,15 @@ public final class ExplorerTerrain {
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
                 if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
                 if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
-                if ((block.getMaterial()
-                    .isLiquid() && block.getMaterial() != net.minecraft.block.material.Material.water)
+                if (block.getMaterial().isLiquid()
                     || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.web
                     || block == Blocks.portal) return false;
             }
         }
-        if (world.getBlock(x, y, z)
-            .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y + 1, z)
-            && passable(world, x, y + 2, z)) return true;
-        if (world.getBlock(x, y - 1, z)
-            .getMaterial() == net.minecraft.block.material.Material.water && passable(world, x, y, z)
-            && passable(world, x, y + 1, z)) return true;
+        if (world.getBlock(x, y, z).getMaterial().isLiquid()
+            || world.getBlock(x, y - 1, z).getMaterial().isLiquid()) return false;
         double surfaceY = walkSurfaceY(world, x, y, z);
         if (surfaceY < y) return false;
         return world

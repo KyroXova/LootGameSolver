@@ -23,7 +23,8 @@ final class InventoryProtection {
             .toLowerCase(Locale.ROOT);
         return id.contains("backpack") || type.contains("backpack")
             || id.contains(":knapsack")
-            || id.contains(":satchel");
+            || id.contains(":satchel")
+            || id.contains("bag") || type.contains("bag");
     }
 
     static boolean essential(ItemStack stack) {

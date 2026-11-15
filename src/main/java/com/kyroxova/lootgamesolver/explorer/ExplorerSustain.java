@@ -17,6 +17,11 @@ public final class ExplorerSustain {
     private final InventoryToolTransfer transfer = new InventoryToolTransfer();
     private boolean eating;
     private int eatingTicks, restoreSlot = -1, automaticSlot = -1, cooldown;
+    private int mineDelayTicks;
+
+    public void notifyBlockMined() {
+        mineDelayTicks = 50;
+    }
 
     boolean busy() {
         return eating || transfer.active();
@@ -45,6 +50,7 @@ public final class ExplorerSustain {
             return true;
         }
         if (cooldown > 0) cooldown--;
+        if (mineDelayTicks > 0) mineDelayTicks--;
         if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
         boolean needsFood = mc.thePlayer.getFoodStats()
             .getFoodLevel() <= 14
@@ -69,7 +75,7 @@ public final class ExplorerSustain {
             }
             cooldown = 100;
         }
-        if (moving) {
+        if (moving && mineDelayTicks == 0) {
             boolean found = false;
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);

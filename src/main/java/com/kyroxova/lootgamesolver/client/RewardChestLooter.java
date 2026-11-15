@@ -505,9 +505,11 @@ final class RewardChestLooter {
         Container container = mc.thePlayer.openContainer;
         String name = container.getClass()
             .getName();
-        boolean isBackpack = name.startsWith("de.eydamos.backpack.inventory.container.")
+        boolean isBackpack = name.startsWith("de.eydamos.backpack.")
             || name.startsWith("de.eydamos.guiadvanced.")
-            || name.startsWith("com.darkona.adventurebackpack.inventory.Container");
+            || name.startsWith("com.darkona.adventurebackpack.")
+            || name.toLowerCase(java.util.Locale.ROOT).contains("backpack")
+            || name.toLowerCase(java.util.Locale.ROOT).contains("bag");
         if (packOpening && mc.currentScreen instanceof GuiChest) {
             // Exclude chest containers from backpack transfers, including shared package names.
             mc.thePlayer.closeScreen();
@@ -555,7 +557,7 @@ final class RewardChestLooter {
                     || playerSlot >= 36
                     || temporaryBag && playerSlot == bagSource
                     || stack == null
-                    || baseline.protects(playerSlot, stack)
+                    || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, playerSlot))
                     || InventoryProtection.essential(stack)
                     || isReservedBuildingStack(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
@@ -658,11 +660,16 @@ final class RewardChestLooter {
         if (oldSlot < 0) oldSlot = mc.thePlayer.inventory.currentItem;
         mc.thePlayer.inventory.currentItem = backpackSlot;
         mc.playerController.updateController();
-        backpackOldYaw = mc.thePlayer.rotationYaw;
-        backpackAimSaved = true;
         packMoved = false;
-        backpackAiming = true;
-        backpackAimTicks = 0;
+        if (!BaritoneInventoryBridge.useHotbarItem(mc, backpackSlot)) {
+            status = "Backpack interaction unavailable";
+            waiting = 5;
+            return;
+        }
+        if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
+        packOpening = true;
+        openWait = 0;
+        waiting = 5;
     }
 
     private static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
@@ -721,7 +728,7 @@ final class RewardChestLooter {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
             if (stack == null || InventoryProtection.essential(stack)
-                || baseline.protects(i, stack)
+                || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i))
                 || temporaryBag && i == bagSource) continue;
             if (safeToStore(stack) && !isReservedBuildingStack(mc, i, stack)) return true;
         }
