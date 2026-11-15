@@ -8,6 +8,21 @@ import org.junit.Test;
 public class TrashPolicyTest {
 
     @Test
+    public void inventoryPressureBeginsAtSeventyFivePercent() {
+        assertFalse(TrashCleanup.inventoryPressureFromEmptySlots(10));
+        assertTrue(TrashCleanup.inventoryPressureFromEmptySlots(9));
+        assertTrue(TrashCleanup.inventoryPressureFromEmptySlots(0));
+    }
+
+    @Test
+    public void oreDisposalRequiresAnExplicitSelection() {
+        assertFalse(TrashPolicy.discardOre("mod:rare_ore", true, false, new String[0]));
+        assertTrue(TrashPolicy.discardOre("mod:common_ore", true, false, new String[] { "mod:common_ore" }));
+        assertTrue(TrashPolicy.discardOre("mod:rare_ore", true, true, new String[0]));
+        assertFalse(TrashPolicy.discardOre("mod:rare_ore", false, true, new String[0]));
+    }
+
+    @Test
     public void filtersSpecifiedJunkAndKeepsUnrelatedLoot() {
         assertTrue(TrashPolicy.buildingReserve("minecraft:cobblestone"));
         assertTrue(TrashPolicy.buildingReserve("minecraft:dirt"));

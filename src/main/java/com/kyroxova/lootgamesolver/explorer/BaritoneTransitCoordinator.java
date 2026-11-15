@@ -19,6 +19,10 @@ public final class BaritoneTransitCoordinator {
     public boolean returnMove;
     public boolean returnWaiting;
     public boolean resumeSearch;
+    public boolean surfaceMove;
+    private boolean surfaceWaiting;
+    private int surfaceWait;
+    private int[] surfaceGoal;
     public boolean returnSolved;
     public int returnWait;
     public int[] returnPoint;
@@ -40,6 +44,10 @@ public final class BaritoneTransitCoordinator {
         returnMove = false;
         returnWaiting = false;
         resumeSearch = false;
+        surfaceMove = false;
+        surfaceWaiting = false;
+        surfaceWait = 0;
+        surfaceGoal = null;
         returnSolved = false;
         returnWait = 0;
         returnPoint = null;
@@ -55,7 +63,42 @@ public final class BaritoneTransitCoordinator {
     }
 
     public boolean active() {
-        return centerMove || structureMove || searchMove || returnMove || returnWaiting || resumeSearch;
+        return centerMove || structureMove || searchMove || returnMove || returnWaiting || resumeSearch || surfaceMove;
+    }
+
+    static boolean needsSurfaceExit(boolean insideRoom, boolean canSeeSky) {
+        return insideRoom || !canSeeSky;
+    }
+
+    boolean beginSurfaceExit(Minecraft mc, Explorer explorer) {
+        surfaceGoal = findSurfaceGoal(mc, 0);
+        if (surfaceGoal == null) return false;
+        surfaceMove = true;
+        surfaceWaiting = true;
+        surfaceWait = 0;
+        routeFailures = 0;
+        explorer.walking = true;
+        explorer.searching = false;
+        explorer.status = "Finding a safe route to the surface";
+        return true;
+    }
+
+    private static int[] findSurfaceGoal(Minecraft mc, int skip) {
+        int px = (int) Math.floor(mc.thePlayer.posX), pz = (int) Math.floor(mc.thePlayer.posZ);
+        for (int radius = 0; radius <= 16; radius += 2) {
+            for (int dx = -radius; dx <= radius; dx += 2) for (int dz = -radius; dz <= radius; dz += 2) {
+                if (radius != 0 && Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                int x = px + dx, z = pz + dz;
+                if (!mc.theWorld.blockExists(x, 64, z)) continue;
+                int y = mc.theWorld.getHeightValue(x, z);
+                if (y <= 0 || y >= 254
+                    || !mc.theWorld.canBlockSeeTheSky(x, y, z)
+                    || !ExplorerTerrain.solidCheckpoint(mc.theWorld, x, y, z)) continue;
+                if (skip-- > 0) continue;
+                return new int[] { x, y, z };
+            }
+        }
+        return null;
     }
 
     public void rememberReturnPoint(Minecraft mc) {
@@ -73,6 +116,43 @@ public final class BaritoneTransitCoordinator {
             }
         } else if (!routePreview.isEmpty()) {
             routePreview.clear();
+        }
+        if (surfaceMove) {
+            if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld) {
+                explorer.baritoneNavigation.stop();
+                reset();
+                explorer.walking = false;
+                return false;
+            }
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            if (!explorer.insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+                explorer.baritoneNavigation.stop();
+                surfaceMove = false;
+                resumeSearch = true;
+                returnWorld = mc.theWorld;
+                returnSolved = true;
+                returnWait = 0;
+                explorer.status = "On the surface; preparing the next search";
+                return true;
+            }
+            if (surfaceWaiting) {
+                BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
+                    .start(surfaceGoal[0], surfaceGoal[1], surfaceGoal[2]);
+                if (started == BaritoneNavigationBridge.Start.STARTED) surfaceWaiting = false;
+                else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40)
+                    explorer.stop(mc, "Could not start a safe surface route");
+            } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                explorer.baritoneNavigation.stop();
+                surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
+                if (routeFailures > 3 || surfaceGoal == null) explorer.stop(mc, "Could not reach the surface safely");
+                else {
+                    surfaceWaiting = true;
+                    surfaceWait = 0;
+                    explorer.status = "Replanning the surface route";
+                }
+            }
+            return true;
         }
         if (returnWaiting || returnMove || resumeSearch) {
             if (mc.thePlayer == null || mc.theWorld == null || returnWorld != mc.theWorld) {

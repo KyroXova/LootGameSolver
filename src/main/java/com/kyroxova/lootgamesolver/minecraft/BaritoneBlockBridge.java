@@ -8,6 +8,41 @@ public final class BaritoneBlockBridge {
 
     private BaritoneBlockBridge() {}
 
+    static boolean startBreaking(net.minecraft.util.MovingObjectPosition hit) {
+        try {
+            Object interaction = interaction();
+            Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
+            Object pos = posType.getConstructor(int.class, int.class, int.class)
+                .newInstance(hit.blockX, hit.blockY, hit.blockZ);
+            Object result = Class.forName("baritone.api.utils.IBlockInteraction")
+                .getMethod("startBreaking", posType, ForgeDirection.class, Vec3.class)
+                .invoke(interaction, pos, ForgeDirection.getOrientation(hit.sideHit), hit.hitVec);
+            return "ATTEMPTED".equals(String.valueOf(result));
+        } catch (ReflectiveOperationException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    static void stopBreaking() {
+        try {
+            Class.forName("baritone.api.utils.IBlockInteraction")
+                .getMethod("stopBreaking")
+                .invoke(interaction());
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
+    private static Object interaction() throws ReflectiveOperationException {
+        Object provider = Class.forName("baritone.api.BaritoneAPI")
+            .getMethod("getProvider")
+            .invoke(null);
+        Object baritone = Class.forName("baritone.api.IBaritoneProvider")
+            .getMethod("getPrimaryBaritone")
+            .invoke(provider);
+        return Class.forName("baritone.api.IBaritone")
+            .getMethod("getBlockInteraction")
+            .invoke(baritone);
+    }
+
     public static boolean click(Minecraft mc, int x, int y, int z, int side, Vec3 hit, boolean attack) {
         Class<?> api;
         try {

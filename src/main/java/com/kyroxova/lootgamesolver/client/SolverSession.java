@@ -383,7 +383,11 @@ public final class SolverSession {
             }
         }
         if (!bridge.interact(snapshot, activeAction, sudokuReverseClick)) {
-            status = "Navigating to " + activeAction.position;
+            if (bridge.foliageClearingFailed()) {
+                cancel("Could not clear foliage blocking the board");
+                return;
+            }
+            status = bridge.isClearingFoliage() ? "Clearing foliage" : "Navigating to " + activeAction.position;
             return;
         }
         bridge.recordSubmittedAction(snapshot);
@@ -404,6 +408,7 @@ public final class SolverSession {
     }
 
     public void cancel(String reason) {
+        bridge.cancelFoliageClearing();
         bridge.releaseSneak();
         Minecraft mc = Minecraft.getMinecraft();
         sudokuTransfer.cancel(mc);

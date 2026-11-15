@@ -152,6 +152,16 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
+    public boolean isPathing() {
+        if (pathing == null || pathingApi == null) return false;
+        try {
+            return (Boolean) pathingApi.getMethod("isPathing")
+                .invoke(pathing);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return true;
+        }
+    }
+
     public boolean isBreaking() {
         if (inputHandler == null || clickLeft == null) return false;
         try {

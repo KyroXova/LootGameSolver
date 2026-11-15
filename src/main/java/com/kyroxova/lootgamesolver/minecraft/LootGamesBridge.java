@@ -25,6 +25,34 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private boolean pendingSneakRelease;
     private boolean restoreSneaking;
+    private final FoliageClearer foliageClearer = new FoliageClearer();
+
+    public void cancelFoliageClearing() {
+        foliageClearer.reset();
+    }
+
+    public boolean isClearingFoliage() {
+        return foliageClearer.clearing();
+    }
+
+    public boolean foliageClearingFailed() {
+        return foliageClearer.failed();
+    }
+
+    public boolean clearMinesweeperObstruction(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || position.length < 3 || mc.theWorld == null || mc.thePlayer == null) return false;
+        String type = mc.theWorld.getBlock(position[0], position[1], position[2])
+            .getClass()
+            .getName();
+        if (!type.equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock")) {
+            Object game = nearbyGame(true);
+            if (game == null || !game.getClass()
+                .getName()
+                .equals(MS_GAME)) return false;
+        }
+        return foliageClearer.clearLine(mc, position[0], position[1], position[2]);
+    }
 
     private static final String LOOTGAMES_PKG = "ru.timeconqueror.lootgames.";
     private static final String MS_GAME = "ru.timeconqueror.lootgames.minigame.minesweeper.GameMineSweeper";
@@ -523,6 +551,9 @@ public final class LootGamesBridge implements MiniGameDetector {
             releasePendingSneak(mc);
             int[] block = boardBlock(detected.game, action.position);
 
+            if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER
+                && foliageClearer.clearLine(mc, block[0], block[1], block[2])) return false;
+
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
                 return false;
             }
@@ -638,6 +669,11 @@ public final class LootGamesBridge implements MiniGameDetector {
             return false;
         int x = position[0], y = position[1], z = position[2];
         if (!isFloorActivator(mc.theWorld.getBlock(x, y, z))) return false;
+        if (mc.theWorld.getBlock(x, y, z)
+            .getClass()
+            .getName()
+            .equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock") && foliageClearer.clearLine(mc, x, y, z))
+            return false;
         if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
@@ -665,6 +701,9 @@ public final class LootGamesBridge implements MiniGameDetector {
             int[] position = gameCenter(game);
             if (position == null) return false;
             int x = position[0], y = position[1], z = position[2];
+            if (game.getClass()
+                .getName()
+                .equals(MS_GAME) && foliageClearer.clearLine(mc, x, y, z)) return false;
             if (!prepareExactCenterAndAim(mc.thePlayer, x, y, z)) return false;
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK

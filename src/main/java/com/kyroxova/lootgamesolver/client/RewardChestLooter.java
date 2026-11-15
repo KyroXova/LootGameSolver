@@ -54,6 +54,7 @@ final class RewardChestLooter {
     private float backpackOldYaw;
     private boolean active, opened, collecting, packing, packOpening, packMoved;
     private boolean existingInventoryPackRequested;
+    private boolean packingOnly;
     private boolean backpackAimSaved;
     private boolean backpackAiming;
     private boolean temporaryBag, temporaryBagUsed, restoringBag;
@@ -84,6 +85,7 @@ final class RewardChestLooter {
         packOpening = false;
         packMoved = false;
         existingInventoryPackRequested = false;
+        packingOnly = false;
         queueIndex = 0;
         backpackSlot = -1;
         backpackTransferAttempts = 0;
@@ -111,6 +113,15 @@ final class RewardChestLooter {
 
     boolean active() {
         return active;
+    }
+
+    boolean startInventoryPacking(Minecraft mc) {
+        if (baseline == null || !hasPackableItems(mc)) return false;
+        start(mc, null, MiniGame.UNKNOWN);
+        packingOnly = true;
+        packing = true;
+        status = "Packing inventory";
+        return true;
     }
 
     boolean completed() {
@@ -180,6 +191,14 @@ final class RewardChestLooter {
                 temporaryBagUsed = false;
                 restoringBag = false;
                 backpackSlot = -1;
+            }
+            return;
+        }
+        if (packingOnly) {
+            if (packing) tickBackpack(mc, exploration);
+            else {
+                active = false;
+                status = "Inventory packing finished";
             }
             return;
         }
@@ -608,7 +627,8 @@ final class RewardChestLooter {
                 }
         }
         if (backpackSlot < 0) {
-            if (!collecting && index >= chests.size()) status = "Reward chests collected";
+            if (packingOnly) status = "No available backpack; items kept";
+            else if (!collecting && index >= chests.size()) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
             packing = false;
             active = false;

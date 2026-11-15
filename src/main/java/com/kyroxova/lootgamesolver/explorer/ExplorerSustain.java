@@ -35,7 +35,7 @@ public final class ExplorerSustain {
         }
         if (eating) {
             if (mc.currentScreen != null || mc.thePlayer.getFoodStats()
-                .getFoodLevel() > 8 || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
+                .getFoodLevel() >= 20 || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
                 releaseUse(mc);
                 eating = false;
                 cooldown = 20;

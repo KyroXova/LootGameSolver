@@ -25,6 +25,7 @@ final class AutoPuzzleCoordinator {
     private int[] autoPuzzlePosition;
     private int[] floorActivatorPosition;
     private boolean floorActivatorClicked;
+    private boolean clearingPositionFoliage;
     private int puzzleWaitTicks;
     private int masterClickAttempts;
     private int centerClickAttempts;
@@ -72,6 +73,7 @@ final class AutoPuzzleCoordinator {
         autoPuzzlePosition = null;
         floorActivatorPosition = null;
         floorActivatorClicked = false;
+        clearingPositionFoliage = false;
         puzzleWaitTicks = 0;
         masterClickAttempts = 0;
         centerClickAttempts = 0;
@@ -206,6 +208,20 @@ final class AutoPuzzleCoordinator {
             } else if (exploration == null || !exploration.navigating()) {
                 int[] center = floorActivatorPosition != null ? floorActivatorPosition
                     : rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+                if (center != null && puzzleBridge.clearMinesweeperObstruction(center)) {
+                    if (puzzleBridge.foliageClearingFailed()) {
+                        state = State.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Could not clear foliage");
+                    } else {
+                        clearingPositionFoliage = true;
+                        if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+                    }
+                    return;
+                }
+                if (clearingPositionFoliage && exploration != null) {
+                    clearingPositionFoliage = false;
+                    if (exploration.moveToPuzzleCenter(mc, center)) return;
+                }
                 if (center != null && mc.thePlayer != null
                     && mc.thePlayer.getDistanceSq(center[0] + 0.5D, center[1] + 0.5D, center[2] + 0.5D) <= 9.0D) {
                     state = State.REVEALING;
@@ -246,6 +262,11 @@ final class AutoPuzzleCoordinator {
                         lastCenterClickTick = puzzleWaitTicks;
                         if (exploration != null) exploration.setAutomationStatus("Opening floor activator");
                     }
+                    if (puzzleBridge.isClearingFoliage()) {
+                        puzzleWaitTicks--;
+                        if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+                        return;
+                    }
                     if (puzzleWaitTicks > 200 && !floorActivatorClicked) {
                         state = State.FAILED;
                         if (exploration != null) exploration.setAutomationStatus("Could not click floor activator");
@@ -275,6 +296,11 @@ final class AutoPuzzleCoordinator {
                 lastCenterClickTick = puzzleWaitTicks;
                 if (exploration != null) exploration.setAutomationStatus("Revealing board");
             }
+            if (puzzleBridge.isClearingFoliage()) {
+                puzzleWaitTicks--;
+                if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+                return;
+            }
             if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
                 state = State.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Board reveal failed");
@@ -298,6 +324,11 @@ final class AutoPuzzleCoordinator {
                 centerClickAttempts++;
                 lastCenterClickTick = puzzleWaitTicks;
                 if (exploration != null) exploration.setAutomationStatus("Revealing Minesweeper board");
+            }
+            if (puzzleBridge.isClearingFoliage()) {
+                puzzleWaitTicks--;
+                if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+                return;
             }
             if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
                 state = State.FAILED;

@@ -11,6 +11,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.oredict.OreDictionary;
 
+import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+
 final class TrashCleanup {
 
     private boolean opening, open;
@@ -39,7 +41,11 @@ final class TrashCleanup {
         if (mc == null || mc.thePlayer == null) return false;
         int empty = 0;
         for (int i = 0; i < 36; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) empty++;
-        return empty <= 8 && nextTrash(mc) >= 0;
+        return inventoryPressureFromEmptySlots(empty);
+    }
+
+    static boolean inventoryPressureFromEmptySlots(int empty) {
+        return empty <= 9;
     }
 
     void reset() {
@@ -125,6 +131,9 @@ final class TrashCleanup {
                 int beforeCount = slot.getStack().stackSize;
                 if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
                     status = "Trash transfer unavailable; items kept";
+                    mc.thePlayer.closeScreen();
+                    open = false;
+                    retryDelay = 1200;
                     return true;
                 }
                 pendingIndex = playerIndex;
@@ -155,7 +164,8 @@ final class TrashCleanup {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
             if (i == reserve || stack == null
-                || baseline != null && baseline.protects(i, stack)
+                || baseline == null
+                || baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i)
                 || InventoryProtection.essential(stack)
                 || stack.hasDisplayName()
                 || stack.hasTagCompound()) continue;
@@ -168,7 +178,10 @@ final class TrashCleanup {
                     break;
                 }
             }
-            if (TrashPolicy.discard(id, stack.getItemDamage(), ore, stack.getItem() instanceof ItemBlock)) return i;
+            boolean unwantedOre = TrashPolicy
+                .discardOre(id, ore, LootGameSolverConfig.discardAllMinedOres, LootGameSolverConfig.discardOreItems);
+            if (TrashPolicy.discard(id, stack.getItemDamage(), unwantedOre, stack.getItem() instanceof ItemBlock))
+                return i;
         }
         return -1;
     }

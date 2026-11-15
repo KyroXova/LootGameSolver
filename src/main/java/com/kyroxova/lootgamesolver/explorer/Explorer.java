@@ -160,6 +160,27 @@ public class Explorer {
     }
 
     private boolean pausedForControl;
+    private boolean inventoryMaintenance;
+
+    public void setInventoryMaintenance(boolean active) {
+        inventoryMaintenance = active;
+    }
+
+    public boolean inventoryMaintenanceReady(Minecraft mc) {
+        return inventoryMaintenance && mc.thePlayer != null
+            && mc.thePlayer.onGround
+            && mc.thePlayer.hurtTime == 0
+            && !mc.thePlayer.capabilities.isFlying
+            && !NavigationControlPolicy.hasManualMovement(
+                GameSettings.isKeyDown(mc.gameSettings.keyBindForward),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindBack),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindLeft),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindRight),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindSneak),
+                GameSettings.isKeyDown(mc.gameSettings.keyBindJump))
+            && (!baritoneCoordinator.active() || !baritoneNavigation.isPathing());
+    }
+
     GroundPathfinder.Search walkingSearch;
     private int[] snowRecoveryTarget;
     private boolean walkingPlanFailed;
@@ -364,7 +385,15 @@ public class Explorer {
         segmentZ = mc.thePlayer.posZ;
         puzzleArrivalPending = false;
         returnAvailable = false;
+        baritoneNavigation.stop();
         baritoneCoordinator.reset();
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (solved && BaritoneTransitCoordinator
+            .needsSurfaceExit(insideDungeonRoom(mc), mc.theWorld.canBlockSeeTheSky(x, y, z))) {
+            if (!baritoneCoordinator.beginSurfaceExit(mc, this)) stop(mc, "No safe surface destination found");
+            return;
+        }
         continueProgressiveSearch(mc, solved);
     }
 
@@ -637,7 +666,7 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
         if (baritoneCoordinator.active() && !baritoneCoordinator.breaking) {
             Float heading = NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
             if (heading != null) {
@@ -756,10 +785,14 @@ public class Explorer {
         return walking && !returning
             && !digging
             && !movingToPuzzleCenter
-            && !insideDungeonRoom(mc)
+            && !sustain.busy()
+            && !toolTransfer.active()
+            && !blockPlacer.selectingBlock()
             && mc.thePlayer != null
             && mc.thePlayer.onGround
-            && route.size() >= 2;
+            && mc.thePlayer.hurtTime == 0
+            && !mc.thePlayer.capabilities.isFlying
+            && (baritoneCoordinator.active() ? !baritoneCoordinator.breaking : route.size() >= 2);
     }
 
     public void toggle(Minecraft mc) {
@@ -926,6 +959,15 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (inventoryMaintenance && mc.thePlayer != null && mc.theWorld != null) {
+            baritoneNavigation.setPaused(true);
+            if (navigationInput != null) {
+                navigationInput.forward = 0;
+                navigationInput.sideways = 0;
+                navigationInput.hop = false;
+            }
+            return;
+        }
         if (baritoneCoordinator.active() && mc.thePlayer != null && mc.theWorld != null) {
             if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled || solverActive) {
                 stop(mc, solverActive ? "Puzzle in progress" : "Exploration disabled");
@@ -948,7 +990,7 @@ public class Explorer {
                 || mc.thePlayer.hurtTime > 0
                 || mc.thePlayer.capabilities.isFlying;
             boolean sustaining = sustain.busy();
-            if (!interrupted || sustaining) sustaining = sustain.tick(mc, walking, false);
+            if (!interrupted || sustaining) sustaining = sustain.tick(mc, walking, !baritoneCoordinator.breaking);
             baritoneNavigation.setPaused(interrupted || sustaining);
             if (interrupted || sustaining) {
                 status = sustaining ? "Eating or preparing food"

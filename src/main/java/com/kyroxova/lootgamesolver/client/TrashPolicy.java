@@ -10,6 +10,15 @@ final class TrashPolicy {
         return "minecraft:dirt".equals(id) || "minecraft:cobblestone".equals(id);
     }
 
+    static boolean discardOre(String id, boolean isOre, boolean all, String[] configured) {
+        if (!isOre || id == null) return false;
+        if (all) return true;
+        if (configured != null) for (String candidate : configured) {
+            if (id.equalsIgnoreCase(candidate)) return true;
+        }
+        return false;
+    }
+
     static boolean discard(String id, int metadata, boolean ore, boolean blockItem) {
         if (id == null) return false;
         String name = id.toLowerCase(Locale.ROOT);

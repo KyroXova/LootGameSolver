@@ -25,6 +25,8 @@ public final class LootGameSolverConfig {
     public static boolean explorationEnabled = true;
     public static boolean staircaseEnabled = true;
     public static int spiralWidth = 3;
+    public static boolean discardAllMinedOres = true;
+    public static String[] discardOreItems = new String[0];
 
     private LootGameSolverConfig() {}
 
@@ -55,6 +57,16 @@ public final class LootGameSolverConfig {
             16,
             1024,
             "Progressive search radius limit for discovering unopened structures.");
+        discardAllMinedOres = cfg.getBoolean(
+            "discardAllMinedOres",
+            "inventory",
+            discardAllMinedOres,
+            "Discard newly acquired ore-dictionary ores during automatic cleanup.");
+        discardOreItems = cfg.getStringList(
+            "discardOreItems",
+            "inventory",
+            discardOreItems,
+            "Registry names of newly acquired ores allowed to be discarded when discardAllMinedOres is false.");
         exploreKey = cfg
             .getInt("exploreKey", "keybinds", exploreKey, 0, 255, "Default walk toggle; also rebind in Controls.");
         overlayKey = cfg.getInt("overlayKey", "keybinds", overlayKey, 0, 255, "LWJGL key code for toggling holograms.");

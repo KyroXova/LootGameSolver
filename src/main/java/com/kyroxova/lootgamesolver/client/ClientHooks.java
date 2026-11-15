@@ -46,6 +46,9 @@ public final class ClientHooks {
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private boolean rewardReturnPending;
     private boolean rewardPreCleanupPending;
+    private int inventoryMaintenanceStage;
+    private int inventoryMaintenanceWait;
+    private int inventoryMaintenanceCooldown;
     private boolean explorationDriven;
     private InventoryBaseline inventoryBaseline;
     private int[] rewardCenter;
@@ -182,6 +185,9 @@ public final class ClientHooks {
         checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
+            if (exploration != null) exploration.setInventoryMaintenance(false);
+            inventoryMaintenanceStage = 0;
+            inventoryMaintenanceCooldown = 0;
             wasInsideRoom = false;
             trashCleanup.reset();
             rewardLooter.cancel(mc);
@@ -201,12 +207,54 @@ public final class ClientHooks {
             }
         }
         trashCleanup.advanceCooldown();
+        if (inventoryMaintenanceCooldown > 0) inventoryMaintenanceCooldown--;
         if (exploration != null && mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
             boolean inside = exploration.inDungeonRoom(mc);
             wasInsideRoom = inside;
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (inventoryMaintenanceStage != 0) {
+            if (exploration == null || !exploration.navigating()
+                || session.isActive()
+                || rewardReturnPending
+                || !LootGameSolverConfig.enabled
+                || !LootGameSolverConfig.explorationEnabled) {
+                if (exploration != null) exploration.setInventoryMaintenance(false);
+                if (rewardLooter.active()) rewardLooter.cancel(mc);
+                inventoryMaintenanceStage = 0;
+                inventoryMaintenanceCooldown = 200;
+                return;
+            }
+            if (++inventoryMaintenanceWait < 4 || !exploration.inventoryMaintenanceReady(mc)) return;
+            if (inventoryMaintenanceStage == 1) {
+                if (!trashCleanup.active() && mc.currentScreen != null) return;
+                if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
+                    if (trashCleanup.tick(mc, true)) {
+                        exploration.setAutomationStatus(trashCleanup.status());
+                        return;
+                    }
+                }
+                inventoryMaintenanceStage = 2;
+            }
+            if (inventoryMaintenanceStage == 2) {
+                if (mc.currentScreen != null) return;
+                if (rewardLooter.startInventoryPacking(mc)) inventoryMaintenanceStage = 3;
+                else inventoryMaintenanceStage = 4;
+            }
+            if (inventoryMaintenanceStage == 3) {
+                rewardLooter.tick(mc, null);
+                exploration.setAutomationStatus(rewardLooter.status());
+                if (rewardLooter.active()) return;
+                inventoryMaintenanceStage = 4;
+            }
+            if (inventoryMaintenanceStage == 4) {
+                exploration.setInventoryMaintenance(false);
+                inventoryMaintenanceStage = 0;
+                inventoryMaintenanceCooldown = 600;
+            }
+            return;
+        }
         if (rewardReturnPending) {
             int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int z = (int) Math.floor(mc.thePlayer.posZ);
@@ -245,12 +293,18 @@ public final class ClientHooks {
             }
             return;
         }
-        if (!session.isActive() && (trashCleanup.active()
-            || exploration != null && trashCleanup.inventoryPressure(mc) && exploration.inventoryCleanupSafe(mc))) {
-            if (trashCleanup.tick(mc, true)) {
-                if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
-                return;
-            }
+        if (!session.isActive() && inventoryBaseline != null
+            && inventoryMaintenanceCooldown == 0
+            && exploration != null
+            && trashCleanup.inventoryPressure(mc)
+            && exploration.inventoryCleanupSafe(mc)
+            && mc.currentScreen == null
+            && mc.thePlayer.inventory.getItemStack() == null) {
+            inventoryMaintenanceStage = 1;
+            inventoryMaintenanceWait = 0;
+            exploration.setInventoryMaintenance(true);
+            exploration.setAutomationStatus("Preparing inventory cleanup");
+            return;
         }
         if (mc.currentScreen != null) {
             if (session.inventoryTransferActive()) session.tick();
