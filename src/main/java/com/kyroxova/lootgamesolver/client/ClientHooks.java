@@ -298,13 +298,15 @@ public final class ClientHooks {
             }
             return;
         }
-        if (!session.isActive() && inventoryBaseline != null
+        if (!session.isActive()
             && inventoryMaintenanceCooldown == 0
             && exploration != null
+            && exploration.navigating()
             && trashCleanup.inventoryPressure(mc)
             && exploration.inventoryCleanupSafe(mc)
             && mc.currentScreen == null
             && mc.thePlayer.inventory.getItemStack() == null) {
+            ensureInventoryBaseline(mc);
             inventoryMaintenanceStage = 1;
             inventoryMaintenanceWait = 0;
             exploration.setInventoryMaintenance(true);

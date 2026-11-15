@@ -92,6 +92,7 @@ public class Explorer {
     int cameraPitchDirection;
     int pitchLastY;
     double pitchLandingX, pitchLandingZ;
+    private int miningCameraCooldownTicks;
     boolean returnDigging;
     TileEntity returnOriginalTarget;
     List<int[]> returnAfterDig;
@@ -164,6 +165,9 @@ public class Explorer {
 
     public void setInventoryMaintenance(boolean active) {
         inventoryMaintenance = active;
+        if (!active) {
+            baritoneNavigation.setPaused(false);
+        }
     }
 
     public boolean inventoryMaintenanceReady(Minecraft mc) {
@@ -177,8 +181,7 @@ public class Explorer {
                 GameSettings.isKeyDown(mc.gameSettings.keyBindLeft),
                 GameSettings.isKeyDown(mc.gameSettings.keyBindRight),
                 GameSettings.isKeyDown(mc.gameSettings.keyBindSneak),
-                GameSettings.isKeyDown(mc.gameSettings.keyBindJump))
-            && (!baritoneCoordinator.active() || !baritoneNavigation.isPathing());
+                GameSettings.isKeyDown(mc.gameSettings.keyBindJump));
     }
 
     GroundPathfinder.Search walkingSearch;
@@ -707,13 +710,21 @@ public class Explorer {
 
     public void renderCamera(Minecraft mc) {
         if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
-        if (baritoneCoordinator.active() && !baritoneCoordinator.breaking) {
+        boolean isMining = miningCameraCooldownTicks > 0
+            || (baritoneCoordinator.active() && baritoneCoordinator.breaking)
+            || digging || returnDigging
+            || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        if (isMining) {
+            camera.clear();
+            return;
+        }
+        if (baritoneCoordinator.active()) {
             Float heading = NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
             if (heading != null) {
                 camera.look(heading, 0F);
                 camera.render(mc, world, true);
             }
-        } else if (!baritoneCoordinator.active()) camera.render(mc, world, true);
+        } else camera.render(mc, world, true);
     }
 
     public void look(float yaw, float pitch) {
@@ -1044,6 +1055,15 @@ public class Explorer {
                 navigationInput.hop = false;
             }
             return;
+        }
+        boolean isMining = (baritoneCoordinator.active() && baritoneCoordinator.breaking)
+            || digging || returnDigging
+            || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        if (isMining) {
+            miningCameraCooldownTicks = 40;
+            sustain.notifyBlockMined();
+        } else if (miningCameraCooldownTicks > 0) {
+            miningCameraCooldownTicks--;
         }
         if (baritoneCoordinator.active() && mc.thePlayer != null && mc.theWorld != null) {
             if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled || solverActive) {

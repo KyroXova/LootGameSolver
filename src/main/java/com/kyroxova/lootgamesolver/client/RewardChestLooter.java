@@ -137,6 +137,9 @@ final class RewardChestLooter {
         backpackTransfer.cancel(mc);
         if ((opened || packing) && mc.thePlayer != null && mc.currentScreen instanceof GuiContainer)
             mc.thePlayer.closeScreen();
+        if (temporaryBag && temporaryBagUsed && mc.thePlayer != null && !restoringBag) {
+            backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced);
+        }
         if (mc.thePlayer != null && oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
         restoreBackpackAim(mc);
         active = false;
@@ -178,11 +181,12 @@ final class RewardChestLooter {
             }
             return;
         }
+        boolean structureFinished = (!packing && !collecting && index >= chests.size())
+            || (packingOnly && !packing);
         if (temporaryBag && temporaryBagUsed
             && !packOpening
             && mc.currentScreen == null
-            && (bagSource >= 0 && bagSource < backpackTried.length && backpackTried[bagSource]
-                || !packing && !collecting && index >= chests.size())) {
+            && structureFinished) {
             if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
                 restoringBag = true;
                 status = "Restoring hotbar";
@@ -635,6 +639,20 @@ final class RewardChestLooter {
         }
         if (backpackSlot >= 9) {
             int selected = backpackSlot;
+            boolean hotbarFull = true;
+            for (int i = 0; i < 9; i++) {
+                if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
+                    hotbarFull = false;
+                    break;
+                }
+            }
+            if (hotbarFull && temporaryBag && temporaryBagUsed && bagHotbar >= 0 && !restoringBag) {
+                if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
+                    restoringBag = true;
+                    status = "Making space in hotbar";
+                    return;
+                }
+            }
             backpackSlot = -1;
             if (backpackTransfer.start(mc, selected, baseline)) {
                 backpackTransferAttempts = 0;
