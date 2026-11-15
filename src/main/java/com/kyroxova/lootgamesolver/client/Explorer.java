@@ -1337,11 +1337,15 @@ public class Explorer {
     public void renderCamera(Minecraft mc) {
         if (!baritoneCenterMove && !baritoneStructureMove
             && !baritoneReturnMove
-            && !baritoneReturnWaiting) camera.render(mc, world, walking);
+            && !baritoneReturnWaiting) camera.render(mc, world, true);
     }
 
-    private void look(float yaw, float pitch) {
+    void look(float yaw, float pitch) {
         camera.look(yaw, pitch);
+    }
+
+    void clearAim() {
+        camera.clear();
     }
 
     private void rememberBaritoneReturnPoint(Minecraft mc) {
@@ -1776,9 +1780,9 @@ public class Explorer {
             } else {
                 double distToCenter = Math.hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D);
                 boolean arrived = target != null
-                    && ((distToCenter <= (movingToRewardView ? 1.8D : 1.5D)
+                    && ((distToCenter <= (movingToRewardView ? 0.75D : 1.5D)
                         && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - target.yCoord - 1) <= 2)
-                        || (baritoneNavigation.completed() && distToCenter <= 3.0D));
+                        || (baritoneNavigation.completed() && distToCenter <= (movingToRewardView ? 1.0D : 3.0D)));
                 if (arrived) {
                     baritoneNavigation.stop();
                     baritoneCenterMove = false;
@@ -1900,6 +1904,11 @@ public class Explorer {
         if (solverActive) {
             pausedForControl = true;
             mc.thePlayer.setSprinting(false);
+            if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+                net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                    mc.gameSettings.keyBindSprint.getKeyCode(),
+                    net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint));
+            }
             status = "Puzzle in progress";
             return;
         }
@@ -1922,6 +1931,11 @@ public class Explorer {
         if (manual || mc.currentScreen != null || mc.thePlayer.hurtTime > 0 || mc.thePlayer.capabilities.isFlying) {
             pausedForControl = true;
             mc.thePlayer.setSprinting(false);
+            if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+                net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                    mc.gameSettings.keyBindSprint.getKeyCode(),
+                    net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint));
+            }
             mc.playerController.resetBlockRemoving();
             miningAim.reset();
             status = manual ? "Paused: release movement keys to resume"
@@ -3127,7 +3141,12 @@ public class Explorer {
         if (navigationInput != null && mc.thePlayer != null) {
             if (mc.thePlayer.movementInput == navigationInput) mc.thePlayer.movementInput = navigationInput.original;
             navigationInput = null;
-            mc.thePlayer.setSprinting(false);
+        }
+        if (mc.thePlayer != null) mc.thePlayer.setSprinting(false);
+        if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+            net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                mc.gameSettings.keyBindSprint.getKeyCode(),
+                net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint));
         }
         if (digging && mc.playerController != null) mc.playerController.resetBlockRemoving();
         if (savedSlot >= 0 && mc.thePlayer != null) mc.thePlayer.inventory.currentItem = savedSlot;

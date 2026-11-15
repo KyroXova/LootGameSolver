@@ -209,7 +209,7 @@ final class RewardChestLooter {
             }
         }
         if (packing) {
-            tickBackpack(mc);
+            tickBackpack(mc, exploration);
             return;
         }
         while (!collecting && index < chests.size()
@@ -403,7 +403,7 @@ final class RewardChestLooter {
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
         float targetYaw = (float) (Math.atan2(hitZ, hitX) * 180D / Math.PI) - 90F;
         float targetPitch = (float) (-Math.atan2(hitY, Math.hypot(hitX, hitZ)) * 180D / Math.PI);
-        if (!turnToward(mc, targetYaw, targetPitch, 14.4F)) {
+        if (!turnToward(mc, exploration, targetYaw, targetPitch)) {
             chestAim.reset();
             status = "Facing reward chest";
             return;
@@ -436,6 +436,7 @@ final class RewardChestLooter {
             return;
         }
         chestAim.reset();
+        if (exploration != null) exploration.clearAim();
         opened = true;
         waiting = 12;
         status = "Opening reward chest";
@@ -447,7 +448,7 @@ final class RewardChestLooter {
         return chestView != null;
     }
 
-    private void tickBackpack(Minecraft mc) {
+    private void tickBackpack(Minecraft mc, Explorer exploration) {
         if (waiting > 0) {
             waiting--;
             return;
@@ -456,10 +457,10 @@ final class RewardChestLooter {
             if (mc.currentScreen != null || backpackSlot < 0
                 || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
                 backpackAiming = false;
-                restoreBackpackAim(mc);
+                restoreBackpackAim(mc, exploration);
                 return;
             }
-            if (!turnToward(mc, backpackOldYaw, -90F, 12F)) {
+            if (!turnToward(mc, exploration, backpackOldYaw, -90F)) {
                 backpackAimTicks = 0;
                 status = "Facing clear space";
                 return;
@@ -467,12 +468,13 @@ final class RewardChestLooter {
             if (++backpackAimTicks < 2) return;
             if (!BaritoneInventoryBridge.useHotbarItem(mc, backpackSlot)) {
                 backpackAiming = false;
-                restoreBackpackAim(mc);
+                restoreBackpackAim(mc, exploration);
                 status = "Backpack interaction unavailable";
                 return;
             }
             if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
             backpackAiming = false;
+            restoreBackpackAim(mc, exploration);
             packOpening = true;
             openWait = 0;
             waiting = 5;
@@ -640,18 +642,29 @@ final class RewardChestLooter {
         backpackAimTicks = 0;
     }
 
-    private static boolean turnToward(Minecraft mc, float yaw, float pitch, float speed) {
-        float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
-        float pitchDelta = pitch - mc.thePlayer.rotationPitch;
-        float yawStep = Math.max(-speed, Math.min(speed, yawDelta));
-        float pitchStep = Math.max(-speed, Math.min(speed, pitchDelta));
-        mc.thePlayer.setAngles(yawStep / 0.15F, -pitchStep / 0.15F);
-        return Math.abs(yawDelta) < 1F && Math.abs(pitchDelta) < 1F;
+    private static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
+        if (exploration != null) {
+            exploration.look(yaw, pitch);
+        } else {
+            float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+            float pitchDelta = pitch - mc.thePlayer.rotationPitch;
+            float yawStep = Math.max(-6F, Math.min(6F, yawDelta));
+            float pitchStep = Math.max(-6F, Math.min(6F, pitchDelta));
+            mc.thePlayer.setAngles(yawStep / 0.15F, -pitchStep / 0.15F);
+        }
+        float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+        float pitchError = pitch - mc.thePlayer.rotationPitch;
+        return Math.abs(yawError) < 2.5F && Math.abs(pitchError) < 2.5F;
     }
 
     private void restoreBackpackAim(Minecraft mc) {
+        restoreBackpackAim(mc, null);
+    }
+
+    private void restoreBackpackAim(Minecraft mc, Explorer exploration) {
         if (!backpackAimSaved || mc.thePlayer == null) return;
         backpackAimSaved = false;
+        if (exploration != null) exploration.clearAim();
     }
 
     private boolean compactBackpackHotbar(Minecraft mc) {

@@ -10,6 +10,8 @@ import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.AxisAlignedBB;
 
 final class ExplorerRouteFollower {
@@ -69,7 +71,13 @@ final class ExplorerRouteFollower {
             input.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
             input.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
         }
-        mc.thePlayer.setSprinting(
-            !centering && !digging && !mc.thePlayer.isInWater() && Math.abs(turn) < 35F && input.forward > 0.8F);
+        boolean wantSprint = !centering && !digging && !mc.thePlayer.isInWater() && Math.abs(turn) < 35F
+            && input.forward > 0.8F && mc.thePlayer.getFoodStats().getFoodLevel() > 6;
+        mc.thePlayer.setSprinting(wantSprint);
+        if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+            KeyBinding.setKeyBindState(
+                mc.gameSettings.keyBindSprint.getKeyCode(),
+                wantSprint || GameSettings.isKeyDown(mc.gameSettings.keyBindSprint));
+        }
     }
 }

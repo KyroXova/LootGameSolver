@@ -783,9 +783,17 @@ public final class ClientHooks {
     }
 
     private void releaseMovementKeys(Minecraft mc) {
-        if (mc.thePlayer != null && mc.thePlayer.movementInput != null) {
-            mc.thePlayer.movementInput.moveForward = 0.0F;
-            mc.thePlayer.movementInput.jump = false;
+        if (mc.thePlayer != null) {
+            mc.thePlayer.setSprinting(false);
+            if (mc.thePlayer.movementInput != null) {
+                mc.thePlayer.movementInput.moveForward = 0.0F;
+                mc.thePlayer.movementInput.jump = false;
+            }
+        }
+        if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+            net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                mc.gameSettings.keyBindSprint.getKeyCode(),
+                net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint));
         }
     }
 

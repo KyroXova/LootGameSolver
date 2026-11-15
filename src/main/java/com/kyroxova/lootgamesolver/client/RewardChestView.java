@@ -30,7 +30,7 @@ final class RewardChestView {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
                     int x = chest[0] + dx, z = chest[2] + dz;
                     if (dx * dx + dz * dz > 4) continue;
-                    if (center != null && Math.abs(x - center[0]) <= 1 && Math.abs(z - center[2]) <= 1) continue;
+                    if (center != null && x == center[0] && z == center[2]) continue;
                     boolean failed = false;
                     for (int[] view : failedChestViews) if (view[0] == x && view[1] == floorY && view[2] == z) {
                         failed = true;

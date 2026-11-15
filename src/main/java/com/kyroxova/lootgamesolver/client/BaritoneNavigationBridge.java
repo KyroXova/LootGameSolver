@@ -98,6 +98,10 @@ final class BaritoneNavigationBridge {
                 candidatePathingApi.getMethod("setNavigationChatOverride", Boolean.class)
                     .invoke(candidatePathing, false);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
+            try {
+                candidatePathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                    .invoke(candidatePathing, false, false, false);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             process = candidate;
             goal = next;
             processApi = customApi;

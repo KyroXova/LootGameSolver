@@ -82,6 +82,22 @@ final class ExplorerSustain {
                     break;
                 }
             }
+        } else {
+            if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem))) {
+                if (restoreSlot >= 0 && restoreSlot < 9
+                    && !isHealingAxe(mc.thePlayer.inventory.getStackInSlot(restoreSlot))) {
+                    int slot = restoreSlot;
+                    restoreSlot = -1;
+                    select(mc, slot);
+                } else {
+                    for (int i = 0; i < 9; i++) {
+                        if (!isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
+                            select(mc, i);
+                            break;
+                        }
+                    }
+                }
+            }
         }
         return false;
     }
@@ -110,7 +126,7 @@ final class ExplorerSustain {
             && !name.contains("golden_apple");
     }
 
-    private static boolean isHealingAxe(ItemStack stack) {
+    static boolean isHealingAxe(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
         String className = stack.getItem().getClass().getName();
         if (className.equals("com.rwtema.extrautils.item.ItemHealingAxe")) return true;

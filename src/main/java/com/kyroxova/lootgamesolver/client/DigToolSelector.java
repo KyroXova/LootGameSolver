@@ -13,6 +13,7 @@ final class DigToolSelector {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
             if (stack == null || stack.stackSize <= 0) continue;
+            if (ExplorerSustain.isHealingAxe(stack)) continue;
             if (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10) continue;
             if (ForgeHooks.canToolHarvestBlock(block, metadata, stack)) return true;
         }
@@ -38,6 +39,7 @@ final class DigToolSelector {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
             if (stack == null || stack.stackSize <= 0) continue;
+            if (ExplorerSustain.isHealingAxe(stack)) continue;
             if (stack.isItemStackDamageable() && stack.getMaxDamage() - stack.getItemDamage() < 10) continue;
             try {
                 usable[i] = block.getHarvestTool(metadata) == null
@@ -49,7 +51,12 @@ final class DigToolSelector {
             }
         }
         int selected = bestSlot(speeds, usable);
-        if (selected < 0) return mc.thePlayer.inventory.currentItem;
-        return selected;
+        if (selected >= 0) return selected;
+        if (ExplorerSustain.isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem))) {
+            for (int i = 0; i < 9; i++) {
+                if (!ExplorerSustain.isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) return i;
+            }
+        }
+        return mc.thePlayer.inventory.currentItem;
     }
 }

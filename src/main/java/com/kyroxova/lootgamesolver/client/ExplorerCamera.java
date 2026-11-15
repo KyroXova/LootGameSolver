@@ -14,7 +14,7 @@ final class ExplorerCamera {
         long nowNano = System.nanoTime();
         double seconds = lastFrame == 0 ? 1D / 60D : (nowNano - lastFrame) / 1_000_000_000D;
         lastFrame = nowNano;
-        if (!walking || !active
+        if (!active
             || mc.thePlayer == null
             || mc.theWorld != world
             || mc.currentScreen != null
