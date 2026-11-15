@@ -1,12 +1,11 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 

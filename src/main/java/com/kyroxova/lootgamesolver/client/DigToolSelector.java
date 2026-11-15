@@ -1,11 +1,11 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
-
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.ForgeHooks;
+
+import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
 
 public final class DigToolSelector {
 

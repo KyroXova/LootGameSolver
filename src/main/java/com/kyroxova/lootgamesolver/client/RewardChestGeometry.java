@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.passable;
 
 import net.minecraft.client.Minecraft;

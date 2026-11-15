@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -9,6 +7,8 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 
 import org.lwjgl.opengl.GL11;
+
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 final class NavigationOverlayRenderer {
 

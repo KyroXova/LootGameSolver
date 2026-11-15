@@ -1,11 +1,10 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
@@ -115,8 +114,8 @@ final class AutoPuzzleCoordinator {
         puzzleCompletion.begin();
     }
 
-    void checkSolvingStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration,
-        SolverSession session, PuzzleCompletionGate puzzleCompletion) {
+    void checkSolvingStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
+        PuzzleCompletionGate puzzleCompletion) {
         if (state != State.SOLVING || puzzleCompletion.won(mc.theWorld != null)) return;
         Object game = puzzleBridge.nearbyGame(true);
         int level = puzzleBridge.currentMinesweeperLevel(game);
@@ -138,9 +137,8 @@ final class AutoPuzzleCoordinator {
         }
     }
 
-    void tick(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration,
-        SolverSession session, PuzzleCompletionGate puzzleCompletion,
-        RewardChestLooter rewardLooter, ClientHooks hooks) {
+    void tick(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
+        PuzzleCompletionGate puzzleCompletion, RewardChestLooter rewardLooter, ClientHooks hooks) {
         if (state == State.IDLE) return;
         if (mc.theWorld == null || mc.thePlayer == null || (puzzleWorld != null && puzzleWorld != mc.theWorld)) {
             reset();

@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +19,7 @@ import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.core.SolverAction;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.solver.gol.GameOfLightBoard;
 

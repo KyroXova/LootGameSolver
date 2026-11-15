@@ -1,9 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
+import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.*;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.*;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerMiningTarget.visibleMiningPoint;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.*;
-import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.*;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -303,7 +303,8 @@ public class Explorer {
         if (target != null) return new int[] { target.xCoord, target.yCoord, target.zCoord };
         Minecraft mc = Minecraft.getMinecraft();
         if (mc != null && mc.theWorld != null && mc.thePlayer != null) {
-            net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery.find(mc, savedFinder, solvedStructures, worldIdentity(mc));
+            net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery
+                .find(mc, savedFinder, solvedStructures, worldIdentity(mc));
             if (found != null) {
                 target = found;
                 knownStructure = new int[] { found.xCoord, found.yCoord, found.zCoord };
@@ -480,10 +481,8 @@ public class Explorer {
             trail.target = knownStructure.clone();
             trail.worldId = worldIdentity(mc);
             trail.dimension = mc.theWorld.provider.dimensionId;
-            trail.points.replace(
-                trail.store.load(trail.worldId, trail.dimension, trail.target[0], trail.target[1], trail.target[2]));
             trail.dirty = false;
-            trail.excavating = trail.points.size() > 1;
+            trail.excavating = false;
         }
     }
 
@@ -696,20 +695,9 @@ public class Explorer {
     public void prepareRewardCollection(Minecraft mc, int[] center) {
         if (walking) stop(mc, "Reward collection started");
         if (mc == null || mc.theWorld == null || center == null) return;
-        if (trail.points.size() < 2) {
-            int[] saved = trail.store.nearestStructure(
-                worldIdentity(mc),
-                mc.theWorld.provider.dimensionId,
-                center[0],
-                center[1],
-                center[2],
-                24);
-            if (saved != null) {
-                knownStructure = saved;
-                trail.target = null;
-                beginAccessTrail(mc);
-            }
-        }
+        knownStructure = center.clone();
+        trail.target = null;
+        beginAccessTrail(mc);
     }
 
     public void clearLastCheckpoint(Minecraft mc) {
@@ -1355,8 +1343,8 @@ public class Explorer {
                     route.addAll(walkingSearch.path());
                     walkingSearch = null;
                     walkingSearchNeedsResume = !movingToPuzzleCenter && !reachedGoal && !route.isEmpty();
-                    if (movingToPuzzleCenter && reachedCenter && target != null)
-                        puzzleCenter.appendPuzzleCenterWaypoint(this, new int[] { target.xCoord, target.yCoord, target.zCoord });
+                    if (movingToPuzzleCenter && reachedCenter && target != null) puzzleCenter
+                        .appendPuzzleCenterWaypoint(this, new int[] { target.xCoord, target.yCoord, target.zCoord });
                     walkingPlanFailed = !reachedGoal;
                 }
             }
@@ -2148,8 +2136,12 @@ public class Explorer {
                     net.minecraft.block.Block b = mc.theWorld.getBlock(x, y - 1, z);
                     net.minecraft.block.Block above = mc.theWorld.getBlock(x, y, z);
                     net.minecraft.block.Block above2 = mc.theWorld.getBlock(x, y + 1, z);
-                    if (b.isNormalCube() && !b.getMaterial().isLiquid()
-                        && !above.getMaterial().isLiquid() && !above2.getMaterial().isLiquid()) {
+                    if (b.isNormalCube() && !b.getMaterial()
+                        .isLiquid()
+                        && !above.getMaterial()
+                            .isLiquid()
+                        && !above2.getMaterial()
+                            .isLiquid()) {
                         double dsq = (x - px) * (x - px) + (z - pz) * (z - pz);
                         if (dsq < bestDistSq) {
                             bestDistSq = dsq;

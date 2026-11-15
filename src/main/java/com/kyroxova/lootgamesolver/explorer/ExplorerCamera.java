@@ -15,18 +15,16 @@ final class ExplorerCamera {
         long nowNano = System.nanoTime();
         double seconds = lastFrame == 0 ? 1D / 60D : (nowNano - lastFrame) / 1_000_000_000D;
         lastFrame = nowNano;
-        if (!active
-            || mc.thePlayer == null
-            || mc.theWorld != world
-            || mc.currentScreen != null
-            || mc.isGamePaused()) return;
+        if (!active || mc.thePlayer == null || mc.theWorld != world || mc.currentScreen != null || mc.isGamePaused())
+            return;
 
         long nowMs = System.currentTimeMillis();
         if (mc.mouseHelper != null && (mc.mouseHelper.deltaX != 0 || mc.mouseHelper.deltaY != 0)) {
             lastUserMouseTime = nowMs;
         }
 
-        // Keep mouse aim unlocked to player use if mouse was moved within the last 10 seconds (only for walking steering)
+        // Keep mouse aim unlocked to player use if mouse was moved within the last 10 seconds (only for walking
+        // steering)
         if (!force && nowMs - lastUserMouseTime < 10_000L) {
             return;
         }

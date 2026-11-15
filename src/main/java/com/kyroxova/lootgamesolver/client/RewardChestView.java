@@ -1,12 +1,13 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.passable;
 
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Vec3;
+
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 final class RewardChestView {
 

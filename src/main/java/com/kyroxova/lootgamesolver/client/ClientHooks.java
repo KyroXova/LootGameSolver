@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -24,6 +22,7 @@ import org.lwjgl.opengl.GL11;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.SolverAction;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
@@ -358,7 +357,9 @@ public final class ClientHooks {
             releaseMovementKeys(mc);
             puzzleCompletion.clear();
             autoPuzzle.reset();
-            if (!exploration.navigating() && (exploration.inDungeonRoom(mc) || puzzleBridge.nearbyFloorActivator() != null || puzzleBridge.nearbyGame(true) != null)) {
+            if (!exploration.navigating()
+                && (exploration.inDungeonRoom(mc) || puzzleBridge.nearbyFloorActivator() != null
+                    || puzzleBridge.nearbyGame(true) != null)) {
                 explorationDriven = true;
                 int[] floor = puzzleBridge.nearbyFloorActivator();
                 Object nearbyGame = puzzleBridge.nearbyGame(true);
@@ -443,8 +444,6 @@ public final class ClientHooks {
             LootGameSolverConfig.setOverlayVisible(!LootGameSolverConfig.showOverlay);
         }
     }
-
-
 
     static int[] nearbyRewardCenter(Minecraft mc) {
         java.util.List<net.minecraft.tileentity.TileEntityChest> nearby = new java.util.ArrayList<>();

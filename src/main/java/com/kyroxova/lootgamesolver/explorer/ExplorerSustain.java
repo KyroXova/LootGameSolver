@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import com.kyroxova.lootgamesolver.client.InventoryToolTransfer;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.EnumAction;
@@ -11,6 +9,8 @@ import net.minecraft.item.ItemStack;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+
+import com.kyroxova.lootgamesolver.client.InventoryToolTransfer;
 
 public final class ExplorerSustain {
 
@@ -46,8 +46,10 @@ public final class ExplorerSustain {
         }
         if (cooldown > 0) cooldown--;
         if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
-        boolean needsFood = mc.thePlayer.getFoodStats().getFoodLevel() <= 14
-            || (mc.thePlayer.shouldHeal() && mc.thePlayer.getFoodStats().getFoodLevel() < 20);
+        boolean needsFood = mc.thePlayer.getFoodStats()
+            .getFoodLevel() <= 14
+            || (mc.thePlayer.shouldHeal() && mc.thePlayer.getFoodStats()
+                .getFoodLevel() < 20);
         if (needsFood && cooldown == 0) {
             int food = findFood(mc, 0, 9);
             if (food < 0) {
@@ -130,14 +132,20 @@ public final class ExplorerSustain {
 
     public static boolean isHealingAxe(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
-        String className = stack.getItem().getClass().getName();
+        String className = stack.getItem()
+            .getClass()
+            .getName();
         if (className.equals("com.rwtema.extrautils.item.ItemHealingAxe")) return true;
-        String name = String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())).toLowerCase(java.util.Locale.ROOT);
+        String name = String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem()))
+            .toLowerCase(java.util.Locale.ROOT);
         if (name.contains("healingaxe") || name.contains("healing_axe")) return true;
         try {
-            String unloc = stack.getItem().getUnlocalizedName(stack);
-            if (unloc != null && (unloc.toLowerCase(java.util.Locale.ROOT).contains("healingaxe")
-                || unloc.toLowerCase(java.util.Locale.ROOT).contains("healing_axe"))) {
+            String unloc = stack.getItem()
+                .getUnlocalizedName(stack);
+            if (unloc != null && (unloc.toLowerCase(java.util.Locale.ROOT)
+                .contains("healingaxe")
+                || unloc.toLowerCase(java.util.Locale.ROOT)
+                    .contains("healing_axe"))) {
                 return true;
             }
         } catch (Throwable ignored) {}

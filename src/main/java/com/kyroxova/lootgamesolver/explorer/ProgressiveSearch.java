@@ -34,9 +34,6 @@ public final class ProgressiveSearch {
         step++;
         int dist = step * 64;
         if (limit > 0 && dist > limit) return null;
-        return new int[] {
-            (int) Math.round(x + dirX * dist),
-            (int) Math.round(z + dirZ * dist)
-        };
+        return new int[] { (int) Math.round(x + dirX * dist), (int) Math.round(z + dirZ * dist) };
     }
 }

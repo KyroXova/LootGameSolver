@@ -28,8 +28,13 @@ public final class PuzzleCenterNavigator {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = explorer.roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, explorer.ticks);
         if (bounds != null) {
-            if (x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]
-                || center[0] <= bounds[0] || center[0] >= bounds[1] || center[2] <= bounds[2] || center[2] >= bounds[3]
+            if (x <= bounds[0] || x >= bounds[1]
+                || z <= bounds[2]
+                || z >= bounds[3]
+                || center[0] <= bounds[0]
+                || center[0] >= bounds[1]
+                || center[2] <= bounds[2]
+                || center[2] >= bounds[3]
                 || Math.abs(y - center[1] - 1) > 3) {
                 return false;
             }
@@ -157,7 +162,8 @@ public final class PuzzleCenterNavigator {
             if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
                 if (allowDigging && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
                     explorer.walking = true;
-                    explorer.status = explorer.digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
+                    explorer.status = explorer.digging ? "Planning an entry to the board center"
+                        : "Moving to a safe board entrance";
                     return true;
                 }
                 if (!allowDigging) {
@@ -178,12 +184,14 @@ public final class PuzzleCenterNavigator {
 
     public void appendPuzzleCenterWaypoint(Explorer explorer, int[] center) {
         int[] stand = new int[] { center[0], center[1] + 1, center[2], explorer.movingToRewardView ? 0 : 2 };
-        if (explorer.route.isEmpty() || !samePosition(explorer.route.get(explorer.route.size() - 1), stand)) explorer.route.add(stand);
+        if (explorer.route.isEmpty() || !samePosition(explorer.route.get(explorer.route.size() - 1), stand))
+            explorer.route.add(stand);
         else explorer.route.set(explorer.route.size() - 1, stand);
     }
 
     public boolean reachPuzzleCenter(Minecraft mc, Explorer explorer) {
-        int[] center = explorer.target == null ? null : new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
+        int[] center = explorer.target == null ? null
+            : new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
         if (center == null) {
             abandonPuzzleCenterMove(mc, explorer);
             return true;
@@ -244,7 +252,8 @@ public final class PuzzleCenterNavigator {
         }
         if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
             explorer.walking = true;
-            explorer.status = explorer.digging ? "Planning an entry to the board center" : "Moving to a safe board entrance";
+            explorer.status = explorer.digging ? "Planning an entry to the board center"
+                : "Moving to a safe board entrance";
             return true;
         }
         abandonPuzzleCenterMove(mc, explorer);

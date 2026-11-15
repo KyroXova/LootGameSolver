@@ -101,7 +101,8 @@ public final class BaritoneTransitCoordinator {
                     (int) Math.floor(mc.thePlayer.boundingBox.minY),
                     (int) Math.floor(mc.thePlayer.posZ));
                 boolean arrived = onSurface
-                    || (mc.thePlayer.onGround && distToExit <= 2.5D && Math.abs(mc.thePlayer.boundingBox.minY - returnPoint[1]) <= 2)
+                    || (mc.thePlayer.onGround && distToExit <= 2.5D
+                        && Math.abs(mc.thePlayer.boundingBox.minY - returnPoint[1]) <= 2)
                     || (explorer.baritoneNavigation.completed() && distToExit <= 4.0D);
                 if (arrived) {
                     explorer.baritoneNavigation.stop();
@@ -139,7 +140,8 @@ public final class BaritoneTransitCoordinator {
                 if (searchHandoff) {
                     BaritoneNavigationBridge.Start started = searchNext
                         ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
-                        : explorer.baritoneNavigation.startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+                        : explorer.baritoneNavigation
+                            .startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
                     if (started == BaritoneNavigationBridge.Start.STARTED) {
                         searchHandoff = false;
                         if (searchNext) {
@@ -156,8 +158,10 @@ public final class BaritoneTransitCoordinator {
                         explorer.stop(mc, "Baritone could not start structure navigation");
                     }
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    double distToGoal = Math.hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D);
-                    boolean arrived = (explorer.baritoneNavigation.completed() && distToGoal <= 4.0D) || distToGoal <= 2.5D;
+                    double distToGoal = Math
+                        .hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D);
+                    boolean arrived = (explorer.baritoneNavigation.completed() && distToGoal <= 4.0D)
+                        || distToGoal <= 2.5D;
                     explorer.baritoneNavigation.stop();
                     if (arrived) {
                         explorer.scan(mc);
@@ -206,11 +210,14 @@ public final class BaritoneTransitCoordinator {
                 centerMove = false;
                 explorer.walking = false;
             } else {
-                double distToCenter = Math.hypot(mc.thePlayer.posX - explorer.target.xCoord - 0.5D, mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+                double distToCenter = Math.hypot(
+                    mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+                    mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
                 boolean arrived = explorer.target != null
                     && ((distToCenter <= (explorer.movingToRewardView ? 0.75D : 1.5D)
                         && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - explorer.target.yCoord - 1) <= 2)
-                        || (explorer.baritoneNavigation.completed() && distToCenter <= (explorer.movingToRewardView ? 1.0D : 3.0D)));
+                        || (explorer.baritoneNavigation.completed()
+                            && distToCenter <= (explorer.movingToRewardView ? 1.0D : 3.0D)));
                 if (arrived) {
                     explorer.baritoneNavigation.stop();
                     centerMove = false;

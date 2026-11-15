@@ -99,7 +99,8 @@ public final class BaritoneNavigationBridge {
                     .invoke(candidatePathing, false);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
             try {
-                candidatePathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                candidatePathingApi
+                    .getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                     .invoke(candidatePathing, false, false, false);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
             process = candidate;
@@ -175,9 +176,11 @@ public final class BaritoneNavigationBridge {
     public void stop() {
         try {
             if (process != null && processApi != null) {
-                if (processApi.getMethod("getGoal").invoke(process) == goal) {
-                    Method setGoal = processApi.getMethod("setGoal", goalApi);
-                    setGoal.invoke(process, new Object[] { null });
+                if (processApi.getMethod("getGoal")
+                    .invoke(process) == goal) {
+                    Class.forName("baritone.api.process.IBaritoneProcess")
+                        .getMethod("onLostControl")
+                        .invoke(process);
                 }
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
@@ -190,12 +193,6 @@ public final class BaritoneNavigationBridge {
                 pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                     .invoke(pathing, null, null, null);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
-            try {
-                pathingApi.getMethod("cancelEverything")
-                    .invoke(pathing);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
-        } else {
-            cancelPrimaryBaritone();
         }
         process = null;
         goal = null;
@@ -205,19 +202,4 @@ public final class BaritoneNavigationBridge {
         pathingApi = null;
     }
 
-    private static void cancelPrimaryBaritone() {
-        try {
-            Class<?> api = Class.forName("baritone.api.BaritoneAPI");
-            Object provider = api.getMethod("getProvider").invoke(null);
-            Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
-            Object baritone = providerApi.getMethod("getPrimaryBaritone").invoke(provider);
-            Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
-            Object pathing = baritoneApi.getMethod("getPathingBehavior").invoke(baritone);
-            Class<?> pathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
-            pathingApi.getMethod("cancelEverything").invoke(pathing);
-            pathingApi.getMethod("setNavigationChatOverride", Boolean.class).invoke(pathing, (Boolean) null);
-            pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
-                .invoke(pathing, null, null, null);
-        } catch (Throwable ignored) {}
-    }
 }

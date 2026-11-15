@@ -90,7 +90,8 @@ public final class ExcavationPlanner {
         ExcavationPathfinder.Terrain terrain = (a, b, c, nx, ny, nz) -> explorer.excavationTerrain
             .excavationCost(mc.theWorld, a, b, c, nx, ny, nz);
         if (goalY == y) {
-            List<int[]> proposal = ExcavationPatterns.straight(x, y, z, explorer.target.xCoord, goalY, explorer.target.zCoord);
+            List<int[]> proposal = ExcavationPatterns
+                .straight(x, y, z, explorer.target.xCoord, goalY, explorer.target.zCoord);
             List<int[]> checked = ExcavationPatterns
                 .checked(proposal.subList(0, Math.min(16, proposal.size())), terrain, x, y, z);
             if (!checked.isEmpty() && checked.size() >= Math.min(4, proposal.size())) {
@@ -99,7 +100,8 @@ public final class ExcavationPlanner {
             }
         }
         if (goalY != y) {
-            int orientation = Math.abs(explorer.target.xCoord - x) >= Math.abs(explorer.target.zCoord - z) ? explorer.target.xCoord >= x ? 0 : 2
+            int orientation = Math.abs(explorer.target.xCoord - x) >= Math.abs(explorer.target.zCoord - z)
+                ? explorer.target.xCoord >= x ? 0 : 2
                 : explorer.target.zCoord >= z ? 1 : 3;
             for (int turn = 0; turn < 4; turn++) {
                 List<int[]> proposal = ExcavationPatterns
@@ -138,7 +140,9 @@ public final class ExcavationPlanner {
         if (roofEscapeGoal == null) explorer.roomExit.planRoofEscape(mc, explorer);
         explorer.excavationTerrain.protectSupport(supportKey(x, y - 1, z));
         if (!explorer.returnDigging) {
-            if (explorer.staircaseDugPath.isEmpty() || !samePosition(explorer.staircaseDugPath.get(explorer.staircaseDugPath.size() - 1), new int[] { x, y, z })) {
+            if (explorer.staircaseDugPath.isEmpty() || !samePosition(
+                explorer.staircaseDugPath.get(explorer.staircaseDugPath.size() - 1),
+                new int[] { x, y, z })) {
                 explorer.staircaseDugPath.add(new int[] { x, y, z });
             }
             if (explorer.trail.target == null || explorer.trail.target[0] != explorer.target.xCoord
@@ -146,14 +150,12 @@ public final class ExcavationPlanner {
                 || explorer.trail.target[2] != explorer.target.zCoord) {
                 explorer.persistAccessTrail(true);
                 explorer.trail.points.clear();
-                explorer.trail.target = new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
+                explorer.trail.target = new int[] { explorer.target.xCoord, explorer.target.yCoord,
+                    explorer.target.zCoord };
                 explorer.trail.worldId = explorer.worldIdentity(mc);
                 explorer.trail.dimension = mc.theWorld.provider.dimensionId;
-                explorer.trail.points.replace(
-                    explorer.trail.store
-                        .load(explorer.trail.worldId, explorer.trail.dimension, explorer.trail.target[0], explorer.trail.target[1], explorer.trail.target[2]));
                 explorer.trail.dirty = false;
-                explorer.trail.excavating = explorer.trail.points.size() > 1;
+                explorer.trail.excavating = false;
             }
             if (!explorer.trail.excavating) {
                 explorer.trail.points.clear();
@@ -204,9 +206,9 @@ public final class ExcavationPlanner {
                 explorer.rejectedSteps.clear();
             }
             boolean complete = excavationSearch.advance(
-                (a, b, c, nx, ny, nz) -> a == x && b == y && c == z && explorer.blockedWalkNodes.contains(supportKey(nx, ny, nz))
-                    ? -1
-                    : explorer.excavationTerrain.excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
+                (a, b, c, nx, ny,
+                    nz) -> a == x && b == y && c == z && explorer.blockedWalkNodes.contains(supportKey(nx, ny, nz)) ? -1
+                        : explorer.excavationTerrain.excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
                 24,
                 System.nanoTime() + 3_000_000L);
             explorer.rejectedSteps.clear();
@@ -229,13 +231,15 @@ public final class ExcavationPlanner {
 
     public boolean clearSnowForExcavation(Minecraft mc, Explorer explorer, int x, int y, int z) {
         if (explorer.target == null || !dryShore(mc.theWorld, x, y, z)) return false;
-        for (int[] direction : ExcavationPolicy.approachDirections(x, z, explorer.target.xCoord, explorer.target.zCoord)) {
+        for (int[] direction : ExcavationPolicy
+            .approachDirections(x, z, explorer.target.xCoord, explorer.target.zCoord)) {
             int nx = x + direction[0], nz = z + direction[1];
             for (int by = y + 1; by >= y - 1; by--) {
                 if (!mc.theWorld.blockExists(nx, by, nz) || mc.theWorld.getBlock(nx, by, nz) != Blocks.snow_layer
                     || !explorer.excavationTerrain.excavatable(mc.theWorld, nx, by, nz)
                     || visibleMiningPoint(mc, nx, by, nz) == null) continue;
-                if (by < y && !mc.theWorld.getBlock(nx, by - 1, nz).isNormalCube()) continue;
+                if (by < y && !mc.theWorld.getBlock(nx, by - 1, nz)
+                    .isNormalCube()) continue;
                 boolean hazard = false;
                 for (int dy = -1; dy <= 2; dy++) {
                     if (!mc.theWorld.blockExists(nx, y + dy, nz)) {
@@ -243,7 +247,8 @@ public final class ExcavationPlanner {
                         break;
                     }
                     net.minecraft.block.Block block = mc.theWorld.getBlock(nx, y + dy, nz);
-                    if (block.getMaterial().isLiquid() || ContactHazards.dangerous(block, mc.theWorld.getBlockMetadata(nx, y + dy, nz))) {
+                    if (block.getMaterial()
+                        .isLiquid() || ContactHazards.dangerous(block, mc.theWorld.getBlockMetadata(nx, y + dy, nz))) {
                         hazard = true;
                         break;
                     }
@@ -264,7 +269,8 @@ public final class ExcavationPlanner {
         if (entrySurfacePoint == null) {
             entrySurfacePoint = new int[] { x, y, z };
         }
-        if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, explorer.target.xCoord, explorer.target.zCoord)
+        if (mc.thePlayer.onGround
+            && ExcavationPolicy.closeEntrance(x, z, explorer.target.xCoord, explorer.target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {
             entranceSurfaceY = y;
@@ -308,7 +314,8 @@ public final class ExcavationPlanner {
                     double norm = Math.hypot(direction[0], direction[1]);
                     int gx = explorer.target.xCoord + (int) Math.round(direction[0] * radius / norm);
                     int gz = explorer.target.zCoord + (int) Math.round(direction[1] * radius / norm);
-                    if (!ExcavationPolicy.preferredEntrance(gx, gz, explorer.target.xCoord, explorer.target.zCoord)) continue;
+                    if (!ExcavationPolicy.preferredEntrance(gx, gz, explorer.target.xCoord, explorer.target.zCoord))
+                        continue;
                     if (!w.blockExists(gx, y, gz)) continue;
                     int surface = w.getHeightValue(gx, gz);
                     int[] heights = { surface - 2, surface - 1, surface, surface + 1, y - 1, y, y + 1 };
@@ -506,8 +513,8 @@ public final class ExcavationPlanner {
             int[] following = excavationRoute.get(0);
             if (!ExcavationPolicy.beside(lastX, lastZ, following[0], following[2]) || Math.abs(following[1] - lastY) > 1
                 || !safe(w, following[0], following[1], following[2])
-                || explorer.excavationTerrain.excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2])
-                    < 0)
+                || explorer.excavationTerrain
+                    .excavationCost(w, lastX, lastY, lastZ, following[0], following[1], following[2]) < 0)
                 break;
             boolean clear = true;
             for (int by = following[1]; by <= Math.max(lastY, following[1]) + 1; by++) {
@@ -529,8 +536,8 @@ public final class ExcavationPlanner {
         return true;
     }
 
-    public int foliageSupportY(World w, Explorer explorer, int x, int foliageY, int z, int playerX, int footY, int playerZ,
-        int destinationY) {
+    public int foliageSupportY(World w, Explorer explorer, int x, int foliageY, int z, int playerX, int footY,
+        int playerZ, int destinationY) {
         net.minecraft.block.Block foliage = w.getBlock(x, foliageY, z);
         if (!FoliagePolicy.canClear(
             isFoliage(foliage),

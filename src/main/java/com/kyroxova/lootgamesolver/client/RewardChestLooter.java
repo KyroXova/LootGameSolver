@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
-
 import static com.kyroxova.lootgamesolver.client.RewardChestView.*;
 
 import java.util.ArrayList;
@@ -27,6 +24,8 @@ import net.minecraft.util.WeightedRandomChestContent;
 import net.minecraftforge.common.ChestGenHooks;
 
 import com.kyroxova.lootgamesolver.core.MiniGame;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
 
 final class RewardChestLooter {
 

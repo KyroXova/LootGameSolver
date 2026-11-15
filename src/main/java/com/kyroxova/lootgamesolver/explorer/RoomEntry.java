@@ -37,8 +37,10 @@ public final class RoomEntry {
             || explorer.target.zCoord >= bounds[3]
             || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3] && y <= explorer.target.yCoord + 3))
             return false;
-        candidates = explorer.roomGeometry
-            .findRoomExitCandidates(mc, bounds, (w, bx, by, bz) -> RoomExit.clearableExitColumn(w, explorer, bx, by, bz));
+        candidates = explorer.roomGeometry.findRoomExitCandidates(
+            mc,
+            bounds,
+            (w, bx, by, bz) -> RoomExit.clearableExitColumn(w, explorer, bx, by, bz));
         candidates.removeIf(candidate -> candidate.length >= 10);
         candidateIndex = 0;
         final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;

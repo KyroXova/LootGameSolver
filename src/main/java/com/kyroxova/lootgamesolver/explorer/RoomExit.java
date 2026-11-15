@@ -9,7 +9,6 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
-import com.kyroxova.lootgamesolver.explorer.ContactHazards;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public final class RoomExit {
@@ -71,8 +70,7 @@ public final class RoomExit {
             .findRoomExitCandidates(mc, bounds, (w, bx, by, bz) -> clearableExitColumn(w, explorer, bx, by, bz));
         if (explorer.trail.points.size() >= 2 && candidates.size() > 1) {
             int[] mouth = savedRoomMouth(explorer, bounds);
-            candidates
-                .sort((a, b) -> Double.compare(exitMouthDistance(a, mouth), exitMouthDistance(b, mouth)));
+            candidates.sort((a, b) -> Double.compare(exitMouthDistance(a, mouth), exitMouthDistance(b, mouth)));
         }
         candidateIndex = 0;
         planning = false;
@@ -121,8 +119,7 @@ public final class RoomExit {
             if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z)) || block.getMaterial()
                 .isLiquid()
                 || block instanceof net.minecraft.block.BlockFalling
-                || !passable(world, x, by, z) && !explorer.excavationTerrain.excavatable(world, x, by, z))
-                return false;
+                || !passable(world, x, by, z) && !explorer.excavationTerrain.excavatable(world, x, by, z)) return false;
         }
         return true;
     }

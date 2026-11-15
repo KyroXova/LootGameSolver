@@ -5,7 +5,6 @@ import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.solidCheckpoi
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.World;
 
 public final class WalkPathfinder {
 

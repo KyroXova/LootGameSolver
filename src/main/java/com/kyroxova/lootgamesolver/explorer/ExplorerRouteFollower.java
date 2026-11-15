@@ -1,9 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.safe;
-import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.walkSurfaceY;
 import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.isRewardChestPit;
 import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.rewardChestAhead;
+import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.safe;
+import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.walkSurfaceY;
 
 import java.util.List;
 
@@ -71,8 +71,12 @@ final class ExplorerRouteFollower {
             input.forward = (float) ((-dx * Math.sin(yaw) + dz * Math.cos(yaw)) / distance * speed);
             input.sideways = (float) ((dx * Math.cos(yaw) + dz * Math.sin(yaw)) / distance * speed);
         }
-        boolean wantSprint = !centering && !digging && !mc.thePlayer.isInWater() && Math.abs(turn) < 35F
-            && input.forward > 0.8F && mc.thePlayer.getFoodStats().getFoodLevel() > 6;
+        boolean wantSprint = !centering && !digging
+            && !mc.thePlayer.isInWater()
+            && Math.abs(turn) < 35F
+            && input.forward > 0.8F
+            && mc.thePlayer.getFoodStats()
+                .getFoodLevel() > 6;
         mc.thePlayer.setSprinting(wantSprint);
         if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
             KeyBinding.setKeyBindState(

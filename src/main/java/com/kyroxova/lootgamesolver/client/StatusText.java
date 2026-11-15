@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-
 import java.util.Locale;
 
 public final class StatusText {
@@ -31,7 +29,8 @@ public final class StatusText {
 
         if (text.contains("stage reveal failed")) return "Stage Failed";
         if (text.contains("board reveal failed")) return "Board Failed";
-        if (text.contains("activator failed") || text.contains("could not click floor activator")) return "Activator Failed";
+        if (text.contains("activator failed") || text.contains("could not click floor activator"))
+            return "Activator Failed";
         if (text.contains("activator did not open")) return "Activator Stalled";
         if (text.contains("opening floor activator")) return "Opening Activator";
         if (text.contains("opening lootgames master")) return "Opening Master";
@@ -39,16 +38,19 @@ public final class StatusText {
         if (text.contains("stage")) return "Opening Stage";
         if (text.contains("reopening")) return "Reopening Board";
 
-        if (text.contains("searching for the next structure") || text.contains("next structure") || text.contains("exploring for structures"))
-            return "Searching";
+        if (text.contains("searching for the next structure") || text.contains("next structure")
+            || text.contains("exploring for structures")) return "Searching";
         if (text.contains("puzzle solved") || text.contains("stage complete")) return "Stage Complete";
-        if (text.contains("puzzle could not be located") || text.contains("opened puzzle could not")) return "Hold: Missing";
+        if (text.contains("puzzle could not be located") || text.contains("opened puzzle could not"))
+            return "Hold: Missing";
         if (text.contains("puzzle did not open")) return "Hold: Stalled";
         if (text.contains("reported a loss") || text.contains("lost")) return "Hold: Lost";
-        if (text.contains("could not reach the board center") || text.contains("center; explorer held")) return "Hold: Center";
+        if (text.contains("could not reach the board center") || text.contains("center; explorer held"))
+            return "Hold: Center";
         if (text.contains("found nearby lootgame")) return "Puzzle Found";
         if (text.contains("arrived at lootgame") || text.contains("arrived beside lootgame")) return "Puzzle Ready";
-        if (text.contains("opening puzzle") || text.contains("waiting for lootgames to create")) return "Opening Puzzle";
+        if (text.contains("opening puzzle") || text.contains("waiting for lootgames to create"))
+            return "Opening Puzzle";
         if (text.contains("resuming")) return "Resuming Puzzle";
         if (text.contains("solving")) return "Solving Puzzle";
         if (text.contains("checking room board") || text.contains("checking board")) return "Checking Board";

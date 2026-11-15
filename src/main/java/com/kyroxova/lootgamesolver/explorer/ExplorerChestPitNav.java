@@ -1,8 +1,7 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.safe;
-import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.solidCheckpoint;
 import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.isRewardChest;
+import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.solidCheckpoint;
 
 import java.util.ArrayList;
 import java.util.List;

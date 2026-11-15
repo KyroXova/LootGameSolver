@@ -82,7 +82,8 @@ public final class ReturnNavigator {
         int[] join = explorer.route.get(checkpointIndex);
         returnTrailRoute = new ArrayList<int[]>();
         for (int p = checkpointIndex; p < explorer.route.size(); p++) returnTrailRoute.add(
-            explorer.route.get(p).clone());
+            explorer.route.get(p)
+                .clone());
         returnJoinSearch = new GroundPathfinder.Search(
             explorer.walkingTerrain(mc.theWorld),
             x,
@@ -117,7 +118,8 @@ public final class ReturnNavigator {
             savedRoute = explorer.trail.points.reverseFrom(nearest);
         }
         if (savedRoute.size() >= 2 && startReturnDig(mc, explorer, savedRoute)) return true;
-        return explorer.insideDungeonRoom(mc) && explorer.roomExit.candidates == null && explorer.startRoomExitSearch(mc);
+        return explorer.insideDungeonRoom(mc) && explorer.roomExit.candidates == null
+            && explorer.startRoomExitSearch(mc);
     }
 
     public boolean startReturnDig(Minecraft mc, Explorer explorer, List<int[]> savedRoute) {
@@ -143,7 +145,8 @@ public final class ReturnNavigator {
         explorer.target = digGoal;
         returnAfterDig = new ArrayList<int[]>();
         for (int i = anchorIndex; i < returnDigSource.size(); i++) returnAfterDig.add(
-            returnDigSource.get(i).clone());
+            returnDigSource.get(i)
+                .clone());
         returnDigAnchorIndex = anchorIndex;
         returnDigResumeSearch = explorer.resumeSearchAfterReturn;
         returnDigging = true;
