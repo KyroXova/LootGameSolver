@@ -170,6 +170,11 @@ public class Explorer {
     private boolean baritoneSearchMove;
     private boolean baritoneSearchHandoff;
     private boolean baritoneSearchNext;
+    private int[] baritoneReturnPoint;
+    private World baritoneReturnWorld;
+    private boolean baritoneReturnMove, baritoneReturnWaiting, baritoneResumeSearch;
+    private boolean baritoneReturnSolved;
+    private int baritoneReturnWait;
     private int baritoneSearchX, baritoneSearchZ, baritoneSearchTicks, baritoneHandoffTicks;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
@@ -554,6 +559,16 @@ public class Explorer {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
             continueProgressiveSearch(mc, solved);
+            return;
+        }
+        if (baritoneReturnPoint != null && baritoneReturnWorld == mc.theWorld) {
+            baritoneReturnWaiting = true;
+            baritoneReturnMove = false;
+            baritoneReturnSolved = solved;
+            baritoneReturnWait = 0;
+            walking = true;
+            returning = true;
+            status = "Returning to the surface";
             return;
         }
         if (startChestPitReturn(mc, true)) return;
@@ -1373,11 +1388,25 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (!baritoneCenterMove && !baritoneStructureMove && !baritoneSearchMove) camera.render(mc, world, walking);
+        if (!baritoneCenterMove && !baritoneStructureMove
+            && !baritoneSearchMove
+            && !baritoneReturnMove
+            && !baritoneReturnWaiting) camera.render(mc, world, walking);
     }
 
     private void look(float yaw, float pitch) {
         camera.look(yaw, pitch);
+    }
+
+    private void rememberBaritoneReturnPoint(Minecraft mc) {
+        if (mc.thePlayer == null || mc.theWorld == null) return;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (mc.thePlayer.onGround && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+            baritoneReturnPoint = new int[] { x, y, z };
+            baritoneReturnWorld = mc.theWorld;
+        }
     }
 
     private void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
@@ -1559,6 +1588,7 @@ public class Explorer {
         BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
             .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
         if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
+            rememberBaritoneReturnPoint(mc);
             baritoneStructureMove = true;
             walking = true;
             searching = false;
@@ -1606,6 +1636,7 @@ public class Explorer {
             BaritoneNavigationBridge.Start started = baritoneNavigation
                 .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
+                rememberBaritoneReturnPoint(mc);
                 baritoneStructureMove = true;
                 walking = true;
                 status = "Walking to LootGame";
@@ -1662,6 +1693,51 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (baritoneReturnWaiting || baritoneReturnMove || baritoneResumeSearch) {
+            if (mc.thePlayer == null || mc.theWorld == null || baritoneReturnWorld != mc.theWorld) {
+                baritoneNavigation.stop();
+                baritoneReturnWaiting = false;
+                baritoneReturnMove = false;
+                baritoneResumeSearch = false;
+                baritoneReturnPoint = null;
+                baritoneReturnWorld = null;
+                walking = false;
+                returning = false;
+            } else if (baritoneResumeSearch) {
+                if (++baritoneReturnWait >= 3) {
+                    baritoneResumeSearch = false;
+                    baritoneReturnPoint = null;
+                    baritoneReturnWorld = null;
+                    continueProgressiveSearch(mc, baritoneReturnSolved);
+                }
+                return;
+            } else if (baritoneReturnWaiting) {
+                BaritoneNavigationBridge.Start started = baritoneNavigation
+                    .start(baritoneReturnPoint[0], baritoneReturnPoint[1], baritoneReturnPoint[2]);
+                if (started == BaritoneNavigationBridge.Start.STARTED) {
+                    baritoneReturnWaiting = false;
+                    baritoneReturnMove = true;
+                } else if (started != BaritoneNavigationBridge.Start.BUSY || ++baritoneReturnWait > 40) {
+                    stop(mc, "Baritone could not start the return route");
+                }
+                return;
+            } else {
+                boolean arrived = mc.thePlayer.onGround && (int) Math.floor(mc.thePlayer.posX) == baritoneReturnPoint[0]
+                    && (int) Math.floor(mc.thePlayer.boundingBox.minY) == baritoneReturnPoint[1]
+                    && (int) Math.floor(mc.thePlayer.posZ) == baritoneReturnPoint[2];
+                if (arrived) {
+                    baritoneNavigation.stop();
+                    baritoneReturnMove = false;
+                    baritoneResumeSearch = true;
+                    baritoneReturnWait = 0;
+                    walking = false;
+                    returning = false;
+                } else if (baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                    stop(mc, "Baritone could not complete the return route");
+                }
+                return;
+            }
+        }
         if (baritoneSearchMove) {
             if (world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
                 baritoneNavigation.stop();
@@ -1688,6 +1764,7 @@ public class Explorer {
                             status = "Exploring for structures";
                         } else {
                             baritoneSearchMove = false;
+                            rememberBaritoneReturnPoint(mc);
                             baritoneStructureMove = true;
                             searching = false;
                             status = "Walking to LootGame";
@@ -2965,17 +3042,29 @@ public class Explorer {
     }
 
     private void stop(Minecraft mc, String message) {
-        if (recoverableRouteFailure(message)) {
+        if (!baritoneCenterMove && !baritoneStructureMove
+            && !baritoneSearchMove
+            && !baritoneReturnMove
+            && !baritoneReturnWaiting
+            && !baritoneResumeSearch
+            && recoverableRouteFailure(message)) {
             queueRouteRetry(mc, message);
             return;
         }
-        if (baritoneCenterMove || baritoneStructureMove || baritoneSearchMove) {
+        if (baritoneCenterMove || baritoneStructureMove
+            || baritoneSearchMove
+            || baritoneReturnMove
+            || baritoneReturnWaiting
+            || baritoneResumeSearch) {
             baritoneNavigation.stop();
             baritoneCenterMove = false;
             baritoneStructureMove = false;
             baritoneSearchMove = false;
             baritoneSearchHandoff = false;
             baritoneSearchNext = false;
+            baritoneReturnMove = false;
+            baritoneReturnWaiting = false;
+            baritoneResumeSearch = false;
         }
         sustain.stop(mc);
         fallingBlocks.reset();
