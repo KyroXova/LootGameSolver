@@ -6,16 +6,16 @@ import java.util.List;
 import java.util.Optional;
 
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
-final class BaritoneNavigationBridge {
+public final class BaritoneNavigationBridge {
 
-    enum Start {
+    public enum Start {
         STARTED,
         ABSENT,
         BUSY,
         FAILED
     }
 
-    enum State {
+    public enum State {
         RUNNING,
         STOPPED,
         LOST
@@ -28,19 +28,19 @@ final class BaritoneNavigationBridge {
     private Object pathing;
     private Class<?> pathingApi;
 
-    Start start(int x, int y, int z) {
+    public Start start(int x, int y, int z) {
         return start(x, y, z, 0, false);
     }
 
-    Start startWithoutBreaking(int x, int y, int z) {
+    public Start startWithoutBreaking(int x, int y, int z) {
         return start(x, y, z, 0, true);
     }
 
-    Start startAdjacent(int x, int y, int z) {
+    public Start startAdjacent(int x, int y, int z) {
         return start(x, y, z, 1, false);
     }
 
-    Start startHorizontal(int x, int z) {
+    public Start startHorizontal(int x, int z) {
         return start(x, 0, z, 2, false);
     }
 
@@ -114,7 +114,7 @@ final class BaritoneNavigationBridge {
         }
     }
 
-    void renderOverlay(boolean visible) {
+    public void renderOverlay(boolean visible) {
         if (pathing == null) return;
         try {
             pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
@@ -122,7 +122,7 @@ final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
-    List<int[]> route() {
+    public List<int[]> route() {
         List<int[]> result = new ArrayList<>();
         if (pathing == null) return result;
         try {
@@ -150,7 +150,7 @@ final class BaritoneNavigationBridge {
         return result;
     }
 
-    boolean completed() {
+    public boolean completed() {
         if (process == null) return false;
         try {
             return processApi.getMethod("getGoal")
@@ -162,7 +162,7 @@ final class BaritoneNavigationBridge {
         }
     }
 
-    State state() {
+    public State state() {
         if (process == null) return State.STOPPED;
         try {
             return processApi.getMethod("getGoal")
@@ -172,7 +172,7 @@ final class BaritoneNavigationBridge {
         }
     }
 
-    void stop() {
+    public void stop() {
         try {
             if (process != null && processApi != null) {
                 if (processApi.getMethod("getGoal").invoke(process) == goal) {

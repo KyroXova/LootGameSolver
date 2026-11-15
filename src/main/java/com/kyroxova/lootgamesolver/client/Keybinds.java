@@ -1,5 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;

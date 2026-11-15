@@ -1,5 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -43,7 +45,9 @@ final class NavigationOverlayRenderer {
                 GL11.glLineWidth(2F);
                 t.startDrawing(GL11.GL_LINES);
                 double[] end = draw(t, exploration.navigationRoute(), start, false);
-                draw(t, exploration.excavationPreview(), end, true);
+                if (exploration.digging()) {
+                    draw(t, exploration.excavationPreview(), end, true);
+                }
                 t.draw();
             }
             if (waypoint != null) {
@@ -106,7 +110,7 @@ final class NavigationOverlayRenderer {
             int[] first = route.get(startIndex);
             double dx = (first[0] + 0.5D) - x;
             double dz = (first[2] + 0.5D) - z;
-            if (dx * dx + dz * dz < 0.64D) {
+            if (dx * dx + dz * dz < 0.36D) {
                 startIndex++;
             } else {
                 break;

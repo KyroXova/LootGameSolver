@@ -1,15 +1,17 @@
 package com.kyroxova.lootgamesolver.client;
 
-import static com.kyroxova.lootgamesolver.client.ExplorerTerrain.passable;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+
+import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.passable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
-final class RewardChestGeometry {
+public final class RewardChestGeometry {
 
     private RewardChestGeometry() {}
 
-    static int[] exitDirection(World world, int x, int y, int z, int[] goal) {
+    public static int[] exitDirection(World world, int x, int y, int z, int[] goal) {
         int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
         int[] best = null;
         double bestScore = Double.MAX_VALUE;
@@ -26,11 +28,11 @@ final class RewardChestGeometry {
         return best;
     }
 
-    static boolean isRewardChest(World world, int x, int y, int z) {
+    public static boolean isRewardChest(World world, int x, int y, int z) {
         return world.blockExists(x, y, z) && world.getBlock(x, y, z) instanceof net.minecraft.block.BlockChest;
     }
 
-    static boolean rewardChestAhead(Minecraft mc, double dx, double dz) {
+    public static boolean rewardChestAhead(Minecraft mc, double dx, double dz) {
         if (!mc.thePlayer.onGround || dx * dx + dz * dz < 0.001D) return false;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
@@ -47,7 +49,7 @@ final class RewardChestGeometry {
         return false;
     }
 
-    static boolean isRewardChestPit(Minecraft mc) {
+    public static boolean isRewardChestPit(Minecraft mc) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);

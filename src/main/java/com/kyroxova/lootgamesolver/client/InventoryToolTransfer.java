@@ -6,7 +6,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.client.C16PacketClientStatus;
 
-final class InventoryToolTransfer {
+public final class InventoryToolTransfer {
 
     private static final class ToolScreen extends GuiInventory {
 
@@ -27,15 +27,15 @@ final class InventoryToolTransfer {
     private boolean swapped;
     private boolean clearing;
 
-    boolean active() {
+    public boolean active() {
         return screen != null;
     }
 
-    boolean start(Minecraft mc, int inventorySlot) {
+    public boolean start(Minecraft mc, int inventorySlot) {
         return start(mc, inventorySlot, null);
     }
 
-    boolean start(Minecraft mc, int inventorySlot, InventoryBaseline baseline) {
+    public boolean start(Minecraft mc, int inventorySlot, InventoryBaseline baseline) {
         if (active() || mc.currentScreen != null
             || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null) return false;
@@ -66,11 +66,11 @@ final class InventoryToolTransfer {
         return true;
     }
 
-    int hotbarSlot() {
+    public int hotbarSlot() {
         return hotbar;
     }
 
-    boolean restore(Minecraft mc, int inventorySlot, int hotbarSlot, ItemStack displaced) {
+    public boolean restore(Minecraft mc, int inventorySlot, int hotbarSlot, ItemStack displaced) {
         if (active() || mc.currentScreen != null
             || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null
@@ -95,7 +95,7 @@ final class InventoryToolTransfer {
         return true;
     }
 
-    boolean clearHotbar(Minecraft mc, int hotbarSlot, int emptySlot) {
+    public boolean clearHotbar(Minecraft mc, int hotbarSlot, int emptySlot) {
         if (active() || mc.currentScreen != null
             || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null
@@ -119,7 +119,7 @@ final class InventoryToolTransfer {
         return true;
     }
 
-    boolean tick(Minecraft mc) {
+    public boolean tick(Minecraft mc) {
         if (mc.currentScreen != screen || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer
             || mc.thePlayer.inventory.getItemStack() != null) {
             cancel(mc);
@@ -154,7 +154,7 @@ final class InventoryToolTransfer {
         return true;
     }
 
-    void cancel(Minecraft mc) {
+    public void cancel(Minecraft mc) {
         if (screen != null && mc.currentScreen == screen
             && mc.thePlayer != null
             && mc.thePlayer.inventory.getItemStack() == null) mc.thePlayer.closeScreen();

@@ -1,5 +1,8 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
+
 import static com.kyroxova.lootgamesolver.client.RewardChestView.*;
 
 import java.util.ArrayList;
@@ -373,7 +376,7 @@ final class RewardChestLooter {
         double dx = pos[0] + 0.5D - mc.thePlayer.posX, dz = pos[2] + 0.5D - mc.thePlayer.posZ;
         double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
-        if (dx * dx + dy * dy + dz * dz > 16D || horizontal > 2.5D) {
+        if (dx * dx + dy * dy + dz * dz > 16D || horizontal > 1.6D) {
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
             else status = "Finding a safe position beside the reward chest";
@@ -644,7 +647,7 @@ final class RewardChestLooter {
 
     private static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
         if (exploration != null) {
-            exploration.look(yaw, pitch);
+            exploration.look(yaw, pitch, true);
         } else {
             float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
             float pitchDelta = pitch - mc.thePlayer.rotationPitch;

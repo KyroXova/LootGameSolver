@@ -1,14 +1,16 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+
 import java.util.Locale;
 
-final class StatusText {
+public final class StatusText {
 
     private static final int MAX_LENGTH = 24;
 
     private StatusText() {}
 
-    static String explorer(String detail) {
+    public static String explorer(String detail) {
         if (detail == null || detail.isEmpty()) return "Idle";
         String text = detail.toLowerCase(Locale.ROOT);
 
@@ -124,7 +126,7 @@ final class StatusText {
         return shorten(detail);
     }
 
-    static String solver(String detail) {
+    public static String solver(String detail) {
         if (detail == null || detail.isEmpty()) return "Ready";
         String text = detail.toLowerCase(Locale.ROOT);
         if (text.contains("solved") || text.contains("stage complete")
@@ -149,6 +151,6 @@ final class StatusText {
             .replaceAll("\\s+", " ");
         if (text.length() <= MAX_LENGTH) return text;
         int end = text.lastIndexOf(' ', MAX_LENGTH - 1);
-        return text.substring(0, end > 0 ? end : MAX_LENGTH - 1) + "…";
+        return text.substring(0, end > 0 ? end : MAX_LENGTH - 1) + "â€¦";
     }
 }

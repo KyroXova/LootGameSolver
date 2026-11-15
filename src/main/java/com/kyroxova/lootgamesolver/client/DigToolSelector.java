@@ -1,13 +1,15 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
+
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.ForgeHooks;
 
-final class DigToolSelector {
+public final class DigToolSelector {
 
-    static boolean canHarvest(Minecraft mc, Block block, int metadata) {
+    public static boolean canHarvest(Minecraft mc, Block block, int metadata) {
         if (mc.thePlayer == null) return false;
         if (mc.thePlayer.capabilities.isCreativeMode) return true;
         for (int i = 0; i < 36; i++) {
@@ -20,7 +22,7 @@ final class DigToolSelector {
         return false;
     }
 
-    static int bestSlot(float[] speeds, boolean[] usable) {
+    public static int bestSlot(float[] speeds, boolean[] usable) {
         int best = -1;
         float speed = 0F;
         for (int i = 0; i < speeds.length; i++) {
@@ -32,7 +34,7 @@ final class DigToolSelector {
         return best;
     }
 
-    static int equip(Minecraft mc, Block block, int metadata) {
+    public static int equip(Minecraft mc, Block block, int metadata) {
         if (mc.thePlayer.capabilities.isCreativeMode) return mc.thePlayer.inventory.currentItem;
         float[] speeds = new float[36];
         boolean[] usable = new boolean[36];
