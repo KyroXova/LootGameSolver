@@ -175,6 +175,8 @@ public class Explorer {
     private boolean baritoneReturnMove, baritoneReturnWaiting, baritoneResumeSearch;
     private boolean baritoneReturnSolved;
     private int baritoneReturnWait;
+    private final List<int[]> baritoneRoutePreview = new ArrayList<int[]>();
+    private int baritonePreviewTick;
     private int baritoneSearchX, baritoneSearchZ, baritoneSearchTicks, baritoneHandoffTicks;
     private boolean puzzleCenterArrivalPending;
     private TileEntity puzzleMasterTarget;
@@ -1416,11 +1418,19 @@ public class Explorer {
     }
 
     List<int[]> navigationRoute() {
-        return navigationPreview;
+        return usingBaritoneNavigation() ? baritoneRoutePreview : navigationPreview;
     }
 
     List<int[]> excavationPreview() {
-        return excavationRoute;
+        return usingBaritoneNavigation() ? java.util.Collections.emptyList() : excavationRoute;
+    }
+
+    private boolean usingBaritoneNavigation() {
+        return baritoneCenterMove || baritoneStructureMove
+            || baritoneSearchMove
+            || baritoneReturnMove
+            || baritoneReturnWaiting
+            || baritoneResumeSearch;
     }
 
     List<int[]> rejectedPreview() {
@@ -1693,6 +1703,15 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive) {
+        if (usingBaritoneNavigation() && baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
+            baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
+            if (++baritonePreviewTick % 5 == 0) {
+                baritoneRoutePreview.clear();
+                if (LootGameSolverConfig.showOverlay) baritoneRoutePreview.addAll(baritoneNavigation.route());
+            }
+        } else if (!baritoneRoutePreview.isEmpty()) {
+            baritoneRoutePreview.clear();
+        }
         if (baritoneReturnWaiting || baritoneReturnMove || baritoneResumeSearch) {
             if (mc.thePlayer == null || mc.theWorld == null || baritoneReturnWorld != mc.theWorld) {
                 baritoneNavigation.stop();

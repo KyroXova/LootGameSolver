@@ -1,6 +1,8 @@
 package com.kyroxova.lootgamesolver.client;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
@@ -23,6 +25,8 @@ final class BaritoneNavigationBridge {
     private Object goal;
     private Class<?> processApi;
     private Class<?> goalApi;
+    private Object pathing;
+    private Class<?> pathingApi;
 
     Start start(int x, int y, int z) {
         return start(x, y, z, 0, false);
@@ -56,6 +60,9 @@ final class BaritoneNavigationBridge {
             Object baritone = providerApi.getMethod("getPrimaryBaritone")
                 .invoke(provider);
             Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
+            Object candidatePathing = baritoneApi.getMethod("getPathingBehavior")
+                .invoke(baritone);
+            Class<?> candidatePathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
             Object manager = baritoneApi.getMethod("getPathingControlManager")
                 .invoke(baritone);
             Class<?> managerApi = Class.forName("baritone.api.pathing.calc.IPathingControlManager");
@@ -91,10 +98,48 @@ final class BaritoneNavigationBridge {
             goal = next;
             processApi = customApi;
             goalApi = goalType;
+            pathing = candidatePathing;
+            pathingApi = candidatePathingApi;
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
         }
+    }
+
+    void renderOverlay(boolean visible) {
+        if (pathing == null) return;
+        try {
+            pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                .invoke(pathing, false, visible, false);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
+    List<int[]> route() {
+        List<int[]> result = new ArrayList<>();
+        if (pathing == null) return result;
+        try {
+            Object executor = pathingApi.getMethod("getCurrent")
+                .invoke(pathing);
+            if (executor == null) return result;
+            Class<?> executorApi = Class.forName("baritone.api.pathing.path.IPathExecutor");
+            Object path = executorApi.getMethod("getPath")
+                .invoke(executor);
+            int index = (Integer) executorApi.getMethod("getPosition")
+                .invoke(executor);
+            List<?> positions = (List<?>) Class.forName("baritone.api.pathing.calc.IPath")
+                .getMethod("positions")
+                .invoke(path);
+            Class<?> positionType = Class.forName("baritone.api.utils.BetterBlockPos");
+            Method x = positionType.getMethod("getX"), y = positionType.getMethod("getY"),
+                z = positionType.getMethod("getZ");
+            for (int i = Math.max(0, index); i < positions.size() && result.size() < 96; i++) {
+                Object pos = positions.get(i);
+                result.add(new int[] { (Integer) x.invoke(pos), (Integer) y.invoke(pos), (Integer) z.invoke(pos) });
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            result.clear();
+        }
+        return result;
     }
 
     boolean completed() {
@@ -128,8 +173,15 @@ final class BaritoneNavigationBridge {
                 setGoal.invoke(process, new Object[] { null });
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {} finally {
+            if (pathing != null) {
+                try {
+                    pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                        .invoke(pathing, null, null, null);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            }
             process = null;
             goal = null;
+            pathing = null;
         }
     }
 }

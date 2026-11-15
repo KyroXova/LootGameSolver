@@ -220,7 +220,6 @@ public final class ClientHooks {
         trashCleanup.advanceCooldown();
         if (exploration != null && mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
             boolean inside = exploration.inDungeonRoom(mc);
-            if (inside && !wasInsideRoom) LootGameSolverConfig.setOverlayVisible(true);
             wasInsideRoom = inside;
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
@@ -538,7 +537,6 @@ public final class ClientHooks {
             && mc.currentScreen == null
             && mc.thePlayer != null
             && mc.theWorld != null) {
-            LootGameSolverConfig.setOverlayVisible(!exploration.navigating() && !rewardReturnPending);
             if (!exploration.navigating() && !rewardReturnPending) {
                 inventoryBaseline = InventoryBaseline.capture(mc);
                 trashCleanup.setBaseline(inventoryBaseline);
@@ -597,7 +595,6 @@ public final class ClientHooks {
                 session.cancel("Auto-Solver Stopped");
                 if (autoPuzzleState == AutoPuzzleState.SOLVING) autoPuzzleState = AutoPuzzleState.FAILED;
             } else {
-                LootGameSolverConfig.setOverlayVisible(true);
                 captureInventoryBaseline(mc);
                 session.start(ActionPlanner.Mode.SOLVE);
                 Object game = puzzleBridge.nearbyGame(true);
