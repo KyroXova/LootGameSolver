@@ -75,6 +75,8 @@ public class Explorer {
     int[] extendedFrom;
     int approachAttempts;
     int[] knownStructure;
+    private World waypointScanWorld;
+    private long waypointScanTick = Long.MIN_VALUE;
     ExcavationPathfinder approachPlan;
     int[] approachAnchor;
     boolean approachReady;
@@ -303,6 +305,10 @@ public class Explorer {
         if (target != null) return new int[] { target.xCoord, target.yCoord, target.zCoord };
         Minecraft mc = Minecraft.getMinecraft();
         if (mc != null && mc.theWorld != null && mc.thePlayer != null) {
+            long now = mc.theWorld.getTotalWorldTime();
+            if (waypointScanWorld == mc.theWorld && now >= waypointScanTick && now - waypointScanTick < 20) return null;
+            waypointScanWorld = mc.theWorld;
+            waypointScanTick = now;
             net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery
                 .find(mc, savedFinder, solvedStructures, worldIdentity(mc));
             if (found != null) {
@@ -631,7 +637,18 @@ public class Explorer {
     }
 
     public void renderCamera(Minecraft mc) {
-        if (!baritoneCoordinator.active()) camera.render(mc, world, true);
+        if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (baritoneCoordinator.active() && !baritoneCoordinator.breaking) {
+            for (int[] point : baritoneCoordinator.routePreview) {
+                double dx = point[0] + 0.5D - mc.thePlayer.posX;
+                double dz = point[2] + 0.5D - mc.thePlayer.posZ;
+                if (dx * dx + dz * dz > 0.36D) {
+                    camera.look((float) Math.toDegrees(Math.atan2(dz, dx)) - 90F, 0F);
+                    break;
+                }
+            }
+            camera.render(mc, world, true);
+        } else if (!baritoneCoordinator.active()) camera.render(mc, world, true);
     }
 
     public void look(float yaw, float pitch) {

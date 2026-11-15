@@ -26,6 +26,8 @@ public final class BaritoneTransitCoordinator {
     public int searchX, searchZ;
     public int searchTicks;
     public int handoffTicks;
+    private int routeFailures;
+    boolean breaking;
     public final List<int[]> routePreview = new ArrayList<int[]>();
     public int previewTick;
 
@@ -46,6 +48,8 @@ public final class BaritoneTransitCoordinator {
         searchZ = 0;
         searchTicks = 0;
         handoffTicks = 0;
+        routeFailures = 0;
+        breaking = false;
         routePreview.clear();
         previewTick = 0;
     }
@@ -60,11 +64,12 @@ public final class BaritoneTransitCoordinator {
     }
 
     public boolean tick(Minecraft mc, Explorer explorer) {
+        breaking = active() && explorer.baritoneNavigation.isBreaking();
         if (active() && explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
             explorer.baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
             if (++previewTick % 5 == 0) {
                 routePreview.clear();
-                if (LootGameSolverConfig.showOverlay) routePreview.addAll(explorer.baritoneNavigation.route());
+                routePreview.addAll(explorer.baritoneNavigation.route());
             }
         } else if (!routePreview.isEmpty()) {
             routePreview.clear();
@@ -180,7 +185,23 @@ public final class BaritoneTransitCoordinator {
                                 handoffTicks = 0;
                             }
                         }
-                    } else explorer.stop(mc, "Baritone exploration stopped before reaching its target");
+                    } else if (++routeFailures <= 3) {
+                        searchNext = true;
+                        searchHandoff = true;
+                        handoffTicks = 0;
+                        explorer.status = "Replanning exploration route";
+                    } else {
+                        int[] next = explorer.search == null ? null : explorer.search.next();
+                        if (next == null) explorer.stop(mc, "No reachable exploration route remains");
+                        else {
+                            routeFailures = 0;
+                            searchX = next[0];
+                            searchZ = next[1];
+                            searchNext = true;
+                            searchHandoff = true;
+                            handoffTicks = 0;
+                        }
+                    }
                 }
                 return true;
             }
@@ -199,7 +220,15 @@ public final class BaritoneTransitCoordinator {
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                     explorer.baritoneNavigation.stop();
                     structureMove = false;
-                    explorer.stop(mc, "Baritone could not reach the structure");
+                    if (explorer.target != null && ++routeFailures <= 3) {
+                        searchMove = true;
+                        searchHandoff = true;
+                        searchNext = false;
+                        handoffTicks = 0;
+                        explorer.status = "Replanning route to LootGame";
+                    } else {
+                        explorer.stop(mc, "Baritone could not reach the structure");
+                    }
                 }
                 return true;
             }

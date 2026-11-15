@@ -74,16 +74,16 @@ final class NavigationOverlayRenderer {
         GL11.glDisable(GL11.GL_CULL_FACE);
         t.startDrawingQuads();
         double coilHeight = 2.2D;
-        int segments = Math.max(16, (int) Math.ceil(height / coilHeight) * 16);
+        int segments = Math.max(16, (int) Math.ceil(height / coilHeight) * 4);
         double radius = 0.42D;
         double cosine = Math.cos(rotation), sine = Math.sin(rotation);
         double phaseCosine = Math.cos(rotation * 3D), phaseSine = Math.sin(rotation * 3D);
+        float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * (sine * phaseCosine - cosine * phaseSine)));
         for (int segment = 0; segment < segments; segment++) {
             double progress = segment / (double) segments;
             double nextProgress = (segment + 1D) / segments;
             double next = nextProgress * height / coilHeight * Math.PI * 2D + rotation;
             double nextCosine = Math.cos(next), nextSine = Math.sin(next);
-            float pulse = (float) (0.55D + 0.3D * (0.5D + 0.5D * (sine * phaseCosine - cosine * phaseSine)));
             t.setColorRGBA_F(0.28F, 0.72F, 1F, pulse);
             t.addVertex(x + cosine * (radius - 0.08D), ground + progress * height, z + sine * (radius - 0.08D));
             t.addVertex(x + cosine * (radius + 0.08D), ground + progress * height, z + sine * (radius + 0.08D));
@@ -105,7 +105,7 @@ final class NavigationOverlayRenderer {
     private static double[] draw(Tessellator t, List<int[]> route, double[] start, boolean excavation) {
         if (route == null || route.isEmpty()) return start;
         double x = start[0], y = start[1], z = start[2];
-        int startIndex = 0;
+        int startIndex = NavigationPathGeometry.firstForwardIndex(route, x, z);
         while (startIndex < route.size() - 1) {
             int[] first = route.get(startIndex);
             double dx = (first[0] + 0.5D) - x;

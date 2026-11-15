@@ -29,6 +29,10 @@ public final class BaritoneNavigationBridge {
     private Class<?> goalApi;
     private Object pathing;
     private Class<?> pathingApi;
+    private Object inputHandler;
+    private Class<?> inputHandlerApi;
+    private Object clickLeft;
+    private Object clickRight;
 
     public Start start(int x, int y, int z) {
         return start(x, y, z, 0, false);
@@ -64,6 +68,14 @@ public final class BaritoneNavigationBridge {
             Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
             Object candidatePathing = baritoneApi.getMethod("getPathingBehavior")
                 .invoke(baritone);
+            Object candidateInput = baritoneApi.getMethod("getInputOverrideHandler")
+                .invoke(baritone);
+            Class<?> candidateInputApi = Class.forName("baritone.api.utils.IInputOverrideHandler");
+            Class<?> inputType = Class.forName("baritone.api.utils.input.Input");
+            Object candidateClick = inputType.getField("CLICK_LEFT")
+                .get(null);
+            Object candidateRightClick = inputType.getField("CLICK_RIGHT")
+                .get(null);
             Class<?> candidatePathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
             Object manager = baritoneApi.getMethod("getPathingControlManager")
                 .invoke(baritone);
@@ -111,6 +123,10 @@ public final class BaritoneNavigationBridge {
             goalApi = goalType;
             pathing = candidatePathing;
             pathingApi = candidatePathingApi;
+            inputHandler = candidateInput;
+            inputHandlerApi = candidateInputApi;
+            clickLeft = candidateClick;
+            clickRight = candidateRightClick;
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
@@ -134,6 +150,17 @@ public final class BaritoneNavigationBridge {
                     .invoke(process, paused);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
+    public boolean isBreaking() {
+        if (inputHandler == null || clickLeft == null) return false;
+        try {
+            Method forced = inputHandlerApi.getMethod("isInputForcedDown", clickLeft.getClass());
+            return (Boolean) forced.invoke(inputHandler, clickLeft)
+                || (clickRight != null && (Boolean) forced.invoke(inputHandler, clickRight));
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return false;
+        }
     }
 
     public List<int[]> route() {
@@ -229,6 +256,10 @@ public final class BaritoneNavigationBridge {
         goalApi = null;
         pathing = null;
         pathingApi = null;
+        inputHandler = null;
+        inputHandlerApi = null;
+        clickLeft = null;
+        clickRight = null;
     }
 
 }
