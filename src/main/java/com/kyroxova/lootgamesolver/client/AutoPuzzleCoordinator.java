@@ -181,8 +181,31 @@ final class AutoPuzzleCoordinator {
                     exploration.setAutomationStatus("Could not reach the board center; explorer held");
                 return;
             }
-            if (autoPuzzlePosition != null && masterClickAttempts < 4
-                && puzzleWaitTicks - lastMasterClickTick >= 40
+            if (autoPuzzlePosition != null) {
+                double dx = autoPuzzlePosition[0] + 0.5D - mc.thePlayer.posX;
+                double dz = autoPuzzlePosition[2] + 0.5D - mc.thePlayer.posZ;
+                double hDist = Math.hypot(dx, dz);
+                if (hDist > 2.2D) {
+                    if (exploration != null && !exploration.navigating()) {
+                        exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
+                    }
+                    if (exploration != null && exploration.navigating()) {
+                        exploration.setAutomationStatus("Walking to puzzle center");
+                        puzzleWaitTicks = 0;
+                        return;
+                    }
+                    float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+                    mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 40.0F);
+                    double speed = 0.22D;
+                    mc.thePlayer.motionX += (dx / hDist) * speed;
+                    mc.thePlayer.motionZ += (dz / hDist) * speed;
+                    if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) mc.thePlayer.jump();
+                    puzzleWaitTicks = 0;
+                    return;
+                }
+            }
+            if (autoPuzzlePosition != null && masterClickAttempts < 6
+                && puzzleWaitTicks - lastMasterClickTick >= 20
                 && puzzleBridge.activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])) {
                 masterClickAttempts++;
                 lastMasterClickTick = puzzleWaitTicks;
@@ -380,5 +403,14 @@ final class AutoPuzzleCoordinator {
         session.start(ActionPlanner.Mode.SOLVE);
         if (session.isActive()) state = State.SOLVING;
         else state = State.FAILED;
+    }
+
+    private static float updateRotation(float current, float target, float maxStep) {
+        float diff = current - target;
+        while (diff >= 180.0F) diff -= 360.0F;
+        while (diff < -180.0F) diff += 360.0F;
+        if (diff > maxStep) diff = maxStep;
+        if (diff < -maxStep) diff = -maxStep;
+        return current - diff;
     }
 }

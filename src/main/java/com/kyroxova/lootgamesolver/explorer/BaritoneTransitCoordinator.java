@@ -13,6 +13,7 @@ public final class BaritoneTransitCoordinator {
 
     public boolean centerMove;
     public boolean structureMove;
+    public boolean preRouting;
     public boolean searchMove;
     public boolean searchHandoff;
     public boolean searchNext;
@@ -38,6 +39,7 @@ public final class BaritoneTransitCoordinator {
     public void reset() {
         centerMove = false;
         structureMove = false;
+        preRouting = false;
         searchMove = false;
         searchHandoff = false;
         searchNext = false;
@@ -110,16 +112,33 @@ public final class BaritoneTransitCoordinator {
         breaking = active() && explorer.baritoneNavigation.isBreaking();
         if (active() && explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
             explorer.baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
+            if (mc.thePlayer != null) {
+                boolean wantSprint = !mc.thePlayer.isInWater() && !mc.thePlayer.isSneaking()
+                    && mc.thePlayer.getFoodStats().getFoodLevel() > 6;
+                explorer.baritoneNavigation.setSprinting(wantSprint);
+                if (wantSprint) {
+                    mc.thePlayer.setSprinting(true);
+                    if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+                        net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                            mc.gameSettings.keyBindSprint.getKeyCode(), true);
+                    }
+                }
+            }
             if (++previewTick % 5 == 0) {
                 routePreview.clear();
                 routePreview.addAll(explorer.baritoneNavigation.route());
             }
             if (surfaceMove || returnMove) explorer.status = "Ascending to Surface";
-            else if (structureMove) explorer.status = "Walking to LootGame";
+            else if (structureMove) explorer.status = preRouting ? "Pre-routing to Puzzle" : "Walking to LootGame";
             else if (centerMove) explorer.status = "Moving to board center";
             else if (searchMove) explorer.status = "Exploring for structures";
         } else if (!routePreview.isEmpty()) {
             routePreview.clear();
+            explorer.baritoneNavigation.setSprinting(false);
+            if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+                net.minecraft.client.settings.KeyBinding.setKeyBindState(
+                    mc.gameSettings.keyBindSprint.getKeyCode(), false);
+            }
         }
         if (surfaceMove) {
             if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld) {
@@ -236,13 +255,15 @@ public final class BaritoneTransitCoordinator {
                 double aimDz = (searchZ + 0.5D) - mc.thePlayer.posZ;
                 float aimYaw = (float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F;
                 explorer.look(aimYaw, 0F);
-                if (!searchHandoff && ++searchTicks % 20 == 0) {
+                if (!searchHandoff && ++searchTicks % 10 == 0) {
                     explorer.scan(mc);
                     if (explorer.target != null) {
                         explorer.baritoneNavigation.stop();
-                        searchHandoff = true;
-                        searchNext = false;
-                        handoffTicks = 0;
+                        searchMove = false;
+                        searchHandoff = false;
+                        rememberReturnPoint(mc);
+                        explorer.routeToStructure(mc);
+                        return true;
                     }
                 }
                 if (searchHandoff) {
@@ -277,9 +298,10 @@ public final class BaritoneTransitCoordinator {
                     if (arrived) {
                         explorer.scan(mc);
                         if (explorer.target != null) {
-                            searchHandoff = true;
-                            searchNext = false;
-                            handoffTicks = 0;
+                            searchMove = false;
+                            searchHandoff = false;
+                            rememberReturnPoint(mc);
+                            explorer.routeToStructure(mc);
                         } else {
                             int[] next = explorer.search == null ? null : explorer.search.next();
                             if (next == null) {
@@ -292,21 +314,22 @@ public final class BaritoneTransitCoordinator {
                                 searchNext = true;
                                 searchHandoff = true;
                                 handoffTicks = 0;
+                                routeFailures = 0;
                             }
                         }
-                    } else if (++routeFailures <= 3) {
+                    } else if (distToGoal > 4.0D && ++routeFailures <= 12) {
                         searchNext = true;
                         searchHandoff = true;
                         handoffTicks = 0;
-                        explorer.status = "Replanning exploration route";
+                        explorer.status = "Exploring for structures";
                     } else {
+                        routeFailures = 0;
                         int[] next = explorer.search == null ? null : explorer.search.next();
                         if (next == null) {
                             explorer.rotateSearch(mc);
                             next = explorer.search == null ? null : explorer.search.next();
                         }
                         if (next != null) {
-                            routeFailures = 0;
                             searchX = next[0];
                             searchZ = next[1];
                             searchNext = true;
@@ -322,34 +345,58 @@ public final class BaritoneTransitCoordinator {
             if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
                 explorer.baritoneNavigation.stop();
                 structureMove = false;
+                preRouting = false;
                 explorer.walking = false;
             } else {
                 if (explorer.target != null && explorer.reachableBoard(mc)) {
                     explorer.baritoneNavigation.stop();
                     structureMove = false;
+                    preRouting = false;
                     explorer.stop(mc, "Arrived at LootGame; opening puzzle");
                     explorer.puzzleArrivalPending = true;
+                } else if (preRouting && explorer.target != null) {
+                    double hDist = Math.hypot(
+                        mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+                        mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+                    if (hDist <= 6.0D || explorer.baritoneNavigation.completed()) {
+                        preRouting = false;
+                        explorer.baritoneNavigation.stop();
+                        BaritoneNavigationBridge.Start start = explorer.baritoneNavigation
+                            .startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+                        if (start == BaritoneNavigationBridge.Start.STARTED) {
+                            explorer.status = "Walking to LootGame";
+                        } else if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+                            structureMove = false;
+                            explorer.walking = true;
+                            explorer.searching = false;
+                        } else {
+                            structureMove = false;
+                            explorer.routeToStructure(mc);
+                        }
+                    } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+                        explorer.baritoneNavigation.startHorizontal(explorer.target.xCoord, explorer.target.zCoord);
+                    }
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                     explorer.baritoneNavigation.stop();
                     structureMove = false;
+                    preRouting = false;
                     if (explorer.target != null && ++routeFailures <= 3) {
-                        searchMove = true;
-                        searchHandoff = true;
-                        searchNext = false;
-                        handoffTicks = 0;
-                        explorer.status = "Replanning route to LootGame";
+                        explorer.routeToStructure(mc);
                     } else {
-                        if (explorer.target != null) {
-                            explorer.markStructureSolved(mc, new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord });
-                        }
-                        explorer.target = null;
-                        explorer.rotateSearch(mc);
-                        searchMove = true;
-                        searchNext = true;
-                        searchHandoff = true;
-                        handoffTicks = 0;
                         routeFailures = 0;
-                        explorer.status = "Exploring for structures";
+                        if (explorer.target != null && LootGameSolverConfig.staircaseEnabled
+                            && explorer.selectDigEntrance(mc)) {
+                            explorer.walking = true;
+                            explorer.searching = false;
+                        } else {
+                            explorer.target = null;
+                            explorer.rotateSearch(mc);
+                            searchMove = true;
+                            searchNext = true;
+                            searchHandoff = true;
+                            handoffTicks = 0;
+                            explorer.status = "Exploring for structures";
+                        }
                     }
                 }
                 return true;

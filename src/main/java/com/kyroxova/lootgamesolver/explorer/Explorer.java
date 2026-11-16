@@ -500,7 +500,8 @@ public class Explorer {
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
             mc.thePlayer.rotationYaw,
-            LootGameSolverConfig.explorationSearchLimit);
+            LootGameSolverConfig.explorationSearchLimit,
+            128);
         int[] first = search.next();
         if (first != null) {
             BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(first[0], first[1]);
@@ -713,7 +714,7 @@ public class Explorer {
             || digging || returnDigging
             || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
         if (isMining) {
-            camera.clear();
+            camera.render(mc, world, true);
             return;
         }
         if (baritoneCoordinator.active()) {
@@ -769,6 +770,70 @@ public class Explorer {
 
     public boolean navigating() {
         return walking;
+    }
+
+    public int checkpointDistance(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return 0;
+        double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
+        if (baritoneCoordinator != null && baritoneCoordinator.active()) {
+            if (baritoneCoordinator.searchMove) {
+                return (int) Math.round(Math.hypot(px - (baritoneCoordinator.searchX + 0.5D), pz - (baritoneCoordinator.searchZ + 0.5D)));
+            }
+            if (target != null) {
+                return (int) Math.round(Math.hypot(px - (target.xCoord + 0.5D), pz - (target.zCoord + 0.5D)));
+            }
+            if (baritoneCoordinator.returnPoint != null) {
+                return (int) Math.round(Math.hypot(px - (baritoneCoordinator.returnPoint[0] + 0.5D), pz - (baritoneCoordinator.returnPoint[2] + 0.5D)));
+            }
+        }
+        if (target != null) {
+            return (int) Math.round(Math.hypot(px - (target.xCoord + 0.5D), pz - (target.zCoord + 0.5D)));
+        }
+        if (knownStructure != null) {
+            return (int) Math.round(Math.hypot(px - (knownStructure[0] + 0.5D), pz - (knownStructure[2] + 0.5D)));
+        }
+        if (!route.isEmpty()) {
+            int[] last = route.get(route.size() - 1);
+            return (int) Math.round(Math.hypot(px - (last[0] + 0.5D), pz - (last[2] + 0.5D)));
+        }
+        return 0;
+    }
+
+    public void routeToStructure(Minecraft mc) {
+        if (target == null || mc == null || mc.thePlayer == null || mc.theWorld == null) return;
+        rememberBaritoneReturnPoint(mc);
+        double playerY = mc.thePlayer.boundingBox.minY;
+        if (playerY > target.yCoord + 5) {
+            BaritoneNavigationBridge.Start start = baritoneNavigation.startHorizontal(target.xCoord, target.zCoord);
+            if (start == BaritoneNavigationBridge.Start.STARTED) {
+                baritoneCoordinator.structureMove = true;
+                baritoneCoordinator.preRouting = true;
+                walking = true;
+                searching = false;
+                status = "Pre-routing to Puzzle";
+                return;
+            }
+        }
+        BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
+            .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+        if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
+            baritoneCoordinator.structureMove = true;
+            baritoneCoordinator.preRouting = false;
+            walking = true;
+            searching = false;
+            status = "Walking to LootGame";
+            return;
+        }
+        if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+            walking = true;
+            searching = false;
+            return;
+        }
+        plan(mc);
+        walking = walkingSearch != null || !route.isEmpty();
+        if (walking) {
+            status = "Walking to LootGame";
+        }
     }
 
     public void stopRewardView(Minecraft mc) {
@@ -854,7 +919,8 @@ public class Explorer {
             px,
             pz,
             searchYaw,
-            LootGameSolverConfig.explorationSearchLimit);
+            LootGameSolverConfig.explorationSearchLimit,
+            128);
     }
 
     public boolean nextSearchGoal(Minecraft mc) {
@@ -900,7 +966,8 @@ public class Explorer {
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.posZ),
             searchYaw,
-            LootGameSolverConfig.explorationSearchLimit);
+            LootGameSolverConfig.explorationSearchLimit,
+            128);
         entranceSelected = false;
         excavationSearch = null;
         excavationReplans = 0;
@@ -941,20 +1008,8 @@ public class Explorer {
             walking = nextSearchLeg(mc);
             return;
         }
-        BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
-            .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
-        if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
-            rememberBaritoneReturnPoint(mc);
-            baritoneCoordinator.structureMove = true;
-            walking = true;
-            searching = false;
-            status = "Walking to LootGame";
-            return;
-        }
-        if (baritoneStart != BaritoneNavigationBridge.Start.ABSENT) {
-            status = "Baritone navigation unavailable or busy";
-            return;
-        }
+        routeToStructure(mc);
+        if (walking) return;
         beginAccessTrail(mc);
         // Preserve the saved entrance while inside so a restart resumes the current route.
         int playerX = (int) Math.floor(mc.thePlayer.posX);

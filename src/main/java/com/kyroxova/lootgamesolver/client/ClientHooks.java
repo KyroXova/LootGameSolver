@@ -241,7 +241,7 @@ public final class ClientHooks {
                 exploration.setInventoryMaintenance(false);
                 exploration.setAutomationStatus(null);
                 inventoryMaintenanceStage = 0;
-                inventoryMaintenanceCooldown = 600;
+                inventoryMaintenanceCooldown = 100;
             }
             return;
         }
@@ -434,7 +434,6 @@ public final class ClientHooks {
                     return;
                 }
                 if (boardCenter != null) {
-                    if (exploration.resumePuzzleInCurrentRoom(mc, boardCenter)) return;
                     autoPuzzle.startManual(boardCenter, floor, mc.theWorld, puzzleCompletion);
                     exploration.moveToPuzzleCenter(mc, boardCenter);
                     exploration.setAutomationStatus("Opening puzzle in current room");
@@ -661,11 +660,14 @@ public final class ClientHooks {
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
 
             String line1 = "\u00A7b\u00A7lLoot Game Solver";
+            int dist = exploration != null ? exploration.checkpointDistance(mc) : 0;
+            String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
             String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
                 + " \u00A78|\u00A7"
                 + (session.isActive() || explorerActive ? "a" : "e")
                 + " "
-                + statusStr;
+                + statusStr
+                + distBadge;
             String line3 = autoColor + "["
                 + autoKeyStr
                 + "] Auto \u00A78|\u00A77 "
@@ -685,7 +687,7 @@ public final class ClientHooks {
             int width3 = mc.fontRenderer.getStringWidth(line3);
             int maxWidth = Math.max(width1, Math.max(width2, width3));
 
-            int panelWidth = Math.max(160, maxWidth + 36);
+            int panelWidth = Math.max(170, maxWidth + 40);
             boolean showCheckpointProgress = exploreKeyHeld || checkpointClearDoneTicks > 0;
             int panelHeight = 44 + (showCheckpointProgress ? 10 : 0);
             int x = resolution.getScaledWidth() - panelWidth - 15;

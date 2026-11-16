@@ -33,6 +33,7 @@ public final class BaritoneNavigationBridge {
     private Class<?> inputHandlerApi;
     private Object clickLeft;
     private Object clickRight;
+    private Object clickSprint;
 
     public Start start(int x, int y, int z) {
         return start(x, y, z, 0, false);
@@ -76,6 +77,10 @@ public final class BaritoneNavigationBridge {
                 .get(null);
             Object candidateRightClick = inputType.getField("CLICK_RIGHT")
                 .get(null);
+            Object candidateSprint = null;
+            try {
+                candidateSprint = inputType.getField("SPRINT").get(null);
+            } catch (ReflectiveOperationException ignored) {}
             Class<?> candidatePathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
             Object manager = baritoneApi.getMethod("getPathingControlManager")
                 .invoke(baritone);
@@ -131,6 +136,7 @@ public final class BaritoneNavigationBridge {
             inputHandlerApi = candidateInputApi;
             clickLeft = candidateClick;
             clickRight = candidateRightClick;
+            clickSprint = candidateSprint;
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
@@ -250,7 +256,22 @@ public final class BaritoneNavigationBridge {
         }
     }
 
+    public void setSprinting(boolean sprint) {
+        if (inputHandler != null && inputHandlerApi != null && clickSprint != null) {
+            try {
+                inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
+                    .invoke(inputHandler, clickSprint, sprint);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+        }
+    }
+
     public void stop() {
+        if (inputHandler != null && inputHandlerApi != null && clickSprint != null) {
+            try {
+                inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
+                    .invoke(inputHandler, clickSprint, false);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+        }
         try {
             if (process != null && processApi != null) {
                 if (processApi.getMethod("getGoal")
@@ -285,6 +306,7 @@ public final class BaritoneNavigationBridge {
         inputHandlerApi = null;
         clickLeft = null;
         clickRight = null;
+        clickSprint = null;
     }
 
 }

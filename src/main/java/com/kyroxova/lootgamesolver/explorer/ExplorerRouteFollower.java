@@ -74,8 +74,8 @@ final class ExplorerRouteFollower {
         }
         boolean wantSprint = !centering && !digging
             && !inWater
-            && Math.abs(turn) < 55F
-            && input.forward > 0.1F
+            && Math.abs(turn) < 70F
+            && input.forward > 0.05F
             && mc.thePlayer.getFoodStats()
                 .getFoodLevel() > 6;
         if (wantSprint) {

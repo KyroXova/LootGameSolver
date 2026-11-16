@@ -143,7 +143,8 @@ public final class WorldOverlayRenderer {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
-        if (exploration != null) NavigationOverlayRenderer.render(exploration, event.partialTicks);
+        boolean solving = session != null && session.isActive();
+        if (exploration != null && !solving) NavigationOverlayRenderer.render(exploration, event.partialTicks);
         DetectedGame current = session.getCurrentDetectedGame();
         if (current == null) return;
 
@@ -168,6 +169,23 @@ public final class WorldOverlayRenderer {
             GL11.glEnable(GL11.GL_DEPTH_TEST);
             GL11.glDepthMask(false);
             GL11.glLineWidth(1.5F);
+
+            SolverAction firstAction = actions.get(0);
+            int[] firstBlock = session.getBlockPos(firstAction.position);
+            if (firstBlock != null) {
+                double fdx = firstBlock[0] + 0.5D - mc.thePlayer.posX;
+                double fdy = firstBlock[1] + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
+                double fdz = firstBlock[2] + 0.5D - mc.thePlayer.posZ;
+                if (fdx * fdx + fdy * fdy + fdz * fdz > 7.84D) {
+                    GL11.glLineWidth(2.5F);
+                    Tessellator t = Tessellator.instance;
+                    t.startDrawing(GL11.GL_LINES);
+                    t.setColorRGBA_F(0.2F, 0.9F, 1.0F, 0.85F);
+                    t.addVertex(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ);
+                    t.addVertex(firstBlock[0] + 0.5D, firstBlock[1] + 0.15D, firstBlock[2] + 0.5D);
+                    t.draw();
+                }
+            }
 
             int maxRender = actions.size();
             Map<CellPosition, String> lightLabels = current.type == MiniGame.GAME_OF_LIGHT

@@ -47,6 +47,7 @@ public final class StatusText {
         if (text.contains("reported a loss") || text.contains("lost")) return "Puzzle Lost";
         if (text.contains("could not reach the board center") || text.contains("center; explorer held"))
             return "Holding at Center";
+        if (text.contains("pre-routing") || text.contains("prerouting")) return "Pre-routing to Puzzle";
         if (text.contains("found nearby lootgame")) return "Puzzle Found";
         if (text.contains("arrived at lootgame") || text.contains("arrived beside lootgame")) return "Puzzle Ready";
         if (text.contains("opening puzzle") || text.contains("waiting for lootgames to create"))

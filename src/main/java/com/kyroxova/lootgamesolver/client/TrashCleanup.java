@@ -85,7 +85,7 @@ final class TrashCleanup {
             if (mc.currentScreen instanceof GuiChest && mc.thePlayer.openContainer instanceof ContainerChest) {
                 IInventory inventory = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
                 String name = inventory.getInventoryName();
-                if (inventory.getSizeInventory() == 36 && ("key.serverutilities.trash".equals(name)
+                if (inventory.getSizeInventory() >= 9 && ("key.serverutilities.trash".equals(name)
                     || "Trash Can".equalsIgnoreCase(name)
                     || StatCollector.translateToLocal("key.serverutilities.trash").equalsIgnoreCase(name)
                     || (name != null && name.toLowerCase(java.util.Locale.ROOT).contains("trash")))) {
@@ -97,7 +97,7 @@ final class TrashCleanup {
             }
             if (++timeout > 80 || (mc.currentScreen != null && !(mc.currentScreen instanceof GuiChest))) {
                 opening = false;
-                retryDelay = 1200;
+                retryDelay = 200;
                 status = "Trash can unavailable; items kept";
                 return false;
             }

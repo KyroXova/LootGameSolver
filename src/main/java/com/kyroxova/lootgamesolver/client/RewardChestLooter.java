@@ -721,21 +721,7 @@ final class RewardChestLooter {
     }
 
     private boolean compactBackpackHotbar(Minecraft mc) {
-        int first = -1;
-        for (int i = 0; i < 9; i++) {
-            if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(i))) continue;
-            if (first < 0) {
-                first = i;
-                continue;
-            }
-            if (baseline.protects(i, mc.thePlayer.inventory.getStackInSlot(i))) continue;
-            for (int slot = 9; slot < 36; slot++) {
-                if (mc.thePlayer.inventory.getStackInSlot(slot) == null && backpackTransfer.clearHotbar(mc, i, slot)) {
-                    status = "Organizing backpacks";
-                    return true;
-                }
-            }
-        }
+        // Keep backpacks in the hotbar while in structure / looting instead of repeatedly moving them back and forth
         return false;
     }
 

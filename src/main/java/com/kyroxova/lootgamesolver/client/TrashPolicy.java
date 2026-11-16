@@ -58,7 +58,8 @@ final class TrashPolicy {
                 || lower.contains("stone") || lower.contains("granite")
                 || lower.contains("diorite") || lower.contains("andesite")
                 || lower.contains("marble") || lower.contains("basalt")
-                || lower.contains("limestone")) {
+                || lower.contains("limestone")
+                || lower.contains("dungeon") || lower.contains("lootgames")) {
                 return true;
             }
         }
