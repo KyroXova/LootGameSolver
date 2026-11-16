@@ -198,7 +198,7 @@ final class AutoPuzzleCoordinator {
                 double dz = autoPuzzlePosition[2] + 0.5D - mc.thePlayer.posZ;
                 double hDist = Math.hypot(dx, dz);
                 if (hDist > 2.2D) {
-                    if (exploration != null && !exploration.navigating()) {
+                    if (hDist > 3.5D && exploration != null && !exploration.navigating()) {
                         exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
                     }
                     if (exploration != null && exploration.navigating()) {
@@ -212,6 +212,7 @@ final class AutoPuzzleCoordinator {
                     mc.thePlayer.motionX += (dx / hDist) * speed;
                     mc.thePlayer.motionZ += (dz / hDist) * speed;
                     if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) mc.thePlayer.jump();
+                    if (exploration != null) exploration.setAutomationStatus("Approaching puzzle master");
                     puzzleWaitTicks = 0;
                     return;
                 }

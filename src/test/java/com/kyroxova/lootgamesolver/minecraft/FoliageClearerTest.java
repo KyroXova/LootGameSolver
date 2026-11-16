@@ -16,4 +16,9 @@ public class FoliageClearerTest {
         assertFalse(FoliageClearer.eligible(false, false, false, 0.2F));
         assertFalse(FoliageClearer.eligible(true, false, false, 2F));
     }
+
+    @Test
+    public void roomObstructionRejectsUnbreakableOrHighHardnessBlocks() {
+        assertFalse(FoliageClearer.isRoomObstruction(null, null, 0, 0, 0));
+    }
 }

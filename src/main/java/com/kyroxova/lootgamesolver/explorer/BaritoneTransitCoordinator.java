@@ -415,7 +415,7 @@ public final class BaritoneTransitCoordinator {
                     && ((distToCenter <= (explorer.movingToRewardView ? 0.75D : 1.5D)
                         && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - explorer.target.yCoord - 1) <= 2)
                         || (explorer.baritoneNavigation.completed()
-                            && distToCenter <= (explorer.movingToRewardView ? 1.0D : 3.0D)));
+                            && distToCenter <= (explorer.movingToRewardView ? 1.0D : 2.2D)));
                 if (arrived) {
                     explorer.baritoneNavigation.stop();
                     centerMove = false;

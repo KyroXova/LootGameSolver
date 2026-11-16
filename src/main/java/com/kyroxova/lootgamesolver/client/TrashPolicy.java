@@ -45,7 +45,7 @@ final class TrashPolicy {
     }
 
     static boolean isBrokenBlockOrTrash(ItemStack stack, String id, int metadata) {
-        if (stack == null) return false;
+        if (stack == null && id == null) return false;
         if (isOreOrDust(stack, id)) return true;
         if (id != null) {
             String lower = id.toLowerCase(Locale.ROOT);
@@ -63,7 +63,7 @@ final class TrashPolicy {
                 return true;
             }
         }
-        return discard(id, metadata, false, stack.getItem() instanceof ItemBlock);
+        return discard(id, metadata, false, stack != null && stack.getItem() instanceof ItemBlock);
     }
 
     static boolean discardOre(String id, boolean isOre, boolean all, String[] configured) {

@@ -75,4 +75,9 @@ Keys can be changed in Minecraft's Controls menu. The HUD shows solver and explo
 
 The configuration includes solver interaction delays, Minesweeper probability settings, display options, and experimental exploration settings such as route range and staircase digging.
 
-See the [3.0.0 changelog](changelog/changelog_2.1.0_to_3.0.0.md) for the latest changes.
+See the [3.1.0 changelog](changelog/changelog_3.0.0_to_3.1.0.md) for the latest changes.
+
+## Baritone Integration & Licensing
+
+> **Note:** Baritone is bundled via Jar-in-Jar with this project. Baritone has been backported to Minecraft 1.7.10 under the `GNU Lesser General Public License` as-is and modified only to accommodate LootGameSolver functionality. It is hosted under the fork [KyroXova/baritone](https://github.com/KyroXova/baritone) for maintenance and build compatibility, contributing backport enhancements without unlawful redistribution. All modifications remain open source and compliant with the LGPL.
+

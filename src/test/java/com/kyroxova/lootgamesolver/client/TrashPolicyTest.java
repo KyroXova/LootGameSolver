@@ -34,4 +34,14 @@ public class TrashPolicyTest {
         assertFalse(TrashPolicy.discard("mod:valuable_block", 0, false, true));
         assertFalse(TrashPolicy.discard("mod:backpack", 0, false, false));
     }
+
+    @Test
+    public void brokenBlocksAndPreviousRunJunkRecognizedAsTrash() {
+        assertTrue(TrashPolicy.isBrokenBlockOrTrash(null, "lootgames:dungeon_brick", 0));
+        assertTrue(TrashPolicy.isBrokenBlockOrTrash(null, "lootgames:dungeon_wall", 0));
+        assertTrue(TrashPolicy.isBrokenBlockOrTrash(null, "minecraft:cobblestone", 0));
+        assertTrue(TrashPolicy.isBrokenBlockOrTrash(null, "minecraft:tallgrass", 0));
+        assertTrue(TrashPolicy.isBrokenBlockOrTrash(null, "minecraft:dirt", 0));
+        assertFalse(TrashPolicy.isBrokenBlockOrTrash(null, "minecraft:iron_sword", 0));
+    }
 }
