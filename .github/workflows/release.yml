@@ -162,6 +162,30 @@ jobs:
       - name: Build mod
         run: ./gradlew build --parallel --max-workers=4
 
+      - name: Obtain Baritone jar for bundled release
+        id: baritone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p baritone-bin
+          if gh release download --repo KyroXova/baritone --pattern "*baritone*.jar" --dir baritone-bin 2>/dev/null; then
+            BARITONE_JAR=$(find baritone-bin -name "*dev.jar" -o -name "*.jar" | head -n 1)
+            echo "Downloaded Baritone jar from release: $BARITONE_JAR"
+          fi
+          if [ -z "${BARITONE_JAR:-}" ] || [ ! -f "${BARITONE_JAR:-}" ]; then
+            echo "Building Baritone from KyroXova/baritone source..."
+            git clone --depth 1 https://github.com/KyroXova/baritone.git baritone-src
+            cd baritone-src
+            chmod +x gradlew
+            ./gradlew build -x test --parallel --max-workers=4
+            cd ..
+            BARITONE_JAR=$(find baritone-src/build/libs -name "*dev.jar" -o -name "*baritone*.jar" | head -n 1)
+          fi
+          echo "jar_path=$(realpath "$BARITONE_JAR")" >> "$GITHUB_OUTPUT"
+
+      - name: Build bundled Baritone mod
+        run: ./gradlew bundledBaritoneJar -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}"
+
       - name: Prepare release changelog notes
         id: release-notes
         shell: bash

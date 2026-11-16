@@ -25,6 +25,7 @@ public final class StatusText {
             return "Checking Chests";
         }
         if (text.contains("trash")) return "Clearing Inventory";
+        if (text.contains("foliage") || text.contains("obstruction")) return "Clearing Foliage";
         if (text.contains("checkpoint") && text.contains("cleared")) return "Checkpoint Done";
 
         if (text.contains("stage reveal failed")) return "Stage Failed";

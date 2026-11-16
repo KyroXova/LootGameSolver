@@ -32,7 +32,7 @@ val bundledBaritoneJar by tasks.registering(Jar::class) {
     group = "build"
     description = "Assemble LootGameSolver and a supplied production Baritone jar"
     dependsOn("reobfJar")
-    archiveClassifier.set("with-baritone")
+    archiveClassifier.set("bundled-staging")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from({ zipTree(tasks.named("reobfJar").get().outputs.files.singleFile) })
     from({
@@ -49,4 +49,10 @@ val bundledBaritoneJar by tasks.registering(Jar::class) {
         "FMLCorePluginContainsFMLMod" to "true",
         "ForceLoadAsMod" to "true"
     )
+    val finalDest = layout.buildDirectory.file("libs/lootgamesolver-${project.version}.jar")
+    doLast {
+        val target = finalDest.get().asFile
+        archiveFile.get().asFile.copyTo(target, overwrite = true)
+        archiveFile.get().asFile.delete()
+    }
 }

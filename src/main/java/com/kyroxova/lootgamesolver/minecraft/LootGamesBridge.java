@@ -54,6 +54,34 @@ public final class LootGamesBridge implements MiniGameDetector {
         return foliageClearer.clearLine(mc, position[0], position[1], position[2]);
     }
 
+    public int[] findRoomObstruction(int[] center) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (center == null || mc.theWorld == null || mc.thePlayer == null) return null;
+        int cx = center[0], cy = center[1], cz = center[2];
+        int[] closest = null;
+        double bestDistSq = Double.MAX_VALUE;
+        for (int dx = -10; dx <= 10; dx++) {
+            for (int dz = -10; dz <= 10; dz++) {
+                for (int dy = 1; dy <= 3; dy++) {
+                    int x = cx + dx, y = cy + dy, z = cz + dz;
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(x, y, z);
+                    if (FoliageClearer.isRoomObstruction(block, mc.theWorld, x, y, z)) {
+                        double distSq = mc.thePlayer.getDistanceSq(x + 0.5D, y + 0.5D, z + 0.5D);
+                        if (distSq < bestDistSq) {
+                            bestDistSq = distSq;
+                            closest = new int[] { x, y, z };
+                        }
+                    }
+                }
+            }
+        }
+        return closest;
+    }
+
+    public boolean clearObstructionBlock(int x, int y, int z) {
+        return foliageClearer.clearBlock(Minecraft.getMinecraft(), x, y, z);
+    }
+
     private static final String LOOTGAMES_PKG = "ru.timeconqueror.lootgames.";
     private static final String MS_GAME = "ru.timeconqueror.lootgames.minigame.minesweeper.GameMineSweeper";
     private static final String SDK_GAME = "ru.timeconqueror.lootgames.minigame.sudoku.GameSudoku";

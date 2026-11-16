@@ -181,6 +181,18 @@ final class AutoPuzzleCoordinator {
                     exploration.setAutomationStatus("Could not reach the board center; explorer held");
                 return;
             }
+            int[] centerForClear = autoPuzzlePosition != null ? autoPuzzlePosition
+                : floorActivatorPosition != null ? floorActivatorPosition : rewardCenter;
+            if (centerForClear != null) {
+                int[] obstruction = puzzleBridge.findRoomObstruction(centerForClear);
+                if (obstruction != null) {
+                    if (puzzleBridge.clearObstructionBlock(obstruction[0], obstruction[1], obstruction[2])) {
+                        if (exploration != null) exploration.setAutomationStatus("Clearing room foliage");
+                        puzzleWaitTicks = 0;
+                        return;
+                    }
+                }
+            }
             if (autoPuzzlePosition != null) {
                 double dx = autoPuzzlePosition[0] + 0.5D - mc.thePlayer.posX;
                 double dz = autoPuzzlePosition[2] + 0.5D - mc.thePlayer.posZ;
@@ -280,6 +292,14 @@ final class AutoPuzzleCoordinator {
             Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
             if (floorActivatorPosition != null) {
                 if (!floorActivatorClicked) {
+                    int[] obstruction = puzzleBridge.findRoomObstruction(floorActivatorPosition);
+                    if (obstruction != null) {
+                        if (puzzleBridge.clearObstructionBlock(obstruction[0], obstruction[1], obstruction[2])) {
+                            if (exploration != null) exploration.setAutomationStatus("Clearing room foliage");
+                            puzzleWaitTicks = 0;
+                            return;
+                        }
+                    }
                     if (puzzleBridge.activateFloorActivator(floorActivatorPosition)) {
                         floorActivatorClicked = true;
                         lastCenterClickTick = puzzleWaitTicks;
