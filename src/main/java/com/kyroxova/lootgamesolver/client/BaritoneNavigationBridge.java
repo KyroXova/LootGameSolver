@@ -263,12 +263,16 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         if (pathing != null && pathingApi != null) {
             try {
-                pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
-                    .invoke(pathing, (Boolean) null);
+                pathingApi.getMethod("cancelEverything")
+                    .invoke(pathing);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
             try {
                 pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
-                    .invoke(pathing, null, null, null);
+                    .invoke(pathing, false, false, false);
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            try {
+                pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
+                    .invoke(pathing, (Boolean) null);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
         }
         process = null;

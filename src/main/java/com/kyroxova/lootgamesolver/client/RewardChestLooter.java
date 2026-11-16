@@ -36,6 +36,7 @@ final class RewardChestLooter {
     private final Map<Long, ItemStack> scanned = new HashMap<Long, ItemStack>();
     private InventoryBaseline baseline;
     private final boolean[] backpackTried = new boolean[36];
+    private final boolean[] slotRejectedForCurrentBag = new boolean[36];
     private final InventoryToolTransfer backpackTransfer = new InventoryToolTransfer();
     private final MiningAimGate chestAim = new MiningAimGate();
     private final LootedChestStore lootedChests = new LootedChestStore(
@@ -106,6 +107,7 @@ final class RewardChestLooter {
         scanned.clear();
         for (int i = 0; i < 36; i++) {
             backpackTried[i] = false;
+            slotRejectedForCurrentBag[i] = false;
         }
         active = true;
         chests.clear();
@@ -251,7 +253,10 @@ final class RewardChestLooter {
                 packOpening = false;
                 packMoved = false;
                 backpackSlot = -1;
-                for (int i = 0; i < backpackTried.length; i++) backpackTried[i] = false;
+                for (int i = 0; i < backpackTried.length; i++) {
+                    backpackTried[i] = false;
+                    slotRejectedForCurrentBag[i] = false;
+                }
                 status = "Packing leftover inventory items";
                 return;
             }
@@ -346,7 +351,10 @@ final class RewardChestLooter {
                     packOpening = false;
                     packMoved = false;
                     backpackSlot = -1;
-                    for (int i = 0; i < backpackTried.length; i++) backpackTried[i] = false;
+                    for (int i = 0; i < backpackTried.length; i++) {
+                    backpackTried[i] = false;
+                    slotRejectedForCurrentBag[i] = false;
+                }
                     status = "Moving collected rewards into a backpack";
                     return;
                 }
@@ -503,6 +511,7 @@ final class RewardChestLooter {
             backpackAiming = false;
             restoreBackpackAim(mc, exploration);
             packOpening = true;
+            java.util.Arrays.fill(slotRejectedForCurrentBag, false);
             openWait = 0;
             waiting = 5;
             return;
@@ -513,8 +522,13 @@ final class RewardChestLooter {
         boolean isBackpack = name.startsWith("de.eydamos.backpack.")
             || name.startsWith("de.eydamos.guiadvanced.")
             || name.startsWith("com.darkona.adventurebackpack.")
+            || name.startsWith("forestry.")
             || name.toLowerCase(java.util.Locale.ROOT).contains("backpack")
-            || name.toLowerCase(java.util.Locale.ROOT).contains("bag");
+            || name.toLowerCase(java.util.Locale.ROOT).contains("bag")
+            || (mc.currentScreen instanceof GuiContainer
+                && !(mc.currentScreen instanceof GuiChest)
+                && !(mc.thePlayer.openContainer instanceof ContainerChest)
+                && mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer);
         if (packOpening && mc.currentScreen instanceof GuiChest) {
             // Exclude chest containers from backpack transfers, including shared package names.
             mc.thePlayer.closeScreen();
@@ -536,21 +550,12 @@ final class RewardChestLooter {
                 if (remaining == null || remaining.stackSize < packPendingCount) {
                     packMoved = true;
                 } else {
-                    mc.thePlayer.closeScreen();
-                    restoreBackpackAim(mc);
-                    packOpening = false;
-                    if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-                    oldSlot = -1;
-                    int fullSlot = temporaryBag ? bagSource : backpackSlot;
-                    if (fullSlot >= 0 && fullSlot < backpackTried.length) backpackTried[fullSlot] = true;
-                    if (preferredBagSlot == fullSlot) preferredBagSlot = -1;
-                    backpackSlot = -1;
-                    packPendingSlot = -1;
-                    if (packMoved) {
-                        waiting = 5;
-                        openWait = 0;
+                    if (pending != null && pending.inventory == mc.thePlayer.inventory) {
+                        int playerSlot = pending.getSlotIndex();
+                        if (playerSlot >= 0 && playerSlot < slotRejectedForCurrentBag.length) {
+                            slotRejectedForCurrentBag[playerSlot] = true;
+                        }
                     }
-                    return;
                 }
                 packPendingSlot = -1;
             }
@@ -560,6 +565,7 @@ final class RewardChestLooter {
                 ItemStack stack = slot.getStack();
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0
                     || playerSlot >= 36
+                    || slotRejectedForCurrentBag[playerSlot]
                     || !isPackable(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
                 int beforeCount = stack.stackSize;
@@ -577,24 +583,25 @@ final class RewardChestLooter {
             packOpening = false;
             if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
             oldSlot = -1;
-            if (packMoved) {
-                preferredBagSlot = temporaryBag ? bagHotbar : backpackSlot;
-                backpackSlot = -1;
-                waiting = 5;
-                openWait = 0;
-                if (collecting && queueIndex < queue.size()) {
-                    packing = false;
-                    packMoved = false;
-                    status = "Resuming reward collection";
-                } else if (!hasPackableItems(mc)) {
-                    packing = false;
-                    packMoved = false;
-                }
-                return;
-            }
             int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
             if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
+            if (packMoved) {
+                preferredBagSlot = temporaryBag ? bagHotbar : backpackSlot;
+            } else if (preferredBagSlot == attemptedSlot) {
+                preferredBagSlot = -1;
+            }
             backpackSlot = -1;
+            waiting = 5;
+            openWait = 0;
+            if (collecting && queueIndex < queue.size()) {
+                packing = false;
+                packMoved = false;
+                status = "Resuming reward collection";
+            } else if (!hasPackableItems(mc)) {
+                packing = false;
+                packMoved = false;
+            }
+            return;
         }
         if (packOpening) {
             if (++openWait > 40) {
@@ -683,6 +690,7 @@ final class RewardChestLooter {
         }
         if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
         packOpening = true;
+        java.util.Arrays.fill(slotRejectedForCurrentBag, false);
         openWait = 0;
         waiting = 5;
     }
@@ -740,8 +748,10 @@ final class RewardChestLooter {
         if (temporaryBag && slotIndex == bagSource) return false;
         if (InventoryProtection.bag(stack)) return false;
         if (ExplorerSustain.isHealingAxe(stack)) return false;
-        if (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, slotIndex)) return false;
+        if (InventoryProtection.essential(stack)) return false;
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
+        String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
+        if (id != null && id.toLowerCase(java.util.Locale.ROOT).contains("torch")) return false;
         return true;
     }
 

@@ -50,8 +50,23 @@ public final class InventoryToolTransfer {
             break;
         }
         if (hotbar < 0) for (int i = 0; i < 9; i++) {
-            if (!InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(i))
-                && (baseline == null || !baseline.protects(i, mc.thePlayer.inventory.getStackInSlot(i)))) {
+            ItemStack s = mc.thePlayer.inventory.getStackInSlot(i);
+            if (!InventoryProtection.essential(s) && (baseline == null || !baseline.protects(i, s))) {
+                hotbar = i;
+                break;
+            }
+        }
+        if (hotbar < 0) for (int i = 0; i < 9; i++) {
+            ItemStack s = mc.thePlayer.inventory.getStackInSlot(i);
+            if (!InventoryProtection.essential(s)) {
+                hotbar = i;
+                break;
+            }
+        }
+        if (hotbar < 0) for (int i = 0; i < 9; i++) {
+            ItemStack s = mc.thePlayer.inventory.getStackInSlot(i);
+            if (!InventoryProtection.bag(s)
+                && (s == null || s.getItem() == null || !s.getItem().getClass().getName().contains("ItemHealingAxe"))) {
                 hotbar = i;
                 break;
             }

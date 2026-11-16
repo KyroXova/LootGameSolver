@@ -302,7 +302,7 @@ public final class ClientHooks {
             && inventoryMaintenanceCooldown == 0
             && exploration != null
             && exploration.navigating()
-            && trashCleanup.inventoryPressure(mc)
+            && (trashCleanup.inventoryPressure(mc) || trashCleanup.shouldClean(mc))
             && exploration.inventoryCleanupSafe(mc)
             && mc.currentScreen == null
             && mc.thePlayer.inventory.getItemStack() == null) {
@@ -680,12 +680,12 @@ public final class ClientHooks {
                     + "] "
                     + exploration.explorationAction();
             }
-            int width1 = mc.fontRenderer.getStringWidth("Loot Game Solver");
-            int width2 = mc.fontRenderer.getStringWidth(gameTitle + " | " + statusStr);
+            int width1 = mc.fontRenderer.getStringWidth(line1);
+            int width2 = mc.fontRenderer.getStringWidth(line2);
             int width3 = mc.fontRenderer.getStringWidth(line3);
             int maxWidth = Math.max(width1, Math.max(width2, width3));
 
-            int panelWidth = maxWidth + 32;
+            int panelWidth = Math.max(160, maxWidth + 36);
             boolean showCheckpointProgress = exploreKeyHeld || checkpointClearDoneTicks > 0;
             int panelHeight = 44 + (showCheckpointProgress ? 10 : 0);
             int x = resolution.getScaledWidth() - panelWidth - 15;

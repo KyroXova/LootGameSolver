@@ -159,7 +159,7 @@ public final class StatusText {
         String text = detail.trim()
             .replaceAll("\\s+", " ");
         if (text.length() <= MAX_LENGTH) return text;
-        int end = text.lastIndexOf(' ', MAX_LENGTH - 1);
-        return text.substring(0, end > 0 ? end : MAX_LENGTH - 1) + "â€¦";
+        int end = text.lastIndexOf(' ', MAX_LENGTH - 3);
+        return text.substring(0, end > 0 ? end : MAX_LENGTH - 3) + "...";
     }
 }

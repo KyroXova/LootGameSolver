@@ -165,9 +165,7 @@ public class Explorer {
 
     public void setInventoryMaintenance(boolean active) {
         inventoryMaintenance = active;
-        if (!active) {
-            baritoneNavigation.setPaused(false);
-        }
+        baritoneNavigation.setPaused(active);
     }
 
     public boolean inventoryMaintenanceReady(Minecraft mc) {
@@ -912,6 +910,10 @@ public class Explorer {
         approachAnchor = null;
         walkingSearch = null;
         continuationSearch = null;
+        navigationPreview.clear();
+        baritoneCoordinator.routePreview.clear();
+        route.clear();
+        returnTrailRoute = null;
         excavationRoute.clear();
         rejectedSteps.clear();
         entranceCandidates.clear();
@@ -980,7 +982,11 @@ public class Explorer {
         lastDistance = Double.MAX_VALUE;
         if (!walking) {
             walking = nextSearchLeg(mc);
-            if (!walking) stop(mc, "No safe exploration route available");
+            if (!walking) {
+                rotateSearch(mc);
+                walking = nextSearchLeg(mc);
+                if (!walking) queueRouteRetry(mc, "Planning next search leg");
+            }
         } else status = "Walking to LootGame";
     }
 
@@ -1016,7 +1022,18 @@ public class Explorer {
             return;
         }
         if (movingToPuzzleCenter) {
-            reachPuzzleCenter(mc);
+            if (++approachAttempts <= 3) {
+                reachPuzzleCenter(mc);
+            } else {
+                approachAttempts = 0;
+                movingToPuzzleCenter = false;
+                if (puzzleMasterTarget != null) {
+                    markStructureSolved(mc, new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
+                }
+                puzzleMasterTarget = null;
+                rotateSearch(mc);
+                walking = nextSearchLeg(mc);
+            }
             return;
         }
         beginAccessTrail(mc);
@@ -2186,7 +2203,11 @@ public class Explorer {
             || text.contains("no walkable")
             || text.contains("entrance did not cross")
             || text.contains("target no longer loaded")
-            || text.contains("could not place a safe return step");
+            || text.contains("could not place a safe return step")
+            || text.contains("could not reach")
+            || text.contains("center")
+            || text.contains("no safe surface")
+            || text.contains("replanning");
     }
 
     private void queueRouteRetry(Minecraft mc, String message) {
@@ -2233,7 +2254,18 @@ public class Explorer {
             return;
         }
         if (movingToPuzzleCenter) {
-            reachPuzzleCenter(mc);
+            if (++approachAttempts <= 3) {
+                reachPuzzleCenter(mc);
+            } else {
+                approachAttempts = 0;
+                movingToPuzzleCenter = false;
+                if (puzzleMasterTarget != null) {
+                    markStructureSolved(mc, new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
+                }
+                puzzleMasterTarget = null;
+                rotateSearch(mc);
+                walking = nextSearchLeg(mc);
+            }
             return;
         }
         if (digging) {
@@ -2363,10 +2395,14 @@ public class Explorer {
             queueRouteRetry(mc, message);
             return;
         }
-        if (baritoneCoordinator.active()) {
-            baritoneNavigation.stop();
-            baritoneCoordinator.reset();
-        }
+        baritoneNavigation.stop();
+        baritoneCoordinator.reset();
+        baritoneCoordinator.routePreview.clear();
+        navigationPreview.clear();
+        returnTrailRoute = null;
+        target = null;
+        knownStructure = null;
+        clearAim();
         sustain.stop(mc);
         fallingBlocks.reset();
         snowRecoveryTarget = null;

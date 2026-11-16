@@ -193,9 +193,7 @@ final class TrashCleanup {
         for (int i = 0; i < 36; i++) {
             if (i == reserve) continue;
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (stack == null
-                || (baseline != null && baseline.protectsQuantity(mc.thePlayer.inventory.mainInventory, i))
-                || InventoryProtection.essential(stack)) continue;
+            if (stack == null || InventoryProtection.essential(stack)) continue;
 
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
             if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())) {
