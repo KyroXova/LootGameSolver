@@ -29,7 +29,7 @@ public final class StorageCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/lgs help | setHome | setWarp <name> | setChest | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus";
+        return "/lgs help | setHome | setWarp <name> | setChest | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
     }
 
     @Override
@@ -45,6 +45,10 @@ public final class StorageCommand extends CommandBase {
             return;
         }
         String world = Explorer.worldIdentity(mc);
+        if ("resumeLoot".equalsIgnoreCase(args.length == 0 ? "" : args[0])) {
+            ClientHooks.requestResumeLoot();
+            return;
+        }
         if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
             reply(
                 sender,
@@ -55,6 +59,7 @@ public final class StorageCommand extends CommandBase {
             reply(
                 sender,
                 "enable/disable: save the recovery preference; storageStatus: show settings. Automatic recovery is not implemented yet.");
+            reply(sender, "resumeLoot: resume a saved unfinished reward collection while near its original location.");
         } else if ("enable".equalsIgnoreCase(args[0]) || "disable".equalsIgnoreCase(args[0])) {
             boolean enable = "enable".equalsIgnoreCase(args[0]);
             LootGameSolverConfig.setStorageEnabled(enable);

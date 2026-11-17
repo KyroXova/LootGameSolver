@@ -29,6 +29,12 @@ import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent;
 
 public final class ClientHooks {
 
+    private static boolean resumeLootRequested;
+
+    static void requestResumeLoot() {
+        resumeLootRequested = true;
+    }
+
     private static final ResourceLocation TEXTURE_UI_9SLICE = new ResourceLocation(
         "lootgamesolver",
         "textures/gui/ui_9slice.png");
@@ -214,6 +220,36 @@ public final class ClientHooks {
         }
         if (exploration != null) exploration.tick(mc, session.isActive());
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (resumeLootRequested) {
+            resumeLootRequested = false;
+            PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
+            if (checkpoint == null || !checkpoint.world.equals(Explorer.worldIdentity(mc))
+                || checkpoint.dimension != mc.theWorld.provider.dimensionId
+                || mc.thePlayer.getDistanceSq(
+                    checkpoint.center[0] + 0.5D,
+                    checkpoint.center[1] + 0.5D,
+                    checkpoint.center[2] + 0.5D) > 256D) {
+                mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] No pending loot nearby in this world and dimension."));
+            } else if (session.isActive() || rewardReturnPending
+                || mc.currentScreen != null
+                || (exploration != null && exploration.navigating())) {
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7e[LootGameSolver] Stop other automation and close screens before resuming loot."));
+                } else {
+                    rewardCenter = checkpoint.center.clone();
+                    ensureInventoryBaseline(mc);
+                    rewardLooter.start(mc, rewardCenter, checkpoint.game);
+                    explorationDriven = exploration != null;
+                    rewardPreCleanupPending = false;
+                    rewardReturnPending = true;
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7a[LootGameSolver] Resuming the saved reward collection."));
+                }
+        }
         if (inventoryMaintenanceStage != 0) {
             if (exploration == null || !exploration.navigating()
                 || session.isActive()

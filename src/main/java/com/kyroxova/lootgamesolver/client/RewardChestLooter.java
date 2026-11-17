@@ -43,6 +43,10 @@ final class RewardChestLooter {
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "looted-chests.json"));
+    private final PendingLootStore pendingLoot = new PendingLootStore(
+        new java.io.File(
+            new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
+            "pending-loot.json"));
     private int[] center;
     private int[] chestView;
     private final List<int[]> failedChestViews = new ArrayList<int[]>();
@@ -136,6 +140,10 @@ final class RewardChestLooter {
 
     String status() {
         return status;
+    }
+
+    PendingLootStore.Checkpoint pendingCheckpoint() {
+        return pendingLoot.load();
     }
 
     void cancel(Minecraft mc) {
@@ -260,6 +268,10 @@ final class RewardChestLooter {
                 return;
             }
             status = "Reward chests collected";
+            PendingLootStore.Checkpoint checkpoint = pendingLoot.load();
+            if (checkpoint != null && checkpoint.world.equals(Explorer.worldIdentity(mc))
+                && checkpoint.dimension == mc.theWorld.provider.dimensionId
+                && java.util.Arrays.equals(checkpoint.center, center)) pendingLoot.clear();
             active = false;
             return;
         }
@@ -653,9 +665,13 @@ final class RewardChestLooter {
             else if (!collecting && index >= chests.size()) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
             if (hasPackableItems(mc) || collecting) {
+                boolean saved = center == null || !collecting
+                    || pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, center, gameType);
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] Inventory or backpacks are full or unavailable. Please make space; uncollected rewards remain in the chest."));
+                        "\u00a7e[LootGameSolver] Inventory or backpacks are full or unavailable. Please make space."
+                            + (collecting ? " Uncollected rewards remain in the chest." : "")
+                            + (saved ? "" : " Could not save the loot checkpoint.")));
             }
             packing = false;
             active = false;
