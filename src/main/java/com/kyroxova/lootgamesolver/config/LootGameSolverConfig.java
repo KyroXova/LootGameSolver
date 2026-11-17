@@ -27,12 +27,18 @@ public final class LootGameSolverConfig {
     public static int spiralWidth = 3;
     public static boolean discardAllMinedOres = true;
     public static String[] discardOreItems = new String[0];
+    public static String storageDestination = "";
+    public static String storageWorld = "";
+    public static String[] storageTargets = new String[0];
 
     private LootGameSolverConfig() {}
 
     public static void load(File file) {
         Configuration cfg = new Configuration(file);
         configuration = cfg;
+        storageDestination = cfg.getString("destination", "storageRecovery", "", "Configured home or warp command.");
+        storageWorld = cfg.getString("world", "storageRecovery", "", "World associated with storage configuration.");
+        storageTargets = cfg.getStringList("targets", "storageRecovery", new String[0], "Marked storage locations.");
         enabled = cfg.getBoolean("enabled", Configuration.CATEGORY_GENERAL, enabled, "Master switch.");
         explorationEnabled = cfg
             .getBoolean("enabled", "explorationBeta", true, "Enable experimental nearby finder and walking.");
@@ -105,5 +111,28 @@ public final class LootGameSolverConfig {
                 .set(visible);
             configuration.save();
         }
+    }
+
+    public static void setStorageDestination(String world, String command) {
+        if (!world.equals(storageWorld) || !command.equals(storageDestination)) storageTargets = new String[0];
+        storageWorld = world;
+        storageDestination = command;
+        saveStorage();
+    }
+
+    public static void setStorageTargets(String[] targets) {
+        storageTargets = targets.clone();
+        saveStorage();
+    }
+
+    private static void saveStorage() {
+        if (configuration == null) return;
+        configuration.get("storageRecovery", "world", "")
+            .set(storageWorld);
+        configuration.get("storageRecovery", "destination", "")
+            .set(storageDestination);
+        configuration.get("storageRecovery", "targets", new String[0])
+            .set(storageTargets);
+        configuration.save();
     }
 }
