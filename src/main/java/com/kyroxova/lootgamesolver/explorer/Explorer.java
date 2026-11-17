@@ -705,9 +705,8 @@ public class Explorer {
         }
         if (baritoneCoordinator.active()) {
             double vx = mc.thePlayer.motionX, vz = mc.thePlayer.motionZ;
-            Float heading = vx * vx + vz * vz > 0.0025D
-                ? NavigationSteering.heading(0, 0, vx, vz, mc.thePlayer.rotationYaw)
-                : NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
+            Float heading = NavigationSteering
+                .walkingHeading(vx, vz, mc.thePlayer.rotationYaw, baritoneCoordinator.routePreview);
             if (heading != null) {
                 camera.look(heading, 0F);
                 camera.render(mc, world, true);

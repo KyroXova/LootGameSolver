@@ -652,6 +652,11 @@ final class RewardChestLooter {
             if (packingOnly) status = "No available backpack; items kept";
             else if (!collecting && index >= chests.size()) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
+            if (hasPackableItems(mc) || collecting) {
+                mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] Inventory or backpacks are full or unavailable. Please make space; uncollected rewards remain in the chest."));
+            }
             packing = false;
             active = false;
             return;

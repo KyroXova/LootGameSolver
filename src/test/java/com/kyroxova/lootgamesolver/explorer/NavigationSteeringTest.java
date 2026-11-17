@@ -9,6 +9,12 @@ import org.junit.Test;
 public class NavigationSteeringTest {
 
     @Test
+    public void stoppedPlayerWithoutRouteHasNoCameraHeading() {
+        assertNull(NavigationSteering.walkingHeading(0, 0, 0, java.util.Collections.emptyList()));
+        assertEquals(-90F, NavigationSteering.walkingHeading(0.2, 0, 0, java.util.Collections.emptyList()), 0F);
+    }
+
+    @Test
     public void pathHeadingFollowsSegmentInsteadOfPlayerPosition() {
         assertEquals(
             -90F,

@@ -2,6 +2,11 @@ package com.kyroxova.lootgamesolver.explorer;
 
 final class NavigationSteering {
 
+    static Float walkingHeading(double vx, double vz, float fallback, java.util.List<int[]> route) {
+        if (vx * vx + vz * vz > 0.0025D) return Float.valueOf(heading(0, 0, vx, vz, fallback));
+        return pathHeading(route);
+    }
+
     static Float pathHeading(java.util.List<int[]> route) {
         for (int i = 1; i < route.size(); i++) {
             int[] previous = route.get(i - 1), next = route.get(i);
