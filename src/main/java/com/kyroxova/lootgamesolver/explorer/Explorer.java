@@ -358,6 +358,22 @@ public class Explorer {
         return puzzleCenter.resumePuzzleInCurrentRoom(mc, this, center);
     }
 
+    public boolean interruptSearchForRoomPuzzle(Minecraft mc, int[] center) {
+        if (!walking || returning
+            || movingToPuzzleCenter
+            || baritoneCoordinator.surfaceMove
+            || baritoneCoordinator.returnMove
+            || baritoneCoordinator.returnWaiting
+            || baritoneCoordinator.resumeSearch
+            || !inDungeonRoom(mc)
+            || !puzzleCenter.isInSameRoom(mc, this, center)
+            || solvedStructures
+                .contains(worldIdentity(mc), mc.theWorld.provider.dimensionId, center[0], center[1], center[2]))
+            return false;
+        stop(mc, "Opening puzzle in current room");
+        return puzzleCenter.resumePuzzleInCurrentRoom(mc, this, center);
+    }
+
     public boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
         return puzzleCenter.moveToPuzzleCenter(mc, this, center);
     }

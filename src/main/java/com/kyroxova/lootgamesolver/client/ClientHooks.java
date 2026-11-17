@@ -354,6 +354,18 @@ public final class ClientHooks {
             else session.pauseForScreen();
             return;
         }
+        if (exploration != null && exploration.navigating()
+            && autoPuzzle.isIdle()
+            && !session.isActive()
+            && mc.thePlayer.ticksExisted % 20 == 0
+            && exploration.inDungeonRoom(mc)) {
+            int[] center = puzzleBridge.nearbyFloorActivator();
+            if (center == null) {
+                Object game = puzzleBridge.nearbyGame(true);
+                if (game != null) center = puzzleBridge.gameCenter(game);
+            }
+            if (center != null) exploration.interruptSearchForRoomPuzzle(mc, center);
+        }
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzle.isIdle()) {
             explorationDriven = true;
             autoPuzzle.startFromExploration(exploration.puzzlePosition(), mc.theWorld, puzzleCompletion);
@@ -679,10 +691,11 @@ public final class ClientHooks {
                         : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
             String statusStr;
-            if (cur != null) {
-                statusStr = session.isActive() ? compactStatus(session.getStatus()) : "Ready";
+            if (session.isActive()) {
+                statusStr = compactStatus(session.getStatus());
             } else if (exploration != null) {
-                statusStr = (exploration.navigating() || rewardReturnPending) ? exploration.navigationStatus()
+                statusStr = (exploration.navigating() || rewardReturnPending || autoPuzzle.isActive())
+                    ? exploration.navigationStatus()
                     : "Ready";
             } else {
                 statusStr = "Ready";

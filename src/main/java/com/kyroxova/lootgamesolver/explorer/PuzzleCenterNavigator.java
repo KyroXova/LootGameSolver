@@ -23,7 +23,23 @@ public final class PuzzleCenterNavigator {
     }
 
     public boolean resumePuzzleInCurrentRoom(Minecraft mc, Explorer explorer, int[] center) {
-        if (explorer.walking || center == null || mc.thePlayer == null || mc.theWorld == null) return false;
+        if (explorer.walking || !isInSameRoom(mc, explorer, center)) return false;
+        explorer.knownStructure = center.clone();
+        TileEntity current = new TileEntity();
+        current.xCoord = explorer.knownStructure[0];
+        current.yCoord = explorer.knownStructure[1];
+        current.zCoord = explorer.knownStructure[2];
+        explorer.target = current;
+        explorer.beginAccessTrail(mc);
+        explorer.returnAvailable = false;
+        explorer.puzzleArrivalPending = true;
+        explorer.status = "Resuming unfinished puzzle in current room";
+        return true;
+    }
+
+    boolean isInSameRoom(Minecraft mc, Explorer explorer, int[] center) {
+        if (mc == null || center == null || center.length < 3 || mc.thePlayer == null || mc.theWorld == null)
+            return false;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = explorer.roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, explorer.ticks);
@@ -43,16 +59,6 @@ public final class PuzzleCenterNavigator {
                 return false;
             }
         }
-        explorer.knownStructure = center.clone();
-        TileEntity current = new TileEntity();
-        current.xCoord = explorer.knownStructure[0];
-        current.yCoord = explorer.knownStructure[1];
-        current.zCoord = explorer.knownStructure[2];
-        explorer.target = current;
-        explorer.beginAccessTrail(mc);
-        explorer.returnAvailable = false;
-        explorer.puzzleArrivalPending = true;
-        explorer.status = "Resuming unfinished puzzle in current room";
         return true;
     }
 
