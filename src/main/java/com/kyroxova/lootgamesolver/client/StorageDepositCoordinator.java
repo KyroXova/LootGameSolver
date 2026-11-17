@@ -67,4 +67,8 @@ final class StorageDepositCoordinator {
         phase = Phase.FAILED;
         return Result.FAILED;
     }
+
+    void cancel(Minecraft mc) {
+        fail(mc);
+    }
 }

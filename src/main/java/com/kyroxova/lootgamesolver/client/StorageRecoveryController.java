@@ -21,6 +21,10 @@ final class StorageRecoveryController {
     private PendingLootStore.Checkpoint checkpoint;
     private InventoryBaseline baseline;
     private StorageDepositCoordinator deposit;
+    private BogoDropOffBridge.Session bogo;
+    private boolean dropOffChecked;
+    private int dropOffWait;
+    private int dropOffSettle;
 
     boolean start(Minecraft mc, PendingLootStore.Checkpoint saved, InventoryBaseline baseline) {
         if (mc == null || mc.theWorld == null
@@ -52,10 +56,39 @@ final class StorageRecoveryController {
     Result tick(Minecraft mc) {
         trip.tick(mc);
         StorageTripState.Phase phase = trip.phase();
-        if (phase == StorageTripState.Phase.FAILED) return Result.FAILED;
+        if (phase == StorageTripState.Phase.FAILED) {
+            if (bogo != null) bogo.close();
+            if (deposit != null) deposit.cancel(mc);
+            return Result.FAILED;
+        }
         if (phase == StorageTripState.Phase.READY_TO_RESUME) return Result.RETURNED;
         if (phase != StorageTripState.Phase.DEPOSITING) return Result.WORKING;
         if (mc == null || mc.theWorld == null || mc.thePlayer == null) return Result.WORKING;
+        if (!dropOffChecked && mc.currentScreen != null) return Result.WORKING;
+        if (!dropOffChecked) {
+            dropOffChecked = true;
+            if (BogoDropOffBridge.available() && BogoDropOffBridge.safeToRequest(mc)) {
+                bogo = new BogoDropOffBridge.Session();
+                if (!bogo.start()) {
+                    bogo = null;
+                    trip.fail();
+                    return Result.FAILED;
+                }
+            }
+        }
+        if (bogo != null) {
+            int response = bogo.response();
+            if (response < 0 || ++dropOffWait > 600) {
+                bogo.close();
+                bogo = null;
+                trip.fail();
+                return Result.FAILED;
+            }
+            if (response == 0) return Result.WORKING;
+            if (++dropOffSettle < 5) return Result.WORKING;
+            bogo.close();
+            bogo = null;
+        }
         if (deposit == null) deposit = new StorageDepositCoordinator(LootGameSolverConfig.storageTargets, baseline);
         StorageDepositCoordinator.Result result = deposit.tick(mc);
         if (result == StorageDepositCoordinator.Result.FAILED) {
@@ -69,5 +102,24 @@ final class StorageRecoveryController {
 
     PendingLootStore.Checkpoint checkpoint() {
         return checkpoint;
+    }
+
+    void cancel() {
+        trip.fail();
+    }
+
+    String status() {
+        switch (trip.phase()) {
+            case WAIT_RETURN_WARP:
+                return "Setting return warp";
+            case WAIT_STORAGE:
+                return "Traveling to storage";
+            case DEPOSITING:
+                return "Depositing items";
+            case WAIT_RETURN:
+                return "Returning to rewards";
+            default:
+                return "Storage recovery";
+        }
     }
 }

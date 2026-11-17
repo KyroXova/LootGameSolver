@@ -48,6 +48,7 @@ public final class ClientHooks {
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
+    private StorageRecoveryController storageRecovery;
     private boolean rewardReturnPending;
     private boolean rewardPreCleanupPending;
     private int inventoryMaintenanceStage;
@@ -163,8 +164,9 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void onChat(ClientChatReceivedEvent event) {
-        if (event == null || event.message == null || !autoPuzzle.isSolving()) return;
-        capturePuzzleMessage(event.message);
+        if (event == null || event.message == null) return;
+        if (storageRecovery != null) storageRecovery.onChat(event.message);
+        if (autoPuzzle.isSolving()) capturePuzzleMessage(event.message);
     }
 
     private void capturePuzzleMessage(IChatComponent message) {
@@ -188,6 +190,32 @@ public final class ClientHooks {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
+        if (storageRecovery != null) {
+            if (mc.currentScreen == null && Keybinds.explore != null && Keybinds.explore.isPressed())
+                storageRecovery.cancel();
+            if (exploration != null) exploration.setAutomationStatus(storageRecovery.status());
+            StorageRecoveryController.Result result = storageRecovery.tick(mc);
+            if (result == StorageRecoveryController.Result.WORKING) return;
+            PendingLootStore.Checkpoint checkpoint = storageRecovery.checkpoint();
+            storageRecovery = null;
+            puzzleWorld = mc.theWorld;
+            if (result == StorageRecoveryController.Result.RETURNED && mc.theWorld != null && mc.thePlayer != null) {
+                rewardCenter = checkpoint.center.clone();
+                rewardLooter.start(mc, rewardCenter, checkpoint.game);
+                rewardPreCleanupPending = false;
+                rewardReturnPending = true;
+                mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7a[LootGameSolver] Storage trip complete; resuming saved rewards."));
+            } else {
+                rewardReturnPending = false;
+                rewardPreCleanupPending = false;
+                if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] Storage recovery stopped. Your unfinished rewards remain saved; check storage and use /lgs resumeLoot when back nearby."));
+            }
+            return;
+        }
         checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
@@ -316,6 +344,19 @@ public final class ClientHooks {
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
+                if (("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+                    || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
+                    && (exploration == null || !exploration.navigating())) {
+                    PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
+                    if (checkpoint != null && java.util.Arrays.equals(rewardCenter, checkpoint.center)) {
+                        StorageRecoveryController recovery = new StorageRecoveryController();
+                        if (recovery.start(mc, checkpoint, inventoryBaseline)) {
+                            storageRecovery = recovery;
+                            if (exploration != null) exploration.setAutomationStatus("Preparing storage trip");
+                            return;
+                        }
+                    }
+                }
                 if (rewardLooter.completed()
                     || "Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
                     || "No available backpack; items kept".equals(rewardLooter.status())) {

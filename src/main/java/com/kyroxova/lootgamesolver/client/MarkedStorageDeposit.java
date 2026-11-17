@@ -29,6 +29,9 @@ final class MarkedStorageDeposit {
     private final InventoryBaseline baseline;
     private int next, wait, oldSlot = -1, moved;
     private StorageTarget opening;
+    private StorageTarget approach;
+    private final BaritoneNavigationBridge navigation = new BaritoneNavigationBridge();
+    private int approachTicks, approachRetries, lastApproachIndex = -1;
     private IInventory inventory;
     private VerifiedStorageTransfer transfer;
 
@@ -45,6 +48,19 @@ final class MarkedStorageDeposit {
             || mc.playerController == null
             || mc.thePlayer.inventory.getItemStack() != null
             || mc.thePlayer.hurtTime > 0) return Result.FAILED;
+        if (approach != null) {
+            if (mc.currentScreen != null || ++approachTicks > 400
+                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
+                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
+                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
+                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindRight))
+                return Result.FAILED;
+            if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) return Result.WORKING;
+            boolean reached = navigation.completed();
+            navigation.stop();
+            approach = null;
+            if (reached && ++approachRetries <= 2) next--;
+        }
         if (transfer != null) {
             VerifiedStorageTransfer.Result result = transfer.tick(mc);
             if (result == VerifiedStorageTransfer.Result.WORKING) return Result.WORKING;
@@ -89,17 +105,46 @@ final class MarkedStorageDeposit {
             if (target == null) continue;
             IInventory candidate = target.loadedInventory(mc);
             double[] pos = target.loadedPosition(mc);
-            if (candidate == null || pos == null || mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]) > 16D) continue;
+            if (candidate == null || pos == null) continue;
+            double distance = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
+            if (distance > 16D) {
+                if (distance > 64D) continue;
+                if (lastApproachIndex != next - 1) {
+                    lastApproachIndex = next - 1;
+                    approachRetries = 0;
+                }
+                BaritoneNavigationBridge.Start started = navigation.startAdjacentWithoutBreaking(
+                    (int) Math.floor(pos[0]),
+                    (int) Math.floor(pos[1]),
+                    (int) Math.floor(pos[2]));
+                if (started == BaritoneNavigationBridge.Start.STARTED) {
+                    approach = target;
+                    approachTicks = 0;
+                    return Result.WORKING;
+                }
+                continue;
+            }
             int empty = -1;
             for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
                 empty = i;
                 break;
             }
-            // A vanilla chest consumes the interaction even when its lid is obstructed.
-            // Other storage blocks and entities may instead use or place the held item.
+            // Forge calls onItemUseFirst before a chest receives the click. Only
+            // ordinary vanilla items are safe if there is no empty hotbar slot.
             if (empty < 0 && target.entity == null
-                && world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest)
-                empty = mc.thePlayer.inventory.currentItem;
+                && !mc.thePlayer.isSneaking()
+                && world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest) {
+                for (int i = 0; i < 9; i++) {
+                    net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+                    if (stack != null && (stack.getItem()
+                        .getClass() == net.minecraft.item.Item.class
+                        || stack.getItem()
+                            .getClass() == net.minecraft.item.ItemBlock.class)) {
+                        empty = i;
+                        break;
+                    }
+                }
+            }
             if (empty < 0) continue;
             Vec3 eye = Vec3.createVectorHelper(
                 mc.thePlayer.posX,
@@ -131,6 +176,7 @@ final class MarkedStorageDeposit {
     }
 
     void cancel(Minecraft mc) {
+        navigation.stop();
         if (mc != null && mc.thePlayer != null) restoreSlot(mc);
     }
 

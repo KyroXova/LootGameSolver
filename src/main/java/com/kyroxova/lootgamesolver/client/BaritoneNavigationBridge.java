@@ -47,11 +47,19 @@ public final class BaritoneNavigationBridge {
         return start(x, y, z, 1, false);
     }
 
+    public Start startAdjacentWithoutBreaking(int x, int y, int z) {
+        return start(x, y, z, 1, true, true);
+    }
+
     public Start startHorizontal(int x, int z) {
         return start(x, 0, z, 2, false);
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
+        return start(x, y, z, kind, forbidBreaking, false);
+    }
+
+    private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -94,6 +102,7 @@ public final class BaritoneNavigationBridge {
             if (owner.isPresent() && owner.get() != candidate) return Start.BUSY;
             if ((Boolean) baseProcessApi.getMethod("isActive")
                 .invoke(candidate)) {
+                if (preserveActiveGoal) return Start.BUSY;
                 try {
                     candidatePathingApi.getMethod("cancelEverything")
                         .invoke(candidatePathing);

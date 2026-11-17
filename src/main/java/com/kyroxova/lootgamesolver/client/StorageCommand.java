@@ -58,7 +58,7 @@ public final class StorageCommand extends CommandBase {
                 "clearChest: unmark the target; clearChests: remove all targets; clearWarp: remove the destination; clearStorage: clear everything.");
             reply(
                 sender,
-                "enable/disable: save the recovery preference; storageStatus: show settings. Automatic recovery is not implemented yet.");
+                "enable/disable: turn configured automatic storage recovery on or off; storageStatus: show settings.");
             reply(sender, "resumeLoot: resume a saved unfinished reward collection while near its original location.");
         } else if ("enable".equalsIgnoreCase(args[0]) || "disable".equalsIgnoreCase(args[0])) {
             boolean enable = "enable".equalsIgnoreCase(args[0]);
@@ -66,7 +66,7 @@ public final class StorageCommand extends CommandBase {
             reply(
                 sender,
                 "Storage recovery preference " + (enable ? "enabled" : "disabled")
-                    + ". Automatic recovery is not implemented yet; destinations and targets remain saved.");
+                    + ". Destinations and targets remain saved.");
         } else if ("clearWarp".equalsIgnoreCase(args[0])) {
             if (!world.equals(LootGameSolverConfig.storageWorld)) {
                 reply(sender, "No storage configuration for this world.");
@@ -83,19 +83,19 @@ public final class StorageCommand extends CommandBase {
             reply(sender, "All marked storage targets cleared.");
         } else if ("setHome".equalsIgnoreCase(args[0]) && args.length == 1) {
             LootGameSolverConfig.setStorageDestination(world, "/home");
-            reply(
-                sender,
-                "Home selected. Mark your storage with /lgs setChest; automatic recovery is not enabled yet.");
+            reply(sender, "Home selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
         } else
             if (("setWarp".equalsIgnoreCase(args[0]) || "setStorage".equalsIgnoreCase(args[0])) && args.length == 2) {
                 if (!validWarpName(args[1])) {
-                    reply(sender, "Warp names may contain only letters, numbers, underscores and hyphens.");
+                    reply(
+                        sender,
+                        "Warp names may contain letters, numbers, underscores and hyphens; returnLooting is reserved for the return trip.");
                     return;
                 }
                 LootGameSolverConfig.setStorageDestination(world, "/warp " + args[1]);
                 reply(
                     sender,
-                    "Storage warp selected. Mark storage with /lgs setChest; automatic recovery is not enabled yet.");
+                    "Storage warp selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
             } else if ("setChest".equalsIgnoreCase(args[0]) || "clearChest".equalsIgnoreCase(args[0])
                 || ("setStorage".equalsIgnoreCase(args[0]) && args.length == 1)) {
                     if (LootGameSolverConfig.storageWorld.isEmpty())
@@ -132,7 +132,7 @@ public final class StorageCommand extends CommandBase {
                     }
                     if (!targets.contains(target)) targets.add(target);
                     LootGameSolverConfig.setStorageTargets(targets.toArray(new String[0]));
-                    reply(sender, "Storage target marked: " + target + ". Automatic recovery is not enabled yet.");
+                    reply(sender, "Storage target marked: " + target + ". Use /lgs enable to allow recovery.");
                 } else if ("clearStorage".equalsIgnoreCase(args[0])) {
                     LootGameSolverConfig.setStorageDestination("", "");
                     LootGameSolverConfig.setStorageEnabled(false);
@@ -147,12 +147,13 @@ public final class StorageCommand extends CommandBase {
                             + LootGameSolverConfig.storageTargets.length
                             + "; preference: "
                             + (LootGameSolverConfig.storageEnabled ? "enabled" : "disabled")
-                            + ". Automatic recovery is not enabled yet.");
+                            + ".");
                 } else reply(sender, getCommandUsage(sender));
     }
 
     static boolean validWarpName(String value) {
-        return value != null && value.matches("[A-Za-z0-9_-]{1,32}");
+        return value != null && value.matches("[A-Za-z0-9_-]{1,32}")
+            && !StorageWarpFeedback.RETURN_WARP.equalsIgnoreCase(value);
     }
 
     private static void reply(ICommandSender sender, String message) {

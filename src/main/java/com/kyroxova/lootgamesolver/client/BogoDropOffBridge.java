@@ -4,6 +4,8 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.minecraft.client.Minecraft;
+
 import cpw.mods.fml.relauncher.Side;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -13,6 +15,37 @@ import io.netty.channel.ChannelPipeline;
 final class BogoDropOffBridge {
 
     private BogoDropOffBridge() {}
+
+    static boolean available() {
+        try {
+            Class.forName("com.cleanroommc.bogosorter.common.network.CDropOff");
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
+    }
+
+    static boolean safeToRequest(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return false;
+        int first = 0;
+        if (mc.isSingleplayer()) {
+            try {
+                Class<?> config = Class.forName("com.cleanroommc.bogosorter.common.config.BogoSorterConfig");
+                Object dropOff = config.getField("dropOff")
+                    .get(null);
+                if (!dropOff.getClass()
+                    .getField("enableHotbarDropOff")
+                    .getBoolean(dropOff)) first = 9;
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
+                return false;
+            }
+        }
+        for (int slot = first; slot < 36; slot++)
+            if (InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(slot))) return false;
+        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        if (reserve >= first && reserve < 36) return false;
+        return true;
+    }
 
     static final class Session {
 
@@ -35,21 +68,8 @@ final class BogoDropOffBridge {
                 Object codec = codecField.get(wrapper);
                 if (!(channel instanceof io.netty.channel.Channel)
                     || !(codec instanceof io.netty.channel.ChannelHandler)) return false;
-                pipeline = ((io.netty.channel.Channel) channel).pipeline();
-                ChannelHandlerContext context = pipeline.context((io.netty.channel.ChannelHandler) codec);
-                if (context == null || pipeline.get(handlerName) != null) return false;
-                pipeline.addAfter(context.name(), handlerName, new ChannelInboundHandlerAdapter() {
-
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object message) throws Exception {
-                        String type = message.getClass()
-                            .getName();
-                        if (type.equals("com.cleanroommc.bogosorter.common.network.SDropOffMessage")) response.set(1);
-                        else if (type.equals("com.cleanroommc.bogosorter.common.network.SDropOffThrottled"))
-                            response.set(-1);
-                        ctx.fireChannelRead(message);
-                    }
-                });
+                if (!observe(((io.netty.channel.Channel) channel).pipeline(), (io.netty.channel.ChannelHandler) codec))
+                    return false;
                 if (request()) return true;
                 close();
                 return false;
@@ -57,6 +77,25 @@ final class BogoDropOffBridge {
                 close();
                 return false;
             }
+        }
+
+        boolean observe(ChannelPipeline observed, io.netty.channel.ChannelHandler codec) {
+            ChannelHandlerContext context = observed.context(codec);
+            if (context == null || observed.get(handlerName) != null) return false;
+            pipeline = observed;
+            pipeline.addAfter(context.name(), handlerName, new ChannelInboundHandlerAdapter() {
+
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object message) throws Exception {
+                    String type = message.getClass()
+                        .getName();
+                    if (type.equals("com.cleanroommc.bogosorter.common.network.SDropOffMessage")) response.set(1);
+                    else if (type.equals("com.cleanroommc.bogosorter.common.network.SDropOffThrottled"))
+                        response.set(-1);
+                    ctx.fireChannelRead(message);
+                }
+            });
+            return true;
         }
 
         int response() {

@@ -13,5 +13,6 @@ public class StorageCommandTest {
         assertFalse(StorageCommand.validWarpName("storage /home"));
         assertFalse(StorageCommand.validWarpName(""));
         assertFalse(StorageCommand.validWarpName(null));
+        assertFalse(StorageCommand.validWarpName("RETURNLOOTING"));
     }
 }

@@ -142,6 +142,7 @@ final class BackpackStorageUnload {
     }
 
     void cancel(Minecraft mc) {
+        if (mc == null) return;
         swap.cancel(mc);
         if (mc != null && mc.thePlayer != null) restoreSelection(mc);
     }
