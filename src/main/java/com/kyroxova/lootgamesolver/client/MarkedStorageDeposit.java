@@ -65,8 +65,11 @@ final class MarkedStorageDeposit {
                         && ((InventoryLargeChest) chest).isPartOfLargeChest(inventory)) opened = chest;
                 }
                 boolean matching = false;
-                for (Object value : mc.thePlayer.openContainer.inventorySlots)
-                    if (((Slot) value).inventory == opened) matching = true;
+                for (Object value : mc.thePlayer.openContainer.inventorySlots) {
+                    IInventory slotInventory = ((Slot) value).inventory;
+                    if (slotInventory == opened) matching = true;
+                    else if (slotInventory != mc.thePlayer.inventory) return Result.FAILED;
+                }
                 if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
                 transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);
                 opening = null;

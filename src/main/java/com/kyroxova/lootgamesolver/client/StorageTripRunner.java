@@ -24,6 +24,10 @@ final class StorageTripRunner {
         return state.reset();
     }
 
+    void fail() {
+        state.fail();
+    }
+
     boolean start(Minecraft mc, boolean checkpointSaved) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return false;
         String currentWorld = Explorer.worldIdentity(mc);
