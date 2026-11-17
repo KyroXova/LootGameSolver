@@ -644,7 +644,7 @@ public final class LootGamesBridge implements MiniGameDetector {
         if (master == null || !master.getClass()
             .getName()
             .endsWith(".PuzzleMasterBlock")) return false;
-        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
             || hit.blockX != x
@@ -717,7 +717,7 @@ public final class LootGamesBridge implements MiniGameDetector {
             .getName()
             .equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock") && foliageClearer.clearLine(mc, x, y, z))
             return false;
-        if (!preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
             || hit.blockX != x
@@ -762,7 +762,12 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (game.getClass()
                 .getName()
                 .equals(MS_GAME) && foliageClearer.clearLine(mc, x, y, z)) return false;
-            if (!prepareExactCenterAndAim(mc.thePlayer, x, y, z)) return false;
+            double dx = x + 0.5D - mc.thePlayer.posX;
+            double dy = y + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            double dz = z + 0.5D - mc.thePlayer.posZ;
+            double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
+            if (dx * dx + dy * dy + dz * dz > reach * reach || !selectSafeInteractionItem(mc)
+                || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
             net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
             if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
                 || hit.blockX != x
@@ -773,6 +778,21 @@ public final class LootGamesBridge implements MiniGameDetector {
             LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);
             return false;
         }
+    }
+
+    private static boolean selectSafeInteractionItem(Minecraft mc) {
+        net.minecraft.item.ItemStack held = mc.thePlayer.getHeldItem();
+        if (held == null || held.getItem() instanceof net.minecraft.item.ItemTool
+            || held.getItem() instanceof net.minecraft.item.ItemSword) return true;
+        for (int slot = 0; slot < 9; slot++) {
+            net.minecraft.item.ItemStack candidate = mc.thePlayer.inventory.getStackInSlot(slot);
+            if (candidate == null || candidate.getItem() instanceof net.minecraft.item.ItemTool
+                || candidate.getItem() instanceof net.minecraft.item.ItemSword) {
+                mc.thePlayer.inventory.currentItem = slot;
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean requiresMinesweeperOpeningClick(DetectedGame detected) {

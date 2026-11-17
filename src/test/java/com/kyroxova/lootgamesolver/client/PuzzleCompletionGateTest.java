@@ -26,4 +26,15 @@ public class PuzzleCompletionGateTest {
         gate.message("msg.lootgames.win");
         assertFalse(gate.won(true));
     }
+
+    @Test
+    public void stageCompletionDoesNotCompleteTheGame() {
+        PuzzleCompletionGate gate = new PuzzleCompletionGate();
+        gate.begin();
+        gate.message("msg.lootgames.stage_complete");
+        assertTrue(gate.stageCompleted());
+        assertFalse(gate.won(true));
+        gate.clearStageCompleted();
+        assertFalse(gate.stageCompleted());
+    }
 }

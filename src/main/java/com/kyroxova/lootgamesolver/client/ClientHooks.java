@@ -168,6 +168,8 @@ public final class ClientHooks {
             puzzleCompletion.message(((ChatComponentTranslation) message).getKey());
         else if (net.minecraft.util.StatCollector.translateToLocal("msg.lootgames.win")
             .equals(message.getUnformattedText())) puzzleCompletion.message("msg.lootgames.win");
+        else if (net.minecraft.util.StatCollector.translateToLocal("msg.lootgames.stage_complete")
+            .equals(message.getUnformattedText())) puzzleCompletion.message("msg.lootgames.stage_complete");
         for (IChatComponent sibling : message.getSiblings()) capturePuzzleMessage(sibling);
     }
 

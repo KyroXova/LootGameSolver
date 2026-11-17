@@ -122,14 +122,17 @@ final class AutoPuzzleCoordinator {
         Object game = puzzleBridge.nearbyGame(true);
         int level = puzzleBridge.currentMinesweeperLevel(game);
         boolean nextLevel = activeMinesweeperLevel >= 1 && level > activeMinesweeperLevel && level <= 4;
-        boolean retryReady = level == activeMinesweeperLevel && puzzleBridge.canOpenMinesweeperBoard(game);
+        boolean ready = puzzleBridge.canOpenMinesweeperBoard(game);
+        boolean retryReady = ready && (level == activeMinesweeperLevel || puzzleCompletion.stageCompleted());
         if (nextLevel || retryReady) {
             session.cancel(nextLevel ? "Minesweeper stage advanced" : "Minesweeper attempt reset");
-            if (nextLevel) activeMinesweeperLevel = level;
+            if (level >= 1) activeMinesweeperLevel = level;
+            puzzleCompletion.clearStageCompleted();
             int[] center = puzzleBridge.gameCenter(game);
-            state = exploration != null && center != null && exploration.moveToPuzzleCenter(mc, center)
-                ? State.POSITIONING_NEXT_STAGE
-                : State.REVEALING_NEXT_STAGE;
+            state = !withinInteractionReach(mc, center) && exploration != null
+                && center != null
+                && exploration.moveToPuzzleCenter(mc, center) ? State.POSITIONING_NEXT_STAGE
+                    : State.REVEALING_NEXT_STAGE;
             puzzleWaitTicks = 0;
             centerClickAttempts = 0;
             minesweeperOpeningClickSent = false;
@@ -137,6 +140,15 @@ final class AutoPuzzleCoordinator {
             if (exploration != null) exploration.setAutomationStatus(
                 nextLevel ? "Opening Minesweeper stage " + level : "Reopening Minesweeper attempt");
         }
+    }
+
+    private static boolean withinInteractionReach(Minecraft mc, int[] position) {
+        if (position == null || mc.thePlayer == null || mc.playerController == null) return false;
+        double dx = position[0] + 0.5D - mc.thePlayer.posX;
+        double dy = position[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+        double dz = position[2] + 0.5D - mc.thePlayer.posZ;
+        double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
+        return dx * dx + dy * dy + dz * dz <= reach * reach;
     }
 
     void tick(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
@@ -154,6 +166,11 @@ final class AutoPuzzleCoordinator {
                 rewardCenter = activator.clone();
                 floorActivatorPosition = activator;
                 floorActivatorClicked = false;
+                if (withinInteractionReach(mc, activator)) {
+                    state = State.REVEALING;
+                    puzzleWaitTicks = 0;
+                    return;
+                }
                 if (exploration.moveToPuzzleCenter(mc, activator)) {
                     state = State.POSITIONING;
                     puzzleWaitTicks = 0;
