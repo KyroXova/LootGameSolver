@@ -50,4 +50,14 @@ final class StorageTarget {
         }
         return null;
     }
+
+    IInventory loadedInventory(Minecraft mc) {
+        if (loadedPosition(mc) == null) return null;
+        if (entity == null) return (IInventory) mc.theWorld.getTileEntity(x, y, z);
+        for (Object value : mc.theWorld.loadedEntityList) {
+            if (value instanceof Entity && value instanceof IInventory && entity.equals(((Entity) value).getUniqueID()))
+                return (IInventory) value;
+        }
+        return null;
+    }
 }

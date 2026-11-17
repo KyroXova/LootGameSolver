@@ -30,4 +30,21 @@ public class StorageTripStateTest {
         state.returnArrival(true);
         assertEquals(StorageTripState.Phase.FAILED, state.phase());
     }
+
+    @Test
+    public void onlyFinishedTripsCanBeResetForAnotherAttempt() {
+        StorageTripState state = new StorageTripState();
+        assertFalse(state.reset());
+        assertTrue(state.begin(true, true));
+        assertFalse(state.reset());
+        state.fail();
+        assertTrue(state.reset());
+        assertTrue(state.begin(true, true));
+        state.returnWarpResult(true);
+        state.storageArrival(true);
+        state.depositResult(true, true, true);
+        state.returnArrival(true);
+        assertTrue(state.reset());
+        assertTrue(state.begin(true, true));
+    }
 }

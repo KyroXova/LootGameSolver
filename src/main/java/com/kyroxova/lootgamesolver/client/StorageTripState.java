@@ -44,4 +44,10 @@ final class StorageTripState {
     void fail() {
         if (phase != Phase.IDLE) phase = Phase.FAILED;
     }
+
+    boolean reset() {
+        if (phase != Phase.FAILED && phase != Phase.READY_TO_RESUME) return false;
+        phase = Phase.IDLE;
+        return true;
+    }
 }
