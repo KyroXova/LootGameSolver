@@ -87,11 +87,7 @@ final class FoliageClearer {
         float hardness = block.getBlockHardness(world, x, y, z);
         if (hardness < 0F || hardness > 1.5F) return false;
         Material mat = block.getMaterial();
-        return block instanceof BlockBush
-            || mat == Material.plants || mat == Material.vine || mat == Material.leaves
-            || mat == Material.circuits
-            || block instanceof net.minecraft.block.BlockTorch
-            || block instanceof net.minecraft.block.BlockSnow;
+        return block instanceof BlockBush || mat == Material.plants || mat == Material.vine || mat == Material.leaves;
     }
 
     boolean clearBlock(Minecraft mc, int bx, int by, int bz) {
@@ -100,7 +96,7 @@ final class FoliageClearer {
             return false;
         }
         Block block = mc.theWorld.getBlock(bx, by, bz);
-        if (block == null || block.isAir(mc.theWorld, bx, by, bz)) {
+        if (!isRoomObstruction(block, mc.theWorld, bx, by, bz)) {
             reset();
             return false;
         }
@@ -111,43 +107,41 @@ final class FoliageClearer {
             y = by;
             z = bz;
         }
-        if (timedOut) return true;
+        if (timedOut) return false;
         if (++ticks > 120) {
             BaritoneBlockBridge.stopBreaking();
             mining = false;
             timedOut = true;
-            return true;
+            return false;
         }
         double dx = bx + 0.5D - mc.thePlayer.posX;
         double dy = by + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
         double dz = bz + 0.5D - mc.thePlayer.posZ;
         double distSq = dx * dx + dy * dy + dz * dz;
         double reach = mc.playerController.getBlockReachDistance();
-        if (distSq > reach * reach) {
-            double distXZ = Math.hypot(dx, dz);
-            float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-            mc.thePlayer.rotationYaw += MathHelper.clamp_float(MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw), -35F, 35F);
-            double speed = 0.22D;
-            mc.thePlayer.motionX += (dx / distXZ) * speed;
-            mc.thePlayer.motionZ += (dz / distXZ) * speed;
-            if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) mc.thePlayer.jump();
-            return true;
-        }
+        if (distSq > reach * reach) return false;
         float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
         float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
-        mc.thePlayer.rotationYaw += MathHelper.clamp_float(MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw), -35F, 35F);
+        mc.thePlayer.rotationYaw += MathHelper
+            .clamp_float(MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw), -35F, 35F);
         mc.thePlayer.rotationPitch += MathHelper.clamp_float(pitch - mc.thePlayer.rotationPitch, -25F, 25F);
         MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(
-            Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ),
+            Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ),
             Vec3.createVectorHelper(bx + 0.5D, by + 0.5D, bz + 0.5D));
-        int side = hit != null ? hit.sideHit : 1;
+        if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
+            || hit.blockX != bx
+            || hit.blockY != by
+            || hit.blockZ != bz) return false;
+        int side = hit.sideHit;
         float hardness = block.getBlockHardness(mc.theWorld, bx, by, bz);
         if (hardness == 0.0F) {
             mc.playerController.clickBlock(bx, by, bz, side);
             mc.thePlayer.swingItem();
         } else {
-            if (hit != null) BaritoneBlockBridge.startBreaking(hit);
-            else mc.playerController.clickBlock(bx, by, bz, side);
+            mining = BaritoneBlockBridge.startBreaking(hit);
         }
         return true;
     }

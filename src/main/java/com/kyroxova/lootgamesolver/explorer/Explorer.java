@@ -378,24 +378,8 @@ public class Explorer {
         try {
             String world = worldIdentity(mc);
             int dim = mc.theWorld.provider.dimensionId;
-            if (position != null) {
-                solvedStructures.mark(world, dim, position, position);
-            }
-            if (knownStructure != null) {
-                solvedStructures.mark(world, dim, knownStructure, knownStructure);
-            }
-            if (target != null) {
-                int[] tPos = new int[] { target.xCoord, target.yCoord, target.zCoord };
-                solvedStructures.mark(world, dim, tPos, tPos);
-            }
-            if (mc.thePlayer != null) {
-                int[] playerPos = new int[] {
-                    (int) Math.floor(mc.thePlayer.posX),
-                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                    (int) Math.floor(mc.thePlayer.posZ)
-                };
-                solvedStructures.mark(world, dim, playerPos, playerPos);
-            }
+            int[] center = position != null ? position : knownStructure;
+            if (center != null) solvedStructures.mark(world, dim, center, center);
         } catch (java.io.IOException ignored) {}
     }
 
@@ -711,7 +695,8 @@ public class Explorer {
         if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
         boolean isMining = miningCameraCooldownTicks > 0
             || (baritoneCoordinator.active() && baritoneCoordinator.breaking)
-            || digging || returnDigging
+            || digging
+            || returnDigging
             || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
         if (isMining) {
             camera.render(mc, world, true);
@@ -777,13 +762,17 @@ public class Explorer {
         double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
         if (baritoneCoordinator != null && baritoneCoordinator.active()) {
             if (baritoneCoordinator.searchMove) {
-                return (int) Math.round(Math.hypot(px - (baritoneCoordinator.searchX + 0.5D), pz - (baritoneCoordinator.searchZ + 0.5D)));
+                return (int) Math.round(
+                    Math.hypot(px - (baritoneCoordinator.searchX + 0.5D), pz - (baritoneCoordinator.searchZ + 0.5D)));
             }
             if (target != null) {
                 return (int) Math.round(Math.hypot(px - (target.xCoord + 0.5D), pz - (target.zCoord + 0.5D)));
             }
             if (baritoneCoordinator.returnPoint != null) {
-                return (int) Math.round(Math.hypot(px - (baritoneCoordinator.returnPoint[0] + 0.5D), pz - (baritoneCoordinator.returnPoint[2] + 0.5D)));
+                return (int) Math.round(
+                    Math.hypot(
+                        px - (baritoneCoordinator.returnPoint[0] + 0.5D),
+                        pz - (baritoneCoordinator.returnPoint[2] + 0.5D)));
             }
         }
         if (target != null) {
@@ -915,12 +904,7 @@ public class Explorer {
         searchYaw = (searchYaw + 45.0F) % 360.0F;
         int px = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posX) : 0;
         int pz = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posZ) : 0;
-        search = new ProgressiveSearch(
-            px,
-            pz,
-            searchYaw,
-            LootGameSolverConfig.explorationSearchLimit,
-            128);
+        search = new ProgressiveSearch(px, pz, searchYaw, LootGameSolverConfig.explorationSearchLimit, 128);
     }
 
     public boolean nextSearchGoal(Minecraft mc) {
@@ -1083,7 +1067,9 @@ public class Explorer {
                 approachAttempts = 0;
                 movingToPuzzleCenter = false;
                 if (puzzleMasterTarget != null) {
-                    markStructureSolved(mc, new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
+                    markStructureSolved(
+                        mc,
+                        new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
                 }
                 puzzleMasterTarget = null;
                 rotateSearch(mc);
@@ -1128,8 +1114,8 @@ public class Explorer {
             }
             return;
         }
-        boolean isMining = (baritoneCoordinator.active() && baritoneCoordinator.breaking)
-            || digging || returnDigging
+        boolean isMining = (baritoneCoordinator.active() && baritoneCoordinator.breaking) || digging
+            || returnDigging
             || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
         if (isMining) {
             miningCameraCooldownTicks = 40;
@@ -1421,7 +1407,9 @@ public class Explorer {
                         (int) Math.floor(mc.thePlayer.boundingBox.minY),
                         (int) Math.floor(mc.thePlayer.posZ),
                         32) >= 0);
+            int[] arrivedAt = { target.xCoord, target.yCoord, target.zCoord };
             stop(mc, "Arrived at LootGame; opening puzzle");
+            knownStructure = arrivedAt;
             puzzleArrivalPending = true;
             return;
         }
@@ -2315,7 +2303,9 @@ public class Explorer {
                 approachAttempts = 0;
                 movingToPuzzleCenter = false;
                 if (puzzleMasterTarget != null) {
-                    markStructureSolved(mc, new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
+                    markStructureSolved(
+                        mc,
+                        new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
                 }
                 puzzleMasterTarget = null;
                 rotateSearch(mc);
@@ -2588,8 +2578,7 @@ public class Explorer {
             walking = true;
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
-            status = route.isEmpty() && walkingSearch == null ? "Checking safe direction"
-                : "Exploring outward";
+            status = route.isEmpty() && walkingSearch == null ? "Checking safe direction" : "Exploring outward";
             return true;
         }
         searching = true;

@@ -71,23 +71,33 @@ public final class ExplorerTerrain {
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
                 if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
                 if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
-                if (block.getMaterial().isLiquid()
-                    || block == Blocks.fire
+                if (block.getMaterial()
+                    .isLiquid() || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.web
                     || block == Blocks.portal) return false;
             }
         }
-        boolean liquidAtFeet = world.getBlock(x, y, z).getMaterial().isLiquid();
-        boolean liquidBelow = world.getBlock(x, y - 1, z).getMaterial().isLiquid();
+        boolean liquidAtFeet = world.getBlock(x, y, z)
+            .getMaterial()
+            .isLiquid();
+        boolean liquidBelow = world.getBlock(x, y - 1, z)
+            .getMaterial()
+            .isLiquid();
         if (liquidAtFeet || liquidBelow) {
-            boolean waterAtFeet = world.getBlock(x, y, z).getMaterial() == net.minecraft.block.material.Material.water;
-            boolean waterBelow = world.getBlock(x, y - 1, z).getMaterial() == net.minecraft.block.material.Material.water;
+            boolean waterAtFeet = world.getBlock(x, y, z)
+                .getMaterial() == net.minecraft.block.material.Material.water;
+            boolean waterBelow = world.getBlock(x, y - 1, z)
+                .getMaterial() == net.minecraft.block.material.Material.water;
             if (waterAtFeet && !liquidBelow && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) {
                 return true;
             }
-            if (!liquidAtFeet && waterBelow && passable(world, x, y, z) && passable(world, x, y + 1, z)
-                && world.getBlock(x, y - 2, z).getMaterial().isSolid()) {
+            if (!liquidAtFeet && waterBelow
+                && passable(world, x, y, z)
+                && passable(world, x, y + 1, z)
+                && world.getBlock(x, y - 2, z)
+                    .getMaterial()
+                    .isSolid()) {
                 return true;
             }
             return false;

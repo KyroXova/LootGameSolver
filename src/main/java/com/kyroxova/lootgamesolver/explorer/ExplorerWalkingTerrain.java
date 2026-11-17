@@ -64,23 +64,39 @@ final class ExplorerWalkingTerrain implements GroundPathfinder.Terrain {
     }
 
     public int extraCost(int x, int y, int z) {
-        return world.getBlock(x, y, z).getMaterial().isLiquid() ? 12 : 0;
+        return world.getBlock(x, y, z)
+            .getMaterial()
+            .isLiquid() ? 12 : 0;
     }
 
     public int transitionCost(int x, int y, int z, int nx, int ny, int nz) {
         int cost = Math.abs(ny - y) == 1 ? 4 : 0;
-        if (world.getBlock(nx, ny - 1, nz).getMaterial().isLiquid()
-            || world.getBlock(nx, ny, nz).getMaterial().isLiquid()) cost += 10;
+        if (world.getBlock(nx, ny - 1, nz)
+            .getMaterial()
+            .isLiquid()
+            || world.getBlock(nx, ny, nz)
+                .getMaterial()
+                .isLiquid())
+            cost += 10;
         return cost;
     }
 
     public boolean canTransition(int x, int y, int z, int nx, int ny, int nz) {
-        boolean waterAtFeet = world.getBlock(x, y, z).getMaterial() == Material.water;
-        boolean waterBelow = world.getBlock(x, y - 1, z).getMaterial() == Material.water;
-        boolean destinationWater = world.getBlock(nx, ny, nz).getMaterial() == Material.water
-            || world.getBlock(nx, ny - 1, nz).getMaterial() == Material.water;
-        boolean destinationNonWaterLiquid = (world.getBlock(nx, ny, nz).getMaterial().isLiquid()
-            || world.getBlock(nx, ny - 1, nz).getMaterial().isLiquid()) && !destinationWater;
+        boolean waterAtFeet = world.getBlock(x, y, z)
+            .getMaterial() == Material.water;
+        boolean waterBelow = world.getBlock(x, y - 1, z)
+            .getMaterial() == Material.water;
+        boolean destinationWater = world.getBlock(nx, ny, nz)
+            .getMaterial() == Material.water
+            || world.getBlock(nx, ny - 1, nz)
+                .getMaterial() == Material.water;
+        boolean destinationNonWaterLiquid = (world.getBlock(nx, ny, nz)
+            .getMaterial()
+            .isLiquid()
+            || world.getBlock(nx, ny - 1, nz)
+                .getMaterial()
+                .isLiquid())
+            && !destinationWater;
         if (destinationNonWaterLiquid) return false;
         if ((waterAtFeet || waterBelow) && !destinationWater && ny > (waterAtFeet ? y + 1 : y)) return false;
         return NavigationSurfacePolicy.reachableRise(walkSurfaceY(world, x, y, z), walkSurfaceY(world, nx, ny, nz));

@@ -181,24 +181,12 @@ final class AutoPuzzleCoordinator {
                     exploration.setAutomationStatus("Could not reach the board center; explorer held");
                 return;
             }
-            int[] centerForClear = autoPuzzlePosition != null ? autoPuzzlePosition
-                : floorActivatorPosition != null ? floorActivatorPosition : rewardCenter;
-            if (centerForClear != null) {
-                int[] obstruction = puzzleBridge.findRoomObstruction(centerForClear);
-                if (obstruction != null) {
-                    if (puzzleBridge.clearObstructionBlock(obstruction[0], obstruction[1], obstruction[2])) {
-                        if (exploration != null) exploration.setAutomationStatus("Clearing room foliage");
-                        puzzleWaitTicks = 0;
-                        return;
-                    }
-                }
-            }
             if (autoPuzzlePosition != null) {
                 double dx = autoPuzzlePosition[0] + 0.5D - mc.thePlayer.posX;
                 double dz = autoPuzzlePosition[2] + 0.5D - mc.thePlayer.posZ;
                 double hDist = Math.hypot(dx, dz);
                 if (hDist > 2.2D) {
-                    if (hDist > 3.5D && exploration != null && !exploration.navigating()) {
+                    if (exploration != null && !exploration.navigating()) {
                         exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
                     }
                     if (exploration != null && exploration.navigating()) {
@@ -206,14 +194,10 @@ final class AutoPuzzleCoordinator {
                         puzzleWaitTicks = 0;
                         return;
                     }
-                    float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-                    mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 40.0F);
-                    double speed = 0.22D;
-                    mc.thePlayer.motionX += (dx / hDist) * speed;
-                    mc.thePlayer.motionZ += (dz / hDist) * speed;
-                    if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) mc.thePlayer.jump();
-                    if (exploration != null) exploration.setAutomationStatus("Approaching puzzle master");
-                    puzzleWaitTicks = 0;
+                    if (puzzleWaitTicks > 200) {
+                        state = State.FAILED;
+                        if (exploration != null) exploration.setAutomationStatus("Could not reach puzzle master");
+                    }
                     return;
                 }
             }
@@ -293,14 +277,6 @@ final class AutoPuzzleCoordinator {
             Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
             if (floorActivatorPosition != null) {
                 if (!floorActivatorClicked) {
-                    int[] obstruction = puzzleBridge.findRoomObstruction(floorActivatorPosition);
-                    if (obstruction != null) {
-                        if (puzzleBridge.clearObstructionBlock(obstruction[0], obstruction[1], obstruction[2])) {
-                            if (exploration != null) exploration.setAutomationStatus("Clearing room foliage");
-                            puzzleWaitTicks = 0;
-                            return;
-                        }
-                    }
                     if (puzzleBridge.activateFloorActivator(floorActivatorPosition)) {
                         floorActivatorClicked = true;
                         lastCenterClickTick = puzzleWaitTicks;
@@ -426,12 +402,4 @@ final class AutoPuzzleCoordinator {
         else state = State.FAILED;
     }
 
-    private static float updateRotation(float current, float target, float maxStep) {
-        float diff = current - target;
-        while (diff >= 180.0F) diff -= 360.0F;
-        while (diff < -180.0F) diff += 360.0F;
-        if (diff > maxStep) diff = maxStep;
-        if (diff < -maxStep) diff = -maxStep;
-        return current - diff;
-    }
 }

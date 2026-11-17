@@ -650,7 +650,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             || hit.blockX != x
             || hit.blockY != y
             || hit.blockZ != z) {
-            Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+            Vec3 eye = Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ);
             Vec3 look = mc.thePlayer.getLook(1.0F);
             double reach = mc.playerController.getBlockReachDistance();
             Vec3 reachEnd = eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach);
@@ -659,7 +662,8 @@ public final class LootGamesBridge implements MiniGameDetector {
         int side = hit != null ? hit.sideHit : 1;
         Vec3 hitVec = hit != null ? hit.hitVec : Vec3.createVectorHelper(x + 0.5D, y + 1.0D, z + 0.5D);
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
-        boolean direct = mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
+        boolean direct = mc.playerController
+            .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
         mc.thePlayer.swingItem();
         return direct;
     }
@@ -719,7 +723,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             || hit.blockX != x
             || hit.blockY != y
             || hit.blockZ != z) {
-            Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+            Vec3 eye = Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ);
             Vec3 look = mc.thePlayer.getLook(1.0F);
             double reach = mc.playerController.getBlockReachDistance();
             Vec3 reachEnd = eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach);
@@ -728,7 +735,8 @@ public final class LootGamesBridge implements MiniGameDetector {
         int side = hit != null ? hit.sideHit : 1;
         Vec3 hitVec = hit != null ? hit.hitVec : Vec3.createVectorHelper(x + 0.5D, y + 1.0D, z + 0.5D);
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
-        boolean direct = mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
+        boolean direct = mc.playerController
+            .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
         mc.thePlayer.swingItem();
         return direct;
     }

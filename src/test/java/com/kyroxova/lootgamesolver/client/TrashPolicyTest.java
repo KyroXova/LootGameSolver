@@ -31,6 +31,9 @@ public class TrashPolicyTest {
         assertTrue(TrashPolicy.discard("openmodularturrets:hardWallTierOne", 0, false, true));
         assertTrue(TrashPolicy.discard("lootgames:LootGamesDungeonLight", 1, false, true));
         assertFalse(TrashPolicy.discard("minecraft:diamond", 0, false, false));
+        assertFalse(TrashPolicy.discard("minecraft:redstone", 0, false, false));
+        assertFalse(TrashPolicy.discard("minecraft:glowstone", 0, false, true));
+        assertFalse(TrashPolicy.isOreOrDust(null, "gregtech:gt.metaitem.01"));
         assertFalse(TrashPolicy.discard("mod:valuable_block", 0, false, true));
         assertFalse(TrashPolicy.discard("mod:backpack", 0, false, false));
     }

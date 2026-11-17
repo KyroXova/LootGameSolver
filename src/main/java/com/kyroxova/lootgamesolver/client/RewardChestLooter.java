@@ -183,12 +183,8 @@ final class RewardChestLooter {
             }
             return;
         }
-        boolean structureFinished = (!packing && !collecting && index >= chests.size())
-            || (packingOnly && !packing);
-        if (temporaryBag && temporaryBagUsed
-            && !packOpening
-            && mc.currentScreen == null
-            && structureFinished) {
+        boolean structureFinished = (!packing && !collecting && index >= chests.size()) || (packingOnly && !packing);
+        if (temporaryBag && temporaryBagUsed && !packOpening && mc.currentScreen == null && structureFinished) {
             if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
                 restoringBag = true;
                 status = "Restoring hotbar";
@@ -352,9 +348,9 @@ final class RewardChestLooter {
                     packMoved = false;
                     backpackSlot = -1;
                     for (int i = 0; i < backpackTried.length; i++) {
-                    backpackTried[i] = false;
-                    slotRejectedForCurrentBag[i] = false;
-                }
+                        backpackTried[i] = false;
+                        slotRejectedForCurrentBag[i] = false;
+                    }
                     status = "Moving collected rewards into a backpack";
                     return;
                 }
@@ -519,14 +515,14 @@ final class RewardChestLooter {
         Container container = mc.thePlayer.openContainer;
         String name = container.getClass()
             .getName();
-        boolean isBackpack = name.startsWith("de.eydamos.backpack.")
-            || name.startsWith("de.eydamos.guiadvanced.")
+        boolean isBackpack = name.startsWith("de.eydamos.backpack.") || name.startsWith("de.eydamos.guiadvanced.")
             || name.startsWith("com.darkona.adventurebackpack.")
             || name.startsWith("forestry.")
-            || name.toLowerCase(java.util.Locale.ROOT).contains("backpack")
-            || name.toLowerCase(java.util.Locale.ROOT).contains("bag")
-            || (mc.currentScreen instanceof GuiContainer
-                && !(mc.currentScreen instanceof GuiChest)
+            || name.toLowerCase(java.util.Locale.ROOT)
+                .contains("backpack")
+            || name.toLowerCase(java.util.Locale.ROOT)
+                .contains("bag")
+            || (mc.currentScreen instanceof GuiContainer && !(mc.currentScreen instanceof GuiChest)
                 && !(mc.thePlayer.openContainer instanceof ContainerChest)
                 && mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer);
         if (packOpening && mc.currentScreen instanceof GuiChest) {
@@ -737,7 +733,8 @@ final class RewardChestLooter {
         if (InventoryProtection.essential(stack)) return false;
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-        if (id != null && id.toLowerCase(java.util.Locale.ROOT).contains("torch")) return false;
+        if (id != null && id.toLowerCase(java.util.Locale.ROOT)
+            .contains("torch")) return false;
         return true;
     }
 

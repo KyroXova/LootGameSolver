@@ -87,7 +87,8 @@ public final class ExplorerSustain {
             cooldown = 100;
         }
         if (mineDelayTicks == 0 && manualDelayTicks == 0) {
-            boolean holdingAxe = isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem));
+            boolean holdingAxe = isHealingAxe(
+                mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem));
             if (!holdingAxe) {
                 boolean found = false;
                 for (int i = 0; i < 9; i++) {

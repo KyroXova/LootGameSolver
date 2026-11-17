@@ -114,13 +114,14 @@ public final class BaritoneTransitCoordinator {
             explorer.baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
             if (mc.thePlayer != null) {
                 boolean wantSprint = !mc.thePlayer.isInWater() && !mc.thePlayer.isSneaking()
-                    && mc.thePlayer.getFoodStats().getFoodLevel() > 6;
+                    && mc.thePlayer.getFoodStats()
+                        .getFoodLevel() > 6;
                 explorer.baritoneNavigation.setSprinting(wantSprint);
                 if (wantSprint) {
                     mc.thePlayer.setSprinting(true);
                     if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
-                        net.minecraft.client.settings.KeyBinding.setKeyBindState(
-                            mc.gameSettings.keyBindSprint.getKeyCode(), true);
+                        net.minecraft.client.settings.KeyBinding
+                            .setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
                     }
                 }
             }
@@ -136,8 +137,8 @@ public final class BaritoneTransitCoordinator {
             routePreview.clear();
             explorer.baritoneNavigation.setSprinting(false);
             if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
-                net.minecraft.client.settings.KeyBinding.setKeyBindState(
-                    mc.gameSettings.keyBindSprint.getKeyCode(), false);
+                net.minecraft.client.settings.KeyBinding
+                    .setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
             }
         }
         if (surfaceMove) {
@@ -164,24 +165,23 @@ public final class BaritoneTransitCoordinator {
                     .start(surfaceGoal[0], surfaceGoal[1], surfaceGoal[2]);
                 if (started == BaritoneNavigationBridge.Start.STARTED) surfaceWaiting = false;
                 else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40) {
-                    surfaceWaiting = false;
-                    surfaceMove = false;
-                    resumeSearch = true;
-                    returnWorld = mc.theWorld;
-                    returnSolved = true;
-                    returnWait = 0;
-                    explorer.status = "Continuing exploration";
+                    surfaceWait = 0;
+                    surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
+                    if (surfaceGoal == null) {
+                        routeFailures = 0;
+                        surfaceGoal = findSurfaceGoal(mc, 0);
+                    }
+                    if (surfaceGoal == null) {
+                        surfaceMove = false;
+                        explorer.stop(mc, "No safe surface destination found");
+                    } else explorer.status = "Replanning the surface route";
                 }
             } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
                 explorer.baritoneNavigation.stop();
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
-                if (routeFailures > 3 || surfaceGoal == null) {
+                if (surfaceGoal == null) {
                     surfaceMove = false;
-                    resumeSearch = true;
-                    returnWorld = mc.theWorld;
-                    returnSolved = true;
-                    returnWait = 0;
-                    explorer.status = "Continuing exploration";
+                    explorer.stop(mc, "No safe surface route found");
                 } else {
                     surfaceWaiting = true;
                     surfaceWait = 0;
@@ -349,10 +349,12 @@ public final class BaritoneTransitCoordinator {
                 explorer.walking = false;
             } else {
                 if (explorer.target != null && explorer.reachableBoard(mc)) {
+                    int[] arrivedAt = { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
                     explorer.baritoneNavigation.stop();
                     structureMove = false;
                     preRouting = false;
                     explorer.stop(mc, "Arrived at LootGame; opening puzzle");
+                    explorer.knownStructure = arrivedAt;
                     explorer.puzzleArrivalPending = true;
                 } else if (preRouting && explorer.target != null) {
                     double hDist = Math.hypot(
@@ -408,6 +410,11 @@ public final class BaritoneTransitCoordinator {
                 centerMove = false;
                 explorer.walking = false;
             } else {
+                if (explorer.target == null) {
+                    centerMove = false;
+                    explorer.stop(mc, "Board center target lost");
+                    return true;
+                }
                 double distToCenter = Math.hypot(
                     mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
                     mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);

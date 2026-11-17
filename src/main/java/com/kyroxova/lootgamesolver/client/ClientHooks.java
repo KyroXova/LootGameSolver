@@ -298,8 +298,7 @@ public final class ClientHooks {
             }
             return;
         }
-        if (!session.isActive()
-            && inventoryMaintenanceCooldown == 0
+        if (!session.isActive() && inventoryMaintenanceCooldown == 0
             && exploration != null
             && exploration.navigating()
             && (trashCleanup.inventoryPressure(mc) || trashCleanup.shouldClean(mc))
@@ -647,7 +646,8 @@ public final class ClientHooks {
             if (cur != null) {
                 statusStr = session.isActive() ? compactStatus(session.getStatus()) : "Ready";
             } else if (exploration != null) {
-                statusStr = (exploration.navigating() || rewardReturnPending) ? exploration.navigationStatus() : "Ready";
+                statusStr = (exploration.navigating() || rewardReturnPending) ? exploration.navigationStatus()
+                    : "Ready";
             } else {
                 statusStr = "Ready";
             }

@@ -65,8 +65,11 @@ public final class InventoryToolTransfer {
         }
         if (hotbar < 0) for (int i = 0; i < 9; i++) {
             ItemStack s = mc.thePlayer.inventory.getStackInSlot(i);
-            if (!InventoryProtection.bag(s)
-                && (s == null || s.getItem() == null || !s.getItem().getClass().getName().contains("ItemHealingAxe"))) {
+            if (!InventoryProtection.bag(s) && (s == null || s.getItem() == null
+                || !s.getItem()
+                    .getClass()
+                    .getName()
+                    .contains("ItemHealingAxe"))) {
                 hotbar = i;
                 break;
             }

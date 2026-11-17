@@ -9,9 +9,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
-import net.minecraftforge.oredict.OreDictionary;
-
-import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 final class TrashCleanup {
 
@@ -85,10 +82,12 @@ final class TrashCleanup {
             if (mc.currentScreen instanceof GuiChest && mc.thePlayer.openContainer instanceof ContainerChest) {
                 IInventory inventory = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
                 String name = inventory.getInventoryName();
-                if (inventory.getSizeInventory() >= 9 && ("key.serverutilities.trash".equals(name)
-                    || "Trash Can".equalsIgnoreCase(name)
-                    || StatCollector.translateToLocal("key.serverutilities.trash").equalsIgnoreCase(name)
-                    || (name != null && name.toLowerCase(java.util.Locale.ROOT).contains("trash")))) {
+                if (inventory.getSizeInventory() >= 9
+                    && ("key.serverutilities.trash".equals(name) || "Trash Can".equalsIgnoreCase(name)
+                        || StatCollector.translateToLocal("key.serverutilities.trash")
+                            .equalsIgnoreCase(name)
+                        || (name != null && name.toLowerCase(java.util.Locale.ROOT)
+                            .contains("trash")))) {
                     opening = false;
                     open = true;
                     wait = 10;
@@ -166,17 +165,17 @@ final class TrashCleanup {
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
             if (id == null) continue;
             String name = id.toLowerCase(java.util.Locale.ROOT);
-            if (name.contains("cobblestone")) {
+            if (name.equals("minecraft:cobblestone")) {
                 if (stack.stackSize > cobbleSize) {
                     bestCobble = i;
                     cobbleSize = stack.stackSize;
                 }
-            } else if (name.contains("dirt")) {
+            } else if (name.equals("minecraft:dirt")) {
                 if (stack.stackSize > dirtSize) {
                     bestDirt = i;
                     dirtSize = stack.stackSize;
                 }
-            } else if (name.contains("stone")) {
+            } else if (name.equals("minecraft:stone")) {
                 if (stack.stackSize > stoneSize) {
                     bestStone = i;
                     stoneSize = stack.stackSize;
@@ -193,7 +192,9 @@ final class TrashCleanup {
         for (int i = 0; i < 36; i++) {
             if (i == reserve) continue;
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (stack == null || InventoryProtection.essential(stack)) continue;
+            if (stack == null || InventoryProtection.essential(stack)
+                || stack.hasTagCompound()
+                || stack.hasDisplayName()) continue;
 
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
             if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())) {

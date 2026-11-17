@@ -24,7 +24,8 @@ final class InventoryProtection {
         return id.contains("backpack") || type.contains("backpack")
             || id.contains(":knapsack")
             || id.contains(":satchel")
-            || id.contains("bag") || type.contains("bag");
+            || id.contains("bag")
+            || type.contains("bag");
     }
 
     static boolean essential(ItemStack stack) {

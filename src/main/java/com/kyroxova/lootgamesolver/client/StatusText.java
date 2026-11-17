@@ -96,7 +96,8 @@ public final class StatusText {
         if (text.contains("waiting") && text.contains("safe route")) return "Planning Route";
         if (text.contains("waiting")) return "Waiting";
         if (text.contains("tool") && (text.contains("inventory") || text.contains("prepare"))) return "Preparing Tool";
-        if (text.contains("return step") && (text.contains("place") || text.contains("block"))) return "Placing Return Block";
+        if (text.contains("return step") && (text.contains("place") || text.contains("block")))
+            return "Placing Return Block";
         if (text.contains("exit") || text.contains("tunnel")
             || text.contains("return")
             || text.contains("saved access route")

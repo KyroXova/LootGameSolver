@@ -79,7 +79,8 @@ public final class BaritoneNavigationBridge {
                 .get(null);
             Object candidateSprint = null;
             try {
-                candidateSprint = inputType.getField("SPRINT").get(null);
+                candidateSprint = inputType.getField("SPRINT")
+                    .get(null);
             } catch (ReflectiveOperationException ignored) {}
             Class<?> candidatePathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
             Object manager = baritoneApi.getMethod("getPathingControlManager")
@@ -91,9 +92,11 @@ public final class BaritoneNavigationBridge {
                 .invoke(baritone);
             Class<?> baseProcessApi = Class.forName("baritone.api.process.IBaritoneProcess");
             if (owner.isPresent() && owner.get() != candidate) return Start.BUSY;
-            if ((Boolean) baseProcessApi.getMethod("isActive").invoke(candidate)) {
+            if ((Boolean) baseProcessApi.getMethod("isActive")
+                .invoke(candidate)) {
                 try {
-                    candidatePathingApi.getMethod("cancelEverything").invoke(candidatePathing);
+                    candidatePathingApi.getMethod("cancelEverything")
+                        .invoke(candidatePathing);
                 } catch (ReflectiveOperationException | LinkageError ignored) {}
             }
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
