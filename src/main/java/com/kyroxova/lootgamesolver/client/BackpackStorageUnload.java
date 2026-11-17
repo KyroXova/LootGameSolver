@@ -31,14 +31,16 @@ final class BackpackStorageUnload {
     private final boolean[] finished = new boolean[36];
     private final InventoryToolTransfer swap = new InventoryToolTransfer();
     private final InventoryBaseline baseline;
+    private final StorageLootLedger ledger;
     private Phase phase = Phase.FIND;
     private VerifiedBackpackUnload withdraw;
     private int source = -1, hotbar = -1, oldSlot = -1, wait;
     private ItemStack displaced;
     private Result afterRestore;
 
-    BackpackStorageUnload(InventoryBaseline baseline) {
+    BackpackStorageUnload(InventoryBaseline baseline, StorageLootLedger ledger) {
         this.baseline = baseline;
+        this.ledger = ledger;
     }
 
     Result tick(Minecraft mc) {
@@ -91,7 +93,7 @@ final class BackpackStorageUnload {
                     contents = candidate;
                 }
                 if (contents == null) return Result.FAILED;
-                withdraw = new VerifiedBackpackUnload(mc.thePlayer.openContainer, contents);
+                withdraw = new VerifiedBackpackUnload(mc.thePlayer.openContainer, contents, ledger);
                 phase = Phase.WITHDRAW;
                 return Result.WORKING;
             }

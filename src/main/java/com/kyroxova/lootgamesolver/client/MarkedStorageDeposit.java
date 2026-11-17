@@ -25,14 +25,18 @@ final class MarkedStorageDeposit {
 
     private final String[] targets;
     private final World world;
-    private int next, wait, oldSlot = -1;
+    private final StorageLootLedger ledger;
+    private final InventoryBaseline baseline;
+    private int next, wait, oldSlot = -1, moved;
     private StorageTarget opening;
     private IInventory inventory;
     private VerifiedStorageTransfer transfer;
 
-    MarkedStorageDeposit(Minecraft mc, String[] targets) {
+    MarkedStorageDeposit(Minecraft mc, String[] targets, StorageLootLedger ledger, InventoryBaseline baseline) {
         world = mc.theWorld;
         this.targets = targets.clone();
+        this.ledger = ledger;
+        this.baseline = baseline;
     }
 
     Result tick(Minecraft mc) {
@@ -45,6 +49,7 @@ final class MarkedStorageDeposit {
             VerifiedStorageTransfer.Result result = transfer.tick(mc);
             if (result == VerifiedStorageTransfer.Result.WORKING) return Result.WORKING;
             if (result == VerifiedStorageTransfer.Result.FAILED) return Result.FAILED;
+            moved += transfer.moved();
             mc.thePlayer.closeScreen();
             transfer = null;
             inventory = null;
@@ -63,7 +68,7 @@ final class MarkedStorageDeposit {
                 for (Object value : mc.thePlayer.openContainer.inventorySlots)
                     if (((Slot) value).inventory == opened) matching = true;
                 if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
-                transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened);
+                transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);
                 opening = null;
                 restoreSlot(mc);
                 return Result.WORKING;
@@ -124,6 +129,10 @@ final class MarkedStorageDeposit {
 
     void cancel(Minecraft mc) {
         if (mc != null && mc.thePlayer != null) restoreSlot(mc);
+    }
+
+    int moved() {
+        return moved;
     }
 
     private void restoreSlot(Minecraft mc) {

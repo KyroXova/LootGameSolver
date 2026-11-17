@@ -20,14 +20,16 @@ final class VerifiedBackpackUnload {
 
     private final Container container;
     private final IInventory backpack;
+    private final StorageLootLedger ledger;
     private final int window;
     private final boolean[] rejected;
     private ItemStack pending;
     private int beforeBag, beforePlayer, beforeHotbar, pendingSlot = -1, wait;
 
-    VerifiedBackpackUnload(Container container, IInventory backpack) {
+    VerifiedBackpackUnload(Container container, IInventory backpack, StorageLootLedger ledger) {
         this.container = container;
         this.backpack = backpack;
+        this.ledger = ledger;
         this.window = container.windowId;
         this.rejected = new boolean[backpack.getSizeInventory()];
     }
@@ -50,7 +52,7 @@ final class VerifiedBackpackUnload {
             if (!StorageTransferPolicy.confirmed(beforeBag, afterBag, beforePlayer, afterPlayer)) {
                 if (afterBag != beforeBag || afterPlayer != beforePlayer) return Result.FAILED;
                 rejected[pendingSlot] = true;
-            }
+            } else ledger.withdrawn(pending, beforeBag - afterBag);
             pending = null;
             pendingSlot = -1;
         }

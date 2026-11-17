@@ -19,14 +19,23 @@ final class VerifiedStorageTransfer {
 
     private final Container container;
     private final IInventory destination;
+    private final StorageLootLedger ledger;
+    private final InventoryBaseline baseline;
     private final int window;
     private final boolean[] rejected = new boolean[36];
     private ItemStack pending;
-    private int beforePlayer, beforeDestination, pendingPlayerSlot = -1, wait;
+    private int beforePlayer, beforeDestination, pendingPlayerSlot = -1, wait, moved;
 
-    VerifiedStorageTransfer(Container container, IInventory destination) {
+    int moved() {
+        return moved;
+    }
+
+    VerifiedStorageTransfer(Container container, IInventory destination, StorageLootLedger ledger,
+        InventoryBaseline baseline) {
         this.container = container;
         this.destination = destination;
+        this.ledger = ledger;
+        this.baseline = baseline;
         this.window = container.windowId;
     }
 
@@ -47,6 +56,10 @@ final class VerifiedStorageTransfer {
             if (!StorageTransferPolicy.confirmed(beforePlayer, afterPlayer, beforeDestination, afterDestination)) {
                 if (afterPlayer != beforePlayer || afterDestination != beforeDestination) return Result.FAILED;
                 rejected[pendingPlayerSlot] = true;
+            } else {
+                int amount = beforePlayer - afterPlayer;
+                moved += amount;
+                ledger.deposited(pending, amount);
             }
             pending = null;
             pendingPlayerSlot = -1;
@@ -60,7 +73,9 @@ final class VerifiedStorageTransfer {
             if (slot.inventory != mc.thePlayer.inventory || index < 9
                 || index >= 36
                 || stack == null
-                || InventoryProtection.essential(stack)
+                || InventoryProtection.bag(stack)
+                || (InventoryProtection.essential(stack)
+                    && (!ledger.contains(stack) || baseline == null || baseline.protects(index, stack)))
                 || index == reserve) continue;
             remaining = true;
             if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) continue;
