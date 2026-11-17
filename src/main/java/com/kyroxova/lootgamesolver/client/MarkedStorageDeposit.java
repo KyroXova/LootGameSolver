@@ -87,7 +87,12 @@ final class MarkedStorageDeposit {
                 empty = i;
                 break;
             }
-            if (empty < 0) return Result.FULL_OR_UNAVAILABLE;
+            // A vanilla chest consumes the interaction even when its lid is obstructed.
+            // Other storage blocks and entities may instead use or place the held item.
+            if (empty < 0 && target.entity == null
+                && world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest)
+                empty = mc.thePlayer.inventory.currentItem;
+            if (empty < 0) continue;
             Vec3 eye = Vec3.createVectorHelper(
                 mc.thePlayer.posX,
                 mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),

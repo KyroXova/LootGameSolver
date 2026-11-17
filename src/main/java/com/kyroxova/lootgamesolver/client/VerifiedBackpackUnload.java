@@ -23,7 +23,7 @@ final class VerifiedBackpackUnload {
     private final int window;
     private final boolean[] rejected;
     private ItemStack pending;
-    private int beforeBag, beforePlayer, pendingSlot = -1, wait;
+    private int beforeBag, beforePlayer, beforeHotbar, pendingSlot = -1, wait;
 
     VerifiedBackpackUnload(Container container, IInventory backpack) {
         this.container = container;
@@ -46,6 +46,7 @@ final class VerifiedBackpackUnload {
         if (pending != null) {
             int afterBag = count(backpack, pending);
             int afterPlayer = count(mc.thePlayer.inventory, pending);
+            if (countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
             if (!StorageTransferPolicy.confirmed(beforeBag, afterBag, beforePlayer, afterPlayer)) {
                 if (afterBag != beforeBag || afterPlayer != beforePlayer) return Result.FAILED;
                 rejected[pendingSlot] = true;
@@ -65,6 +66,7 @@ final class VerifiedBackpackUnload {
             pending = stack.copy();
             beforeBag = count(backpack, pending);
             beforePlayer = count(mc.thePlayer.inventory, pending);
+            beforeHotbar = countHotbar(mc, pending);
             pendingSlot = index;
             if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
                 pending = null;
@@ -77,7 +79,9 @@ final class VerifiedBackpackUnload {
     }
 
     private static boolean playerHasSpace(Minecraft mc, ItemStack stack) {
-        for (int i = 0; i < 36; i++) {
+        // Marked storage deposits operate on the main inventory. Request a deposit
+        // before withdrawing more when only hotbar slots remain available.
+        for (int i = 9; i < 36; i++) {
             ItemStack current = mc.thePlayer.inventory.getStackInSlot(i);
             if (current == null || (current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack)
                 && current.stackSize < current.getMaxStackSize())) return true;
@@ -89,6 +93,16 @@ final class VerifiedBackpackUnload {
         int result = 0;
         for (int i = 0; i < inventory.getSizeInventory(); i++) {
             ItemStack current = inventory.getStackInSlot(i);
+            if (current != null && current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack))
+                result += current.stackSize;
+        }
+        return result;
+    }
+
+    private static int countHotbar(Minecraft mc, ItemStack stack) {
+        int result = 0;
+        for (int i = 0; i < 9; i++) {
+            ItemStack current = mc.thePlayer.inventory.getStackInSlot(i);
             if (current != null && current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack))
                 result += current.stackSize;
         }
