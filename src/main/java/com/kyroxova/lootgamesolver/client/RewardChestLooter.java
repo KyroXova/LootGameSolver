@@ -661,6 +661,16 @@ final class RewardChestLooter {
                 }
         }
         if (backpackSlot < 0) {
+            if (temporaryBag && temporaryBagUsed && !restoringBag) {
+                if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
+                    restoringBag = true;
+                    status = "Restoring hotbar";
+                    return;
+                }
+                status = "Hotbar changed; bag kept";
+                temporaryBag = false;
+                temporaryBagUsed = false;
+            }
             if (packingOnly) status = "No available backpack; items kept";
             else if (!collecting && index >= chests.size()) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";

@@ -37,14 +37,18 @@ final class BaritoneInventoryBridge {
     }
 
     static boolean quickMove(Minecraft mc, int slot) {
-        return click(mc, slot, true, 0);
+        return click(mc, slot, "QUICK_MOVE", 0);
     }
 
     static boolean swapOpenContainer(Minecraft mc, int slot, int hotbar) {
-        return click(mc, slot, false, hotbar);
+        return click(mc, slot, "HOTBAR_SWAP", hotbar);
     }
 
-    private static boolean click(Minecraft mc, int slot, boolean quick, int button) {
+    static boolean leftClick(Minecraft mc, int slot) {
+        return click(mc, slot, "LEFT", 0);
+    }
+
+    private static boolean click(Minecraft mc, int slot, String kind, int button) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -52,8 +56,8 @@ final class BaritoneInventoryBridge {
             mc.playerController.windowClick(
                 mc.thePlayer.openContainer.windowId,
                 slot,
-                quick ? 0 : button,
-                quick ? 1 : 2,
+                "HOTBAR_SWAP".equals(kind) ? button : 0,
+                "QUICK_MOVE".equals(kind) ? 1 : "HOTBAR_SWAP".equals(kind) ? 2 : 0,
                 mc.thePlayer);
             return true;
         } catch (LinkageError failure) {
@@ -74,7 +78,7 @@ final class BaritoneInventoryBridge {
             if (snapshot == null) return false;
             Class<?> snapshotType = Class.forName("baritone.api.utils.IInventoryControl$ContainerSnapshot");
             Class<?> clickType = Class.forName("baritone.api.utils.IInventoryControl$Click");
-            Object clickTypeValue = clickType.getField(quick ? "QUICK_MOVE" : "HOTBAR_SWAP")
+            Object clickTypeValue = clickType.getField(kind)
                 .get(null);
             Object result = inventoryApi.getMethod("clickContainerSlot", snapshotType, int.class, clickType, int.class)
                 .invoke(inventory, snapshot, slot, clickTypeValue, button);

@@ -22,16 +22,15 @@ final class VerifiedBackpackUnload {
     private final IInventory backpack;
     private final StorageLootLedger ledger;
     private final int window;
-    private final boolean[] rejected;
     private ItemStack pending;
-    private int beforeBag, beforePlayer, beforeHotbar, pendingSlot = -1, wait;
+    private ItemStack destinationBefore;
+    private int beforeBag, beforePlayer, beforeHotbar, destinationSlot, stage, wait;
 
     VerifiedBackpackUnload(Container container, IInventory backpack, StorageLootLedger ledger) {
         this.container = container;
         this.backpack = backpack;
         this.ledger = ledger;
         this.window = container.windowId;
-        this.rejected = new boolean[backpack.getSizeInventory()];
     }
 
     Result tick(Minecraft mc) {
@@ -39,56 +38,76 @@ final class VerifiedBackpackUnload {
             || !(mc.currentScreen instanceof GuiContainer)
             || mc.thePlayer.openContainer != container
             || container.windowId != window
-            || mc.thePlayer.inventory.getItemStack() != null
+            || (stage == 0 && mc.thePlayer.inventory.getItemStack() != null)
             || backpack == mc.thePlayer.inventory) return Result.FAILED;
         if (wait > 0) {
             wait--;
             return Result.WORKING;
         }
-        if (pending != null) {
+        if (stage == 1) {
+            ItemStack cursor = mc.thePlayer.inventory.getItemStack();
+            Slot destination = container.getSlot(destinationSlot);
+            if (!ItemStack.areItemStacksEqual(cursor, pending)
+                || !ItemStack.areItemStacksEqual(destinationBefore, destination.getStack())
+                || !BaritoneInventoryBridge.leftClick(mc, destinationSlot)) return Result.FAILED;
+            stage = 2;
+            wait = 5;
+            return Result.WORKING;
+        }
+        if (stage == 2) {
             int afterBag = count(backpack, pending);
             int afterPlayer = count(mc.thePlayer.inventory, pending);
-            if (countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
-            if (!StorageTransferPolicy.confirmed(beforeBag, afterBag, beforePlayer, afterPlayer)) {
-                if (afterBag != beforeBag || afterPlayer != beforePlayer) return Result.FAILED;
-                rejected[pendingSlot] = true;
-            } else ledger.withdrawn(pending, beforeBag - afterBag);
+            if (mc.thePlayer.inventory.getItemStack() != null || countHotbar(mc, pending) != beforeHotbar
+                || !StorageTransferPolicy.confirmed(beforeBag, afterBag, beforePlayer, afterPlayer))
+                return Result.FAILED;
+            ledger.withdrawn(pending, beforeBag - afterBag);
             pending = null;
-            pendingSlot = -1;
+            destinationBefore = null;
+            stage = 0;
         }
         boolean remaining = false;
         for (Object value : container.inventorySlots) {
             Slot slot = (Slot) value;
             int index = slot.getSlotIndex();
             ItemStack stack = slot.getStack();
-            if (slot.inventory != backpack || index < 0 || index >= rejected.length || stack == null) continue;
+            if (slot.inventory != backpack || index < 0 || index >= backpack.getSizeInventory() || stack == null)
+                continue;
             remaining = true;
-            if (InventoryProtection.bag(stack) || rejected[index] || !slot.canTakeStack(mc.thePlayer)) continue;
-            if (!playerHasSpace(mc, stack)) return Result.PLAYER_FULL;
+            if (InventoryProtection.bag(stack) || !slot.canTakeStack(mc.thePlayer)) continue;
+            Slot destination = destination(container, mc.thePlayer.inventory, stack);
+            if (destination == null) return Result.PLAYER_FULL;
             pending = stack.copy();
             beforeBag = count(backpack, pending);
             beforePlayer = count(mc.thePlayer.inventory, pending);
             beforeHotbar = countHotbar(mc, pending);
-            pendingSlot = index;
-            if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
+            destinationSlot = destination.slotNumber;
+            destinationBefore = destination.getStack() == null ? null
+                : destination.getStack()
+                    .copy();
+            if (!BaritoneInventoryBridge.leftClick(mc, slot.slotNumber)) {
                 pending = null;
                 return Result.FAILED;
             }
+            stage = 1;
             wait = 5;
             return Result.WORKING;
         }
         return remaining ? Result.NEEDS_ATTENTION : Result.EMPTY;
     }
 
-    private static boolean playerHasSpace(Minecraft mc, ItemStack stack) {
-        // Marked storage deposits operate on the main inventory. Request a deposit
-        // before withdrawing more when only hotbar slots remain available.
-        for (int i = 9; i < 36; i++) {
-            ItemStack current = mc.thePlayer.inventory.getStackInSlot(i);
-            if (current == null || (current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack)
-                && current.stackSize < current.getMaxStackSize())) return true;
+    static Slot destination(Container container, IInventory playerInventory, ItemStack stack) {
+        for (Object value : container.inventorySlots) {
+            Slot slot = (Slot) value;
+            int index = slot.getSlotIndex();
+            if (slot.inventory != playerInventory || index < 9 || index >= 36 || !slot.isItemValid(stack)) continue;
+            ItemStack current = slot.getStack();
+            int limit = Math.min(stack.getMaxStackSize(), slot.getSlotStackLimit());
+            if (current == null && stack.stackSize <= limit) return slot;
+            if (current != null && current.isItemEqual(stack)
+                && ItemStack.areItemStackTagsEqual(current, stack)
+                && current.stackSize + stack.stackSize <= limit) return slot;
         }
-        return false;
+        return null;
     }
 
     private static int count(IInventory inventory, ItemStack stack) {

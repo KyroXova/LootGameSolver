@@ -47,7 +47,7 @@ final class BackpackStorageUnload {
         if (mc == null || mc.theWorld == null
             || mc.thePlayer == null
             || mc.playerController == null
-            || mc.thePlayer.inventory.getItemStack() != null
+            || (phase != Phase.WITHDRAW && mc.thePlayer.inventory.getItemStack() != null)
             || mc.thePlayer.hurtTime > 0) return Result.FAILED;
         if (phase == Phase.SWAP || phase == Phase.RESTORE) {
             if (swap.active()) {
