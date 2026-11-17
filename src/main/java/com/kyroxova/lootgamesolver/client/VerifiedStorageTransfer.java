@@ -70,13 +70,7 @@ final class VerifiedStorageTransfer {
             Slot slot = (Slot) value;
             int index = slot.getSlotIndex();
             ItemStack stack = slot.getStack();
-            if (slot.inventory != mc.thePlayer.inventory || index < 9
-                || index >= 36
-                || stack == null
-                || InventoryProtection.bag(stack)
-                || (InventoryProtection.essential(stack)
-                    && (!ledger.contains(stack) || baseline == null || baseline.protects(index, stack)))
-                || index == reserve) continue;
+            if (slot.inventory != mc.thePlayer.inventory || !movable(index, stack, reserve, ledger, baseline)) continue;
             remaining = true;
             if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) continue;
             pending = stack.copy();
@@ -91,6 +85,21 @@ final class VerifiedStorageTransfer {
             return Result.WORKING;
         }
         return remaining ? Result.FULL_OR_REJECTED : Result.DONE;
+    }
+
+    static boolean hasMovable(Minecraft mc, StorageLootLedger ledger, InventoryBaseline baseline) {
+        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        for (int index = 9; index < 36; index++)
+            if (movable(index, mc.thePlayer.inventory.getStackInSlot(index), reserve, ledger, baseline)) return true;
+        return false;
+    }
+
+    static boolean movable(int index, ItemStack stack, int reserve, StorageLootLedger ledger,
+        InventoryBaseline baseline) {
+        if (index < 9 || index >= 36 || stack == null || index == reserve || InventoryProtection.bag(stack))
+            return false;
+        return !InventoryProtection.essential(stack)
+            || (ledger.contains(stack) && baseline != null && !baseline.protects(index, stack));
     }
 
     private boolean accepts(ItemStack stack) {

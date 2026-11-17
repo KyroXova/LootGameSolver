@@ -21,6 +21,9 @@ final class InventoryProtection {
             .getClass()
             .getName()
             .toLowerCase(Locale.ROOT);
+        // Consumable reward bags are not portable storage and must never be opened here.
+        if (id.contains("lootbag") || id.contains("loot_bag") || type.contains("lootbag") || type.contains("loot_bag"))
+            return false;
         return id.contains("backpack") || type.contains("backpack")
             || id.contains(":knapsack")
             || id.contains(":satchel")

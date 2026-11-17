@@ -146,6 +146,10 @@ final class RewardChestLooter {
         return pendingLoot.load();
     }
 
+    int[] rewardCenter() {
+        return center == null ? null : center.clone();
+    }
+
     void cancel(Minecraft mc) {
         backpackTransfer.cancel(mc);
         if ((opened || packing) && mc.thePlayer != null && mc.currentScreen instanceof GuiContainer)

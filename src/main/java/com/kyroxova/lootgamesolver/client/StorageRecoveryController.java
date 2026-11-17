@@ -67,12 +67,18 @@ final class StorageRecoveryController {
         if (!dropOffChecked && mc.currentScreen != null) return Result.WORKING;
         if (!dropOffChecked) {
             dropOffChecked = true;
-            if (BogoDropOffBridge.available() && BogoDropOffBridge.safeToRequest(mc)) {
-                bogo = new BogoDropOffBridge.Session();
-                if (!bogo.start()) {
-                    bogo = null;
-                    trip.fail();
-                    return Result.FAILED;
+            if (BogoDropOffBridge.available()) {
+                if (BogoDropOffBridge.safeToRequest(mc)) {
+                    bogo = new BogoDropOffBridge.Session();
+                    if (!bogo.start()) {
+                        bogo = null;
+                        trip.fail();
+                        return Result.FAILED;
+                    }
+                } else {
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7e[LootGameSolver] Nearby drop-off skipped to protect carried gear; using marked storage."));
                 }
             }
         }

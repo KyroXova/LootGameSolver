@@ -79,6 +79,7 @@ final class MarkedStorageDeposit {
                     IInventory chest = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
                     if (chest instanceof InventoryLargeChest
                         && ((InventoryLargeChest) chest).isPartOfLargeChest(inventory)) opened = chest;
+                    else if (vanillaChestView(mc, opening, inventory, chest)) opened = chest;
                 }
                 boolean matching = false;
                 for (Object value : mc.thePlayer.openContainer.inventorySlots) {
@@ -109,19 +110,7 @@ final class MarkedStorageDeposit {
             double distance = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
             if (distance > 16D) {
                 if (distance > 64D) continue;
-                if (lastApproachIndex != next - 1) {
-                    lastApproachIndex = next - 1;
-                    approachRetries = 0;
-                }
-                BaritoneNavigationBridge.Start started = navigation.startAdjacentWithoutBreaking(
-                    (int) Math.floor(pos[0]),
-                    (int) Math.floor(pos[1]),
-                    (int) Math.floor(pos[2]));
-                if (started == BaritoneNavigationBridge.Start.STARTED) {
-                    approach = target;
-                    approachTicks = 0;
-                    return Result.WORKING;
-                }
+                if (approach(target, pos)) return Result.WORKING;
                 continue;
             }
             int empty = -1;
@@ -153,16 +142,26 @@ final class MarkedStorageDeposit {
             Vec3 destination = Vec3.createVectorHelper(pos[0], pos[1], pos[2]);
             MovingObjectPosition hit = world.rayTraceBlocks(eye, destination);
             if (target.entity == null
-                && (hit == null || hit.blockX != target.x || hit.blockY != target.y || hit.blockZ != target.z))
+                && (hit == null || hit.blockX != target.x || hit.blockY != target.y || hit.blockZ != target.z)) {
+                if (approach(target, pos)) return Result.WORKING;
                 continue;
+            }
             if (target.entity != null
-                && (!(candidate instanceof Entity) || !mc.thePlayer.canEntityBeSeen((Entity) candidate))) continue;
+                && (!(candidate instanceof Entity) || !mc.thePlayer.canEntityBeSeen((Entity) candidate))) {
+                if (approach(target, pos)) return Result.WORKING;
+                continue;
+            }
             oldSlot = mc.thePlayer.inventory.currentItem;
             mc.thePlayer.inventory.currentItem = empty;
             mc.playerController.updateController();
-            boolean sent = target.entity == null
-                ? BaritoneBlockBridge.click(mc, target.x, target.y, target.z, hit.sideHit, hit.hitVec, false)
-                : mc.playerController.interactWithEntitySendPacket(mc.thePlayer, (Entity) candidate);
+            boolean sent;
+            if (target.entity == null) {
+                sent = BaritoneBlockBridge.click(mc, target.x, target.y, target.z, hit.sideHit, hit.hitVec, false);
+            } else {
+                // This method sends the packet even if the client-side interaction returns false.
+                mc.playerController.interactWithEntitySendPacket(mc.thePlayer, (Entity) candidate);
+                sent = true;
+            }
             if (!sent) {
                 restoreSlot(mc);
                 continue;
@@ -182,6 +181,57 @@ final class MarkedStorageDeposit {
 
     int moved() {
         return moved;
+    }
+
+    static boolean vanillaChestView(Minecraft mc, StorageTarget target, IInventory marked, IInventory opened) {
+        if (!(opened instanceof net.minecraft.inventory.InventoryBasic) || target == null
+            || mc == null
+            || mc.theWorld == null) return false;
+        if (marked instanceof net.minecraft.entity.item.EntityMinecartChest)
+            return target.entity != null && opened.getSizeInventory() == marked.getSizeInventory()
+                && java.util.Objects.equals(opened.getInventoryName(), marked.getInventoryName());
+        if (!(marked instanceof net.minecraft.tileentity.TileEntityChest) || target.entity != null) return false;
+        if (vanillaChestSizes(marked, opened, false))
+            return java.util.Objects.equals(opened.getInventoryName(), marked.getInventoryName());
+        if (!vanillaChestSizes(marked, opened, true)) return false;
+        int[][] offsets = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        for (int[] offset : offsets) {
+            int x = target.x + offset[0], z = target.z + offset[1];
+            if (mc.theWorld.blockExists(x, target.y, z)
+                && mc.theWorld.getBlock(x, target.y, z) == mc.theWorld.getBlock(target.x, target.y, target.z)
+                && mc.theWorld.getTileEntity(x, target.y, z) instanceof net.minecraft.tileentity.TileEntityChest) {
+                IInventory neighbor = (IInventory) mc.theWorld.getTileEntity(x, target.y, z);
+                String name = opened.getInventoryName();
+                if ((marked.hasCustomInventoryName() && java.util.Objects.equals(name, marked.getInventoryName()))
+                    || (neighbor.hasCustomInventoryName()
+                        && java.util.Objects.equals(name, neighbor.getInventoryName()))
+                    || (!marked.hasCustomInventoryName() && !neighbor.hasCustomInventoryName()
+                        && "container.chestDouble".equals(name)))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean vanillaChestSizes(IInventory marked, IInventory opened, boolean adjacent) {
+        return marked instanceof net.minecraft.tileentity.TileEntityChest
+            && opened instanceof net.minecraft.inventory.InventoryBasic
+            && (opened.getSizeInventory() == marked.getSizeInventory()
+                || (adjacent && opened.getSizeInventory() == marked.getSizeInventory() * 2));
+    }
+
+    private boolean approach(StorageTarget target, double[] pos) {
+        if (lastApproachIndex != next - 1) {
+            lastApproachIndex = next - 1;
+            approachRetries = 0;
+        }
+        if (approachRetries > 2) return false;
+        BaritoneNavigationBridge.Start started = navigation
+            .startAdjacentWithoutBreaking((int) Math.floor(pos[0]), (int) Math.floor(pos[1]), (int) Math.floor(pos[2]));
+        if (started != BaritoneNavigationBridge.Start.STARTED) return false;
+        approach = target;
+        approachTicks = 0;
+        return true;
     }
 
     private void restoreSlot(Minecraft mc) {

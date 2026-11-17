@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("com.gtnewhorizons.gtnhconvention")
 }
@@ -24,6 +26,7 @@ val verifyReleaseContent by tasks.registering {
 tasks.named("check") { dependsOn(verifyReleaseContent) }
 tasks.matching { it.name == "publishCurseforge" }.configureEach {
     dependsOn("check")
+    dependsOn("bundledBaritoneJar")
 }
 
 // The local Baritone artifact is supplied explicitly for integration builds.
@@ -33,6 +36,8 @@ val bundledBaritoneJar by tasks.registering(Jar::class) {
     description = "Assemble LootGameSolver and a supplied production Baritone jar"
     dependsOn("reobfJar")
     archiveClassifier.set("bundled-staging")
+    // The published jar replaces reobfJar's output, so a normal build can overwrite it.
+    outputs.upToDateWhen { false }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from({ zipTree(tasks.named("reobfJar").get().outputs.files.singleFile) })
     from({
@@ -53,6 +58,12 @@ val bundledBaritoneJar by tasks.registering(Jar::class) {
     doLast {
         val target = finalDest.get().asFile
         archiveFile.get().asFile.copyTo(target, overwrite = true)
+        ZipFile(target).use { bundled ->
+            check(bundled.getEntry("baritone/api/BaritoneAPI.class") != null) { "Bundled jar is missing Baritone" }
+            check(bundled.getEntry("com/kyroxova/lootgamesolver/client/ClientHooks.class") != null) {
+                "Bundled jar is missing LootGameSolver"
+            }
+        }
         archiveFile.get().asFile.delete()
     }
 }

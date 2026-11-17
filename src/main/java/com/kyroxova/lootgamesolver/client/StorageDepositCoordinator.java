@@ -46,6 +46,15 @@ final class StorageDepositCoordinator {
             } else if (result == BackpackStorageUnload.Result.DONE) phase = Phase.FINAL_DEPOSIT;
             return Result.WORKING;
         }
+        if (deposit == null && !VerifiedStorageTransfer.hasMovable(mc, ledger, baseline)) {
+            if (needsSpace || (phase == Phase.FINAL_DEPOSIT && !ledger.empty())) return fail(mc);
+            if (phase == Phase.FINAL_DEPOSIT) {
+                phase = Phase.COMPLETE;
+                return Result.COMPLETE;
+            }
+            phase = Phase.UNLOAD;
+            return Result.WORKING;
+        }
         if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline);
         MarkedStorageDeposit.Result result = deposit.tick(mc);
         if (result == MarkedStorageDeposit.Result.WORKING) return Result.WORKING;

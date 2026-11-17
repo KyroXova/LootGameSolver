@@ -206,6 +206,6 @@ jobs:
         if: needs.check-version.outputs.is_prerelease != 'true'
         run: |
           test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
-          ./gradlew publishCurseforge --no-configuration-cache
+          ./gradlew publishCurseforge -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}" --no-configuration-cache
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}

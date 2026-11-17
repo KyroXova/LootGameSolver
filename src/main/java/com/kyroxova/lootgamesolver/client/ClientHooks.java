@@ -348,7 +348,7 @@ public final class ClientHooks {
                     || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
                     PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
-                    if (checkpoint != null && java.util.Arrays.equals(rewardCenter, checkpoint.center)) {
+                    if (checkpoint != null && java.util.Arrays.equals(rewardLooter.rewardCenter(), checkpoint.center)) {
                         StorageRecoveryController recovery = new StorageRecoveryController();
                         if (recovery.start(mc, checkpoint, inventoryBaseline)) {
                             storageRecovery = recovery;
