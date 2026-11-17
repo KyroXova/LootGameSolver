@@ -30,6 +30,7 @@ public final class LootGameSolverConfig {
     public static String storageDestination = "";
     public static String storageWorld = "";
     public static String[] storageTargets = new String[0];
+    public static boolean storageEnabled = false;
 
     private LootGameSolverConfig() {}
 
@@ -39,6 +40,8 @@ public final class LootGameSolverConfig {
         storageDestination = cfg.getString("destination", "storageRecovery", "", "Configured home or warp command.");
         storageWorld = cfg.getString("world", "storageRecovery", "", "World associated with storage configuration.");
         storageTargets = cfg.getStringList("targets", "storageRecovery", new String[0], "Marked storage locations.");
+        storageEnabled = cfg
+            .getBoolean("enabled", "storageRecovery", false, "Enable configured storage recovery when available.");
         enabled = cfg.getBoolean("enabled", Configuration.CATEGORY_GENERAL, enabled, "Master switch.");
         explorationEnabled = cfg
             .getBoolean("enabled", "explorationBeta", true, "Enable experimental nearby finder and walking.");
@@ -114,7 +117,7 @@ public final class LootGameSolverConfig {
     }
 
     public static void setStorageDestination(String world, String command) {
-        if (!world.equals(storageWorld) || !command.equals(storageDestination)) storageTargets = new String[0];
+        if (!world.equals(storageWorld)) storageTargets = new String[0];
         storageWorld = world;
         storageDestination = command;
         saveStorage();
@@ -122,6 +125,11 @@ public final class LootGameSolverConfig {
 
     public static void setStorageTargets(String[] targets) {
         storageTargets = targets.clone();
+        saveStorage();
+    }
+
+    public static void setStorageEnabled(boolean enabled) {
+        storageEnabled = enabled;
         saveStorage();
     }
 
@@ -133,6 +141,8 @@ public final class LootGameSolverConfig {
             .set(storageDestination);
         configuration.get("storageRecovery", "targets", new String[0])
             .set(storageTargets);
+        configuration.get("storageRecovery", "enabled", false)
+            .set(storageEnabled);
         configuration.save();
     }
 }

@@ -142,7 +142,10 @@ public final class WorldOverlayRenderer {
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
-        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.showOverlay) return;
+        if (!LootGameSolverConfig.enabled) return;
+        if (LootGameSolverConfig.showOverlay || (exploration != null && exploration.navigating()))
+            renderStorageTargets();
+        if (!LootGameSolverConfig.showOverlay) return;
         boolean solving = session != null && session.isActive();
         if (exploration != null && !solving) NavigationOverlayRenderer.render(exploration, event.partialTicks);
         DetectedGame current = session.getCurrentDetectedGame();
@@ -246,6 +249,58 @@ public final class WorldOverlayRenderer {
             GL11.glEnable(GL11.GL_LIGHTING);
             GL11.glDisable(GL11.GL_BLEND);
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
+            GL11.glPopAttrib();
+        }
+    }
+
+    private static void renderStorageTargets() {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.thePlayer == null
+            || !Explorer.worldIdentity(mc)
+                .equals(LootGameSolverConfig.storageWorld))
+            return;
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslated(-RenderManager.renderPosX, -RenderManager.renderPosY, -RenderManager.renderPosZ);
+            GL11.glEnable(GL11.GL_BLEND);
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            GL11.glDisable(GL11.GL_LIGHTING);
+            GL11.glDepthMask(false);
+            GL11.glLineWidth(2F);
+            for (String target : LootGameSolverConfig.storageTargets) {
+                String[] fields = target.split(":");
+                try {
+                    if (fields.length < 3 || Integer.parseInt(fields[1]) != mc.theWorld.provider.dimensionId) continue;
+                    AxisAlignedBB box = null;
+                    if ("block".equals(fields[0]) && fields.length == 5) {
+                        int x = Integer.parseInt(fields[2]), y = Integer.parseInt(fields[3]),
+                            z = Integer.parseInt(fields[4]);
+                        if (!mc.theWorld.blockExists(x, y, z)
+                            || !(mc.theWorld.getTileEntity(x, y, z) instanceof net.minecraft.inventory.IInventory))
+                            continue;
+                        if (mc.thePlayer.getDistanceSq(x + 0.5D, y + 0.5D, z + 0.5D) > 4096D) continue;
+                        box = AxisAlignedBB.getBoundingBox(x, y, z, x + 1, y + 1, z + 1);
+                    } else if ("entity".equals(fields[0]) && fields.length == 3) {
+                        java.util.UUID id = java.util.UUID.fromString(fields[2]);
+                        for (Object value : mc.theWorld.loadedEntityList) {
+                            if (value instanceof net.minecraft.entity.Entity) {
+                                net.minecraft.entity.Entity entity = (net.minecraft.entity.Entity) value;
+                                if (entity instanceof net.minecraft.inventory.IInventory
+                                    && id.equals(entity.getUniqueID())
+                                    && mc.thePlayer.getDistanceSqToEntity(entity) <= 4096D) {
+                                    box = entity.boundingBox.copy();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (box != null) drawWireframe(box.expand(0.01D, 0.01D, 0.01D), 0.2F, 1F, 0.2F);
+                } catch (IllegalArgumentException ignored) {}
+            }
+        } finally {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
