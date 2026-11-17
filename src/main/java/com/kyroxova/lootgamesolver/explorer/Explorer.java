@@ -93,6 +93,7 @@ public class Explorer {
     int pitchLastY;
     double pitchLandingX, pitchLandingZ;
     private int miningCameraCooldownTicks;
+    private int inventoryMiningCooldownTicks;
     boolean returnDigging;
     TileEntity returnOriginalTarget;
     List<int[]> returnAfterDig;
@@ -703,7 +704,10 @@ public class Explorer {
             return;
         }
         if (baritoneCoordinator.active()) {
-            Float heading = NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
+            double vx = mc.thePlayer.motionX, vz = mc.thePlayer.motionZ;
+            Float heading = vx * vx + vz * vz > 0.0025D
+                ? NavigationSteering.heading(0, 0, vx, vz, mc.thePlayer.rotationYaw)
+                : NavigationSteering.pathHeading(baritoneCoordinator.routePreview);
             if (heading != null) {
                 camera.look(heading, 0F);
                 camera.render(mc, world, true);
@@ -885,8 +889,13 @@ public class Explorer {
     }
 
     public boolean inventoryCleanupSafe(Minecraft mc) {
-        return walking && !returning
+        return walking
+            && (returning || baritoneCoordinator.surfaceMove
+                || baritoneCoordinator.returnMove
+                || (baritoneCoordinator.structureMove && !baritoneCoordinator.preRouting))
             && !digging
+            && !returnDigging
+            && inventoryCleanupDelayPassed()
             && !movingToPuzzleCenter
             && !sustain.busy()
             && !toolTransfer.active()
@@ -896,6 +905,10 @@ public class Explorer {
             && mc.thePlayer.hurtTime == 0
             && !mc.thePlayer.capabilities.isFlying
             && (baritoneCoordinator.active() ? !baritoneCoordinator.breaking : route.size() >= 2);
+    }
+
+    public boolean inventoryCleanupDelayPassed() {
+        return inventoryMiningCooldownTicks == 0;
     }
 
     private float searchYaw;
@@ -1117,6 +1130,8 @@ public class Explorer {
         boolean isMining = (baritoneCoordinator.active() && baritoneCoordinator.breaking) || digging
             || returnDigging
             || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        if (isMining) inventoryMiningCooldownTicks = 30;
+        else if (inventoryMiningCooldownTicks > 0) inventoryMiningCooldownTicks--;
         if (isMining) {
             miningCameraCooldownTicks = 40;
             sustain.notifyBlockMined();

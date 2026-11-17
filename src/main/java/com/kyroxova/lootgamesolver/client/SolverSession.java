@@ -501,6 +501,10 @@ public final class SolverSession {
         return cachedRenderActions;
     }
 
+    public SolverAction getActiveAction() {
+        return mode == null ? null : activeAction;
+    }
+
     public int[] getBlockPos(CellPosition position) {
         DetectedGame cur = getCurrentDetectedGame();
         if (cur == null || cur.blockPositions == null) return null;

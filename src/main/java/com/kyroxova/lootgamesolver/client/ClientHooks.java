@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client;
 
-import java.util.List;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -260,6 +258,7 @@ public final class ClientHooks {
                 return;
             }
             if (rewardPreCleanupPending) {
+                if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return;
                 trashCleanup.clearCooldown();
                 if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
                     if (trashCleanup.tick(mc, true)) {
@@ -552,13 +551,11 @@ public final class ClientHooks {
 
     private void handleAutoMovement(Minecraft mc) {
         if (mc.thePlayer == null || mc.thePlayer.movementInput == null) return;
-        List<SolverAction> actions = session.getActiveActions();
-        if (actions == null || actions.isEmpty()) {
+        SolverAction targetAction = session.getActiveAction();
+        if (targetAction == null) {
             releaseMovementKeys(mc);
             return;
         }
-
-        SolverAction targetAction = actions.get(0);
         int[] block = session.getBlockPos(targetAction.position);
         if (block == null) {
             releaseMovementKeys(mc);
@@ -576,7 +573,8 @@ public final class ClientHooks {
         mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 40.0F);
         mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 30.0F);
 
-        if (distSq > 7.84D) {
+        double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
+        if (distSq > reach * reach) {
             double speed = 0.22D;
             if (distXZ > 0.1D) {
                 mc.thePlayer.motionX += (dx / distXZ) * speed;

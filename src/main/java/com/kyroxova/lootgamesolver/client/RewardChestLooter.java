@@ -51,6 +51,8 @@ final class RewardChestLooter {
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
     private int packPendingSlot = -1, packPendingCount;
+    private ItemStack packPendingStack;
+    private int packPendingBagCount;
     private int backpackTransferAttempts;
     private int backpackAimTicks;
     private float backpackOldYaw;
@@ -93,6 +95,7 @@ final class RewardChestLooter {
         backpackTransferAttempts = 0;
         oldSlot = -1;
         packPendingSlot = -1;
+        packPendingStack = null;
         backpackAimSaved = false;
         backpackAiming = false;
         backpackAimTicks = 0;
@@ -543,8 +546,14 @@ final class RewardChestLooter {
                 Slot pending = packPendingSlot < container.inventorySlots.size() ? container.getSlot(packPendingSlot)
                     : null;
                 ItemStack remaining = pending == null ? null : pending.getStack();
-                if (remaining == null || remaining.stackSize < packPendingCount) {
+                int bagCount = backpackItemCount(container, mc, packPendingStack);
+                boolean sourceChanged = remaining == null || !remaining.isItemEqual(packPendingStack)
+                    || !ItemStack.areItemStackTagsEqual(remaining, packPendingStack)
+                    || remaining.stackSize < packPendingCount;
+                if (sourceChanged && bagCount > packPendingBagCount) {
                     packMoved = true;
+                } else if (sourceChanged) {
+                    java.util.Arrays.fill(slotRejectedForCurrentBag, true);
                 } else {
                     if (pending != null && pending.inventory == mc.thePlayer.inventory) {
                         int playerSlot = pending.getSlotIndex();
@@ -554,6 +563,7 @@ final class RewardChestLooter {
                     }
                 }
                 packPendingSlot = -1;
+                packPendingStack = null;
             }
             for (Object obj : container.inventorySlots) {
                 Slot slot = (Slot) obj;
@@ -564,7 +574,13 @@ final class RewardChestLooter {
                     || slotRejectedForCurrentBag[playerSlot]
                     || !isPackable(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
+                if (!backpackHasSpace(container, mc, stack)) {
+                    slotRejectedForCurrentBag[playerSlot] = true;
+                    continue;
+                }
                 int beforeCount = stack.stackSize;
+                packPendingStack = stack.copy();
+                packPendingBagCount = backpackItemCount(container, mc, stack);
                 if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
                     status = "Backpack transfer unavailable";
                     return;
@@ -723,6 +739,31 @@ final class RewardChestLooter {
 
     private static boolean isBackpack(ItemStack stack) {
         return InventoryProtection.bag(stack);
+    }
+
+    private static boolean backpackHasSpace(Container container, Minecraft mc, ItemStack stack) {
+        for (Object obj : container.inventorySlots) {
+            Slot slot = (Slot) obj;
+            if (slot.inventory == mc.thePlayer.inventory || !slot.isItemValid(stack)) continue;
+            ItemStack existing = slot.getStack();
+            if (existing == null) return true;
+            if (existing.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(existing, stack)
+                && existing.stackSize < Math.min(existing.getMaxStackSize(), slot.getSlotStackLimit())) return true;
+        }
+        return false;
+    }
+
+    private static int backpackItemCount(Container container, Minecraft mc, ItemStack stack) {
+        if (stack == null) return 0;
+        int count = 0;
+        for (Object obj : container.inventorySlots) {
+            Slot slot = (Slot) obj;
+            ItemStack existing = slot.getStack();
+            if (slot.inventory != mc.thePlayer.inventory && existing != null
+                && existing.isItemEqual(stack)
+                && ItemStack.areItemStackTagsEqual(existing, stack)) count += existing.stackSize;
+        }
+        return count;
     }
 
     private boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack) {
