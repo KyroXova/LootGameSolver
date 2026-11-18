@@ -58,6 +58,7 @@ final class RewardChestLooter {
     private int[] chestView;
     private final List<int[]> failedChestViews = new ArrayList<int[]>();
     private int failedViewChest = -1;
+    private int failedViewRounds;
     private MiniGame gameType;
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
@@ -89,6 +90,7 @@ final class RewardChestLooter {
         chestView = null;
         failedChestViews.clear();
         failedViewChest = -1;
+        failedViewRounds = 0;
         gameType = type;
         ticks = 0;
         index = 0;
@@ -249,7 +251,7 @@ final class RewardChestLooter {
         }
         if (++ticks < 30) return;
         if (chests.isEmpty() && index == 0) {
-            int[] cluster = ClientHooks.nearbyRewardCenter(mc);
+            int[] cluster = ClientHooks.nearbyRewardCenter(mc, center);
             if (cluster != null) center = cluster;
             for (Object obj : mc.theWorld.loadedTileEntityList) {
                 if (!(obj instanceof TileEntityChest)) continue;
@@ -352,6 +354,7 @@ final class RewardChestLooter {
         if (failedViewChest != index) {
             failedViewChest = index;
             failedChestViews.clear();
+            failedViewRounds = 0;
         }
         if (mc.currentScreen instanceof GuiChest && opened && mc.thePlayer.openContainer instanceof ContainerChest) {
             ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
@@ -445,7 +448,7 @@ final class RewardChestLooter {
         if (dx * dx + dy * dy + dz * dz > reach * reach) {
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
-            else status = "Finding a safe position beside the reward chest";
+            else if (active) status = "Finding a safe position beside the reward chest";
             waiting = 10;
             return;
         }
@@ -464,7 +467,7 @@ final class RewardChestLooter {
             }
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
-            else status = "Finding a clear view of the reward chest";
+            else if (active) status = "Finding a clear view of the reward chest";
             waiting = 10;
             return;
         }
@@ -526,6 +529,16 @@ final class RewardChestLooter {
     private boolean moveToChestView(Minecraft mc, Explorer exploration, int[] chest, int[] roomCenter,
         List<int[]> failedViews) {
         chestView = RewardChestView.findAndMove(mc, exploration, chest, roomCenter, failedViews);
+        if (chestView == null && ++failedViewRounds >= 6) {
+            boolean saved = saveCheckpoint(mc) != null;
+            active = false;
+            status = "Reward chest unreachable; collection paused";
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00A7e[LootGameSolver] Could not reach a reward chest."
+                        + (saved ? " Rewards saved; use /lgs resumeLoot after clearing the route."
+                            : " Could not save the reward checkpoint.")));
+        }
         return chestView != null;
     }
 

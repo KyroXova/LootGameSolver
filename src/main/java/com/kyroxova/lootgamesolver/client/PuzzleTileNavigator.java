@@ -41,7 +41,7 @@ final class PuzzleTileNavigator {
         double dx = target[0] + 0.5D - mc.thePlayer.posX;
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
-        double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+        double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
         if (withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target)) {
             stopRoute();
             return true;

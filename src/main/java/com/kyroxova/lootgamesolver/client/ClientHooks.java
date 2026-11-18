@@ -400,6 +400,21 @@ public final class ClientHooks {
             return;
         }
         if (rewardReturnPending) {
+            if (rewardCenter != null
+                && rewardCollectionTooFar(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ, rewardCenter)) {
+                boolean saved = rewardLooter.saveCheckpoint(mc) != null;
+                if (preLootPacker.active()) preLootPacker.cancel(mc);
+                rewardLooter.cancel(mc);
+                rewardReturnPending = false;
+                rewardPreCleanupPending = false;
+                if (exploration != null && exploration.navigating()) exploration.stop(mc, "Reward collection paused");
+                mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00A7e[LootGameSolver] Reward collection paused: too far from the room."
+                            + (saved ? " Return nearby and use /lgs resumeLoot."
+                                : " Could not save the reward checkpoint.")));
+                return;
+            }
             if (rewardPreCleanupPending) {
                 if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return;
                 if (!rewardPrePackingAttempted) {
@@ -430,6 +445,12 @@ public final class ClientHooks {
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
             if (!rewardLooter.active()) {
+                if ("Reward chest unreachable; collection paused".equals(rewardLooter.status())) {
+                    rewardReturnPending = false;
+                    rewardPreCleanupPending = false;
+                    if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
+                    return;
+                }
                 if (("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
                     || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
@@ -448,7 +469,16 @@ public final class ClientHooks {
                         if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
                         exploration.finishPuzzle(mc, true);
                     }
-                }
+                } else if (!"Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+                    && !"No available backpack; items kept".equals(rewardLooter.status())) {
+                        boolean saved = rewardLooter.saveCheckpoint(mc) != null;
+                        rewardReturnPending = false;
+                        rewardPreCleanupPending = false;
+                        mc.thePlayer.addChatMessage(
+                            new net.minecraft.util.ChatComponentText(
+                                "\u00A7e[LootGameSolver] " + rewardLooter.status()
+                                    + (saved ? " Rewards saved; use /lgs resumeLoot nearby." : "")));
+                    }
             }
             return;
         }
@@ -510,7 +540,7 @@ public final class ClientHooks {
             if (room != null && (recovery == RoomOpenWatchdog.Action.RETRY || autoPuzzle.isIdle()))
                 exploration.setAutomationStatus(roomOpenWatchdog.status());
             if (recovery != RoomOpenWatchdog.Action.WAIT) {
-                int[] rewards = nearbyRewardCenter(mc);
+                int[] rewards = nearbyRewardCenter(mc, room);
                 if (rewards != null) {
                     roomOpenWatchdog.reset();
                     autoPuzzle.reset();
@@ -748,6 +778,20 @@ public final class ClientHooks {
     }
 
     static int[] nearbyRewardCenter(Minecraft mc) {
+        return nearbyRewardCenter(mc, null);
+    }
+
+    static boolean rewardClusterMatches(int[] anchor, int x, int y, int z) {
+        return anchor == null
+            || (Math.abs(anchor[0] - x) <= 5 && Math.abs(anchor[2] - z) <= 5 && Math.abs(anchor[1] - y) <= 5);
+    }
+
+    static boolean rewardCollectionTooFar(double x, double y, double z, int[] center) {
+        double dx = x - (center[0] + 0.5D), dz = z - (center[2] + 0.5D);
+        return dx * dx + dz * dz > 32D * 32D || Math.abs(y - center[1]) > 24D;
+    }
+
+    static int[] nearbyRewardCenter(Minecraft mc, int[] anchor) {
         java.util.List<net.minecraft.tileentity.TileEntityChest> nearby = new java.util.ArrayList<>();
         for (Object value : mc.theWorld.loadedTileEntityList) {
             if (!(value instanceof net.minecraft.tileentity.TileEntityChest)) continue;
@@ -755,6 +799,8 @@ public final class ClientHooks {
             if (mc.thePlayer.getDistanceSq(chest.xCoord + 0.5D, chest.yCoord + 0.5D, chest.zCoord + 0.5D) <= 256D)
                 nearby.add(chest);
         }
+        int[] best = null;
+        double bestDistance = Double.MAX_VALUE;
         for (net.minecraft.tileentity.TileEntityChest chest : nearby) {
             int x = chest.xCoord, y = chest.yCoord, z = chest.zCoord;
             int[][] offsets = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
@@ -762,10 +808,17 @@ public final class ClientHooks {
                 int cx = x + offset[0], cz = z + offset[1], count = 0;
                 for (net.minecraft.tileentity.TileEntityChest other : nearby)
                     if (other.yCoord == y && Math.abs(other.xCoord - cx) + Math.abs(other.zCoord - cz) == 1) count++;
-                if (count >= 3) return new int[] { cx, y, cz };
+                if (count >= 3 && rewardClusterMatches(anchor, cx, y, cz)) {
+                    double distance = anchor == null ? mc.thePlayer.getDistanceSq(cx + 0.5D, y, cz + 0.5D)
+                        : Math.pow(anchor[0] - cx, 2) + Math.pow(anchor[1] - y, 2) + Math.pow(anchor[2] - cz, 2);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new int[] { cx, y, cz };
+                    }
+                }
             }
         }
-        return null;
+        return best;
     }
 
     private boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {
@@ -886,8 +939,8 @@ public final class ClientHooks {
             long minutes = (totalSeconds % 3600L) / 60L;
             long seconds = totalSeconds % 60L;
             String timerStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7f" + timerStr
-                + " \u00A77] [ \u00A7f"
+            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7d" + timerStr
+                + " \u00A77] [ \u00A76"
                 + solvedPuzzles
                 + " \u00A77]";
             int dist = exploration != null ? exploration.checkpointDistance(mc) : 0;
@@ -906,11 +959,11 @@ public final class ClientHooks {
                 + holoKeyStr
                 + "] Holograms";
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
-                line3 += " \u00A78|" + (exploreKeyHeld ? "\u00A7e" : explorerActive ? "\u00A7a" : "\u00A77")
-                    + " ["
-                    + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+                String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] "
                     + exploration.explorationAction();
+                int held = checkpointClearDoneTicks > 0 ? 20 : exploreKeyHeld ? exploreHoldTicks : 0;
+                line3 += " \u00A78|" + explorerKeyLabel(label, explorerActive, held);
             }
             int width1 = mc.fontRenderer.getStringWidth(line1);
             int width2 = mc.fontRenderer.getStringWidth(line2);
@@ -918,8 +971,7 @@ public final class ClientHooks {
             int maxWidth = Math.max(width1, Math.max(width2, width3));
 
             int panelWidth = Math.max(170, maxWidth + 40);
-            boolean showCheckpointProgress = exploreKeyHeld || checkpointClearDoneTicks > 0;
-            int panelHeight = 44 + (showCheckpointProgress ? 10 : 0);
+            int panelHeight = 44;
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
@@ -928,11 +980,6 @@ public final class ClientHooks {
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
-            if (showCheckpointProgress) {
-                float progress = checkpointClearDoneTicks > 0 ? 1F : Math.min(1F, exploreHoldTicks / 20F);
-                int barX = x + 14, barY = y + panelHeight - 8, barWidth = panelWidth - 28;
-                drawCheckpointProgressBar(barX, barY, barWidth, 3, progress);
-            }
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();
@@ -944,13 +991,10 @@ public final class ClientHooks {
         return StatusText.solver(text);
     }
 
-    private static void drawCheckpointProgressBar(int x, int y, int width, int height, float progress) {
-        float amount = Math.max(0F, Math.min(1F, progress));
-        int fill = Math.round(width * amount);
-        int red = Math.round(255F * (1F - amount));
-        int green = Math.round(255F * amount);
-        net.minecraft.client.gui.Gui.drawRect(x, y, x + width, y + height, 0xE0202020);
-        if (fill > 0) net.minecraft.client.gui.Gui
-            .drawRect(x, y, x + fill, y + height, 0xFF000000 | (red << 16) | (green << 8) | 0x20);
+    static String explorerKeyLabel(String label, boolean active, int heldTicks) {
+        String base = active ? "\u00A7a" : "\u00A77";
+        if (heldTicks < 5) return base + label;
+        int filled = Math.min(label.length(), Math.max(0, (heldTicks - 4) * label.length() / 16));
+        return "\u00A7e" + label.substring(0, filled) + base + label.substring(filled);
     }
 }

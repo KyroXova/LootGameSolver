@@ -33,6 +33,32 @@ public class BaritoneNavigationBridgeTest {
         }
     }
 
+    public static class Pathing {
+
+        boolean cancelled;
+
+        public void cancelEverything() {
+            cancelled = true;
+        }
+    }
+
+    @Test
+    public void stoppingAnOldRequestDoesNotCancelTheNewOwner() throws Exception {
+        Goal oldGoal = new Goal();
+        Process process = new Process();
+        process.current = new Goal();
+        Pathing pathing = new Pathing();
+        BaritoneNavigationBridge bridge = new BaritoneNavigationBridge();
+        setField(bridge, "process", process);
+        setField(bridge, "processApi", Process.class);
+        setField(bridge, "goal", oldGoal);
+        setField(bridge, "pathing", pathing);
+        setField(bridge, "pathingApi", Pathing.class);
+        bridge.stop();
+        assertFalse(pathing.cancelled);
+        assertTrue(process.current != oldGoal);
+    }
+
     @Test
     public void pauseOnlyChangesTheOwnedGoal() throws Exception {
         Goal goal = new Goal();

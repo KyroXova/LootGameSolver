@@ -332,23 +332,28 @@ public final class BaritoneNavigationBridge {
     }
 
     public void stop() {
-        if (inputHandler != null && inputHandlerApi != null && clickSprint != null) {
+        boolean ownsGoal = false;
+        try {
+            if (process != null && processApi != null && goal != null) {
+                Object current = processApi.getMethod("getGoal")
+                    .invoke(process);
+                ownsGoal = current == goal;
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        if (ownsGoal && inputHandler != null && inputHandlerApi != null && clickSprint != null) {
             try {
                 inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
                     .invoke(inputHandler, clickSprint, false);
             } catch (ReflectiveOperationException | LinkageError ignored) {}
         }
         try {
-            if (process != null && processApi != null) {
-                if (processApi.getMethod("getGoal")
-                    .invoke(process) == goal) {
-                    Class.forName("baritone.api.process.IBaritoneProcess")
-                        .getMethod("onLostControl")
-                        .invoke(process);
-                }
+            if (ownsGoal) {
+                Class.forName("baritone.api.process.IBaritoneProcess")
+                    .getMethod("onLostControl")
+                    .invoke(process);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
-        if (pathing != null && pathingApi != null) {
+        if (ownsGoal && pathing != null && pathingApi != null) {
             try {
                 pathingApi.getMethod("cancelEverything")
                     .invoke(pathing);
