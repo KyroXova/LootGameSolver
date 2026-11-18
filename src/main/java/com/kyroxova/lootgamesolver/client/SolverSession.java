@@ -386,6 +386,7 @@ public final class SolverSession {
                 return;
             }
         }
+        if (!bridge.isClearingFoliage() && !prepareEmptyHand(Minecraft.getMinecraft())) return;
         if (!bridge.interact(snapshot, activeAction, sudokuReverseClick)) {
             if (bridge.foliageClearingFailed()) {
                 cancel("Could not clear foliage blocking the board");
@@ -404,6 +405,38 @@ public final class SolverSession {
             sudokuValueBeforeClick = snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x];
         }
         lastActionAt = System.currentTimeMillis();
+    }
+
+    private boolean prepareEmptyHand(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.playerController == null) return false;
+        if (mc.thePlayer.getHeldItem() == null) return true;
+        for (int slot = 0; slot < 9; slot++) {
+            if (mc.thePlayer.inventory.getStackInSlot(slot) != null) continue;
+            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+            sudokuAutomaticSlot = slot;
+            mc.thePlayer.inventory.currentItem = slot;
+            mc.playerController.updateController();
+            return true;
+        }
+        int empty = -1;
+        for (int slot = 9; slot < 36; slot++) if (mc.thePlayer.inventory.getStackInSlot(slot) == null) {
+            empty = slot;
+            break;
+        }
+        if (empty >= 0) for (int slot = 0; slot < 9; slot++) {
+            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(slot);
+            if (stack == null || InventoryProtection.essential(stack)
+                || stack.hasTagCompound()
+                || stack.hasDisplayName()) continue;
+            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+            if (sudokuTransfer.clearHotbar(mc, slot, empty)) {
+                sudokuAutomaticSlot = slot;
+                status = "Preparing an empty hand for puzzle";
+                return false;
+            }
+        }
+        status = "Make an empty hotbar slot to solve the puzzle";
+        return false;
     }
 
     public boolean isActionComplete(DetectedGame snapshot) {

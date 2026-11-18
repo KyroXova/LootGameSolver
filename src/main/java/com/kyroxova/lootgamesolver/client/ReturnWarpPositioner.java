@@ -19,6 +19,11 @@ final class ReturnWarpPositioner {
     }
 
     private final BaritoneNavigationBridge navigation = new BaritoneNavigationBridge();
+
+    void pause(boolean paused) {
+        navigation.setPaused(paused);
+    }
+
     private final java.util.List<int[]> candidates = new java.util.ArrayList<int[]>();
     private int[] goal;
     private int ticks, candidateIndex;

@@ -156,6 +156,7 @@ public final class LootGamesBridge implements MiniGameDetector {
         double dy = targetY - eyeY;
         double dz = z + 0.5D - player.posZ;
         double distSq = dx * dx + dy * dy + dz * dz;
+        if (distSq > 17.64D) return false;
 
         double distXZ = Math.sqrt(dx * dx + dz * dz);
         float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
@@ -164,7 +165,6 @@ public final class LootGamesBridge implements MiniGameDetector {
         player.rotationYaw = updateRotation(player.rotationYaw, yaw, 45.0F);
         player.rotationPitch = updateRotation(player.rotationPitch, pitch, 35.0F);
 
-        if (distSq > 17.64D) return false;
         return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 15F
             && Math.abs(pitch - player.rotationPitch) < 15F;
     }
@@ -902,22 +902,11 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private static boolean selectSafeInteractionItem(Minecraft mc) {
         net.minecraft.item.ItemStack held = mc.thePlayer.getHeldItem();
-        if (held != null && !(held.getItem() instanceof net.minecraft.item.ItemBlock)) {
-            if (held.getItem() instanceof net.minecraft.item.ItemTool
-                || held.getItem() instanceof net.minecraft.item.ItemSword) return true;
-        } else if (held == null) {
-            return true;
-        }
+        if (held == null) return true;
         int fallbackSlot = -1;
         for (int slot = 0; slot < 9; slot++) {
             net.minecraft.item.ItemStack candidate = mc.thePlayer.inventory.getStackInSlot(slot);
             if (candidate == null) {
-                mc.thePlayer.inventory.currentItem = slot;
-                if (mc.playerController != null) mc.playerController.updateController();
-                return true;
-            }
-            if (candidate.getItem() instanceof net.minecraft.item.ItemTool
-                || candidate.getItem() instanceof net.minecraft.item.ItemSword) {
                 mc.thePlayer.inventory.currentItem = slot;
                 if (mc.playerController != null) mc.playerController.updateController();
                 return true;

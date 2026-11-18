@@ -386,8 +386,21 @@ public class Explorer {
     }
 
     public void suspendStructureSearchForRoomWork(Minecraft mc) {
-        if (baritoneCoordinator.searchMove || baritoneCoordinator.structureMove) {
+        if (baritoneCoordinator.searchMove || baritoneCoordinator.structureMove || (walking && searching)) {
             stop(mc, "Room automation in progress");
+        }
+    }
+
+    public void suspendUnrelatedRouteForRewards(Minecraft mc) {
+        if (walking && !movingToRewardView) stop(mc, "Reward collection in progress");
+    }
+
+    public void pauseAutomation(boolean paused) {
+        baritoneNavigation.setPaused(paused);
+        if (paused && navigationInput != null) {
+            navigationInput.forward = 0;
+            navigationInput.sideways = 0;
+            navigationInput.hop = false;
         }
     }
 
@@ -1238,7 +1251,7 @@ public class Explorer {
         status = "Retrying route to current target";
     }
 
-    public void tick(Minecraft mc, boolean solverActive) {
+    public void tick(Minecraft mc, boolean solverActive, boolean roomWorkActive) {
         if (inventoryMaintenance && mc.thePlayer != null && mc.theWorld != null) {
             baritoneNavigation.setPaused(true);
             if (navigationInput != null) {
@@ -1387,8 +1400,8 @@ public class Explorer {
                 navigationPreview.add(new int[] { step[0], step[1], step[2], water ? 1 : 0 });
             }
         }
-        if (++ticks % 100 == 0 && !walking) scan(mc);
-        if (walking && searching && ticks % 40 == 0) {
+        if (++ticks % 100 == 0 && !walking && !roomWorkActive) scan(mc);
+        if (walking && searching && !roomWorkActive && ticks % 40 == 0) {
             TileEntity previous = target;
             scan(mc);
             if (target != null) {

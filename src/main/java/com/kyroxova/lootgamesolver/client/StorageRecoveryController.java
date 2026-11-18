@@ -20,6 +20,11 @@ final class StorageRecoveryController {
 
     private final StorageTripRunner trip = new StorageTripRunner();
     private final ReturnWarpPositioner positioner = new ReturnWarpPositioner();
+
+    void pause(boolean paused) {
+        positioner.pause(paused);
+    }
+
     private boolean positioning, cancelled;
     private String failureReason;
     private PendingLootStore.Checkpoint checkpoint;

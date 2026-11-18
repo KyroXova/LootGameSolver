@@ -224,6 +224,8 @@ public final class BaritoneNavigationBridge {
                 .invoke(process) == goal) {
                 processApi.getMethod("setPaused", boolean.class)
                     .invoke(process, paused);
+                if (paused && inputHandler != null && inputHandlerApi != null) inputHandlerApi.getMethod("clearAllKeys")
+                    .invoke(inputHandler);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }

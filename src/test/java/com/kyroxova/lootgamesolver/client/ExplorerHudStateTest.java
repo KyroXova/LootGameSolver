@@ -34,4 +34,14 @@ public class ExplorerHudStateTest {
         assertFalse(ClientHooks.rewardCollectionTooFar(102, 51, 101, room));
         assertTrue(ClientHooks.rewardCollectionTooFar(400, 51, 101, room));
     }
+
+    @Test
+    public void exploreKeyPausesAndOnlyResumesOnNextShortPress() {
+        assertTrue(ClientHooks.pauseOnExplorePress(false, true));
+        assertFalse(ClientHooks.pauseOnExplorePress(true, true));
+        assertFalse(ClientHooks.pauseOnExplorePress(false, false));
+        assertFalse(ClientHooks.resumeOnExploreRelease(true, false, true, true));
+        assertTrue(ClientHooks.resumeOnExploreRelease(true, false, true, false));
+        assertFalse(ClientHooks.resumeOnExploreRelease(true, true, true, false));
+    }
 }

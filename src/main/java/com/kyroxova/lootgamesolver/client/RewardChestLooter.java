@@ -59,6 +59,7 @@ final class RewardChestLooter {
     private final List<int[]> failedChestViews = new ArrayList<int[]>();
     private int failedViewChest = -1;
     private int failedViewRounds;
+    private int chestDiscoveryQuietTicks;
     private MiniGame gameType;
     private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
     private int queueIndex, backpackSlot = -1, oldSlot = -1;
@@ -91,6 +92,7 @@ final class RewardChestLooter {
         failedChestViews.clear();
         failedViewChest = -1;
         failedViewRounds = 0;
+        chestDiscoveryQuietTicks = 0;
         gameType = type;
         ticks = 0;
         index = 0;
@@ -253,23 +255,12 @@ final class RewardChestLooter {
         if (chests.isEmpty() && index == 0) {
             int[] cluster = ClientHooks.nearbyRewardCenter(mc, center);
             if (cluster != null) center = cluster;
-            for (Object obj : mc.theWorld.loadedTileEntityList) {
-                if (!(obj instanceof TileEntityChest)) continue;
-                TileEntity tile = (TileEntity) obj;
-                int dx = tile.xCoord - center[0], dz = tile.zCoord - center[2];
-                // Include the nearby chest cluster because the reported board center varies by stage.
-                if (Math.abs(dx) + Math.abs(dz) <= 3 && Math.abs(tile.yCoord - center[1]) <= 5)
-                    chests.add(new int[] { tile.xCoord, tile.yCoord, tile.zCoord });
-            }
-            chests.sort(
-                (a, b) -> Integer.compare(
-                    Math.abs(a[0] - center[0]) + Math.abs(a[2] - center[2]),
-                    Math.abs(b[0] - center[0]) + Math.abs(b[2] - center[2])));
-            while (chests.size() > 4) chests.remove(chests.size() - 1);
-            if (chests.isEmpty()) {
-                status = "Waiting for reward chests";
-                return;
-            }
+        }
+        if (discoverChests(mc)) chestDiscoveryQuietTicks = 0;
+        else if (chestDiscoveryQuietTicks < 60) chestDiscoveryQuietTicks++;
+        if (chests.isEmpty()) {
+            status = "Waiting for reward chests";
+            return;
         }
         if (packing) {
             tickBackpack(mc, exploration);
@@ -279,6 +270,10 @@ final class RewardChestLooter {
             && lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
             index++;
         if (!collecting && index >= chests.size()) {
+            if (chestDiscoveryQuietTicks < 60) {
+                status = "Checking for remaining reward chests";
+                return;
+            }
             if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
             opened = false;
             if (compactBackpackHotbar(mc)) return;
@@ -524,6 +519,26 @@ final class RewardChestLooter {
         opened = true;
         waiting = 12;
         status = "Opening reward chest";
+    }
+
+    private boolean discoverChests(Minecraft mc) {
+        boolean added = false;
+        for (Object obj : mc.theWorld.loadedTileEntityList) {
+            if (!(obj instanceof TileEntityChest) || chests.size() >= 4) continue;
+            TileEntity tile = (TileEntity) obj;
+            if (Math.abs(tile.xCoord - center[0]) + Math.abs(tile.zCoord - center[2]) > 3
+                || Math.abs(tile.yCoord - center[1]) > 5) continue;
+            boolean known = false;
+            for (int[] pos : chests) if (pos[0] == tile.xCoord && pos[1] == tile.yCoord && pos[2] == tile.zCoord) {
+                known = true;
+                break;
+            }
+            if (!known) {
+                chests.add(new int[] { tile.xCoord, tile.yCoord, tile.zCoord });
+                added = true;
+            }
+        }
+        return added;
     }
 
     private boolean moveToChestView(Minecraft mc, Explorer exploration, int[] chest, int[] roomCenter,

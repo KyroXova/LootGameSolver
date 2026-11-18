@@ -66,6 +66,7 @@ public final class ClientHooks {
     private InventoryBaseline inventoryBaseline;
     private int[] rewardCenter;
     private boolean exploreKeyHeld;
+    private boolean automationPaused, pausedOnThisPress;
     private boolean exploreHoldActionDone;
     private int exploreHoldTicks;
     private int checkpointClearDoneTicks;
@@ -83,6 +84,14 @@ public final class ClientHooks {
     static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven, boolean solving,
         boolean opening, boolean storage) {
         return navigating || looting || (explorationDriven && (solving || opening || storage));
+    }
+
+    static boolean pauseOnExplorePress(boolean paused, boolean active) {
+        return !paused && active;
+    }
+
+    static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused, boolean pausedOnPress) {
+        return wasHeld && !holdAction && paused && !pausedOnPress;
     }
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
@@ -213,9 +222,10 @@ public final class ClientHooks {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
 
         Minecraft mc = Minecraft.getMinecraft();
+        checkKeyToggles();
+        if (automationPaused && mc.theWorld != null && mc.thePlayer != null) return;
+        if (mc.theWorld == null || mc.thePlayer == null) automationPaused = false;
         if (storageRecovery != null) {
-            if (mc.currentScreen == null && Keybinds.explore != null && Keybinds.explore.isPressed())
-                storageRecovery.cancel();
             if (exploration != null) exploration.setAutomationStatus(storageRecovery.status());
             StorageRecoveryController.Result result = storageRecovery.tick(mc);
             if (result == StorageRecoveryController.Result.WORKING) return;
@@ -251,7 +261,6 @@ public final class ClientHooks {
             }
             return;
         }
-        checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
             if (minedDropStore != null && minedDrops.dirty()) minedDropStore.save(minedDrops);
@@ -314,9 +323,12 @@ public final class ClientHooks {
             wasInsideRoom = inside;
         }
         if (exploration != null) {
-            if (autoPuzzle.isActive() || session.isActive() || rewardReturnPending || storageRecovery != null)
-                exploration.suspendStructureSearchForRoomWork(mc);
-            exploration.tick(mc, session.isActive());
+            boolean roomWork = autoPuzzle.isActive() || session.isActive()
+                || rewardReturnPending
+                || storageRecovery != null;
+            if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
+            if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc);
+            exploration.tick(mc, session.isActive(), roomWork);
         }
         if (mc.thePlayer != null && mc.theWorld != null) {
             if (minedDropStore == null && mc.thePlayer.ticksExisted >= 40 && hasInventoryContents(mc)) {
@@ -628,6 +640,18 @@ public final class ClientHooks {
         return false;
     }
 
+    private void setAutomationPaused(Minecraft mc, boolean paused) {
+        automationPaused = paused;
+        tileNavigator.pause(paused);
+        if (exploration != null) exploration.pauseAutomation(paused);
+        if (storageRecovery != null) storageRecovery.pause(paused);
+        if (paused && mc.thePlayer != null) {
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
+            mc.thePlayer.setSprinting(false);
+        }
+    }
+
     void captureInventoryBaseline(Minecraft mc) {
         inventoryBaseline = InventoryBaseline.capture(mc);
         trashCleanup.setBaseline(inventoryBaseline);
@@ -643,32 +667,76 @@ public final class ClientHooks {
         Minecraft mc = Minecraft.getMinecraft();
         boolean explorePressed = Keybinds.explore.isPressed();
         boolean exploreDown = GameSettings.isKeyDown(Keybinds.explore);
+        boolean active = session.isActive() || autoPuzzle.isActive()
+            || rewardReturnPending
+            || storageRecovery != null
+            || (exploration != null && exploration.navigating());
         boolean runExploreAction = false;
-        if (mc.currentScreen != null) {
+        boolean acceptsExplore = mc.currentScreen == null
+            || mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiChest
+            || mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiInventory;
+        if (!acceptsExplore) {
             exploreKeyHeld = false;
             exploreHoldActionDone = false;
             exploreHoldTicks = 0;
         } else if (exploreDown) {
-            if (!exploreKeyHeld) exploreHoldTicks = 0;
+            if (!exploreKeyHeld) {
+                exploreHoldTicks = 0;
+                pausedOnThisPress = false;
+                if (pauseOnExplorePress(automationPaused, active)) {
+                    setAutomationPaused(mc, true);
+                    pausedOnThisPress = true;
+                }
+            }
             exploreKeyHeld = true;
             exploreHoldTicks++;
             if (exploreHoldTicks >= 20 && !exploreHoldActionDone) {
                 exploreHoldActionDone = true;
                 checkpointClearDoneTicks = 12;
-                if (rewardReturnPending) {
+                boolean clearedPaused = automationPaused;
+                if (automationPaused) {
+                    if (rewardReturnPending) rewardLooter.saveCheckpoint(mc);
+                    if (preLootPacker.active()) preLootPacker.cancel(mc);
+                    if (rewardLooter.active()) rewardLooter.cancel(mc);
+                    rewardReturnPending = false;
+                    if (storageRecovery != null) storageRecovery.cancel();
+                    storageRecovery = null;
+                    session.cancel("Automation cleared");
+                    tileNavigator.stop();
+                    autoPuzzle.reset();
+                    if (exploration != null && exploration.navigating()) exploration.stop(mc, "Automation cleared");
+                    setAutomationPaused(mc, false);
+                } else if (rewardReturnPending) {
                     if (preLootPacker.active()) preLootPacker.cancel(mc);
                     rewardLooter.cancel(mc);
                     rewardReturnPending = false;
                 }
                 if (exploration != null && mc.thePlayer != null && mc.theWorld != null)
                     exploration.clearLastCheckpoint(mc);
+                if (clearedPaused && exploration != null && exploration.navigating())
+                    exploration.stop(mc, "Automation cleared");
             }
         } else {
-            runExploreAction = exploreKeyHeld ? !exploreHoldActionDone : explorePressed;
+            if (!exploreKeyHeld && explorePressed && pauseOnExplorePress(automationPaused, active)) {
+                setAutomationPaused(mc, true);
+                pausedOnThisPress = true;
+            }
+            if (resumeOnExploreRelease(
+                exploreKeyHeld || explorePressed,
+                exploreHoldActionDone,
+                automationPaused,
+                pausedOnThisPress)) {
+                setAutomationPaused(mc, false);
+            } else {
+                runExploreAction = !automationPaused && !pausedOnThisPress
+                    && (exploreKeyHeld ? !exploreHoldActionDone : explorePressed);
+            }
             exploreKeyHeld = false;
             exploreHoldActionDone = false;
             exploreHoldTicks = 0;
+            pausedOnThisPress = false;
         }
+        if (automationPaused) return;
         if (exploration != null && runExploreAction
             && mc.currentScreen == null
             && mc.thePlayer != null
@@ -845,7 +913,7 @@ public final class ClientHooks {
     }
 
     private void handleAutoMovement(Minecraft mc) {
-        if (mc.thePlayer == null || mc.thePlayer.movementInput == null) return;
+        if (mc.thePlayer == null || mc.thePlayer.movementInput == null || mc.currentScreen != null) return;
         SolverAction targetAction = session.getActiveAction();
         if (targetAction == null) {
             releaseMovementKeys(mc);
@@ -910,7 +978,9 @@ public final class ClientHooks {
                         : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
 
             String statusStr;
-            if (session.isActive()) {
+            if (automationPaused) {
+                statusStr = "Paused";
+            } else if (session.isActive()) {
                 statusStr = compactStatus(session.getStatus());
             } else if (exploration != null) {
                 statusStr = (exploration.navigating() || rewardReturnPending
