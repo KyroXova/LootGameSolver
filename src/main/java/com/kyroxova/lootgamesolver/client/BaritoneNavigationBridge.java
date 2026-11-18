@@ -70,9 +70,14 @@ public final class BaritoneNavigationBridge {
     public void disablePlacement() {
         try {
             Class<?> api = Class.forName("baritone.api.BaritoneAPI");
-            Object settings = api.getMethod("getSettings").invoke(null);
-            Object allowPlace = settings.getClass().getField("allowPlace").get(settings);
-            allowPlace.getClass().getField("value").set(allowPlace, false);
+            Object settings = api.getMethod("getSettings")
+                .invoke(null);
+            Object allowPlace = settings.getClass()
+                .getField("allowPlace")
+                .get(settings);
+            allowPlace.getClass()
+                .getField("value")
+                .set(allowPlace, false);
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
@@ -91,12 +96,21 @@ public final class BaritoneNavigationBridge {
         }
         try {
             try {
-                Object settings = api.getMethod("getSettings").invoke(null);
-                Object allowPlace = settings.getClass().getField("allowPlace").get(settings);
-                allowPlace.getClass().getField("value").set(allowPlace, kind == 3);
+                Object settings = api.getMethod("getSettings")
+                    .invoke(null);
+                Object allowPlace = settings.getClass()
+                    .getField("allowPlace")
+                    .get(settings);
+                allowPlace.getClass()
+                    .getField("value")
+                    .set(allowPlace, kind == 3);
                 try {
-                    Object allowInventory = settings.getClass().getField("allowInventory").get(settings);
-                    allowInventory.getClass().getField("value").set(allowInventory, true);
+                    Object allowInventory = settings.getClass()
+                        .getField("allowInventory")
+                        .get(settings);
+                    allowInventory.getClass()
+                        .getField("value")
+                        .set(allowInventory, true);
                 } catch (ReflectiveOperationException | LinkageError ignored) {}
             } catch (ReflectiveOperationException | LinkageError ignored) {}
             Object provider = api.getMethod("getProvider")

@@ -75,7 +75,9 @@ public final class PuzzleCenterNavigator {
         double initDx = mc.thePlayer.posX - (center[0] + 0.5D);
         double initDz = mc.thePlayer.posZ - (center[2] + 0.5D);
         double initDy = (mc.thePlayer.posY + mc.thePlayer.getEyeHeight()) - (center[1] + 0.5D);
-        if (initDx * initDx + initDy * initDy + initDz * initDz <= 14.0D && Math.hypot(initDx, initDz) <= 2.8D) {
+        if (allowDigging
+            ? initDx * initDx + initDy * initDy + initDz * initDz <= 14.0D && Math.hypot(initDx, initDz) <= 2.8D
+            : rewardViewArrived(initDx, initDz, mc.thePlayer.boundingBox.minY, center[1])) {
             explorer.movingToPuzzleCenter = false;
             explorer.target = explorer.puzzleMasterTarget;
             explorer.puzzleMasterTarget = null;
@@ -83,8 +85,9 @@ public final class PuzzleCenterNavigator {
             return true;
         }
         if (!explorer.walking && explorer.navigationInput == null) {
-            BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
-                .startAdjacentWithoutBreaking(center[0], center[1] + 1, center[2]);
+            BaritoneNavigationBridge.Start started = allowDigging
+                ? explorer.baritoneNavigation.startAdjacentWithoutBreaking(center[0], center[1] + 1, center[2])
+                : explorer.baritoneNavigation.startPuzzleTileApproach(center[0], center[1] + 1, center[2]);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 explorer.puzzleMasterTarget = explorer.target;
                 TileEntity point = new TileEntity();
@@ -150,7 +153,9 @@ public final class PuzzleCenterNavigator {
                 return true;
             }
             if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
-                if (allowDigging && !explorer.inDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+                if (allowDigging && !explorer.inDungeonRoom(mc)
+                    && LootGameSolverConfig.staircaseEnabled
+                    && explorer.selectDigEntrance(mc)) {
                     explorer.walking = true;
                     explorer.status = explorer.digging ? "Planning board entry" : "Moving to board entrance";
                     return true;
@@ -175,7 +180,9 @@ public final class PuzzleCenterNavigator {
                 return true;
             }
             if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
-                if (allowDigging && !explorer.inDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+                if (allowDigging && !explorer.inDungeonRoom(mc)
+                    && LootGameSolverConfig.staircaseEnabled
+                    && explorer.selectDigEntrance(mc)) {
                     explorer.walking = true;
                     explorer.status = explorer.digging ? "Planning an entry to the board center"
                         : "Moving to a safe board entrance";
@@ -195,6 +202,10 @@ public final class PuzzleCenterNavigator {
         }
         explorer.status = "Moving to board center";
         return true;
+    }
+
+    static boolean rewardViewArrived(double dx, double dz, double feetY, int floorY) {
+        return Math.hypot(dx, dz) <= 0.75D && Math.floor(feetY) == floorY + 1;
     }
 
     public void appendPuzzleCenterWaypoint(Explorer explorer, int[] center) {

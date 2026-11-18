@@ -36,12 +36,32 @@ public final class RoomExit {
         int roomY = explorer.knownStructure != null ? explorer.knownStructure[1]
             : explorer.target == null ? Integer.MIN_VALUE : explorer.target.yCoord;
         if (roomY == Integer.MIN_VALUE) return false;
+        return isInsideRoom(mc, explorer, roomY);
+    }
+
+    boolean isInsideRoom(Minecraft mc, Explorer explorer, int roomY) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return false;
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         int[] bounds = explorer.roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, explorer.ticks);
         if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return false;
-        return y <= roomY + 3;
+        int midX = (bounds[0] + bounds[1]) >> 1, midZ = (bounds[2] + bounds[3]) >> 1;
+        int[][] walls = { { bounds[0], midZ }, { bounds[1], midZ }, { midX, bounds[2] }, { midX, bounds[3] } };
+        int bottom = Integer.MAX_VALUE, top = Integer.MIN_VALUE;
+        for (int by = Math.max(0, roomY - 12); by <= Math.min(255, roomY + 12); by++) {
+            int count = 0;
+            for (int[] wall : walls) if (isDungeonWall(mc.theWorld, wall[0], by, wall[1])) count++;
+            if (count >= 2) {
+                bottom = Math.min(bottom, by);
+                top = Math.max(top, by);
+            }
+        }
+        return insideVerticalBounds(y, bottom, top);
+    }
+
+    static boolean insideVerticalBounds(int feetY, int bottom, int top) {
+        return bottom != Integer.MAX_VALUE && top > bottom && feetY >= bottom && feetY < top;
     }
 
     public boolean startSearch(Minecraft mc, Explorer explorer) {

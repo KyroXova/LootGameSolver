@@ -15,7 +15,8 @@ public final class ExplorerTerrain {
         if (block == net.minecraft.init.Blocks.air) return true;
         if (block == net.minecraft.init.Blocks.snow_layer && world.getBlockMetadata(x, y, z) <= 1) return true;
         if (block.getMaterial() == net.minecraft.block.material.Material.leaves) return false;
-        if (block.getMaterial().isLiquid()) return false;
+        if (block.getMaterial()
+            .isLiquid()) return false;
         return block.getCollisionBoundingBoxFromPool(world, x, y, z) == null;
     }
 

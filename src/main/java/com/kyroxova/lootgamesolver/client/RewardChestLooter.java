@@ -183,11 +183,15 @@ final class RewardChestLooter {
                 mc.thePlayer.posX,
                 mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
                 mc.thePlayer.posZ);
-            boolean arrived = mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D) <= 2.25D;
+            boolean arrived = mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D)
+                <= 2.25D;
             if (arrived) {
                 if (index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null) {
                     failedChestViews.add(chestView);
                 }
+                chestView = null;
+            } else {
+                failedChestViews.add(chestView);
                 chestView = null;
             }
         }
@@ -491,8 +495,15 @@ final class RewardChestLooter {
         }
         if (!com.kyroxova.lootgamesolver.minecraft.BaritoneBlockBridge
             .click(mc, pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec, false)) {
-            boolean direct = mc.playerController
-                .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec);
+            boolean direct = mc.playerController.onPlayerRightClick(
+                mc.thePlayer,
+                mc.theWorld,
+                mc.thePlayer.getHeldItem(),
+                pos[0],
+                pos[1],
+                pos[2],
+                aimed.sideHit,
+                aimed.hitVec);
             mc.thePlayer.swingItem();
             if (!direct) {
                 status = "Chest interaction unavailable";

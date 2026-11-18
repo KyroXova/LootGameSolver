@@ -37,12 +37,15 @@ public final class BaritoneTransitCoordinator {
     public int searchTicks;
     public int handoffTicks;
     private int routeFailures;
+    private int rewardViewStalled;
+    private double rewardViewX, rewardViewY, rewardViewZ;
     boolean breaking;
     public final List<int[]> routePreview = new ArrayList<int[]>();
     public int previewTick;
 
     public void reset() {
         centerMove = false;
+        rewardViewStalled = 0;
         structureMove = false;
         preRouting = false;
         searchMove = false;
@@ -486,6 +489,22 @@ public final class BaritoneTransitCoordinator {
                 centerMove = false;
                 explorer.walking = false;
             } else {
+                if (explorer.movingToRewardView) {
+                    double dx = mc.thePlayer.posX - rewardViewX;
+                    double dy = mc.thePlayer.posY - rewardViewY;
+                    double dz = mc.thePlayer.posZ - rewardViewZ;
+                    if (dx * dx + dy * dy + dz * dz >= 0.09D) {
+                        rewardViewX = mc.thePlayer.posX;
+                        rewardViewY = mc.thePlayer.posY;
+                        rewardViewZ = mc.thePlayer.posZ;
+                        rewardViewStalled = 0;
+                    } else if (++rewardViewStalled >= 160) {
+                        rewardViewStalled = 0;
+                        centerMove = false;
+                        explorer.stop(mc, "Reward chest approach stalled; trying another position");
+                        return true;
+                    }
+                } else rewardViewStalled = 0;
                 if (explorer.target == null) {
                     centerMove = false;
                     explorer.stop(mc, "Board center target lost");

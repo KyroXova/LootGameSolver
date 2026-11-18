@@ -151,15 +151,13 @@ public class Explorer {
     }
 
     boolean reachableBoard(Minecraft mc) {
-        if (returning || searching || movingToPuzzleCenter || knownStructure == null) return false;
-        net.minecraft.util.Vec3 eye = net.minecraft.util.Vec3
-            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
-        net.minecraft.util.Vec3 goal = net.minecraft.util.Vec3
-            .createVectorHelper(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D);
-        double reach = Math.min(4.2D, mc.playerController.getBlockReachDistance());
-        if (eye.squareDistanceTo(goal) > reach * reach) return false;
-        net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, goal);
-        return hit != null && hit.blockX == target.xCoord && hit.blockY == target.yCoord && hit.blockZ == target.zCoord;
+        if (returning || searching
+            || movingToPuzzleCenter
+            || knownStructure == null
+            || target == null
+            || !insideDungeonRoom(mc)) return false;
+        return com.kyroxova.lootgamesolver.minecraft.LootGamesBridge
+            .visibleMasterFace(mc, target.xCoord, target.yCoord, target.zCoord) != null;
     }
 
     private boolean pausedForControl;
@@ -360,6 +358,14 @@ public class Explorer {
 
     public int[] puzzlePosition() {
         return knownStructure == null ? null : knownStructure.clone();
+    }
+
+    private void signalPuzzleArrival(Minecraft mc, String message) {
+        int[] position = target != null ? new int[] { target.xCoord, target.yCoord, target.zCoord }
+            : knownStructure == null ? null : knownStructure.clone();
+        stop(mc, message);
+        knownStructure = position;
+        puzzleArrivalPending = position != null;
     }
 
     public boolean resumePuzzleInCurrentRoom(Minecraft mc, int[] center) {
@@ -897,6 +903,38 @@ public class Explorer {
         return mc != null && mc.thePlayer != null && mc.theWorld != null && insideDungeonRoom(mc);
     }
 
+    public boolean inTargetRoom(Minecraft mc, int[] position) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || position == null || position.length != 3)
+            return false;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int[] bounds = roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, ticks);
+        return bounds != null && position[0] > bounds[0]
+            && position[0] < bounds[1]
+            && position[2] > bounds[2]
+            && position[2] < bounds[3]
+            && roomExit.isInsideRoom(mc, this, position[1]);
+    }
+
+    public boolean enterTargetRoom(Minecraft mc, int[] position) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || position == null || position.length != 3)
+            return false;
+        if (inTargetRoom(mc, position) || walking) return true;
+        target = new TileEntity();
+        target.xCoord = position[0];
+        target.yCoord = position[1];
+        target.zCoord = position[2];
+        knownStructure = position.clone();
+        if (startRoomEntrySearch(mc)) return true;
+        if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) {
+            walking = true;
+            searching = false;
+            return true;
+        }
+        status = "No safe route into the puzzle room";
+        return false;
+    }
+
     public int[] verifiedRoomCenter(Minecraft mc) {
         if (mc == null || mc.thePlayer == null
             || mc.theWorld == null
@@ -1163,15 +1201,9 @@ public class Explorer {
                 reachPuzzleCenter(mc);
             } else {
                 approachAttempts = 0;
-                movingToPuzzleCenter = false;
-                if (puzzleMasterTarget != null) {
-                    markStructureSolved(
-                        mc,
-                        new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
-                }
-                puzzleMasterTarget = null;
-                rotateSearch(mc);
-                walking = nextSearchLeg(mc);
+                int[] room = knownStructure == null ? null : knownStructure.clone();
+                stop(mc, "Puzzle approach failed; room work held");
+                knownStructure = room;
             }
             return;
         }
@@ -1766,8 +1798,7 @@ public class Explorer {
                     return;
                 }
                 if (reachableBoard(mc)) {
-                    stop(mc, "Arrived at LootGame; opening puzzle");
-                    puzzleArrivalPending = true;
+                    signalPuzzleArrival(mc, "Arrived at LootGame; opening puzzle");
                     return;
                 }
                 stop(mc, "No safe route to room center");
@@ -1890,8 +1921,7 @@ public class Explorer {
                     return;
                 }
                 if (reachableBoard(mc)) {
-                    stop(mc, "Arrived at LootGame; opening puzzle");
-                    puzzleArrivalPending = true;
+                    signalPuzzleArrival(mc, "Arrived at LootGame; opening puzzle");
                 } else stop(mc, "No safe route to room center");
                 return;
             }
@@ -1940,10 +1970,8 @@ public class Explorer {
                 if (target != null) {
                     beginAccessTrail(mc);
                     searching = false;
-                    if (mc.thePlayer.getDistanceSq(target.xCoord + 0.5D, target.yCoord + 0.5D, target.zCoord + 0.5D)
-                        <= 16D) {
-                        stop(mc, "Found nearby LootGame");
-                        puzzleArrivalPending = true;
+                    if (reachableBoard(mc)) {
+                        signalPuzzleArrival(mc, "Found nearby LootGame");
                         return;
                     }
                     plan(mc);
@@ -1985,8 +2013,13 @@ public class Explorer {
                 plan(mc);
                 if (!route.isEmpty() || walkingSearch != null) return;
             }
-            stop(mc, "Arrived beside LootGame");
-            puzzleArrivalPending = true;
+            if (!insideDungeonRoom(mc)) {
+                if (startRoomEntrySearch(mc)) return;
+                if (LootGameSolverConfig.staircaseEnabled && selectDigEntrance(mc)) return;
+                stop(mc, "No safe route into the puzzle room");
+                return;
+            }
+            signalPuzzleArrival(mc, "Arrived beside LootGame");
             return;
         }
         if (!digging && !returning
@@ -2042,7 +2075,8 @@ public class Explorer {
         if (digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
                 net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
-                if (plant == net.minecraft.init.Blocks.snow_layer && mc.theWorld.getBlockMetadata(next[0], by, next[2]) <= 1) continue;
+                if (plant == net.minecraft.init.Blocks.snow_layer
+                    && mc.theWorld.getBlockMetadata(next[0], by, next[2]) <= 1) continue;
                 if (FoliagePolicy.canClear(
                     isFoliage(plant),
                     mc.theWorld.getTileEntity(next[0], by, next[2]) != null,
@@ -2402,15 +2436,9 @@ public class Explorer {
                 reachPuzzleCenter(mc);
             } else {
                 approachAttempts = 0;
-                movingToPuzzleCenter = false;
-                if (puzzleMasterTarget != null) {
-                    markStructureSolved(
-                        mc,
-                        new int[] { puzzleMasterTarget.xCoord, puzzleMasterTarget.yCoord, puzzleMasterTarget.zCoord });
-                }
-                puzzleMasterTarget = null;
-                rotateSearch(mc);
-                walking = nextSearchLeg(mc);
+                int[] room = knownStructure == null ? null : knownStructure.clone();
+                stop(mc, "Puzzle approach failed; room work held");
+                knownStructure = room;
             }
             return;
         }

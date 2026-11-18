@@ -35,39 +35,39 @@ public final class RoomEntry {
             || explorer.target.xCoord >= bounds[1]
             || explorer.target.zCoord <= bounds[2]
             || explorer.target.zCoord >= bounds[3]
-            || (x > bounds[0] && x < bounds[1] && z > bounds[2] && z < bounds[3] && y <= explorer.target.yCoord + 3))
-            return false;
-        candidates = explorer.roomGeometry.findRoomExitCandidates(
+            || explorer.inDungeonRoom(mc)) return false;
+        explorer.roomEntryCandidates = explorer.roomGeometry.findRoomExitCandidates(
             mc,
             bounds,
             (w, bx, by, bz) -> RoomExit.clearableExitColumn(w, explorer, bx, by, bz));
-        candidates.removeIf(candidate -> candidate.length >= 10);
-        candidateIndex = 0;
+        explorer.roomEntryCandidates.removeIf(candidate -> candidate.length >= 10);
+        explorer.roomEntryCandidateIndex = 0;
         final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
         final int tx = explorer.target.xCoord, tz = explorer.target.zCoord;
-        candidates.sort(
+        explorer.roomEntryCandidates.sort(
             (a, b) -> Double.compare(
                 Math.hypot(a[3] + 0.5D - px, a[5] + 0.5D - pz) + Math.hypot(a[0] - tx, a[2] - tz),
                 Math.hypot(b[3] + 0.5D - px, b[5] + 0.5D - pz) + Math.hypot(b[0] - tx, b[2] - tz)));
         if (startNextSearch(mc, explorer)) return true;
-        candidates = null;
+        explorer.roomEntryCandidates = null;
         return false;
     }
 
     public boolean startNextSearch(Minecraft mc, Explorer explorer) {
-        if (candidates == null || candidateIndex >= candidates.size()) return false;
-        active = candidates.get(candidateIndex);
+        if (explorer.roomEntryCandidates == null
+            || explorer.roomEntryCandidateIndex >= explorer.roomEntryCandidates.size()) return false;
+        explorer.activeRoomEntry = explorer.roomEntryCandidates.get(explorer.roomEntryCandidateIndex);
         explorer.walkingSearch = new GroundPathfinder.Search(
             explorer.walkingTerrain(mc.theWorld),
             (int) Math.floor(mc.thePlayer.posX),
             (int) Math.floor(mc.thePlayer.boundingBox.minY),
             (int) Math.floor(mc.thePlayer.posZ),
-            active[3],
-            active[4],
-            active[5],
+            explorer.activeRoomEntry[3],
+            explorer.activeRoomEntry[4],
+            explorer.activeRoomEntry[5],
             LootGameSolverConfig.explorationRange);
-        planning = true;
-        searchNeedsResume = false;
+        explorer.roomEntryPlanning = true;
+        explorer.roomEntrySearchNeedsResume = false;
         explorer.walking = true;
         explorer.searching = false;
         explorer.digging = false;

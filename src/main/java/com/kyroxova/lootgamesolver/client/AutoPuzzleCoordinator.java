@@ -119,7 +119,7 @@ final class AutoPuzzleCoordinator {
     }
 
     void checkSolvingStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
-        PuzzleCompletionGate puzzleCompletion) {
+        PuzzleCompletionGate puzzleCompletion, PuzzleTileNavigator tileNavigator) {
         if (state != State.SOLVING || puzzleCompletion.won(mc.theWorld != null)) return;
         Object game = puzzleBridge.nearbyGame(true);
         int level = puzzleBridge.currentMinesweeperLevel(game);
@@ -127,6 +127,7 @@ final class AutoPuzzleCoordinator {
         boolean ready = puzzleBridge.canOpenMinesweeperBoard(game);
         boolean retryReady = ready && (level == activeMinesweeperLevel || puzzleCompletion.stageCompleted());
         if (nextLevel || retryReady) {
+            tileNavigator.stop();
             session.cancel(nextLevel ? "Minesweeper stage advanced" : "Minesweeper attempt reset");
             if (level >= 1) activeMinesweeperLevel = level;
             puzzleCompletion.clearStageCompleted();
@@ -163,13 +164,24 @@ final class AutoPuzzleCoordinator {
 
         if (state == State.OPENING) {
             puzzleWaitTicks++;
+            if (hooks.isExplorationDriven() && exploration != null
+                && autoPuzzlePosition != null
+                && !exploration.inTargetRoom(mc, autoPuzzlePosition)) {
+                if (exploration.navigating() || exploration.enterTargetRoom(mc, autoPuzzlePosition)) {
+                    exploration.setAutomationStatus("Entering puzzle room");
+                    puzzleWaitTicks = 0;
+                } else if (puzzleWaitTicks > 200) {
+                    state = State.FAILED;
+                    exploration.setAutomationStatus("No safe entrance to puzzle room");
+                }
+                return;
+            }
             int[] activator = puzzleBridge.nearbyFloorActivator();
             if (activator != null && exploration != null) {
                 rewardCenter = activator.clone();
                 floorActivatorPosition = activator;
                 floorActivatorClicked = false;
-                if (withinInteractionReach(mc, activator)
-                    && puzzleBridge.hasClearView(activator)) {
+                if (withinInteractionReach(mc, activator) && puzzleBridge.hasClearView(activator)) {
                     state = State.REVEALING;
                     puzzleWaitTicks = 0;
                     return;
@@ -207,7 +219,9 @@ final class AutoPuzzleCoordinator {
                 return;
             }
             if (autoPuzzlePosition != null) {
-                if (!withinInteractionReach(mc, autoPuzzlePosition)) {
+                if (LootGamesBridge
+                    .visibleMasterFace(mc, autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])
+                    == null) {
                     if (exploration != null && !exploration.navigating()) {
                         exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
                     }
@@ -416,8 +430,11 @@ final class AutoPuzzleCoordinator {
     }
 
     void startPuzzleSolver(Minecraft mc, LootGamesBridge puzzleBridge, SolverSession session, ClientHooks hooks) {
-        if (hooks != null && hooks.getExploration() != null && hooks.getExploration().navigating()) {
-            hooks.getExploration().stop(mc, "Solving puzzle in progress");
+        if (hooks != null && hooks.getExploration() != null
+            && hooks.getExploration()
+                .navigating()) {
+            hooks.getExploration()
+                .stop(mc, "Solving puzzle in progress");
         }
         if (state != State.REVEALING_NEXT_STAGE) {
             Object game = puzzleBridge.nearbyGame(true);

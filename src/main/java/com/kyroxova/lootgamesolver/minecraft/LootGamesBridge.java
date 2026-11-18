@@ -687,40 +687,43 @@ public final class LootGamesBridge implements MiniGameDetector {
         boolean valid = isMasterBlock(master);
         if (!valid) {
             net.minecraft.tileentity.TileEntity te = mc.theWorld.getTileEntity(x, y, z);
-            if (te != null && isMasterTile(te.getClass().getName())) valid = true;
+            if (te != null && isMasterTile(
+                te.getClass()
+                    .getName()))
+                valid = true;
         }
         if (!valid) return false;
         if (!selectSafeInteractionItem(mc)) return false;
 
-        double eyeY = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
-        double targetY = eyeY < y ? y + 0.1D : (eyeY > y + 1.0D ? y + 0.9D : y + 0.5D);
-        double dx = x + 0.5D - mc.thePlayer.posX;
-        double dy = targetY - eyeY;
-        double dz = z + 0.5D - mc.thePlayer.posZ;
-        double distSq = dx * dx + dy * dy + dz * dz;
-        double reach = Math.min(4.5D, mc.playerController.getBlockReachDistance());
-        if (distSq > reach * reach) return false;
-
-        float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-        float pitch = (float) (-(Math.atan2(dy, Math.hypot(dx, dz)) * 180.0D / Math.PI));
-        mc.thePlayer.rotationYaw = yaw;
-        mc.thePlayer.rotationPitch = pitch;
-
-        net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
-        int side = eyeY < y ? 0 : (eyeY > y + 1.0D ? 1 : 2);
-        Vec3 hitVec = null;
-        if (hit != null) {
-            side = hit.sideHit;
-            hitVec = hit.hitVec;
-        } else {
-            double hitY = side == 0 ? y + 0.0D : (side == 1 ? y + 1.0D : y + 0.5D);
-            hitVec = Vec3.createVectorHelper(x + 0.5D, hitY, z + 0.5D);
-        }
+        net.minecraft.util.MovingObjectPosition hit = visibleMasterFace(mc, x, y, z);
+        if (hit == null) return false;
+        double dx = hit.hitVec.xCoord - mc.thePlayer.posX;
+        double dy = hit.hitVec.yCoord - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+        double dz = hit.hitVec.zCoord - mc.thePlayer.posZ;
+        mc.thePlayer.rotationYaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
+        mc.thePlayer.rotationPitch = (float) (-Math.atan2(dy, Math.hypot(dx, dz)) * 180D / Math.PI);
+        int side = hit.sideHit;
+        Vec3 hitVec = hit.hitVec;
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
         boolean direct = mc.playerController
             .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
         mc.thePlayer.swingItem();
         return direct;
+    }
+
+    public static net.minecraft.util.MovingObjectPosition visibleMasterFace(Minecraft mc, int x, int y, int z) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || mc.playerController == null) return null;
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        double reach = Math.min(4.2D, mc.playerController.getBlockReachDistance());
+        double[] offsets = { 0.5D, 0.15D, 0.85D };
+        for (double ox : offsets) for (double oy : offsets) for (double oz : offsets) {
+            Vec3 point = Vec3.createVectorHelper(x + ox, y + oy, z + oz);
+            if (eye.squareDistanceTo(point) > reach * reach) continue;
+            net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
+            if (targetHit(hit, x, y, z)) return hit;
+        }
+        return null;
     }
 
     public int[] nearbyMasterBlock() {
@@ -747,7 +750,10 @@ public final class LootGamesBridge implements MiniGameDetector {
                     boolean isMaster = isMasterBlock(block);
                     if (!isMaster) {
                         net.minecraft.tileentity.TileEntity te = mc.theWorld.getTileEntity(x, y, z);
-                        if (te != null && isMasterTile(te.getClass().getName())) isMaster = true;
+                        if (te != null && isMasterTile(
+                            te.getClass()
+                                .getName()))
+                            isMaster = true;
                     }
                     if (isMaster) {
                         double distance = dx * dx + dy * dy + dz * dz;
@@ -764,7 +770,9 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (!(obj instanceof net.minecraft.tileentity.TileEntity)) continue;
             net.minecraft.tileentity.TileEntity te = (net.minecraft.tileentity.TileEntity) obj;
             if (te.isInvalid()) continue;
-            if (isMasterTile(te.getClass().getName())) {
+            if (isMasterTile(
+                te.getClass()
+                    .getName())) {
                 double distance = mc.thePlayer.getDistanceSq(te.xCoord + 0.5D, te.yCoord + 0.5D, te.zCoord + 0.5D);
                 if (distance <= 256.0D && distance < best) {
                     closest = new int[] { te.xCoord, te.yCoord, te.zCoord };
@@ -777,8 +785,10 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public static boolean isMasterBlock(net.minecraft.block.Block block) {
         if (block == null) return false;
-        String name = block.getClass().getName();
-        return name.endsWith(".PuzzleMasterBlock") || name.equals("ru.timeconqueror.lootgames.common.block.PuzzleMasterBlock");
+        String name = block.getClass()
+            .getName();
+        return name.endsWith(".PuzzleMasterBlock")
+            || name.equals("ru.timeconqueror.lootgames.common.block.PuzzleMasterBlock");
     }
 
     public static boolean isMasterTile(String className) {

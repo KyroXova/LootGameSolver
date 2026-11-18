@@ -363,18 +363,6 @@ public final class ClientHooks {
             return;
         }
         if (rewardReturnPending) {
-            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-            int z = (int) Math.floor(mc.thePlayer.posZ);
-            if (exploration != null && !exploration.inDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
-                if (preLootPacker.active()) preLootPacker.cancel(mc);
-                rewardLooter.cancel(mc);
-                rewardReturnPending = false;
-                if (explorationDriven && exploration != null) {
-                    if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
-                    exploration.finishPuzzle(mc, true);
-                }
-                return;
-            }
             if (rewardPreCleanupPending) {
                 if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return;
                 if (!rewardPrePackingAttempted) {
@@ -410,9 +398,7 @@ public final class ClientHooks {
                     && (exploration == null || !exploration.navigating())) {
                     if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
                 }
-                if (rewardLooter.completed()
-                    || "Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
-                    || "No available backpack; items kept".equals(rewardLooter.status())) {
+                if (rewardLooter.completed()) {
                     if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
                         if (trashCleanup.tick(mc, true)) {
                             if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
@@ -469,12 +455,12 @@ public final class ClientHooks {
             autoPuzzle.startFromExploration(exploration.puzzlePosition(), mc.theWorld, puzzleCompletion);
         }
 
-        autoPuzzle.checkSolvingStage(mc, puzzleBridge, exploration, session, puzzleCompletion);
+        autoPuzzle.checkSolvingStage(mc, puzzleBridge, exploration, session, puzzleCompletion, tileNavigator);
 
         // Poll dormant board detection less often; poll every tick while solving.
         detectCounter++;
         if (session.isActive() || detectCounter % 20 == 0) {
-            session.tick();
+            session.tick(!tileNavigator.moving());
         }
 
         autoPuzzle.tick(mc, puzzleBridge, exploration, session, puzzleCompletion, rewardLooter, this);
@@ -512,7 +498,8 @@ public final class ClientHooks {
                     int[] master = puzzleBridge.nearbyMasterBlock(room);
                     int[] floor = puzzleBridge.nearbyFloorActivator();
                     Object game = puzzleBridge.nearbyGame(true);
-                    int[] center = master != null ? master : (floor != null ? floor : (game == null ? room : puzzleBridge.gameCenter(game)));
+                    int[] center = master != null ? master
+                        : (floor != null ? floor : (game == null ? room : puzzleBridge.gameCenter(game)));
                     exploration.stop(mc, "Retrying room puzzle");
                     explorationDriven = true;
                     autoPuzzle.startManual(center != null ? center : room, floor, mc.theWorld, puzzleCompletion);
@@ -776,42 +763,11 @@ public final class ClientHooks {
             return;
         }
 
-        double dx = block[0] + 0.5D - mc.thePlayer.posX;
-        double dy = block[1] + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
-        double dz = block[2] + 0.5D - mc.thePlayer.posZ;
-        double distSq = dx * dx + dy * dy + dz * dz;
-        double distXZ = Math.sqrt(dx * dx + dz * dz);
-
-        // Smooth humanized camera rotation to face target block
-        float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-        float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
-        mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 45.0F);
-        mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 35.0F);
-
-        // Step towards target block if outside interaction reach
-        if (distSq > 7.84D) {
-            double speed = 0.28D;
-            if (distXZ > 0.1D) {
-                mc.thePlayer.motionX += (dx / distXZ) * speed;
-                mc.thePlayer.motionZ += (dz / distXZ) * speed;
-                mc.thePlayer.setSprinting(true);
-            }
-            if (dy > 1.0D && mc.thePlayer.onGround) {
-                mc.thePlayer.jump();
-            }
-        } else {
-            mc.thePlayer.setSprinting(false);
-            if (mc.thePlayer.movementInput != null) {
-                mc.thePlayer.movementInput.moveForward = 0.0F;
-            }
+        if (!tileNavigator.tick(mc, block)) {
+            tileNavigator.stop();
+            session.cancel("No safe route to a visible puzzle tile");
+            if (exploration != null) exploration.setAutomationStatus("Puzzle tile unreachable; explorer held");
         }
-    }
-
-    private static float updateRotation(float current, float target, float maxStep) {
-        float diff = net.minecraft.util.MathHelper.wrapAngleTo180_float(target - current);
-        if (diff > maxStep) diff = maxStep;
-        if (diff < -maxStep) diff = -maxStep;
-        return current + diff;
     }
 
     void releaseMovementKeys(Minecraft mc) {

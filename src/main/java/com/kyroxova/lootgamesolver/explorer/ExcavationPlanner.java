@@ -3,7 +3,6 @@ package com.kyroxova.lootgamesolver.explorer;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.entranceScore;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.samePosition;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.supportKey;
-import static com.kyroxova.lootgamesolver.explorer.ExplorerMiningTarget.visibleMiningPoint;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.dryShore;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.isFoliage;
 import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.passable;
