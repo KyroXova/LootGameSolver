@@ -70,6 +70,16 @@ final class MinedDropTracker {
         return untracked <= 0 && entry.mined >= stack.stackSize;
     }
 
+    boolean containsTracked(ItemStack[] inventory, int slot) {
+        if (slot < 0 || slot >= inventory.length || inventory[slot] == null) return false;
+        ItemStack stack = inventory[slot];
+        Entry entry = find(stack);
+        if (entry == null || entry.mined == 0) return false;
+        int untracked = Math.max(0, count(inventory, stack) - entry.mined);
+        for (int i = 0; i < slot; i++) if (matches(inventory[i], stack)) untracked -= inventory[i].stackSize;
+        return untracked < stack.stackSize;
+    }
+
     private Entry find(ItemStack stack) {
         for (Entry entry : entries) if (matches(entry.item, stack)) return entry;
         return null;

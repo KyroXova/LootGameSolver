@@ -840,7 +840,8 @@ final class RewardChestLooter {
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
         if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
-            || (minedDrops != null && minedDrops.fullyTracked(MinedDropTracker.inventory(mc), slotIndex))) return false;
+            || (minedDrops != null && minedDrops.containsTracked(MinedDropTracker.inventory(mc), slotIndex)))
+            return false;
         if (id != null && id.toLowerCase(java.util.Locale.ROOT)
             .contains("torch")) return false;
         return true;

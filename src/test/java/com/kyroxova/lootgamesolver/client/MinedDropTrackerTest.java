@@ -18,6 +18,7 @@ public class MinedDropTrackerTest {
         MinedDropTracker tracker = new MinedDropTracker();
         tracker.observe(inventory, true, stack -> true);
         assertFalse(tracker.fullyTracked(inventory, 0));
+        assertFalse(tracker.containsTracked(inventory, 0));
         inventory[1] = new ItemStack(item, 64);
         tracker.observe(inventory, true, stack -> true);
         assertTrue(tracker.fullyTracked(inventory, 1));
@@ -37,6 +38,7 @@ public class MinedDropTrackerTest {
         inventory[0].stackSize = 20;
         tracker.observe(inventory, true, stack -> true);
         assertFalse(tracker.fullyTracked(inventory, 0));
+        assertTrue(tracker.containsTracked(inventory, 0));
         inventory[1] = new ItemStack(new Item(), 3);
         tracker.observe(inventory, false, stack -> true);
         assertFalse(tracker.fullyTracked(inventory, 1));
