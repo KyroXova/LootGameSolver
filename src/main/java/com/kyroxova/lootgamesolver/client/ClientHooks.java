@@ -309,7 +309,7 @@ public final class ClientHooks {
             exploration.tick(mc, session.isActive());
         }
         if (mc.thePlayer != null && mc.theWorld != null) {
-            if (minedDropStore == null) {
+            if (minedDropStore == null && mc.thePlayer.ticksExisted >= 40 && hasInventoryContents(mc)) {
                 minedDropStore = new MinedDropStore(
                     new java.io.File(mc.mcDataDir, "config/lootgamesolver"),
                     Explorer.worldIdentity(mc),
@@ -322,8 +322,10 @@ public final class ClientHooks {
                 && !session.isActive()
                 && !rewardReturnPending
                 && mc.currentScreen == null;
-            minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
-            if (minedDrops.dirty() && mc.thePlayer.ticksExisted % 20 == 0) minedDropStore.save(minedDrops);
+            if (minedDropStore != null) {
+                minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
+                if (minedDrops.dirty() && mc.thePlayer.ticksExisted % 20 == 0) minedDropStore.save(minedDrops);
+            }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (resumeLootRequested) {
@@ -579,6 +581,11 @@ public final class ClientHooks {
 
     InventoryBaseline getInventoryBaseline() {
         return inventoryBaseline;
+    }
+
+    private static boolean hasInventoryContents(Minecraft mc) {
+        for (net.minecraft.item.ItemStack stack : MinedDropTracker.inventory(mc)) if (stack != null) return true;
+        return false;
     }
 
     void captureInventoryBaseline(Minecraft mc) {
