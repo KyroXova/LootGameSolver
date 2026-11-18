@@ -991,7 +991,7 @@ public final class ClientHooks {
                 statusStr = "Ready";
             }
 
-            boolean autoActive = session.isActive();
+            boolean autoActive = !automationPaused && session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
             boolean explorerActive = exploration != null && explorerHudActive(
                 exploration.navigating(),
@@ -1001,7 +1001,7 @@ public final class ClientHooks {
                 autoPuzzle.isActive(),
                 storageRecovery != null);
 
-            String autoColor = autoActive ? "\u00A7c" : "\u00A77";
+            String autoColor = automationPaused ? "\u00A7f" : autoActive ? "\u00A7c" : "\u00A77";
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
 
             long totalSeconds = totalActiveTicks / 20L;
@@ -1033,7 +1033,8 @@ public final class ClientHooks {
                     + "] "
                     + exploration.explorationAction();
                 int held = checkpointClearDoneTicks > 0 ? 20 : exploreKeyHeld ? exploreHoldTicks : 0;
-                line3 += " \u00A78|" + explorerKeyLabel(label, explorerActive, held);
+                line3 += " \u00A78|"
+                    + explorerKeyLabel(label, !automationPaused && explorerActive, held, automationPaused);
             }
             int width1 = mc.fontRenderer.getStringWidth(line1);
             int width2 = mc.fontRenderer.getStringWidth(line2);
@@ -1062,7 +1063,11 @@ public final class ClientHooks {
     }
 
     static String explorerKeyLabel(String label, boolean active, int heldTicks) {
-        String base = active ? "\u00A7a" : "\u00A77";
+        return explorerKeyLabel(label, active, heldTicks, false);
+    }
+
+    static String explorerKeyLabel(String label, boolean active, int heldTicks, boolean paused) {
+        String base = paused ? "\u00A7f" : active ? "\u00A7a" : "\u00A77";
         if (heldTicks < 5) return base + label;
         int filled = Math.min(label.length(), Math.max(0, (heldTicks - 4) * label.length() / 16));
         return "\u00A7e" + label.substring(0, filled) + base + label.substring(filled);

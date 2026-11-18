@@ -42,7 +42,10 @@ final class PuzzleTileNavigator {
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
         double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
-        if (withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target)) {
+        boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
+        if (reachable && (goal == null
+            || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
+            || navigation.completed())) {
             stopRoute();
             return true;
         }
@@ -62,12 +65,13 @@ final class PuzzleTileNavigator {
         int y = target[1] + 1;
         for (int x = target[0] - 3; x <= target[0] + 3; x++) for (int z = target[2] - 3; z <= target[2] + 3; z++) {
             int[] candidate = { x, y, z };
+            if (sameFeetBlock(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, candidate)) continue;
             boolean used = false;
             for (int[] old : tried) if (java.util.Arrays.equals(old, candidate)) used = true;
             if (used || !ExplorerTerrain.puzzleCenterStandable(mc.theWorld, x, y, z)
                 || !ExplorerTerrain.safe(mc.theWorld, x, y, z)) continue;
             double cx = x + 0.5D - target[0] - 0.5D, cz = z + 0.5D - target[2] - 0.5D;
-            if (!withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
+            if (cx * cx + cz * cz > 4D || !withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
                 || !LootGamesBridge.topFaceVisibleFrom(mc, target, x + 0.5D, y + mc.thePlayer.getEyeHeight(), z + 0.5D))
                 continue;
             candidates.add(candidate);
@@ -102,6 +106,15 @@ final class PuzzleTileNavigator {
 
     static boolean withinReach(double dx, double dy, double dz, double reach) {
         return reach > 0 && dx * dx + dy * dy + dz * dz <= reach * reach;
+    }
+
+    static boolean sameFeetBlock(double x, double y, double z, int[] pos) {
+        return (int) Math.floor(x) == pos[0] && (int) Math.floor(y) == pos[1] && (int) Math.floor(z) == pos[2];
+    }
+
+    static boolean atApproachGoal(double x, double y, double z, int[] pos) {
+        double dx = x - pos[0] - 0.5D, dz = z - pos[2] - 0.5D;
+        return Math.floor(y) == pos[1] && dx * dx + dz * dz <= 0.55D * 0.55D;
     }
 
     void stop() {

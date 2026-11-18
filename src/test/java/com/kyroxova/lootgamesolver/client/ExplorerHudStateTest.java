@@ -24,6 +24,7 @@ public class ExplorerHudStateTest {
         String label = " [G] Explore";
         assertEquals("\u00A7a" + label, ClientHooks.explorerKeyLabel(label, true, 4));
         assertEquals("\u00A7e" + label + "\u00A7a", ClientHooks.explorerKeyLabel(label, true, 20));
+        assertEquals("\u00A7f" + label, ClientHooks.explorerKeyLabel(label, false, 0, true));
     }
 
     @Test
