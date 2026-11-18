@@ -2,6 +2,10 @@ package com.kyroxova.lootgamesolver.explorer;
 
 final class NavigationSteering {
 
+    static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
+        return baritoneActive && (interacting || attacking || cooldown > 0);
+    }
+
     static Float walkingHeading(double vx, double vz, float fallback, java.util.List<int[]> route) {
         if (vx * vx + vz * vz > 0.0025D) return Float.valueOf(heading(0, 0, vx, vz, fallback));
         return pathHeading(route);

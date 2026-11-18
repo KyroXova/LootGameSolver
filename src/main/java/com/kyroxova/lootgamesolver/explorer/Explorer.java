@@ -711,11 +711,21 @@ public class Explorer {
 
     public void renderCamera(Minecraft mc) {
         if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
+        boolean baritoneActive = baritoneCoordinator.active();
+        boolean attacking = mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
+        if (NavigationSteering.yieldCameraToBaritone(
+            baritoneActive,
+            baritoneActive && (baritoneCoordinator.breaking || baritoneNavigation.isBreaking()),
+            attacking,
+            miningCameraCooldownTicks)) {
+            camera.clear();
+            return;
+        }
         boolean isMining = miningCameraCooldownTicks > 0
             || (baritoneCoordinator.active() && baritoneCoordinator.breaking)
             || digging
             || returnDigging
-            || (mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+            || attacking;
         if (isMining) {
             camera.render(mc, world, true);
             return;

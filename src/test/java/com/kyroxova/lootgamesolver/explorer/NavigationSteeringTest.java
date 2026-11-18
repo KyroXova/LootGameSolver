@@ -1,12 +1,22 @@
 package com.kyroxova.lootgamesolver.explorer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 public class NavigationSteeringTest {
+
+    @Test
+    public void yieldsTheWalkingCameraDuringBaritoneInteractions() {
+        assertTrue(NavigationSteering.yieldCameraToBaritone(true, true, false, 0));
+        assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 3));
+        assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, true, 0));
+        assertFalse(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
+        assertFalse(NavigationSteering.yieldCameraToBaritone(false, true, true, 3));
+    }
 
     @Test
     public void stoppedPlayerWithoutRouteHasNoCameraHeading() {
