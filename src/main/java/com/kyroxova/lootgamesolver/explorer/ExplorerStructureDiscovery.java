@@ -28,9 +28,6 @@ final class ExplorerStructureDiscovery {
                         || !isLootGamesTile(
                             existing.getClass()
                                 .getName())) {
-                        try {
-                            solved.mark(worldId, mc.theWorld.provider.dimensionId, position, position);
-                        } catch (java.io.IOException ignored) {}
                         continue;
                     }
                 }
@@ -71,7 +68,55 @@ final class ExplorerStructureDiscovery {
     }
 
     static boolean isLootGamesTile(String className) {
-        return className.startsWith("ru.timeconqueror.lootgames.");
+        return "ru.timeconqueror.lootgames.common.block.tile.PuzzleMasterTile".equals(className)
+            || "ru.timeconqueror.lootgames.common.block.tile.GOLMasterTile".equals(className)
+            || "ru.timeconqueror.lootgames.common.block.tile.MSMasterTile".equals(className)
+            || "ru.timeconqueror.lootgames.common.block.tile.SudokuTile".equals(className);
+    }
+
+    static int[] displayedPosition(Minecraft mc, int[] master) {
+        if (master == null || master.length < 3) return null;
+        if (mc == null || mc.theWorld == null || !mc.theWorld.blockExists(master[0], master[1], master[2]))
+            return master.clone();
+        TileEntity tile = mc.theWorld.getTileEntity(master[0], master[1], master[2]);
+        if (tile == null || tile.isInvalid()
+            || !isLootGamesTile(
+                tile.getClass()
+                    .getName()))
+            return master.clone();
+        try {
+            Object game = tile.getClass()
+                .getMethod("getGame")
+                .invoke(tile);
+            int[] center = gameCenter(game);
+            return center == null ? master.clone() : center;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return master.clone();
+        }
+    }
+
+    static int[] gameCenter(Object game) {
+        if (game == null) return null;
+        try {
+            Object size = game.getClass()
+                .getMethod("getCurrentBoardSize")
+                .invoke(game);
+            if (!(size instanceof Number) || ((Number) size).intValue() <= 0) return null;
+            Object center = game.getClass()
+                .getMethod("getGameCenter")
+                .invoke(game);
+            return new int[] { ((Number) center.getClass()
+                .getMethod("getX")
+                .invoke(center)).intValue(),
+                ((Number) center.getClass()
+                    .getMethod("getY")
+                    .invoke(center)).intValue(),
+                ((Number) center.getClass()
+                    .getMethod("getZ")
+                    .invoke(center)).intValue() };
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
     }
 
     static double labelHeight(Minecraft mc, TileEntity target) {

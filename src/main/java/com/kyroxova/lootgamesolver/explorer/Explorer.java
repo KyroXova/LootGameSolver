@@ -77,6 +77,7 @@ public class Explorer {
     int[] knownStructure;
     private World waypointScanWorld;
     private long waypointScanTick = Long.MIN_VALUE;
+    private int[] waypointScanResult;
     ExcavationPathfinder approachPlan;
     int[] approachAnchor;
     boolean approachReady;
@@ -324,22 +325,25 @@ public class Explorer {
     }
 
     public int[] structureWaypoint() {
-        if (knownStructure != null) return knownStructure;
-        if (target != null) return new int[] { target.xCoord, target.yCoord, target.zCoord };
         Minecraft mc = Minecraft.getMinecraft();
+        if (searching || baritoneCoordinator.searchMove) return null;
+        if (knownStructure != null) return ExplorerStructureDiscovery.displayedPosition(mc, knownStructure);
+        if (target != null) return null;
         if (mc != null && mc.theWorld != null && mc.thePlayer != null) {
             long now = mc.theWorld.getTotalWorldTime();
-            if (waypointScanWorld == mc.theWorld && now >= waypointScanTick && now - waypointScanTick < 20) return null;
+            if (waypointScanWorld == mc.theWorld && now >= waypointScanTick && now - waypointScanTick < 20)
+                return waypointScanResult == null ? null : waypointScanResult.clone();
             waypointScanWorld = mc.theWorld;
             waypointScanTick = now;
             net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery
                 .find(mc, savedFinder, solvedStructures, worldIdentity(mc));
             if (found != null) {
-                target = found;
-                knownStructure = new int[] { found.xCoord, found.yCoord, found.zCoord };
-                waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, target);
-                return knownStructure;
+                int[] foundPosition = { found.xCoord, found.yCoord, found.zCoord };
+                waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, found);
+                waypointScanResult = ExplorerStructureDiscovery.displayedPosition(mc, foundPosition);
+                return waypointScanResult == null ? null : waypointScanResult.clone();
             }
+            waypointScanResult = null;
         }
         return null;
     }
@@ -366,10 +370,7 @@ public class Explorer {
             || baritoneCoordinator.returnWaiting
             || baritoneCoordinator.resumeSearch
             || !inDungeonRoom(mc)
-            || !puzzleCenter.isInSameRoom(mc, this, center)
-            || solvedStructures
-                .contains(worldIdentity(mc), mc.theWorld.provider.dimensionId, center[0], center[1], center[2]))
-            return false;
+            || !puzzleCenter.isInSameRoom(mc, this, center)) return false;
         stop(mc, "Opening puzzle in current room");
         return puzzleCenter.resumePuzzleInCurrentRoom(mc, this, center);
     }
