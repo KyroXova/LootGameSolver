@@ -72,8 +72,18 @@ public final class ClientHooks {
     private boolean wasInsideRoom;
     private World puzzleWorld;
     private long totalActiveTicks = 0L;
+    private int solvedPuzzles;
 
     private final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
+
+    void recordPuzzleSolved() {
+        solvedPuzzles++;
+    }
+
+    static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven, boolean solving,
+        boolean opening, boolean storage) {
+        return navigating || looting || (explorationDriven && (solving || opening || storage));
+    }
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
         if (texture == null || mc == null || mc.getTextureManager() == null) return;
@@ -602,8 +612,7 @@ public final class ClientHooks {
     private void checkKeyToggles() {
         Minecraft mc = Minecraft.getMinecraft();
         boolean explorePressed = Keybinds.explore.isPressed();
-        int exploreCode = Keybinds.explore.getKeyCode();
-        boolean exploreDown = exploreCode > 0 && exploreCode < 256 && Keyboard.isKeyDown(exploreCode);
+        boolean exploreDown = GameSettings.isKeyDown(Keybinds.explore);
         boolean runExploreAction = false;
         if (mc.currentScreen != null) {
             exploreKeyHeld = false;
@@ -825,7 +834,9 @@ public final class ClientHooks {
             && !rewardReturnPending
             && (exploration == null || !exploration.navigating())
             && !wasInsideRoom
-            && !autoPuzzle.isActive()) return;
+            && !autoPuzzle.isActive()
+            && !exploreKeyHeld
+            && checkpointClearDoneTicks == 0) return;
         DetectedGame cur = session.getCurrentDetectedGame();
         if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
 
@@ -859,7 +870,13 @@ public final class ClientHooks {
 
             boolean autoActive = session.isActive();
             boolean holoActive = LootGameSolverConfig.showOverlay;
-            boolean explorerActive = exploration != null && (exploration.navigating() || rewardReturnPending);
+            boolean explorerActive = exploration != null && explorerHudActive(
+                exploration.navigating(),
+                rewardReturnPending,
+                explorationDriven,
+                session.isActive(),
+                autoPuzzle.isActive(),
+                storageRecovery != null);
 
             String autoColor = autoActive ? "\u00A7c" : "\u00A77";
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
@@ -869,7 +886,10 @@ public final class ClientHooks {
             long minutes = (totalSeconds % 3600L) / 60L;
             long seconds = totalSeconds % 60L;
             String timerStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7f" + timerStr + " \u00A77]";
+            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7f" + timerStr
+                + " \u00A77] [ \u00A7f"
+                + solvedPuzzles
+                + " \u00A77]";
             int dist = exploration != null ? exploration.checkpointDistance(mc) : 0;
             String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
             String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
@@ -886,7 +906,7 @@ public final class ClientHooks {
                 + holoKeyStr
                 + "] Holograms";
             if (exploration != null && LootGameSolverConfig.explorationEnabled) {
-                line3 += " \u00A78|" + (explorerActive ? "\u00A7a" : "\u00A77")
+                line3 += " \u00A78|" + (exploreKeyHeld ? "\u00A7e" : explorerActive ? "\u00A7a" : "\u00A77")
                     + " ["
                     + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] "
@@ -925,39 +945,12 @@ public final class ClientHooks {
     }
 
     private static void drawCheckpointProgressBar(int x, int y, int width, int height, float progress) {
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-        GL11.glDisable(GL11.GL_ALPHA_TEST);
-        GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glShadeModel(GL11.GL_SMOOTH);
-        GL11.glDepthMask(false);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glColor4f(0.12F, 0.12F, 0.12F, 0.9F);
-        GL11.glBegin(GL11.GL_QUADS);
-        GL11.glVertex2f(x, y);
-        GL11.glVertex2f(x + width, y);
-        GL11.glVertex2f(x + width, y + height);
-        GL11.glVertex2f(x, y + height);
-        GL11.glEnd();
-        int fill = Math.max(1, Math.round(width * Math.max(0F, Math.min(1F, progress))));
-        float leftGreen = Math.min(1F, progress * 0.75F);
-        float rightGreen = Math.min(1F, progress + 0.25F);
-        GL11.glBegin(GL11.GL_QUADS);
-        setProgressColor(1F - leftGreen, leftGreen, 0.05F, 1F);
-        GL11.glVertex2f(x, y);
-        setProgressColor(1F - rightGreen, rightGreen, 0.05F, 1F);
-        GL11.glVertex2f(x + fill, y);
-        setProgressColor(1F - rightGreen, rightGreen, 0.05F, 1F);
-        GL11.glVertex2f(x + fill, y + height);
-        setProgressColor(1F - leftGreen, leftGreen, 0.05F, 1F);
-        GL11.glVertex2f(x, y + height);
-        GL11.glEnd();
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1F, 1F, 1F, 1F);
-    }
-
-    private static void setProgressColor(float red, float green, float blue, float alpha) {
-        GL11.glColor4f(red, green, blue, alpha);
+        float amount = Math.max(0F, Math.min(1F, progress));
+        int fill = Math.round(width * amount);
+        int red = Math.round(255F * (1F - amount));
+        int green = Math.round(255F * amount);
+        net.minecraft.client.gui.Gui.drawRect(x, y, x + width, y + height, 0xE0202020);
+        if (fill > 0) net.minecraft.client.gui.Gui
+            .drawRect(x, y, x + fill, y + height, 0xFF000000 | (red << 16) | (green << 8) | 0x20);
     }
 }

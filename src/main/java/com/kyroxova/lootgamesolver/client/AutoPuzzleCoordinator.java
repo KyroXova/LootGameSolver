@@ -401,6 +401,7 @@ final class AutoPuzzleCoordinator {
                 return;
             }
             if (puzzleCompletion.won(mc.theWorld != null)) {
+                hooks.recordPuzzleSolved();
                 com.kyroxova.lootgamesolver.core.MiniGame completedGame = session.getGame();
                 session.cancel("Puzzle solved");
                 hooks.releaseMovementKeys(mc);
