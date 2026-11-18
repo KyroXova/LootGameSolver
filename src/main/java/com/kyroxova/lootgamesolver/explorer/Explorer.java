@@ -873,6 +873,28 @@ public class Explorer {
         return mc != null && mc.thePlayer != null && mc.theWorld != null && insideDungeonRoom(mc);
     }
 
+    public int[] verifiedRoomCenter(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null
+            || mc.theWorld == null
+            || baritoneCoordinator.surfaceMove
+            || baritoneCoordinator.returnMove
+            || returning) return null;
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (mc.theWorld.canBlockSeeTheSky(x, y, z)) return null;
+        int[] bounds = roomGeometry.dungeonRoomBounds(mc.theWorld, x, y, z, ticks);
+        if (bounds == null || x <= bounds[0] || x >= bounds[1] || z <= bounds[2] || z >= bounds[3]) return null;
+        return new int[] { (bounds[0] + bounds[1]) >> 1, y - 1, (bounds[2] + bounds[3]) >> 1 };
+    }
+
+    public void skipUnopenableRoom(Minecraft mc, int[] center) {
+        if (center == null) return;
+        stop(mc, "Skipping unopenable room");
+        knownStructure = center.clone();
+        markStructureSolved(mc, center);
+        finishPuzzle(mc, true);
+    }
+
     public void prepareRewardCollection(Minecraft mc, int[] center) {
         if (walking) stop(mc, "Reward collection started");
         if (mc == null || mc.theWorld == null || center == null) return;

@@ -46,6 +46,7 @@ public final class ClientHooks {
     private int detectCounter = 0;
     private final LootGamesBridge puzzleBridge = new LootGamesBridge();
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+    private final RoomOpenWatchdog roomOpenWatchdog = new RoomOpenWatchdog();
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
     private final RewardChestLooter preLootPacker = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
@@ -440,6 +441,44 @@ public final class ClientHooks {
         }
 
         autoPuzzle.tick(mc, puzzleBridge, exploration, session, puzzleCompletion, rewardLooter, this);
+
+        if (exploration != null) {
+            boolean watchingRoom = !session.isActive() && !rewardReturnPending
+                && (exploration.navigating() || (explorationDriven && !autoPuzzle.isIdle()));
+            int[] room = watchingRoom ? exploration.verifiedRoomCenter(mc) : null;
+            RoomOpenWatchdog.Action recovery = roomOpenWatchdog.tick(room, watchingRoom);
+            if (recovery != RoomOpenWatchdog.Action.WAIT) {
+                int[] rewards = nearbyRewardCenter(mc);
+                if (rewards != null) {
+                    roomOpenWatchdog.reset();
+                    autoPuzzle.reset();
+                    exploration.prepareRewardCollection(mc, rewards);
+                    rewardCenter = rewards;
+                    explorationDriven = true;
+                    ensureInventoryBaseline(mc);
+                    rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
+                    rewardPreCleanupPending = true;
+                    rewardPrePackingAttempted = false;
+                    rewardReturnPending = true;
+                } else if (recovery == RoomOpenWatchdog.Action.SKIP) {
+                    roomOpenWatchdog.reset();
+                    autoPuzzle.reset();
+                    session.cancel("Skipping unopenable room");
+                    releaseMovementKeys(mc);
+                    exploration.skipUnopenableRoom(mc, room);
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7e[LootGameSolver] Could not open this room after three retries; moving on."));
+                } else {
+                    int[] floor = puzzleBridge.nearbyFloorActivator();
+                    Object game = puzzleBridge.nearbyGame(true);
+                    int[] center = floor != null ? floor : game == null ? room : puzzleBridge.gameCenter(game);
+                    exploration.stop(mc, "Retrying room puzzle");
+                    explorationDriven = true;
+                    autoPuzzle.startManual(center != null ? center : room, floor, mc.theWorld, puzzleCompletion);
+                }
+            }
+        }
 
         if (session.isActive()) {
             handleAutoMovement(mc);
