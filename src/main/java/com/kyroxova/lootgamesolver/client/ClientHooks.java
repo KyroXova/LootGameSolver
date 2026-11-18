@@ -542,7 +542,6 @@ public final class ClientHooks {
                 }
                 if (boardCenter != null) {
                     autoPuzzle.startManual(boardCenter, floor, mc.theWorld, puzzleCompletion);
-                    exploration.moveToPuzzleCenter(mc, boardCenter);
                     exploration.setAutomationStatus("Opening puzzle in current room");
                     return;
                 }

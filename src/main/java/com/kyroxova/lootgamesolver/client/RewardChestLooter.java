@@ -366,14 +366,11 @@ final class RewardChestLooter {
                     packOpening = false;
                     packMoved = false;
                     backpackSlot = -1;
-                    for (int i = 0; i < backpackTried.length; i++) {
-                        backpackTried[i] = false;
-                        slotRejectedForCurrentBag[i] = false;
-                    }
                     status = "Moving collected rewards into a backpack";
                     return;
                 }
                 pendingSlot = -1;
+                java.util.Arrays.fill(backpackTried, false);
                 if (after == null) queueIndex++;
                 else return;
             }
@@ -621,7 +618,7 @@ final class RewardChestLooter {
             backpackSlot = -1;
             waiting = 5;
             openWait = 0;
-            if (collecting && queueIndex < queue.size()) {
+            if (collecting && queueIndex < queue.size() && packMoved) {
                 packing = false;
                 packMoved = false;
                 status = "Resuming reward collection";

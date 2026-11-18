@@ -188,6 +188,11 @@ final class AutoPuzzleCoordinator {
                     return;
                 }
                 int[] center = detectedCenter;
+                if (withinInteractionReach(mc, center)) {
+                    state = State.REVEALING;
+                    puzzleWaitTicks = 0;
+                    return;
+                }
                 if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
                     state = State.POSITIONING;
                     puzzleWaitTicks = 0;
