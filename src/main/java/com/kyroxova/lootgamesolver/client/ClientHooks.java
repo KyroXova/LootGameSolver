@@ -254,7 +254,11 @@ public final class ClientHooks {
             boolean inside = exploration.inDungeonRoom(mc);
             wasInsideRoom = inside;
         }
-        if (exploration != null) exploration.tick(mc, session.isActive());
+        if (exploration != null) {
+            if (autoPuzzle.isActive() || session.isActive() || rewardReturnPending || storageRecovery != null)
+                exploration.suspendStructureSearchForRoomWork(mc);
+            exploration.tick(mc, session.isActive());
+        }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (resumeLootRequested) {
             resumeLootRequested = false;
@@ -753,9 +757,10 @@ public final class ClientHooks {
             if (session.isActive()) {
                 statusStr = compactStatus(session.getStatus());
             } else if (exploration != null) {
-                statusStr = (exploration.navigating() || rewardReturnPending || autoPuzzle.isActive())
-                    ? exploration.navigationStatus()
-                    : "Ready";
+                statusStr = (exploration.navigating() || rewardReturnPending
+                    || autoPuzzle.isActive()
+                    || autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED) ? exploration.navigationStatus()
+                        : "Ready";
             } else {
                 statusStr = "Ready";
             }

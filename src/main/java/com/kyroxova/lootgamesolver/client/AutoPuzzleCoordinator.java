@@ -94,6 +94,7 @@ final class AutoPuzzleCoordinator {
         masterClickAttempts = 0;
         centerClickAttempts = 0;
         minesweeperOpeningClickSent = false;
+        activeMinesweeperLevel = -1;
         lastMasterClickTick = -40;
         lastCenterClickTick = -40;
         puzzleWorld = world;
@@ -110,6 +111,7 @@ final class AutoPuzzleCoordinator {
         masterClickAttempts = 0;
         centerClickAttempts = 0;
         minesweeperOpeningClickSent = false;
+        activeMinesweeperLevel = -1;
         lastMasterClickTick = -40;
         lastCenterClickTick = -40;
         puzzleWorld = world;
@@ -407,6 +409,9 @@ final class AutoPuzzleCoordinator {
                     hooks.setRewardPreCleanupPending(false);
                 }
                 autoPuzzlePosition = null;
+            } else if (!session.isActive()) {
+                state = State.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Solver stopped: " + session.getStatus());
             }
         }
     }

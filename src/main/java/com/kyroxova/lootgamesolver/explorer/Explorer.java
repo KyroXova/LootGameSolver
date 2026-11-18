@@ -375,6 +375,12 @@ public class Explorer {
         return puzzleCenter.resumePuzzleInCurrentRoom(mc, this, center);
     }
 
+    public void suspendStructureSearchForRoomWork(Minecraft mc) {
+        if (baritoneCoordinator.searchMove || baritoneCoordinator.structureMove) {
+            stop(mc, "Room automation in progress");
+        }
+    }
+
     public boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
         return puzzleCenter.moveToPuzzleCenter(mc, this, center);
     }
