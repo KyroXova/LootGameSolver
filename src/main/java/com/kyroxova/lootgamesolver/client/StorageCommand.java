@@ -17,6 +17,9 @@ import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 public final class StorageCommand extends CommandBase {
 
+    private static final String[] SUBCOMMANDS = { "help", "setHome", "setWarp", "setChest", "setStorage", "clearChest",
+        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot" };
+
     @Override
     public String getCommandName() {
         return "lootgamesolver";
@@ -29,12 +32,20 @@ public final class StorageCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/lgs help | setHome | setWarp <name> | setChest | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
+        return "/lgs help [command] | setHome | setWarp <name> | setChest | setStorage [name] | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
     }
 
     @Override
     public int getRequiredPermissionLevel() {
         return 0;
+    }
+
+    @Override
+    public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
+        if (args == null || args.length == 0) return new ArrayList<String>();
+        if (args.length == 1 || (args.length == 2 && "help".equalsIgnoreCase(args[0])))
+            return getListOfStringsMatchingLastWord(args, SUBCOMMANDS);
+        return new ArrayList<String>();
     }
 
     @Override
@@ -50,16 +61,13 @@ public final class StorageCommand extends CommandBase {
             return;
         }
         if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
-            reply(
-                sender,
-                "setHome: select /home; setWarp <name>: select /warp <name>; setChest: mark the inventory you are looking at.");
-            reply(
-                sender,
-                "clearChest: unmark the target; clearChests: remove all targets; clearWarp: remove the destination; clearStorage: clear everything.");
-            reply(
-                sender,
-                "enable/disable: turn configured automatic storage recovery on or off; storageStatus: show settings.");
-            reply(sender, "resumeLoot: resume a saved unfinished reward collection while near its original location.");
+            if (args.length > 1) {
+                String detail = commandHelp(args[1]);
+                reply(sender, detail == null ? "Unknown command. Use /lgs help to see all commands." : detail);
+            } else {
+                reply(sender, "Commands (use /lgs help <command> for details):");
+                for (String command : SUBCOMMANDS) reply(sender, commandHelp(command));
+            }
         } else if ("enable".equalsIgnoreCase(args[0]) || "disable".equalsIgnoreCase(args[0])) {
             boolean enable = "enable".equalsIgnoreCase(args[0]);
             LootGameSolverConfig.setStorageEnabled(enable);
@@ -154,6 +162,40 @@ public final class StorageCommand extends CommandBase {
     static boolean validWarpName(String value) {
         return value != null && value.matches("[A-Za-z0-9_-]{1,32}")
             && !StorageWarpFeedback.RETURN_WARP.equalsIgnoreCase(value);
+    }
+
+    static String commandHelp(String command) {
+        if (command == null) return null;
+        switch (command.toLowerCase(java.util.Locale.ROOT)) {
+            case "help":
+                return "/lgs help [command] - List commands or describe one command.";
+            case "sethome":
+                return "/lgs setHome - Use your existing /home command as the storage destination.";
+            case "setwarp":
+                return "/lgs setWarp <name> - Use /warp <name> as the storage destination; returnLooting is reserved.";
+            case "setchest":
+                return "/lgs setChest - Mark the inventory block or entity you are looking at for storage.";
+            case "setstorage":
+                return "/lgs setStorage [name] - With no name, mark the looked-at inventory; with a name, select that storage warp.";
+            case "clearchest":
+                return "/lgs clearChest - Unmark the storage block or entity you are looking at.";
+            case "clearchests":
+                return "/lgs clearChests - Remove all marked storage targets for this world.";
+            case "clearwarp":
+                return "/lgs clearWarp - Clear the home or warp destination, keeping marked targets.";
+            case "clearstorage":
+                return "/lgs clearStorage - Clear the destination and all targets, and disable recovery.";
+            case "enable":
+                return "/lgs enable - Allow recovery when a destination and storage targets are configured.";
+            case "disable":
+                return "/lgs disable - Disable recovery while keeping the destination and targets.";
+            case "storagestatus":
+                return "/lgs storageStatus - Show the destination, number of targets, and enabled setting.";
+            case "resumeloot":
+                return "/lgs resumeLoot - Resume saved reward collection when you are back near its location.";
+            default:
+                return null;
+        }
     }
 
     private static void reply(ICommandSender sender, String message) {
