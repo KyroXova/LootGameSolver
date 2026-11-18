@@ -585,6 +585,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
                 return false;
             }
+            net.minecraft.util.MovingObjectPosition visible = visibleTarget(mc, block[0], block[1], block[2]);
+            if (visible == null) return false;
             boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
                 && action.type == SolverAction.Type.SET_VALUE
                 && sudokuReverseClick;
@@ -598,14 +600,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             try {
                 boolean attack = action.type == SolverAction.Type.REVEAL
                     && detected.type != com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT;
-                return BaritoneBlockBridge.click(
-                    mc,
-                    block[0],
-                    block[1],
-                    block[2],
-                    1,
-                    Vec3.createVectorHelper(block[0] + 0.5D, block[1] + 1D, block[2] + 0.5D),
-                    attack);
+                return BaritoneBlockBridge
+                    .click(mc, block[0], block[1], block[2], visible.sideHit, visible.hitVec, attack);
             } finally {
                 // Keep reverse-cycle sneak active through the click's network tick.
                 if (shouldSneak && !wasSneaking) {
@@ -637,6 +633,33 @@ public final class LootGamesBridge implements MiniGameDetector {
         mc.thePlayer.setSneaking(restoreSneaking);
     }
 
+    static boolean targetHit(net.minecraft.util.MovingObjectPosition hit, int x, int y, int z) {
+        return hit != null && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
+            && hit.blockX == x
+            && hit.blockY == y
+            && hit.blockZ == z
+            && hit.hitVec != null;
+    }
+
+    private static net.minecraft.util.MovingObjectPosition visibleTarget(Minecraft mc, int x, int y, int z) {
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 look = mc.thePlayer.getLook(1.0F);
+        double reach = mc.playerController.getBlockReachDistance();
+        net.minecraft.util.MovingObjectPosition hit = mc.theWorld
+            .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
+        return targetHit(hit, x, y, z) ? hit : null;
+    }
+
+    public boolean hasClearView(int[] position) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (position == null || position.length < 3 || mc.thePlayer == null || mc.theWorld == null) return false;
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 center = Vec3.createVectorHelper(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
+        return targetHit(mc.theWorld.rayTraceBlocks(eye, center), position[0], position[1], position[2]);
+    }
+
     public boolean activateMaster(int x, int y, int z) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
@@ -645,22 +668,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             .getName()
             .endsWith(".PuzzleMasterBlock")) return false;
         if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
-        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
-        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-            || hit.blockX != x
-            || hit.blockY != y
-            || hit.blockZ != z) {
-            Vec3 eye = Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ);
-            Vec3 look = mc.thePlayer.getLook(1.0F);
-            double reach = mc.playerController.getBlockReachDistance();
-            Vec3 reachEnd = eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach);
-            hit = mc.theWorld.rayTraceBlocks(eye, reachEnd);
-        }
-        int side = hit != null ? hit.sideHit : 1;
-        Vec3 hitVec = hit != null ? hit.hitVec : Vec3.createVectorHelper(x + 0.5D, y + 1.0D, z + 0.5D);
+        net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
+        if (hit == null) return false;
+        int side = hit.sideHit;
+        Vec3 hitVec = hit.hitVec;
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
         boolean direct = mc.playerController
             .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
@@ -718,22 +729,10 @@ public final class LootGamesBridge implements MiniGameDetector {
             .equals(LOOTGAMES_PKG + "common.block.MSActivatorBlock") && foliageClearer.clearLine(mc, x, y, z))
             return false;
         if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
-        net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
-        if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-            || hit.blockX != x
-            || hit.blockY != y
-            || hit.blockZ != z) {
-            Vec3 eye = Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ);
-            Vec3 look = mc.thePlayer.getLook(1.0F);
-            double reach = mc.playerController.getBlockReachDistance();
-            Vec3 reachEnd = eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach);
-            hit = mc.theWorld.rayTraceBlocks(eye, reachEnd);
-        }
-        int side = hit != null ? hit.sideHit : 1;
-        Vec3 hitVec = hit != null ? hit.hitVec : Vec3.createVectorHelper(x + 0.5D, y + 1.0D, z + 0.5D);
+        net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
+        if (hit == null) return false;
+        int side = hit.sideHit;
+        Vec3 hitVec = hit.hitVec;
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
         boolean direct = mc.playerController
             .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
@@ -768,11 +767,8 @@ public final class LootGamesBridge implements MiniGameDetector {
             double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
             if (dx * dx + dy * dy + dz * dz > reach * reach || !selectSafeInteractionItem(mc)
                 || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
-            net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
-            if (hit == null || hit.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-                || hit.blockX != x
-                || hit.blockY != y
-                || hit.blockZ != z) return false;
+            net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
+            if (hit == null) return false;
             return BaritoneBlockBridge.click(mc, x, y, z, hit.sideHit, hit.hitVec, false);
         } catch (Exception e) {
             LootGameSolver.LOG.debug("Could not activate the LootGames board center", e);

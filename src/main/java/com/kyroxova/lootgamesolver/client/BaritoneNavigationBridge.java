@@ -43,6 +43,10 @@ public final class BaritoneNavigationBridge {
         return start(x, y, z, 0, true);
     }
 
+    public Start startWithPlacementWithoutBreaking(int x, int y, int z) {
+        return start(x, y, z, 3, true);
+    }
+
     public Start startAdjacent(int x, int y, int z) {
         return start(x, y, z, 1, false);
     }
@@ -127,7 +131,11 @@ public final class BaritoneNavigationBridge {
                     .getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
             }
-            customApi.getMethod(forbidBreaking ? "setGoalAndPathWithoutBreaking" : "setGoalAndPath", goalType)
+            customApi
+                .getMethod(
+                    kind == 3 ? "setGoalAndPathWithPlacementWithoutBreaking"
+                        : forbidBreaking ? "setGoalAndPathWithoutBreaking" : "setGoalAndPath",
+                    goalType)
                 .invoke(candidate, next);
             try {
                 candidatePathingApi.getMethod("setNavigationChatOverride", Boolean.class)

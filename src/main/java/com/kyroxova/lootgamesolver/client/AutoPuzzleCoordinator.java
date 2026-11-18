@@ -168,7 +168,8 @@ final class AutoPuzzleCoordinator {
                 rewardCenter = activator.clone();
                 floorActivatorPosition = activator;
                 floorActivatorClicked = false;
-                if (withinInteractionReach(mc, activator)) {
+                if (withinInteractionReach(mc, activator) && mc.thePlayer.boundingBox.minY >= activator[1] + 0.9D
+                    && puzzleBridge.hasClearView(activator)) {
                     state = State.REVEALING;
                     puzzleWaitTicks = 0;
                     return;

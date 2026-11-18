@@ -73,8 +73,10 @@ public final class PuzzleCenterNavigator {
     public boolean moveToPosition(Minecraft mc, Explorer explorer, int[] center, boolean allowDigging) {
         if (mc.thePlayer == null || center == null || center.length < 3 || explorer.movingToPuzzleCenter) return false;
         if (!explorer.walking && explorer.navigationInput == null) {
-            BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
-                .startWithoutBreaking(center[0], center[1] + 1, center[2]);
+            BaritoneNavigationBridge.Start started = allowDigging
+                && (!explorer.inDungeonRoom(mc) || mc.thePlayer.boundingBox.minY < center[1] + 0.5D)
+                    ? explorer.baritoneNavigation.startWithPlacementWithoutBreaking(center[0], center[1] + 1, center[2])
+                    : explorer.baritoneNavigation.startWithoutBreaking(center[0], center[1] + 1, center[2]);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 explorer.puzzleMasterTarget = explorer.target;
                 TileEntity point = new TileEntity();
