@@ -403,6 +403,7 @@ final class AutoPuzzleCoordinator {
                     exploration.prepareRewardCollection(mc, solvedPos);
                     hooks.ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, solvedPos, completedGame);
+                    hooks.setRewardCenter(solvedPos);
                     hooks.setRewardPreCleanupPending(true);
                     hooks.setRewardReturnPending(true);
                 } else {

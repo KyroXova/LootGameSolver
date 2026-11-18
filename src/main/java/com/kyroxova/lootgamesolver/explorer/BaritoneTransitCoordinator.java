@@ -22,6 +22,7 @@ public final class BaritoneTransitCoordinator {
     public boolean resumeSearch;
     public boolean surfaceMove;
     private boolean surfaceWaiting;
+    private boolean surfaceSolved;
     private int surfaceWait;
     private int surfaceStallTicks;
     private double surfaceLastX, surfaceLastY, surfaceLastZ;
@@ -76,8 +77,13 @@ public final class BaritoneTransitCoordinator {
     }
 
     boolean beginSurfaceExit(Minecraft mc, Explorer explorer) {
+        return beginSurfaceExit(mc, explorer, true);
+    }
+
+    boolean beginSurfaceExit(Minecraft mc, Explorer explorer, boolean solved) {
         surfaceGoal = findSurfaceGoal(mc, 0);
         if (surfaceGoal == null) return false;
+        surfaceSolved = solved;
         surfaceMove = true;
         surfaceWaiting = true;
         surfaceWait = 0;
@@ -162,7 +168,7 @@ public final class BaritoneTransitCoordinator {
                 surfaceMove = false;
                 resumeSearch = true;
                 returnWorld = mc.theWorld;
-                returnSolved = true;
+                returnSolved = surfaceSolved;
                 returnWait = 0;
                 explorer.status = "On the surface; preparing the next search";
                 return true;

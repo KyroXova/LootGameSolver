@@ -145,9 +145,13 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     private static boolean preparePlayerPositionAndAim(EntityPlayer player, int x, int y, int z) {
+        return preparePlayerPositionAndAim(player, x, y, z, false);
+    }
+
+    private static boolean preparePlayerPositionAndAim(EntityPlayer player, int x, int y, int z, boolean top) {
         if (player == null) return false;
         double dx = x + 0.5D - player.posX;
-        double dy = y + 0.5D - (player.posY + player.getEyeHeight());
+        double dy = y + (top ? 0.999D : 0.5D) - (player.posY + player.getEyeHeight());
         double dz = z + 0.5D - player.posZ;
         double distSq = dx * dx + dy * dy + dz * dz;
 
@@ -158,20 +162,7 @@ public final class LootGamesBridge implements MiniGameDetector {
         player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
         player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
 
-        if (distSq > 17.64D) {
-            double speed = 0.15D;
-            if (distXZ > 0.1D) {
-                player.motionX += (dx / distXZ) * speed;
-                player.motionZ += (dz / distXZ) * speed;
-            }
-            if (player.capabilities.allowFlying) {
-                player.capabilities.isFlying = true;
-                if (Math.abs(dy) > 1.2D) {
-                    player.motionY = dy > 0 ? 0.12D : -0.12D;
-                }
-            }
-            return false;
-        }
+        if (distSq > 17.64D) return false;
         return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
             && Math.abs(pitch - player.rotationPitch) < 2F;
     }
@@ -582,11 +573,11 @@ public final class LootGamesBridge implements MiniGameDetector {
             if (detected.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER
                 && foliageClearer.clearLine(mc, block[0], block[1], block[2])) return false;
 
-            if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2])) {
+            if (!preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2], true)) {
                 return false;
             }
             net.minecraft.util.MovingObjectPosition visible = visibleTarget(mc, block[0], block[1], block[2]);
-            if (visible == null) return false;
+            if (visible == null || visible.sideHit != 1) return false;
             boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
                 && action.type == SolverAction.Type.SET_VALUE
                 && sudokuReverseClick;
@@ -658,6 +649,15 @@ public final class LootGamesBridge implements MiniGameDetector {
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         Vec3 center = Vec3.createVectorHelper(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
         return targetHit(mc.theWorld.rayTraceBlocks(eye, center), position[0], position[1], position[2]);
+    }
+
+    public static boolean topFaceVisible(Minecraft mc, int[] position) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || position == null) return false;
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 top = Vec3.createVectorHelper(position[0] + 0.5D, position[1] + 0.999D, position[2] + 0.5D);
+        net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, top);
+        return targetHit(hit, position[0], position[1], position[2]) && hit.sideHit == 1;
     }
 
     public boolean activateMaster(int x, int y, int z) {

@@ -48,6 +48,7 @@ final class RewardChestLooter {
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "pending-loot.json"));
     private int[] center;
+    private int[] checkpointCenter;
     private int[] chestView;
     private final List<int[]> failedChestViews = new ArrayList<int[]>();
     private int failedViewChest = -1;
@@ -78,6 +79,7 @@ final class RewardChestLooter {
     void start(Minecraft mc, int[] position, MiniGame type) {
         if (baseline == null) baseline = InventoryBaseline.capture(mc);
         center = position == null ? null : position.clone();
+        checkpointCenter = center == null ? null : center.clone();
         chestView = null;
         failedChestViews.clear();
         failedViewChest = -1;
@@ -146,8 +148,15 @@ final class RewardChestLooter {
         return pendingLoot.load();
     }
 
+    PendingLootStore.Checkpoint saveCheckpoint(Minecraft mc) {
+        if (mc == null || mc.theWorld == null || checkpointCenter == null) return null;
+        if (!pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, checkpointCenter, gameType))
+            return null;
+        return pendingLoot.load();
+    }
+
     int[] rewardCenter() {
-        return center == null ? null : center.clone();
+        return checkpointCenter == null ? null : checkpointCenter.clone();
     }
 
     void cancel(Minecraft mc) {
@@ -275,7 +284,7 @@ final class RewardChestLooter {
             PendingLootStore.Checkpoint checkpoint = pendingLoot.load();
             if (checkpoint != null && checkpoint.world.equals(Explorer.worldIdentity(mc))
                 && checkpoint.dimension == mc.theWorld.provider.dimensionId
-                && java.util.Arrays.equals(checkpoint.center, center)) pendingLoot.clear();
+                && java.util.Arrays.equals(checkpoint.center, checkpointCenter)) pendingLoot.clear();
             active = false;
             return;
         }
@@ -673,11 +682,10 @@ final class RewardChestLooter {
                 temporaryBagUsed = false;
             }
             if (packingOnly) status = "No available backpack; items kept";
-            else if (!collecting && index >= chests.size()) status = "Reward chests collected";
+            else if (!collecting && index >= chests.size() && !hasPackableItems(mc)) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
             if (hasPackableItems(mc) || collecting) {
-                boolean saved = center == null || !collecting
-                    || pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, center, gameType);
+                boolean saved = center == null || saveCheckpoint(mc) != null;
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
                         "\u00a7e[LootGameSolver] Inventory or backpacks are full or unavailable. Please make space."

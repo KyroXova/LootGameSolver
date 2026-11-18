@@ -194,6 +194,10 @@ public class Explorer {
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "solved-structures.json"));
+    private final SolvedStructureStore blockedStructures = new SolvedStructureStore(
+        new java.io.File(
+            new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
+            "blocked-structures.json"));
     boolean puzzleArrivalPending;
     private ExcavationPathfinder existingAccessPlan;
     private boolean planningExistingAccess;
@@ -336,7 +340,7 @@ public class Explorer {
             waypointScanWorld = mc.theWorld;
             waypointScanTick = now;
             net.minecraft.tileentity.TileEntity found = ExplorerStructureDiscovery
-                .find(mc, savedFinder, solvedStructures, worldIdentity(mc));
+                .find(mc, savedFinder, solvedStructures, blockedStructures, worldIdentity(mc));
             if (found != null) {
                 int[] foundPosition = { found.xCoord, found.yCoord, found.zCoord };
                 waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, found);
@@ -687,6 +691,7 @@ public class Explorer {
     }
 
     public String navigationStatus() {
+        if (status != null && status.startsWith("Retry ")) return status;
         if (baritoneCoordinator.active() && baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
             if (baritoneCoordinator.surfaceMove || baritoneCoordinator.returnMove) return "Ascending to Surface";
             if (baritoneCoordinator.structureMove) return "Navigating to Puzzle";
@@ -891,8 +896,15 @@ public class Explorer {
         if (center == null) return;
         stop(mc, "Skipping unopenable room");
         knownStructure = center.clone();
-        markStructureSolved(mc, center);
-        finishPuzzle(mc, true);
+        try {
+            blockedStructures.mark(worldIdentity(mc), mc.theWorld.provider.dimensionId, center, center);
+        } catch (java.io.IOException e) {
+            status = "Could not save blocked room";
+            return;
+        }
+        segmentX = mc.thePlayer.posX;
+        segmentZ = mc.thePlayer.posZ;
+        if (!baritoneCoordinator.beginSurfaceExit(mc, this, false)) stop(mc, "No safe surface destination found");
     }
 
     public void prepareRewardCollection(Minecraft mc, int[] center) {
@@ -2612,7 +2624,8 @@ public class Explorer {
         target = null;
         knownStructure = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
-        target = ExplorerStructureDiscovery.find(mc, savedFinder, solvedStructures, worldIdentity(mc));
+        target = ExplorerStructureDiscovery
+            .find(mc, savedFinder, solvedStructures, blockedStructures, worldIdentity(mc));
         if (target != null) {
             knownStructure = new int[] { target.xCoord, target.yCoord, target.zCoord };
             waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, target);

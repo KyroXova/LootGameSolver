@@ -32,4 +32,8 @@ final class RoomOpenWatchdog {
         ticks = 0;
         room = null;
     }
+
+    String status() {
+        return "Retry " + Math.min(3, ticks / 150) + "/3: " + Math.max(0, (600 - ticks + 19) / 20) + "s";
+    }
 }

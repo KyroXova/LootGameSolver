@@ -357,6 +357,8 @@ public final class ClientHooks {
                     preLootPacker.tick(mc, null);
                     if (exploration != null) exploration.setAutomationStatus(preLootPacker.status());
                     if (preLootPacker.active()) return;
+                    if ("No available backpack; items kept".equals(preLootPacker.status())
+                        && startStorageRecovery(mc, rewardLooter.saveCheckpoint(mc))) return;
                 }
                 rewardPreCleanupPending = false;
                 rewardPrePackingAttempted = false;
@@ -367,15 +369,7 @@ public final class ClientHooks {
                 if (("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
                     || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
-                    PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
-                    if (checkpoint != null && java.util.Arrays.equals(rewardLooter.rewardCenter(), checkpoint.center)) {
-                        StorageRecoveryController recovery = new StorageRecoveryController();
-                        if (recovery.start(mc, checkpoint, inventoryBaseline)) {
-                            storageRecovery = recovery;
-                            if (exploration != null) exploration.setAutomationStatus("Preparing storage trip");
-                            return;
-                        }
-                    }
+                    if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
                 }
                 if (rewardLooter.completed()
                     || "Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
@@ -447,6 +441,7 @@ public final class ClientHooks {
                 && (exploration.navigating() || (explorationDriven && !autoPuzzle.isIdle()));
             int[] room = watchingRoom ? exploration.verifiedRoomCenter(mc) : null;
             RoomOpenWatchdog.Action recovery = roomOpenWatchdog.tick(room, watchingRoom);
+            if (room != null) exploration.setAutomationStatus(roomOpenWatchdog.status());
             if (recovery != RoomOpenWatchdog.Action.WAIT) {
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
@@ -500,6 +495,20 @@ public final class ClientHooks {
 
     void setRewardReturnPending(boolean pending) {
         this.rewardReturnPending = pending;
+    }
+
+    void setRewardCenter(int[] center) {
+        rewardCenter = center == null ? null : center.clone();
+    }
+
+    private boolean startStorageRecovery(Minecraft mc, PendingLootStore.Checkpoint checkpoint) {
+        if (checkpoint == null || !java.util.Arrays.equals(rewardLooter.rewardCenter(), checkpoint.center))
+            return false;
+        StorageRecoveryController recovery = new StorageRecoveryController();
+        if (!recovery.start(mc, checkpoint, inventoryBaseline)) return false;
+        storageRecovery = recovery;
+        if (exploration != null) exploration.setAutomationStatus("Preparing storage trip");
+        return true;
     }
 
     InventoryBaseline getInventoryBaseline() {
@@ -719,13 +728,8 @@ public final class ClientHooks {
         double distSq = dx * dx + dy * dy + dz * dz;
         double distXZ = Math.sqrt(dx * dx + dz * dz);
 
-        float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
-        float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
-        mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 40.0F);
-        mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 30.0F);
-
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
-        if (distSq > reach * reach) {
+        if ((distSq > reach * reach || !LootGamesBridge.topFaceVisible(mc, block)) && distXZ > 0.75D) {
             double speed = 0.10D;
             if (distXZ > 0.1D) {
                 mc.thePlayer.motionX = (dx / distXZ) * speed;

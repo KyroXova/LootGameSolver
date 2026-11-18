@@ -14,6 +14,7 @@ public class RoomOpenWatchdogTest {
             RoomOpenWatchdog.Action expected = tick == 600 ? RoomOpenWatchdog.Action.SKIP
                 : tick % 150 == 0 ? RoomOpenWatchdog.Action.RETRY : RoomOpenWatchdog.Action.WAIT;
             assertEquals("tick " + tick, expected, watchdog.tick(room, true));
+            if (tick == 150) assertEquals("Retry 1/3: 23s", watchdog.status());
         }
     }
 

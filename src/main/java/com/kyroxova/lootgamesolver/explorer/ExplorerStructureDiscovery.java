@@ -11,12 +11,14 @@ final class ExplorerStructureDiscovery {
     private ExplorerStructureDiscovery() {}
 
     static TileEntity find(Minecraft mc, SavedStructureFinder savedFinder, SolvedStructureStore solved,
-        String worldId) {
+        SolvedStructureStore blocked, String worldId) {
         if (mc.theWorld == null || mc.thePlayer == null) return null;
         TileEntity target = null;
         double nearest = Double.MAX_VALUE;
         if (savedFinder != null) for (int[] position : savedFinder.positions()) {
             if (solved.contains(worldId, mc.theWorld.provider.dimensionId, position[0], position[1], position[2]))
+                continue;
+            if (blocked.contains(worldId, mc.theWorld.provider.dimensionId, position[0], position[1], position[2]))
                 continue;
             double distance = mc.thePlayer.getDistanceSq(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
             if (distance < nearest) {
@@ -46,6 +48,8 @@ final class ExplorerStructureDiscovery {
                     .getName()))
                 continue;
             if (solved.contains(worldId, mc.theWorld.provider.dimensionId, tile.xCoord, tile.yCoord, tile.zCoord))
+                continue;
+            if (blocked.contains(worldId, mc.theWorld.provider.dimensionId, tile.xCoord, tile.yCoord, tile.zCoord))
                 continue;
             try {
                 boolean unopened = tile.getClass()
