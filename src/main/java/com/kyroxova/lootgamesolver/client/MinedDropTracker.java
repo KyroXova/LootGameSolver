@@ -24,6 +24,46 @@ final class MinedDropTracker {
 
     private final List<Entry> entries = new ArrayList<Entry>();
     private boolean initialized;
+    private boolean dirty;
+
+    static final class SavedEntry {
+
+        String item;
+        int metadata, total, mined;
+    }
+
+    List<SavedEntry> snapshot() {
+        List<SavedEntry> saved = new ArrayList<SavedEntry>();
+        for (Entry entry : entries) {
+            if (entry.mined <= 0) continue;
+            String id = (String) Item.itemRegistry.getNameForObject(entry.item.getItem());
+            if (id == null) continue;
+            SavedEntry value = new SavedEntry();
+            value.item = id;
+            value.metadata = entry.item.getItemDamage();
+            value.total = entry.previous;
+            value.mined = entry.mined;
+            saved.add(value);
+        }
+        return saved;
+    }
+
+    void restore(ItemStack item, int total, int mined) {
+        if (item == null || total <= 0 || mined <= 0 || mined > total || find(item) != null) return;
+        Entry entry = new Entry(item);
+        entry.previous = total;
+        entry.mined = mined;
+        entries.add(entry);
+        initialized = true;
+    }
+
+    boolean dirty() {
+        return dirty;
+    }
+
+    void saved() {
+        dirty = false;
+    }
 
     static ItemStack[] inventory(Minecraft mc) {
         ItemStack[] result = new ItemStack[36];
@@ -42,6 +82,7 @@ final class MinedDropTracker {
     void clear() {
         entries.clear();
         initialized = false;
+        dirty = false;
     }
 
     void observe(ItemStack[] inventory, boolean mining, Predicate<ItemStack> eligible) {
@@ -52,10 +93,12 @@ final class MinedDropTracker {
         for (Entry entry : entries) {
             int old = entry.previous;
             int current = count(inventory, entry.item);
+            int oldMined = entry.mined;
             if (initialized && mining && current > old && eligible.test(entry.item)) entry.mined += current - old;
             if (current < old) entry.mined = Math.max(0, entry.mined - (old - current));
             entry.mined = Math.min(entry.mined, current);
             entry.previous = current;
+            if (oldMined != entry.mined || (entry.mined > 0 && old != current)) dirty = true;
         }
         initialized = true;
     }

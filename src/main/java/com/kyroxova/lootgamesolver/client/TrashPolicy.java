@@ -36,7 +36,9 @@ final class TrashPolicy {
     }
 
     static boolean isOreDictionaryTrash(String name) {
-        return name != null && (name.startsWith("ore") || name.startsWith("rawOre") || name.startsWith("crushed"));
+        return name != null && (name.startsWith("ore") || name.startsWith("rawOre")
+            || name.startsWith("crushed")
+            || name.startsWith("dust"));
     }
 
     static boolean isBrokenBlockOrTrash(ItemStack stack, String id, int metadata) {
@@ -79,6 +81,7 @@ final class TrashPolicy {
             || name.equals("minecraft:clay")
             || name.equals("minecraft:clay_ball")
             || name.equals("gregtech:gt.blockgranites")
+            || (name.equals("gregtech:gt.metaitem.01") && metadata >= 3000 && metadata < 4000)
             || name.equals("minecraft:snow")
             || name.equals("minecraft:snow_layer")
             || name.equals("minecraft:snowball")

@@ -52,6 +52,7 @@ public final class ClientHooks {
     private final RewardChestLooter preLootPacker = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private final MinedDropTracker minedDrops = new MinedDropTracker();
+    private MinedDropStore minedDropStore;
     private StorageRecoveryController storageRecovery;
     private boolean storageResumeChecked;
     private int storageResumeWait;
@@ -243,6 +244,8 @@ public final class ClientHooks {
         checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
+            if (minedDropStore != null && minedDrops.dirty()) minedDropStore.save(minedDrops);
+            minedDropStore = null;
             minedDrops.clear();
             trashCleanup.setMinedDrops(minedDrops);
             rewardLooter.setMinedDrops(minedDrops);
@@ -306,11 +309,21 @@ public final class ClientHooks {
             exploration.tick(mc, session.isActive());
         }
         if (mc.thePlayer != null && mc.theWorld != null) {
+            if (minedDropStore == null) {
+                minedDropStore = new MinedDropStore(
+                    new java.io.File(mc.mcDataDir, "config/lootgamesolver"),
+                    Explorer.worldIdentity(mc),
+                    mc.thePlayer.getUniqueID()
+                        .toString());
+                minedDropStore.load(minedDrops);
+                minedDrops.observe(MinedDropTracker.inventory(mc), false, MinedDropTracker::eligible);
+            }
             boolean mining = exploration != null && exploration.observingMinedDrops()
                 && !session.isActive()
                 && !rewardReturnPending
                 && mc.currentScreen == null;
             minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
+            if (minedDrops.dirty() && mc.thePlayer.ticksExisted % 20 == 0) minedDropStore.save(minedDrops);
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (resumeLootRequested) {
