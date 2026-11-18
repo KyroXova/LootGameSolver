@@ -47,10 +47,12 @@ public final class ClientHooks {
     private final LootGamesBridge puzzleBridge = new LootGamesBridge();
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
+    private final RewardChestLooter preLootPacker = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private StorageRecoveryController storageRecovery;
     private boolean rewardReturnPending;
     private boolean rewardPreCleanupPending;
+    private boolean rewardPrePackingAttempted;
     private int inventoryMaintenanceStage;
     private int inventoryMaintenanceWait;
     private int inventoryMaintenanceCooldown;
@@ -213,6 +215,9 @@ public final class ClientHooks {
                 if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
                         "\u00a7e[LootGameSolver] Storage recovery stopped. Your unfinished rewards remain saved; check storage and use /lgs resumeLoot when back nearby."));
+                if (mc.thePlayer != null && mc.thePlayer.inventory.getItemStack() != null) mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] An item is on your cursor. Place it in an inventory slot before closing the screen."));
             }
             return;
         }
@@ -224,6 +229,7 @@ public final class ClientHooks {
             inventoryMaintenanceCooldown = 0;
             wasInsideRoom = false;
             trashCleanup.reset();
+            if (preLootPacker.active()) preLootPacker.cancel(mc);
             rewardLooter.cancel(mc);
             rewardReturnPending = false;
             rewardPreCleanupPending = false;
@@ -231,6 +237,8 @@ public final class ClientHooks {
             inventoryBaseline = null;
             trashCleanup.setBaseline(null);
             rewardLooter.setBaseline(null);
+            preLootPacker.setBaseline(null);
+            rewardPrePackingAttempted = false;
             rewardCenter = null;
             puzzleWorld = mc.theWorld;
             if (!autoPuzzle.isIdle()) {
@@ -313,6 +321,7 @@ public final class ClientHooks {
             int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int z = (int) Math.floor(mc.thePlayer.posZ);
             if (exploration != null && !exploration.inDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+                if (preLootPacker.active()) preLootPacker.cancel(mc);
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
                 if (explorationDriven && exploration != null) {
@@ -323,23 +332,28 @@ public final class ClientHooks {
             }
             if (rewardPreCleanupPending) {
                 if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return;
-                trashCleanup.clearCooldown();
-                if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
-                    if (trashCleanup.tick(mc, true)) {
-                        if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                if (!rewardPrePackingAttempted) {
+                    trashCleanup.clearCooldown();
+                    if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
+                        if (trashCleanup.tick(mc, true)) {
+                            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                            return;
+                        }
+                    }
+                    rewardPrePackingAttempted = true;
+                    preLootPacker.setBaseline(inventoryBaseline);
+                    if (preLootPacker.startInventoryPacking(mc)) {
+                        if (exploration != null) exploration.setAutomationStatus("Packing inventory before looting");
                         return;
                     }
                 }
-                if (!rewardLooter.active() && rewardLooter.startInventoryPacking(mc)) {
-                    if (exploration != null) exploration.setAutomationStatus("Packing inventory before looting");
-                    return;
-                }
-                if (rewardLooter.active() && "Packing inventory".equals(rewardLooter.status())) {
-                    rewardLooter.tick(mc, null);
-                    if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
-                    if (rewardLooter.active()) return;
+                if (preLootPacker.active()) {
+                    preLootPacker.tick(mc, null);
+                    if (exploration != null) exploration.setAutomationStatus(preLootPacker.status());
+                    if (preLootPacker.active()) return;
                 }
                 rewardPreCleanupPending = false;
+                rewardPrePackingAttempted = false;
             }
             rewardLooter.tick(mc, exploration);
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
@@ -437,6 +451,7 @@ public final class ClientHooks {
 
     void setRewardPreCleanupPending(boolean pending) {
         this.rewardPreCleanupPending = pending;
+        this.rewardPrePackingAttempted = false;
     }
 
     void setRewardReturnPending(boolean pending) {
@@ -451,6 +466,7 @@ public final class ClientHooks {
         inventoryBaseline = InventoryBaseline.capture(mc);
         trashCleanup.setBaseline(inventoryBaseline);
         rewardLooter.setBaseline(inventoryBaseline);
+        preLootPacker.setBaseline(inventoryBaseline);
     }
 
     void ensureInventoryBaseline(Minecraft mc) {
@@ -475,6 +491,7 @@ public final class ClientHooks {
                 exploreHoldActionDone = true;
                 checkpointClearDoneTicks = 12;
                 if (rewardReturnPending) {
+                    if (preLootPacker.active()) preLootPacker.cancel(mc);
                     rewardLooter.cancel(mc);
                     rewardReturnPending = false;
                 }
@@ -497,6 +514,7 @@ public final class ClientHooks {
                 rewardLooter.setBaseline(inventoryBaseline);
             }
             if (rewardReturnPending) {
+                if (preLootPacker.active()) preLootPacker.cancel(mc);
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
                 if (exploration.navigating()) exploration.toggle(mc);
@@ -535,6 +553,7 @@ public final class ClientHooks {
                     ensureInventoryBaseline(mc);
                     rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
                     rewardPreCleanupPending = true;
+                    rewardPrePackingAttempted = false;
                     rewardReturnPending = true;
                     exploration.setAutomationStatus("Collecting reward chests");
                     return;

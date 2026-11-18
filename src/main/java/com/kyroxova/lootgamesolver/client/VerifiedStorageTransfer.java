@@ -24,7 +24,8 @@ final class VerifiedStorageTransfer {
     private final int window;
     private final boolean[] rejected = new boolean[36];
     private ItemStack pending;
-    private int beforePlayer, beforeDestination, pendingPlayerSlot = -1, wait, moved;
+    private VerifiedContainerClick click;
+    private int beforePlayer, beforeDestination, pendingPlayerSlot = -1, moved;
 
     int moved() {
         return moved;
@@ -46,11 +47,11 @@ final class VerifiedStorageTransfer {
             || container.windowId != window
             || mc.thePlayer.inventory.getItemStack() != null
             || destination == mc.thePlayer.inventory) return Result.FAILED;
-        if (wait > 0) {
-            wait--;
-            return Result.WORKING;
-        }
         if (pending != null) {
+            VerifiedContainerClick.Result reply = click.tick();
+            if (reply == VerifiedContainerClick.Result.WAITING) return Result.WORKING;
+            if (reply == VerifiedContainerClick.Result.FAILED) return Result.FAILED;
+            click = null;
             int afterPlayer = count(mc.thePlayer.inventory, pending);
             int afterDestination = count(destination, pending);
             if (!StorageTransferPolicy.confirmed(beforePlayer, afterPlayer, beforeDestination, afterDestination)) {
@@ -77,14 +78,18 @@ final class VerifiedStorageTransfer {
             beforePlayer = count(mc.thePlayer.inventory, pending);
             beforeDestination = count(destination, pending);
             pendingPlayerSlot = index;
-            if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
+            click = VerifiedContainerClick.start(mc, slot.slotNumber, true);
+            if (click == null) {
                 pending = null;
                 return Result.FAILED;
             }
-            wait = 5;
             return Result.WORKING;
         }
         return remaining ? Result.FULL_OR_REJECTED : Result.DONE;
+    }
+
+    void cancel() {
+        if (click != null) click.close();
     }
 
     static boolean hasMovable(Minecraft mc, StorageLootLedger ledger, InventoryBaseline baseline) {

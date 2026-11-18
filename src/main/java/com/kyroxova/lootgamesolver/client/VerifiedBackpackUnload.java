@@ -24,7 +24,8 @@ final class VerifiedBackpackUnload {
     private final int window;
     private ItemStack pending;
     private ItemStack destinationBefore;
-    private int beforeBag, beforePlayer, beforeHotbar, destinationSlot, stage, wait;
+    private VerifiedContainerClick click;
+    private int beforeBag, beforePlayer, beforeHotbar, destinationSlot, stage;
 
     VerifiedBackpackUnload(Container container, IInventory backpack, StorageLootLedger ledger) {
         this.container = container;
@@ -40,18 +41,20 @@ final class VerifiedBackpackUnload {
             || container.windowId != window
             || (stage == 0 && mc.thePlayer.inventory.getItemStack() != null)
             || backpack == mc.thePlayer.inventory) return Result.FAILED;
-        if (wait > 0) {
-            wait--;
-            return Result.WORKING;
+        if (stage != 0) {
+            VerifiedContainerClick.Result reply = click.tick();
+            if (reply == VerifiedContainerClick.Result.WAITING) return Result.WORKING;
+            if (reply == VerifiedContainerClick.Result.FAILED) return Result.FAILED;
+            click = null;
         }
         if (stage == 1) {
             ItemStack cursor = mc.thePlayer.inventory.getItemStack();
             Slot destination = container.getSlot(destinationSlot);
             if (!ItemStack.areItemStacksEqual(cursor, pending)
-                || !ItemStack.areItemStacksEqual(destinationBefore, destination.getStack())
-                || !BaritoneInventoryBridge.leftClick(mc, destinationSlot)) return Result.FAILED;
+                || !ItemStack.areItemStacksEqual(destinationBefore, destination.getStack())) return Result.FAILED;
+            click = VerifiedContainerClick.start(mc, destinationSlot, false);
+            if (click == null) return Result.FAILED;
             stage = 2;
-            wait = 5;
             return Result.WORKING;
         }
         if (stage == 2) {
@@ -84,15 +87,19 @@ final class VerifiedBackpackUnload {
             destinationBefore = destination.getStack() == null ? null
                 : destination.getStack()
                     .copy();
-            if (!BaritoneInventoryBridge.leftClick(mc, slot.slotNumber)) {
+            click = VerifiedContainerClick.start(mc, slot.slotNumber, false);
+            if (click == null) {
                 pending = null;
                 return Result.FAILED;
             }
             stage = 1;
-            wait = 5;
             return Result.WORKING;
         }
         return remaining ? Result.NEEDS_ATTENTION : Result.EMPTY;
+    }
+
+    void cancel() {
+        if (click != null) click.close();
     }
 
     static Slot destination(Container container, IInventory playerInventory, ItemStack stack) {

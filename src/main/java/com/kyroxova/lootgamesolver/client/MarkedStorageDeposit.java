@@ -175,6 +175,7 @@ final class MarkedStorageDeposit {
     }
 
     void cancel(Minecraft mc) {
+        if (transfer != null) transfer.cancel();
         navigation.stop();
         if (mc != null && mc.thePlayer != null) restoreSlot(mc);
     }
@@ -237,7 +238,7 @@ final class MarkedStorageDeposit {
     private void restoreSlot(Minecraft mc) {
         if (oldSlot >= 0) {
             mc.thePlayer.inventory.currentItem = oldSlot;
-            mc.playerController.updateController();
+            if (mc.playerController != null) mc.playerController.updateController();
             oldSlot = -1;
         }
     }

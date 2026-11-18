@@ -142,6 +142,7 @@ final class BackpackStorageUnload {
     }
 
     void cancel(Minecraft mc) {
+        if (withdraw != null) withdraw.cancel();
         if (mc == null) return;
         swap.cancel(mc);
         if (mc != null && mc.thePlayer != null) restoreSelection(mc);
@@ -150,7 +151,7 @@ final class BackpackStorageUnload {
     private void restoreSelection(Minecraft mc) {
         if (oldSlot >= 0) {
             mc.thePlayer.inventory.currentItem = oldSlot;
-            mc.playerController.updateController();
+            if (mc.playerController != null) mc.playerController.updateController();
             oldSlot = -1;
         }
     }
