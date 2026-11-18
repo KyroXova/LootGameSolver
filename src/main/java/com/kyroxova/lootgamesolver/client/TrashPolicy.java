@@ -20,7 +20,7 @@ final class TrashPolicy {
         if (stack != null) {
             for (int oreId : OreDictionary.getOreIDs(stack)) {
                 String name = OreDictionary.getOreName(oreId);
-                if (name.startsWith("ore") || name.startsWith("rawOre")) {
+                if (isOreDictionaryTrash(name)) {
                     return true;
                 }
             }
@@ -33,6 +33,10 @@ final class TrashPolicy {
             }
         }
         return false;
+    }
+
+    static boolean isOreDictionaryTrash(String name) {
+        return name != null && (name.startsWith("ore") || name.startsWith("rawOre") || name.startsWith("crushed"));
     }
 
     static boolean isBrokenBlockOrTrash(ItemStack stack, String id, int metadata) {
@@ -72,6 +76,9 @@ final class TrashPolicy {
             || name.equals("minecraft:gravel")
             || name.equals("minecraft:sand")
             || name.equals("minecraft:sandstone")
+            || name.equals("minecraft:clay")
+            || name.equals("minecraft:clay_ball")
+            || (name.equals("gregtech:gt.blockgranites") && metadata == 9)
             || name.equals("minecraft:snow")
             || name.equals("minecraft:snow_layer")
             || name.equals("minecraft:snowball")

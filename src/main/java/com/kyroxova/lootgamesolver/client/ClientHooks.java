@@ -64,6 +64,7 @@ public final class ClientHooks {
     private int exploreHoldTicks;
     private int checkpointClearDoneTicks;
     private boolean wasInsideRoom;
+    private boolean solverMovementOwned;
     private World puzzleWorld;
 
     private final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
@@ -686,19 +687,23 @@ public final class ClientHooks {
 
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
         if (distSq > reach * reach) {
-            double speed = 0.22D;
+            double speed = 0.10D;
             if (distXZ > 0.1D) {
-                mc.thePlayer.motionX += (dx / distXZ) * speed;
-                mc.thePlayer.motionZ += (dz / distXZ) * speed;
+                mc.thePlayer.motionX = (dx / distXZ) * speed;
+                mc.thePlayer.motionZ = (dz / distXZ) * speed;
+                solverMovementOwned = true;
             }
-            if (mc.thePlayer.capabilities.allowFlying) {
-                mc.thePlayer.capabilities.isFlying = true;
+            if (mc.thePlayer.capabilities.isFlying) {
                 if (Math.abs(dy) > 0.8D) {
                     mc.thePlayer.motionY = dy > 0 ? 0.15D : -0.15D;
                 }
             } else if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) {
                 mc.thePlayer.jump();
             }
+        } else if (solverMovementOwned) {
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
+            solverMovementOwned = false;
         }
     }
 
@@ -713,6 +718,11 @@ public final class ClientHooks {
 
     void releaseMovementKeys(Minecraft mc) {
         if (mc.thePlayer != null) {
+            if (solverMovementOwned) {
+                mc.thePlayer.motionX = 0;
+                mc.thePlayer.motionZ = 0;
+                solverMovementOwned = false;
+            }
             mc.thePlayer.setSprinting(false);
             if (mc.thePlayer.movementInput != null) {
                 mc.thePlayer.movementInput.moveForward = 0.0F;

@@ -23,6 +23,8 @@ public final class BaritoneTransitCoordinator {
     public boolean surfaceMove;
     private boolean surfaceWaiting;
     private int surfaceWait;
+    private int surfaceStallTicks;
+    private double surfaceLastX, surfaceLastY, surfaceLastZ;
     private int[] surfaceGoal;
     public boolean returnSolved;
     public int returnWait;
@@ -49,6 +51,7 @@ public final class BaritoneTransitCoordinator {
         surfaceMove = false;
         surfaceWaiting = false;
         surfaceWait = 0;
+        surfaceStallTicks = 0;
         surfaceGoal = null;
         returnSolved = false;
         returnWait = 0;
@@ -78,6 +81,10 @@ public final class BaritoneTransitCoordinator {
         surfaceMove = true;
         surfaceWaiting = true;
         surfaceWait = 0;
+        surfaceStallTicks = 0;
+        surfaceLastX = mc.thePlayer.posX;
+        surfaceLastY = mc.thePlayer.posY;
+        surfaceLastZ = mc.thePlayer.posZ;
         routeFailures = 0;
         explorer.walking = true;
         explorer.searching = false;
@@ -176,8 +183,20 @@ public final class BaritoneTransitCoordinator {
                         explorer.stop(mc, "No safe surface destination found");
                     } else explorer.status = "Replanning the surface route";
                 }
-            } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+            } else {
+                double dx = mc.thePlayer.posX - surfaceLastX;
+                double dy = mc.thePlayer.posY - surfaceLastY;
+                double dz = mc.thePlayer.posZ - surfaceLastZ;
+                if (dx * dx + dy * dy + dz * dz >= 0.25D) {
+                    surfaceLastX = mc.thePlayer.posX;
+                    surfaceLastY = mc.thePlayer.posY;
+                    surfaceLastZ = mc.thePlayer.posZ;
+                    surfaceStallTicks = 0;
+                } else surfaceStallTicks++;
+                if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING
+                    && surfaceStallTicks < 600) return true;
                 explorer.baritoneNavigation.stop();
+                surfaceStallTicks = 0;
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
                 if (surfaceGoal == null) {
                     surfaceMove = false;

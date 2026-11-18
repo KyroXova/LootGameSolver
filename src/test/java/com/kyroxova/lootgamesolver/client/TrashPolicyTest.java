@@ -36,6 +36,12 @@ public class TrashPolicyTest {
         assertFalse(TrashPolicy.isOreOrDust(null, "gregtech:gt.metaitem.01"));
         assertFalse(TrashPolicy.discard("mod:valuable_block", 0, false, true));
         assertFalse(TrashPolicy.discard("mod:backpack", 0, false, false));
+        assertTrue(TrashPolicy.isOreDictionaryTrash("crushedGypsum"));
+        assertTrue(TrashPolicy.isOreDictionaryTrash("crushedPurifiedIron"));
+        assertFalse(TrashPolicy.isOreDictionaryTrash("ingotIron"));
+        assertTrue(TrashPolicy.discard("gregtech:gt.blockgranites", 9, false, true));
+        assertTrue(TrashPolicy.discard("minecraft:clay", 0, false, true));
+        assertTrue(TrashPolicy.discard("minecraft:clay_ball", 0, false, false));
     }
 
     @Test
