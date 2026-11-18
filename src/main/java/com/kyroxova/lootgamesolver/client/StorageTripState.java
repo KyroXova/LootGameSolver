@@ -25,6 +25,12 @@ final class StorageTripState {
         return true;
     }
 
+    boolean resumeAtStorage(boolean configured, boolean checkpointSaved) {
+        if (phase != Phase.IDLE || !configured || !checkpointSaved) return false;
+        phase = Phase.DEPOSITING;
+        return true;
+    }
+
     void returnWarpResult(boolean confirmed) {
         if (phase == Phase.WAIT_RETURN_WARP) phase = confirmed ? Phase.WAIT_STORAGE : Phase.FAILED;
     }
@@ -35,6 +41,10 @@ final class StorageTripState {
 
     void depositResult(boolean confirmed, boolean bagsEmpty, boolean itemsStored) {
         if (phase == Phase.DEPOSITING) phase = confirmed && bagsEmpty && itemsStored ? Phase.WAIT_RETURN : Phase.FAILED;
+    }
+
+    void returnAfterDepositFailure() {
+        if (phase == Phase.DEPOSITING) phase = Phase.WAIT_RETURN;
     }
 
     void returnArrival(boolean verified) {

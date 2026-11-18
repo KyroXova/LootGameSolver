@@ -14,15 +14,20 @@ final class StorageRecoveryController {
     enum Result {
         WORKING,
         RETURNED,
+        RETURNED_UNSTORED,
         FAILED
     }
 
     private final StorageTripRunner trip = new StorageTripRunner();
+    private final ReturnWarpPositioner positioner = new ReturnWarpPositioner();
+    private boolean positioning, cancelled;
+    private String failureReason;
     private PendingLootStore.Checkpoint checkpoint;
     private InventoryBaseline baseline;
     private StorageDepositCoordinator deposit;
     private BogoDropOffBridge.Session bogo;
     private boolean dropOffChecked;
+    private boolean returnWithoutDeposit;
     private int dropOffWait;
     private int dropOffSettle;
 
@@ -38,7 +43,21 @@ final class StorageRecoveryController {
             || mc.thePlayer.getDistanceSq(saved.center[0] + 0.5D, saved.center[1] + 0.5D, saved.center[2] + 0.5D)
                 > 256D)
             return false;
-        if (!trip.start(mc, true)) return false;
+        if (!StorageTripPolicy.destinationConfigured(
+            LootGameSolverConfig.storageEnabled,
+            LootGameSolverConfig.storageWorld,
+            Explorer.worldIdentity(mc),
+            LootGameSolverConfig.storageDestination,
+            LootGameSolverConfig.storageTargets) || mc.currentScreen != null) return false;
+        checkpoint = saved;
+        this.baseline = baseline;
+        positioning = positioner.start(mc, saved.center);
+        if (!positioning) failureReason = "No clear supported 3x3 area was found for the return warp.";
+        return true;
+    }
+
+    boolean resumeAtStorage(Minecraft mc, PendingLootStore.Checkpoint saved, InventoryBaseline baseline) {
+        if (!trip.resumeAtStorage(mc, saved)) return false;
         checkpoint = saved;
         this.baseline = baseline;
         return true;
@@ -54,6 +73,26 @@ final class StorageRecoveryController {
     }
 
     Result tick(Minecraft mc) {
+        if (cancelled) return Result.FAILED;
+        if (failureReason != null) return Result.FAILED;
+        if (positioning) {
+            if (mc == null || mc.theWorld == null
+                || mc.thePlayer == null
+                || !checkpoint.world.equals(Explorer.worldIdentity(mc))
+                || checkpoint.dimension != mc.theWorld.provider.dimensionId) {
+                positioner.stop();
+                return Result.FAILED;
+            }
+            ReturnWarpPositioner.Result result = positioner.tick(mc);
+            if (result == ReturnWarpPositioner.Result.FAILED) {
+                positioner.stop();
+                failureReason = "Could not reach a clear 3x3 area for the return warp.";
+                return Result.FAILED;
+            }
+            if (result == ReturnWarpPositioner.Result.WORKING) return Result.WORKING;
+            positioning = false;
+            if (!trip.start(mc, true)) return Result.FAILED;
+        }
         trip.tick(mc);
         StorageTripState.Phase phase = trip.phase();
         if (phase == StorageTripState.Phase.FAILED) {
@@ -61,7 +100,8 @@ final class StorageRecoveryController {
             if (deposit != null) deposit.cancel(mc);
             return Result.FAILED;
         }
-        if (phase == StorageTripState.Phase.READY_TO_RESUME) return Result.RETURNED;
+        if (phase == StorageTripState.Phase.READY_TO_RESUME)
+            return returnWithoutDeposit ? Result.RETURNED_UNSTORED : Result.RETURNED;
         if (phase != StorageTripState.Phase.DEPOSITING) return Result.WORKING;
         if (mc == null || mc.theWorld == null || mc.thePlayer == null) return Result.WORKING;
         if (!dropOffChecked && mc.currentScreen != null) return Result.WORKING;
@@ -72,6 +112,7 @@ final class StorageRecoveryController {
                     bogo = new BogoDropOffBridge.Session();
                     if (!bogo.start()) {
                         bogo = null;
+                        if (returnAfterDepositFailure(mc)) return Result.WORKING;
                         trip.fail();
                         return Result.FAILED;
                     }
@@ -87,6 +128,7 @@ final class StorageRecoveryController {
             if (response < 0 || ++dropOffWait > 600) {
                 bogo.close();
                 bogo = null;
+                if (returnAfterDepositFailure(mc)) return Result.WORKING;
                 trip.fail();
                 return Result.FAILED;
             }
@@ -98,6 +140,7 @@ final class StorageRecoveryController {
         if (deposit == null) deposit = new StorageDepositCoordinator(LootGameSolverConfig.storageTargets, baseline);
         StorageDepositCoordinator.Result result = deposit.tick(mc);
         if (result == StorageDepositCoordinator.Result.FAILED) {
+            if (returnAfterDepositFailure(mc)) return Result.WORKING;
             trip.fail();
             return Result.FAILED;
         }
@@ -106,15 +149,32 @@ final class StorageRecoveryController {
         return Result.WORKING;
     }
 
+    private boolean returnAfterDepositFailure(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.thePlayer.inventory.getItemStack() != null) return false;
+        if (deposit != null) deposit.cancel(mc);
+        if (mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiContainer) mc.thePlayer.closeScreen();
+        if (mc.currentScreen != null || !trip.returnAfterDepositFailure(mc)) return false;
+        returnWithoutDeposit = true;
+        return true;
+    }
+
     PendingLootStore.Checkpoint checkpoint() {
         return checkpoint;
     }
 
+    String failureReason() {
+        return failureReason;
+    }
+
     void cancel() {
+        positioner.stop();
+        positioning = false;
+        cancelled = true;
         trip.fail();
     }
 
     String status() {
+        if (positioning) return "Finding clear return position";
         switch (trip.phase()) {
             case WAIT_RETURN_WARP:
                 return "Setting return warp";

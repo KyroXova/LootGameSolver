@@ -43,12 +43,20 @@ public final class BaritoneNavigationBridge {
         return start(x, y, z, 0, true);
     }
 
+    public Start startPuzzleTileApproach(int x, int y, int z) {
+        return start(x, y, z, 0, true, true);
+    }
+
     public Start startWithPlacementWithoutBreaking(int x, int y, int z) {
         return start(x, y, z, 3, true);
     }
 
     public Start startAdjacent(int x, int y, int z) {
         return start(x, y, z, 1, false);
+    }
+
+    public Start startStructureApproach(int x, int y, int z) {
+        return start(x, y, z, 4, false);
     }
 
     public Start startAdjacentWithoutBreaking(int x, int y, int z) {
@@ -115,7 +123,7 @@ public final class BaritoneNavigationBridge {
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
             Class<?> goalType = Class.forName("baritone.api.pathing.goals.Goal");
             Object next;
-            if (kind == 1) {
+            if (kind == 1 || kind == 4) {
                 Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
                 Object pos = posType.getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
@@ -131,7 +139,13 @@ public final class BaritoneNavigationBridge {
                     .getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
             }
-            customApi
+            if (kind == 4) {
+                Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
+                Object center = posType.getConstructor(int.class, int.class, int.class)
+                    .newInstance(x, y, z);
+                customApi.getMethod("setGoalAndPathProtectingPuzzleFloor", goalType, posType)
+                    .invoke(candidate, next, center);
+            } else customApi
                 .getMethod(
                     kind == 3 ? "setGoalAndPathWithPlacementWithoutBreaking"
                         : forbidBreaking ? "setGoalAndPathWithoutBreaking" : "setGoalAndPath",

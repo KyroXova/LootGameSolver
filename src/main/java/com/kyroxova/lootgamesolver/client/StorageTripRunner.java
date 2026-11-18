@@ -14,6 +14,7 @@ final class StorageTripRunner {
     private String destination;
     private int originDimension, ticks;
     private double originX, originY, originZ;
+    private double returnRadius = 5D;
     private boolean warpConfirmed;
 
     StorageTripState.Phase phase() {
@@ -44,9 +45,34 @@ final class StorageTripRunner {
         originX = mc.thePlayer.posX;
         originY = mc.thePlayer.posY;
         originZ = mc.thePlayer.posZ;
+        returnRadius = 5D;
         ticks = 0;
         warpConfirmed = false;
         mc.thePlayer.sendChatMessage("/setwarp " + StorageWarpFeedback.RETURN_WARP);
+        return true;
+    }
+
+    boolean resumeAtStorage(Minecraft mc, PendingLootStore.Checkpoint checkpoint) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null || checkpoint == null)
+            return false;
+        String currentWorld = Explorer.worldIdentity(mc);
+        boolean configured = StorageTripPolicy.destinationConfigured(
+            LootGameSolverConfig.storageEnabled,
+            LootGameSolverConfig.storageWorld,
+            currentWorld,
+            LootGameSolverConfig.storageDestination,
+            LootGameSolverConfig.storageTargets);
+        if (!currentWorld.equals(checkpoint.world) || !nearMarkedTarget(mc)
+            || !state.resumeAtStorage(configured, checkpoint.center != null && checkpoint.center.length == 3))
+            return false;
+        world = currentWorld;
+        destination = LootGameSolverConfig.storageDestination;
+        originDimension = checkpoint.dimension;
+        originX = checkpoint.center[0] + 0.5D;
+        originY = checkpoint.center[1] + 0.5D;
+        originZ = checkpoint.center[2] + 0.5D;
+        returnRadius = 16D;
+        ticks = 0;
         return true;
     }
 
@@ -84,7 +110,7 @@ final class StorageTripRunner {
             originX,
             originY,
             originZ,
-            5D)) {
+            returnRadius)) {
                 state.returnArrival(true);
             }
     }
@@ -119,5 +145,13 @@ final class StorageTripRunner {
             ticks = 0;
             mc.thePlayer.sendChatMessage("/warp " + StorageWarpFeedback.RETURN_WARP);
         }
+    }
+
+    boolean returnAfterDepositFailure(Minecraft mc) {
+        if (state.phase() != StorageTripState.Phase.DEPOSITING || mc == null || mc.thePlayer == null) return false;
+        state.returnAfterDepositFailure();
+        ticks = 0;
+        mc.thePlayer.sendChatMessage("/warp " + StorageWarpFeedback.RETURN_WARP);
+        return true;
     }
 }

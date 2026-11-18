@@ -47,4 +47,27 @@ public class StorageTripStateTest {
         assertTrue(state.reset());
         assertTrue(state.begin(true, true));
     }
+
+    @Test
+    public void interruptedTripContinuesDepositingBeforeReturning() {
+        StorageTripState state = new StorageTripState();
+        assertFalse(state.resumeAtStorage(false, true));
+        assertFalse(state.resumeAtStorage(true, false));
+        assertTrue(state.resumeAtStorage(true, true));
+        state.returnArrival(true);
+        assertEquals(StorageTripState.Phase.DEPOSITING, state.phase());
+        state.depositResult(true, true, true);
+        state.returnArrival(true);
+        assertEquals(StorageTripState.Phase.READY_TO_RESUME, state.phase());
+    }
+
+    @Test
+    public void failedDepositMayReturnWithoutTreatingItAsSuccessful() {
+        StorageTripState state = new StorageTripState();
+        assertTrue(state.resumeAtStorage(true, true));
+        state.returnAfterDepositFailure();
+        assertEquals(StorageTripState.Phase.WAIT_RETURN, state.phase());
+        state.returnArrival(true);
+        assertEquals(StorageTripState.Phase.READY_TO_RESUME, state.phase());
+    }
 }

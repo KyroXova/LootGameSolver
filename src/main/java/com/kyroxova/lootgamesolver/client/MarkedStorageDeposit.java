@@ -122,7 +122,11 @@ final class MarkedStorageDeposit {
             // ordinary vanilla items are safe if there is no empty hotbar slot.
             if (empty < 0 && target.entity == null
                 && !mc.thePlayer.isSneaking()
-                && world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest) {
+                && (world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest
+                    || "cpw.mods.ironchest.BlockIronChest".equals(
+                        world.getBlock(target.x, target.y, target.z)
+                            .getClass()
+                            .getName()))) {
                 for (int i = 0; i < 9; i++) {
                     net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
                     if (stack != null && (stack.getItem()
