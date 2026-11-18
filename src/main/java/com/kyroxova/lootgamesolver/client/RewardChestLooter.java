@@ -35,6 +35,12 @@ final class RewardChestLooter {
     private List<RewardLootPolicy.Entry> queue = new ArrayList<RewardLootPolicy.Entry>();
     private final Map<Long, ItemStack> scanned = new HashMap<Long, ItemStack>();
     private InventoryBaseline baseline;
+    private MinedDropTracker minedDrops;
+
+    void setMinedDrops(MinedDropTracker value) {
+        minedDrops = value;
+    }
+
     private final boolean[] backpackTried = new boolean[36];
     private final boolean[] slotRejectedForCurrentBag = new boolean[36];
     private final InventoryToolTransfer backpackTransfer = new InventoryToolTransfer();
@@ -833,6 +839,8 @@ final class RewardChestLooter {
         if (InventoryProtection.essential(stack)) return false;
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
+        if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
+            || (minedDrops != null && minedDrops.fullyTracked(MinedDropTracker.inventory(mc), slotIndex))) return false;
         if (id != null && id.toLowerCase(java.util.Locale.ROOT)
             .contains("torch")) return false;
         return true;

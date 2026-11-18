@@ -78,7 +78,7 @@ final class TrashPolicy {
             || name.equals("minecraft:sandstone")
             || name.equals("minecraft:clay")
             || name.equals("minecraft:clay_ball")
-            || (name.equals("gregtech:gt.blockgranites") && metadata == 9)
+            || name.equals("gregtech:gt.blockgranites")
             || name.equals("minecraft:snow")
             || name.equals("minecraft:snow_layer")
             || name.equals("minecraft:snowball")

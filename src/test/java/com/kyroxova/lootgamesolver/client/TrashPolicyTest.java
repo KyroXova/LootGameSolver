@@ -40,6 +40,7 @@ public class TrashPolicyTest {
         assertTrue(TrashPolicy.isOreDictionaryTrash("crushedPurifiedIron"));
         assertFalse(TrashPolicy.isOreDictionaryTrash("ingotIron"));
         assertTrue(TrashPolicy.discard("gregtech:gt.blockgranites", 9, false, true));
+        assertTrue(TrashPolicy.discard("gregtech:gt.blockgranites", 0, false, true));
         assertTrue(TrashPolicy.discard("minecraft:clay", 0, false, true));
         assertTrue(TrashPolicy.discard("minecraft:clay_ball", 0, false, false));
     }

@@ -51,6 +51,7 @@ public final class ClientHooks {
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
     private final RewardChestLooter preLootPacker = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
+    private final MinedDropTracker minedDrops = new MinedDropTracker();
     private StorageRecoveryController storageRecovery;
     private boolean storageResumeChecked;
     private int storageResumeWait;
@@ -242,6 +243,10 @@ public final class ClientHooks {
         checkKeyToggles();
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
         if (puzzleWorld != mc.theWorld) {
+            minedDrops.clear();
+            trashCleanup.setMinedDrops(minedDrops);
+            rewardLooter.setMinedDrops(minedDrops);
+            preLootPacker.setMinedDrops(minedDrops);
             if (exploration != null) exploration.setInventoryMaintenance(false);
             inventoryMaintenanceStage = 0;
             inventoryMaintenanceCooldown = 0;
@@ -299,6 +304,13 @@ public final class ClientHooks {
             if (autoPuzzle.isActive() || session.isActive() || rewardReturnPending || storageRecovery != null)
                 exploration.suspendStructureSearchForRoomWork(mc);
             exploration.tick(mc, session.isActive());
+        }
+        if (mc.thePlayer != null && mc.theWorld != null) {
+            boolean mining = exploration != null && exploration.observingMinedDrops()
+                && !session.isActive()
+                && !rewardReturnPending
+                && mc.currentScreen == null;
+            minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (resumeLootRequested) {

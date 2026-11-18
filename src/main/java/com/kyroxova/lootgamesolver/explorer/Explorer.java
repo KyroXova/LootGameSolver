@@ -1034,6 +1034,10 @@ public class Explorer {
         return inventoryMiningCooldownTicks == 0;
     }
 
+    public boolean observingMinedDrops() {
+        return walking && inventoryMiningCooldownTicks > 0;
+    }
+
     private float searchYaw;
 
     public void rotateSearch(Minecraft mc) {

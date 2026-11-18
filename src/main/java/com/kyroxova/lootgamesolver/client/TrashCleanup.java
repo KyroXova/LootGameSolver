@@ -17,6 +17,11 @@ final class TrashCleanup {
     private int pendingIndex = -1, pendingSize;
     private String status = "";
     private InventoryBaseline baseline;
+    private MinedDropTracker minedDrops;
+
+    void setMinedDrops(MinedDropTracker value) {
+        minedDrops = value;
+    }
 
     void setBaseline(InventoryBaseline value) {
         baseline = value;
@@ -189,6 +194,7 @@ final class TrashCleanup {
 
     private int nextTrash(Minecraft mc) {
         int reserve = findBuildingReserveSlot(mc);
+        ItemStack[] inventory = MinedDropTracker.inventory(mc);
         for (int i = 0; i < 36; i++) {
             if (i == reserve) continue;
             ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
@@ -197,7 +203,8 @@ final class TrashCleanup {
                 || stack.hasDisplayName()) continue;
 
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-            if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())) {
+            if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
+                || (minedDrops != null && minedDrops.fullyTracked(inventory, i))) {
                 return i;
             }
         }
