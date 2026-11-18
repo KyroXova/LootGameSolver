@@ -29,7 +29,7 @@ final class RewardChestView {
         int playerFloorY = (int) Math.floor(mc.thePlayer.boundingBox.minY) - 1;
         java.util.List<int[]> positions = new java.util.ArrayList<>();
         for (int floorY = Math.min(playerFloorY, chest[1] - 1); floorY <= Math.max(playerFloorY, chest[1]); floorY++)
-            for (int radius = 1; radius <= 4; radius++)
+            for (int radius = 1; radius <= 2; radius++)
                 for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
                     int x = chest[0] + dx, z = chest[2] + dz;

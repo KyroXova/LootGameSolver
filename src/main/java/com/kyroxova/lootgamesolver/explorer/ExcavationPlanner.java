@@ -74,13 +74,38 @@ public final class ExcavationPlanner {
         explorer.route.clear();
         explorer.walkingSearch = null;
         explorer.continuationSearch = null;
-        excavationSearch = null;
-        excavationRoute.clear();
+        explorer.excavationSearch = null;
+        explorer.excavationRoute.clear();
         explorer.digging = true;
-        entranceSelected = true;
-        seekingDryEntrance = false;
+        explorer.entranceSelected = true;
+        explorer.seekingDryEntrance = false;
         explorer.savedSlot = mc.thePlayer.inventory.currentItem;
         explorer.status = "Planning a safe tunnel from the current checkpoint";
+        return true;
+    }
+
+    public boolean beginDiggingToSurface(Minecraft mc, Explorer explorer) {
+        if (!LootGameSolverConfig.staircaseEnabled || mc.thePlayer == null || mc.theWorld == null) return false;
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        int surfaceY = mc.theWorld.getHeightValue(x, z);
+        if (surfaceY <= y) surfaceY = y + 25;
+        net.minecraft.tileentity.TileEntity surfaceTarget = new net.minecraft.tileentity.TileEntity();
+        surfaceTarget.xCoord = x;
+        surfaceTarget.yCoord = surfaceY;
+        surfaceTarget.zCoord = z;
+        explorer.target = surfaceTarget;
+        explorer.route.clear();
+        explorer.walkingSearch = null;
+        explorer.continuationSearch = null;
+        explorer.excavationSearch = null;
+        explorer.excavationRoute.clear();
+        explorer.digging = true;
+        explorer.entranceSelected = true;
+        explorer.seekingDryEntrance = false;
+        explorer.savedSlot = mc.thePlayer.inventory.currentItem;
+        explorer.status = "Digging upward staircase to surface";
         return true;
     }
 
@@ -225,39 +250,10 @@ public final class ExcavationPlanner {
             stairZ = next[2] - z;
             if (attemptStairStep(mc, explorer, next[1])) return true;
         }
-        if (clearSnowForExcavation(mc, explorer, x, y, z)) return true;
         return ++excavationReplans <= 12;
     }
 
     public boolean clearSnowForExcavation(Minecraft mc, Explorer explorer, int x, int y, int z) {
-        if (explorer.target == null || !dryShore(mc.theWorld, x, y, z)) return false;
-        for (int[] direction : ExcavationPolicy
-            .approachDirections(x, z, explorer.target.xCoord, explorer.target.zCoord)) {
-            int nx = x + direction[0], nz = z + direction[1];
-            for (int by = y + 1; by >= y - 1; by--) {
-                if (!mc.theWorld.blockExists(nx, by, nz) || mc.theWorld.getBlock(nx, by, nz) != Blocks.snow_layer
-                    || !explorer.excavationTerrain.excavatable(mc.theWorld, nx, by, nz)
-                    || visibleMiningPoint(mc, nx, by, nz) == null) continue;
-                if (by < y && !mc.theWorld.getBlock(nx, by - 1, nz)
-                    .isNormalCube()) continue;
-                boolean hazard = false;
-                for (int dy = -1; dy <= 2; dy++) {
-                    if (!mc.theWorld.blockExists(nx, y + dy, nz)) {
-                        hazard = true;
-                        break;
-                    }
-                    net.minecraft.block.Block block = mc.theWorld.getBlock(nx, y + dy, nz);
-                    if (block.getMaterial()
-                        .isLiquid() || ContactHazards.dangerous(block, mc.theWorld.getBlockMetadata(nx, y + dy, nz))) {
-                        hazard = true;
-                        break;
-                    }
-                }
-                if (hazard) continue;
-                snowRecoveryTarget = new int[] { nx, by, nz };
-                return explorer.minePlannedBlock(mc, nx, by, nz, by);
-            }
-        }
         return false;
     }
 
@@ -266,28 +262,28 @@ public final class ExcavationPlanner {
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (entrySurfacePoint == null) {
-            entrySurfacePoint = new int[] { x, y, z };
+        if (explorer.entrySurfacePoint == null) {
+            explorer.entrySurfacePoint = new int[] { x, y, z };
         }
         if (mc.thePlayer.onGround
             && ExcavationPolicy.closeEntrance(x, z, explorer.target.xCoord, explorer.target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {
-            entranceSurfaceY = y;
-            entrySurfacePoint = new int[] { x, y, z };
+            explorer.entranceSurfaceY = y;
+            explorer.entrySurfacePoint = new int[] { x, y, z };
             explorer.staircaseDugPath.clear();
             explorer.staircaseDugPath.add(new int[] { x, y, z });
             explorer.route.clear();
             explorer.extendedFrom = null;
-            approachPlan = null;
-            approachAnchor = null;
+            explorer.approachPlan = null;
+            explorer.approachAnchor = null;
             explorer.walkingSearch = null;
             explorer.continuationSearch = null;
-            excavationSearch = null;
-            excavationRoute.clear();
+            explorer.excavationSearch = null;
+            explorer.excavationRoute.clear();
             explorer.digging = true;
-            seekingDryEntrance = false;
-            entranceSelected = true;
+            explorer.seekingDryEntrance = false;
+            explorer.entranceSelected = true;
             explorer.savedSlot = mc.thePlayer.inventory.currentItem;
             explorer.status = "Planning access from the nearest safe structure wall";
             return true;
@@ -305,8 +301,8 @@ public final class ExcavationPlanner {
         final GroundPathfinder.Terrain approachTerrain = explorer.walkingTerrain(w);
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (entranceCandidates.isEmpty()) {
-            entranceCandidate = 0;
+        if (explorer.entranceCandidates.isEmpty()) {
+            explorer.entranceCandidate = 0;
             int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
                 { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
             for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
@@ -324,24 +320,36 @@ public final class ExcavationPlanner {
                         boolean duplicate = false;
                         for (int j = 0; j < i; j++) if (heights[j] == gy) duplicate = true;
                         if (!duplicate && gy > 0 && gy < w.getHeight() - 2 && dryShore(w, gx, gy, gz))
-                            entranceCandidates.add(new int[] { gx, gy, gz });
+                            explorer.entranceCandidates.add(new int[] { gx, gy, gz });
                     }
                 }
             final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
             final int tx = explorer.target.xCoord, tz = explorer.target.zCoord;
-            entranceCandidates
+            explorer.entranceCandidates
                 .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
         }
-        for (int attempts = 0; attempts < 1 && entranceCandidate < entranceCandidates.size(); attempts++) {
-            int[] goal = entranceCandidates.get(entranceCandidate++);
+        for (int attempts = 0; attempts < 1
+            && explorer.entranceCandidate < explorer.entranceCandidates.size(); attempts++) {
+            int[] goal = explorer.entranceCandidates.get(explorer.entranceCandidate++);
             if (Math.abs(goal[0] - x) + Math.abs(goal[2] - z) <= 1 && Math.abs(goal[1] - y) <= 1) {
                 if (mc.thePlayer.onGround && dryShore(w, x, y, z) && safe(w, x, y, z)) {
                     explorer.digging = true;
-                    seekingDryEntrance = false;
-                    entranceSelected = true;
+                    explorer.seekingDryEntrance = false;
+                    explorer.entranceSelected = true;
                     explorer.savedSlot = mc.thePlayer.inventory.currentItem;
-                    entranceCandidates.clear();
+                    explorer.entranceCandidates.clear();
                     explorer.status = "Planning access from the nearest safe structure wall";
+                    return true;
+                }
+            }
+            if (mc.thePlayer.isInWater()) {
+                com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
+                    .startPuzzleTileApproach(goal[0], goal[1], goal[2]);
+                if (started == com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge.Start.STARTED) {
+                    explorer.baritoneCoordinator.beginShoreMove(goal);
+                    explorer.walking = true;
+                    explorer.searching = false;
+                    explorer.status = "Swimming to a dry entrance";
                     return true;
                 }
             }
@@ -370,24 +378,24 @@ public final class ExcavationPlanner {
             explorer.walkingSearchNeedsResume = false;
             explorer.continuationSearch = null;
             explorer.extendedFrom = null;
-            approachPlan = null;
-            approachAnchor = null;
-            approachReady = false;
+            explorer.approachPlan = null;
+            explorer.approachAnchor = null;
+            explorer.approachReady = false;
             explorer.segmentX = mc.thePlayer.posX;
             explorer.segmentZ = mc.thePlayer.posZ;
-            seekingDryEntrance = true;
+            explorer.seekingDryEntrance = true;
             explorer.searching = false;
-            entranceCandidates.clear();
-            stairX = 0;
-            stairZ = 0;
+            explorer.entranceCandidates.clear();
+            explorer.stairX = 0;
+            explorer.stairZ = 0;
             explorer.status = "Moving to selected dry entrance";
             return true;
         }
-        if (entranceCandidate < entranceCandidates.size()) {
+        if (explorer.entranceCandidate < explorer.entranceCandidates.size()) {
             explorer.status = "Checking alternate dry entrances";
             return true;
         }
-        entranceCandidates.clear();
+        explorer.entranceCandidates.clear();
         return false;
     }
 
@@ -416,6 +424,7 @@ public final class ExcavationPlanner {
         World w = mc.theWorld;
         for (int by = y; by <= y + 1; by++) {
             net.minecraft.block.Block plant = w.getBlock(x, by, z);
+            if (plant == net.minecraft.init.Blocks.snow_layer && w.getBlockMetadata(x, by, z) <= 1) continue;
             if (FoliagePolicy.canClear(
                 isFoliage(plant),
                 w.getTileEntity(x, by, z) != null,
@@ -448,20 +457,6 @@ public final class ExcavationPlanner {
             }
         }
         for (int by = destinationY; by <= clearTop; by++) {
-            if (w.getBlock(nx, by, nz) == Blocks.snow_layer && FoliagePolicy.canClear(
-                true,
-                w.getTileEntity(nx, by, nz) != null,
-                w.getBlock(nx, by, nz)
-                    .getBlockHardness(w, nx, by, nz),
-                nx,
-                by,
-                nz,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                true)) return explorer.minePlannedBlock(mc, nx, by, nz, destinationY);
             if (w.getBlock(nx, by, nz) instanceof net.minecraft.block.BlockFalling)
                 return explorer.minePlannedBlock(mc, nx, by, nz, destinationY);
         }

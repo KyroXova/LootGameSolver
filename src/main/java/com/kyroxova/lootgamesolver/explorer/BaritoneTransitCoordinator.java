@@ -21,6 +21,8 @@ public final class BaritoneTransitCoordinator {
     public boolean returnWaiting;
     public boolean resumeSearch;
     public boolean surfaceMove;
+    public boolean shoreMove;
+    private int[] shoreGoal;
     private boolean surfaceWaiting;
     private boolean surfaceSolved;
     private int surfaceWait;
@@ -50,6 +52,8 @@ public final class BaritoneTransitCoordinator {
         returnWaiting = false;
         resumeSearch = false;
         surfaceMove = false;
+        shoreMove = false;
+        shoreGoal = null;
         surfaceWaiting = false;
         surfaceWait = 0;
         surfaceStallTicks = 0;
@@ -69,7 +73,13 @@ public final class BaritoneTransitCoordinator {
     }
 
     public boolean active() {
-        return centerMove || structureMove || searchMove || returnMove || returnWaiting || resumeSearch || surfaceMove;
+        return centerMove || structureMove
+            || searchMove
+            || returnMove
+            || returnWaiting
+            || resumeSearch
+            || surfaceMove
+            || shoreMove;
     }
 
     static boolean needsSurfaceExit(boolean insideRoom, boolean canSeeSky) {
@@ -121,6 +131,11 @@ public final class BaritoneTransitCoordinator {
         returnWorld = null;
     }
 
+    void beginShoreMove(int[] goal) {
+        shoreGoal = goal.clone();
+        shoreMove = true;
+    }
+
     public boolean tick(Minecraft mc, Explorer explorer) {
         breaking = active() && explorer.baritoneNavigation.isBreaking();
         if (active() && explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
@@ -142,7 +157,8 @@ public final class BaritoneTransitCoordinator {
                 routePreview.clear();
                 routePreview.addAll(explorer.baritoneNavigation.route());
             }
-            if (surfaceMove || returnMove) explorer.status = "Ascending to Surface";
+            if (shoreMove) explorer.status = "Swimming to a dry entrance";
+            else if (surfaceMove || returnMove) explorer.status = "Ascending to Surface";
             else if (structureMove) explorer.status = preRouting ? "Pre-routing to Puzzle" : "Walking to LootGame";
             else if (centerMove) explorer.status = "Moving to board center";
             else if (searchMove) explorer.status = "Exploring for structures";
@@ -153,6 +169,29 @@ public final class BaritoneTransitCoordinator {
                 net.minecraft.client.settings.KeyBinding
                     .setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
             }
+        }
+        if (shoreMove) {
+            if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld || shoreGoal == null) {
+                explorer.baritoneNavigation.stop();
+                shoreMove = false;
+                explorer.walking = false;
+                return true;
+            }
+            if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) return true;
+            boolean arrived = explorer.baritoneNavigation.completed()
+                && ExplorerTerrain.dryShore(mc.theWorld, shoreGoal[0], shoreGoal[1], shoreGoal[2]);
+            explorer.baritoneNavigation.stop();
+            shoreMove = false;
+            shoreGoal = null;
+            if (arrived) {
+                explorer.seekingDryEntrance = true;
+                explorer.entranceCandidates.clear();
+                explorer.status = "Reached dry entrance";
+            } else if (!explorer.findDryEntrance(mc)) {
+                explorer.stop(mc, "No safe route to a dry entrance");
+                return true;
+            }
+            return shoreMove;
         }
         if (surfaceMove) {
             if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld) {
@@ -204,8 +243,10 @@ public final class BaritoneTransitCoordinator {
                 explorer.baritoneNavigation.stop();
                 surfaceStallTicks = 0;
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
-                if (surfaceGoal == null) {
+                if (surfaceGoal == null || routeFailures >= 3) {
                     surfaceMove = false;
+                    if (explorer.insideDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled
+                        && explorer.beginDiggingToSurface(mc)) return true;
                     explorer.stop(mc, "No safe surface route found");
                 } else {
                     surfaceWaiting = true;
@@ -294,8 +335,10 @@ public final class BaritoneTransitCoordinator {
                 if (searchHandoff) {
                     BaritoneNavigationBridge.Start started = searchNext
                         ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
-                        : explorer.baritoneNavigation
-                            .startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+                        : explorer.baritoneNavigation.startStructureApproach(
+                            explorer.target.xCoord,
+                            explorer.target.yCoord,
+                            explorer.target.zCoord);
                     if (started == BaritoneNavigationBridge.Start.STARTED) {
                         searchHandoff = false;
                         if (searchNext) {
@@ -394,8 +437,10 @@ public final class BaritoneTransitCoordinator {
                             explorer.searching = false;
                             return true;
                         }
-                        BaritoneNavigationBridge.Start start = explorer.baritoneNavigation
-                            .startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+                        BaritoneNavigationBridge.Start start = explorer.baritoneNavigation.startStructureApproach(
+                            explorer.target.xCoord,
+                            explorer.target.yCoord,
+                            explorer.target.zCoord);
                         if (start == BaritoneNavigationBridge.Start.STARTED) {
                             explorer.status = "Walking to LootGame";
                         } else if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {

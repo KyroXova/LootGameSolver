@@ -10,13 +10,13 @@ public final class ExplorerTerrain {
     private ExplorerTerrain() {}
 
     public static boolean passable(World world, int x, int y, int z) {
-        return world.blockExists(x, y, z) && world.getBlock(x, y, z)
-            .getMaterial() != net.minecraft.block.material.Material.leaves
-            && !world.getBlock(x, y, z)
-                .getMaterial()
-                .isLiquid()
-            && world.getBlock(x, y, z)
-                .getCollisionBoundingBoxFromPool(world, x, y, z) == null;
+        if (!world.blockExists(x, y, z)) return false;
+        net.minecraft.block.Block block = world.getBlock(x, y, z);
+        if (block == net.minecraft.init.Blocks.air) return true;
+        if (block == net.minecraft.init.Blocks.snow_layer && world.getBlockMetadata(x, y, z) <= 1) return true;
+        if (block.getMaterial() == net.minecraft.block.material.Material.leaves) return false;
+        if (block.getMaterial().isLiquid()) return false;
+        return block.getCollisionBoundingBoxFromPool(world, x, y, z) == null;
     }
 
     public static boolean puzzleCenterStandable(World world, int x, int y, int z) {
@@ -45,8 +45,9 @@ public final class ExplorerTerrain {
     }
 
     public static boolean isFoliage(net.minecraft.block.Block block) {
+        if (block == null || block == Blocks.air || block == Blocks.snow_layer) return false;
         net.minecraft.block.material.Material material = block.getMaterial();
-        return block == Blocks.snow_layer || block instanceof net.minecraft.block.BlockBush
+        return block instanceof net.minecraft.block.BlockBush
             || material == net.minecraft.block.material.Material.plants
             || material == net.minecraft.block.material.Material.vine
             || material == net.minecraft.block.material.Material.leaves;

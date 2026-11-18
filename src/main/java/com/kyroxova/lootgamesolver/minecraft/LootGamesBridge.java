@@ -150,8 +150,10 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private static boolean preparePlayerPositionAndAim(EntityPlayer player, int x, int y, int z, boolean top) {
         if (player == null) return false;
+        double eyeY = player.posY + player.getEyeHeight();
+        double targetY = eyeY < y ? y + 0.05D : (top || eyeY > y + 1.0D ? y + 0.95D : y + 0.5D);
         double dx = x + 0.5D - player.posX;
-        double dy = y + (top ? 0.999D : 0.5D) - (player.posY + player.getEyeHeight());
+        double dy = targetY - eyeY;
         double dz = z + 0.5D - player.posZ;
         double distSq = dx * dx + dy * dy + dz * dz;
 
@@ -159,12 +161,12 @@ public final class LootGamesBridge implements MiniGameDetector {
         float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
         float pitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
 
-        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 35.0F);
-        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 25.0F);
+        player.rotationYaw = updateRotation(player.rotationYaw, yaw, 45.0F);
+        player.rotationPitch = updateRotation(player.rotationPitch, pitch, 35.0F);
 
         if (distSq > 17.64D) return false;
-        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 2F
-            && Math.abs(pitch - player.rotationPitch) < 2F;
+        return Math.abs(net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - player.rotationYaw)) < 15F
+            && Math.abs(pitch - player.rotationPitch) < 15F;
     }
 
     private static boolean prepareExactCenterAndAim(EntityPlayer player, int x, int y, int z) {
@@ -578,6 +580,9 @@ public final class LootGamesBridge implements MiniGameDetector {
             }
             net.minecraft.util.MovingObjectPosition visible = visibleTarget(mc, block[0], block[1], block[2]);
             if (visible == null || visible.sideHit != 1) return false;
+            boolean attack = action.type == SolverAction.Type.REVEAL
+                && detected.type != com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT;
+            if (!attack && !selectSafeInteractionItem(mc)) return false;
             boolean shouldSneak = detected.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
                 && action.type == SolverAction.Type.SET_VALUE
                 && sudokuReverseClick;
@@ -589,8 +594,6 @@ public final class LootGamesBridge implements MiniGameDetector {
                 mc.thePlayer.setSneaking(shouldSneak);
             }
             try {
-                boolean attack = action.type == SolverAction.Type.REVEAL
-                    && detected.type != com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT;
                 return BaritoneBlockBridge
                     .click(mc, block[0], block[1], block[2], visible.sideHit, visible.hitVec, attack);
             } finally {
@@ -639,7 +642,15 @@ public final class LootGamesBridge implements MiniGameDetector {
         double reach = mc.playerController.getBlockReachDistance();
         net.minecraft.util.MovingObjectPosition hit = mc.theWorld
             .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
-        return targetHit(hit, x, y, z) ? hit : null;
+        if (targetHit(hit, x, y, z)) return hit;
+
+        double targetY = eye.yCoord > y + 1.0D ? y + 0.99D : (eye.yCoord < y ? y + 0.01D : y + 0.5D);
+        Vec3 directTarget = Vec3.createVectorHelper(x + 0.5D, targetY, z + 0.5D);
+        if (eye.squareDistanceTo(directTarget) <= reach * reach) {
+            hit = mc.theWorld.rayTraceBlocks(eye, directTarget);
+            if (targetHit(hit, x, y, z)) return hit;
+        }
+        return null;
     }
 
     public boolean hasClearView(int[] position) {
@@ -653,8 +664,17 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     public static boolean topFaceVisible(Minecraft mc, int[] position) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null || position == null) return false;
-        Vec3 eye = Vec3
-            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        return topFaceVisibleFrom(
+            mc,
+            position,
+            mc.thePlayer.posX,
+            mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+            mc.thePlayer.posZ);
+    }
+
+    public static boolean topFaceVisibleFrom(Minecraft mc, int[] position, double x, double y, double z) {
+        if (mc == null || mc.theWorld == null || position == null) return false;
+        Vec3 eye = Vec3.createVectorHelper(x, y, z);
         Vec3 top = Vec3.createVectorHelper(position[0] + 0.5D, position[1] + 0.999D, position[2] + 0.5D);
         net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, top);
         return targetHit(hit, position[0], position[1], position[2]) && hit.sideHit == 1;
@@ -664,19 +684,106 @@ public final class LootGamesBridge implements MiniGameDetector {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.theWorld == null || mc.thePlayer == null || mc.playerController == null) return false;
         net.minecraft.block.Block master = mc.theWorld.getBlock(x, y, z);
-        if (master == null || !master.getClass()
-            .getName()
-            .endsWith(".PuzzleMasterBlock")) return false;
-        if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
+        boolean valid = isMasterBlock(master);
+        if (!valid) {
+            net.minecraft.tileentity.TileEntity te = mc.theWorld.getTileEntity(x, y, z);
+            if (te != null && isMasterTile(te.getClass().getName())) valid = true;
+        }
+        if (!valid) return false;
+        if (!selectSafeInteractionItem(mc)) return false;
+
+        double eyeY = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
+        double targetY = eyeY < y ? y + 0.1D : (eyeY > y + 1.0D ? y + 0.9D : y + 0.5D);
+        double dx = x + 0.5D - mc.thePlayer.posX;
+        double dy = targetY - eyeY;
+        double dz = z + 0.5D - mc.thePlayer.posZ;
+        double distSq = dx * dx + dy * dy + dz * dz;
+        double reach = Math.min(4.5D, mc.playerController.getBlockReachDistance());
+        if (distSq > reach * reach) return false;
+
+        float yaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+        float pitch = (float) (-(Math.atan2(dy, Math.hypot(dx, dz)) * 180.0D / Math.PI));
+        mc.thePlayer.rotationYaw = yaw;
+        mc.thePlayer.rotationPitch = pitch;
+
         net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
-        if (hit == null) return false;
-        int side = hit.sideHit;
-        Vec3 hitVec = hit.hitVec;
+        int side = eyeY < y ? 0 : (eyeY > y + 1.0D ? 1 : 2);
+        Vec3 hitVec = null;
+        if (hit != null) {
+            side = hit.sideHit;
+            hitVec = hit.hitVec;
+        } else {
+            double hitY = side == 0 ? y + 0.0D : (side == 1 ? y + 1.0D : y + 0.5D);
+            hitVec = Vec3.createVectorHelper(x + 0.5D, hitY, z + 0.5D);
+        }
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
         boolean direct = mc.playerController
             .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
         mc.thePlayer.swingItem();
         return direct;
+    }
+
+    public int[] nearbyMasterBlock() {
+        return nearbyMasterBlock(null);
+    }
+
+    public int[] nearbyMasterBlock(int[] center) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null) return null;
+        int px = center != null ? center[0] : (int) Math.floor(mc.thePlayer.posX);
+        int py = center != null ? center[1] : (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int pz = center != null ? center[2] : (int) Math.floor(mc.thePlayer.posZ);
+        int[] closest = null;
+        double best = Double.MAX_VALUE;
+        int minDy = center != null ? 0 : -2;
+        int maxDy = center != null ? 4 : 5;
+        int r = center != null ? 3 : 16;
+        for (int dy = minDy; dy <= maxDy; dy++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    int x = px + dx, y = py + dy, z = pz + dz;
+                    if (!mc.theWorld.blockExists(x, y, z)) continue;
+                    net.minecraft.block.Block block = mc.theWorld.getBlock(x, y, z);
+                    boolean isMaster = isMasterBlock(block);
+                    if (!isMaster) {
+                        net.minecraft.tileentity.TileEntity te = mc.theWorld.getTileEntity(x, y, z);
+                        if (te != null && isMasterTile(te.getClass().getName())) isMaster = true;
+                    }
+                    if (isMaster) {
+                        double distance = dx * dx + dy * dy + dz * dz;
+                        if (distance < best) {
+                            closest = new int[] { x, y, z };
+                            best = distance;
+                        }
+                    }
+                }
+            }
+        }
+        if (closest != null) return closest;
+        for (Object obj : mc.theWorld.loadedTileEntityList) {
+            if (!(obj instanceof net.minecraft.tileentity.TileEntity)) continue;
+            net.minecraft.tileentity.TileEntity te = (net.minecraft.tileentity.TileEntity) obj;
+            if (te.isInvalid()) continue;
+            if (isMasterTile(te.getClass().getName())) {
+                double distance = mc.thePlayer.getDistanceSq(te.xCoord + 0.5D, te.yCoord + 0.5D, te.zCoord + 0.5D);
+                if (distance <= 256.0D && distance < best) {
+                    closest = new int[] { te.xCoord, te.yCoord, te.zCoord };
+                    best = distance;
+                }
+            }
+        }
+        return closest;
+    }
+
+    public static boolean isMasterBlock(net.minecraft.block.Block block) {
+        if (block == null) return false;
+        String name = block.getClass().getName();
+        return name.endsWith(".PuzzleMasterBlock") || name.equals("ru.timeconqueror.lootgames.common.block.PuzzleMasterBlock");
+    }
+
+    public static boolean isMasterTile(String className) {
+        return className != null && (className.endsWith(".PuzzleMasterTile")
+            || className.equals("ru.timeconqueror.lootgames.common.block.tile.PuzzleMasterTile"));
     }
 
     public Object nearbyGame(boolean forceScan) {
@@ -730,9 +837,16 @@ public final class LootGamesBridge implements MiniGameDetector {
             return false;
         if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
         net.minecraft.util.MovingObjectPosition hit = visibleTarget(mc, x, y, z);
-        if (hit == null) return false;
-        int side = hit.sideHit;
-        Vec3 hitVec = hit.hitVec;
+        int side = 1;
+        Vec3 hitVec = null;
+        if (hit != null) {
+            side = hit.sideHit;
+            hitVec = hit.hitVec;
+        } else {
+            double eyeY = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
+            side = eyeY < y ? 0 : 1;
+            hitVec = Vec3.createVectorHelper(x + 0.5D, y + (side == 0 ? 0.0D : 1.0D), z + 0.5D);
+        }
         if (BaritoneBlockBridge.click(mc, x, y, z, side, hitVec, false)) return true;
         boolean direct = mc.playerController
             .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), x, y, z, side, hitVec);
@@ -778,17 +892,36 @@ public final class LootGamesBridge implements MiniGameDetector {
 
     private static boolean selectSafeInteractionItem(Minecraft mc) {
         net.minecraft.item.ItemStack held = mc.thePlayer.getHeldItem();
-        if (held == null || held.getItem() instanceof net.minecraft.item.ItemTool
-            || held.getItem() instanceof net.minecraft.item.ItemSword) return true;
+        if (held != null && !(held.getItem() instanceof net.minecraft.item.ItemBlock)) {
+            if (held.getItem() instanceof net.minecraft.item.ItemTool
+                || held.getItem() instanceof net.minecraft.item.ItemSword) return true;
+        } else if (held == null) {
+            return true;
+        }
+        int fallbackSlot = -1;
         for (int slot = 0; slot < 9; slot++) {
             net.minecraft.item.ItemStack candidate = mc.thePlayer.inventory.getStackInSlot(slot);
-            if (candidate == null || candidate.getItem() instanceof net.minecraft.item.ItemTool
-                || candidate.getItem() instanceof net.minecraft.item.ItemSword) {
+            if (candidate == null) {
                 mc.thePlayer.inventory.currentItem = slot;
+                if (mc.playerController != null) mc.playerController.updateController();
                 return true;
             }
+            if (candidate.getItem() instanceof net.minecraft.item.ItemTool
+                || candidate.getItem() instanceof net.minecraft.item.ItemSword) {
+                mc.thePlayer.inventory.currentItem = slot;
+                if (mc.playerController != null) mc.playerController.updateController();
+                return true;
+            }
+            if (fallbackSlot == -1 && !(candidate.getItem() instanceof net.minecraft.item.ItemBlock)) {
+                fallbackSlot = slot;
+            }
         }
-        return false;
+        if (fallbackSlot != -1) {
+            mc.thePlayer.inventory.currentItem = fallbackSlot;
+            if (mc.playerController != null) mc.playerController.updateController();
+            return true;
+        }
+        return held != null && !(held.getItem() instanceof net.minecraft.item.ItemBlock);
     }
 
     public boolean requiresMinesweeperOpeningClick(DetectedGame detected) {

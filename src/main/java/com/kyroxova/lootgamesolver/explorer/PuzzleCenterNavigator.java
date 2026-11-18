@@ -72,11 +72,19 @@ public final class PuzzleCenterNavigator {
 
     public boolean moveToPosition(Minecraft mc, Explorer explorer, int[] center, boolean allowDigging) {
         if (mc.thePlayer == null || center == null || center.length < 3 || explorer.movingToPuzzleCenter) return false;
+        double initDx = mc.thePlayer.posX - (center[0] + 0.5D);
+        double initDz = mc.thePlayer.posZ - (center[2] + 0.5D);
+        double initDy = (mc.thePlayer.posY + mc.thePlayer.getEyeHeight()) - (center[1] + 0.5D);
+        if (initDx * initDx + initDy * initDy + initDz * initDz <= 14.0D && Math.hypot(initDx, initDz) <= 2.8D) {
+            explorer.movingToPuzzleCenter = false;
+            explorer.target = explorer.puzzleMasterTarget;
+            explorer.puzzleMasterTarget = null;
+            puzzleCenterArrivalPending = true;
+            return true;
+        }
         if (!explorer.walking && explorer.navigationInput == null) {
-            BaritoneNavigationBridge.Start started = allowDigging
-                && (!explorer.inDungeonRoom(mc) || mc.thePlayer.boundingBox.minY < center[1] + 0.5D)
-                    ? explorer.baritoneNavigation.startWithPlacementWithoutBreaking(center[0], center[1] + 1, center[2])
-                    : explorer.baritoneNavigation.startWithoutBreaking(center[0], center[1] + 1, center[2]);
+            BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
+                .startAdjacentWithoutBreaking(center[0], center[1] + 1, center[2]);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 explorer.puzzleMasterTarget = explorer.target;
                 TileEntity point = new TileEntity();
@@ -134,15 +142,15 @@ public final class PuzzleCenterNavigator {
         if (explorer.walkingSearch == null && explorer.route.isEmpty()) {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
+            if (distance <= 2.5D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 3) {
                 explorer.movingToPuzzleCenter = false;
                 explorer.target = explorer.puzzleMasterTarget;
                 explorer.puzzleMasterTarget = null;
                 puzzleCenterArrivalPending = true;
                 return true;
             }
-            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
-                if (allowDigging && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+            if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
+                if (allowDigging && !explorer.inDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
                     explorer.walking = true;
                     explorer.status = explorer.digging ? "Planning board entry" : "Moving to board entrance";
                     return true;
@@ -159,15 +167,15 @@ public final class PuzzleCenterNavigator {
         if (!explorer.walking) {
             double distance = Math
                 .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 1.8D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 2) {
+            if (distance <= 2.5D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 3) {
                 explorer.movingToPuzzleCenter = false;
                 explorer.target = explorer.puzzleMasterTarget;
                 explorer.puzzleMasterTarget = null;
                 puzzleCenterArrivalPending = true;
                 return true;
             }
-            if (distance > 1.8D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 2) {
-                if (allowDigging && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+            if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
+                if (allowDigging && !explorer.inDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
                     explorer.walking = true;
                     explorer.status = explorer.digging ? "Planning an entry to the board center"
                         : "Moving to a safe board entrance";
@@ -203,9 +211,14 @@ public final class PuzzleCenterNavigator {
             abandonPuzzleCenterMove(mc, explorer);
             return true;
         }
-        double distance = Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-        boolean atFloor = Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) < 0.01D;
-        if (distance <= (explorer.movingToRewardView ? 0.75D : 0.35D) && atFloor && mc.thePlayer.onGround) {
+        double dx = mc.thePlayer.posX - (center[0] + 0.5D);
+        double dz = mc.thePlayer.posZ - (center[2] + 0.5D);
+        double dy = (mc.thePlayer.posY + mc.thePlayer.getEyeHeight()) - (center[1] + 0.5D);
+        double distSq = dx * dx + dy * dy + dz * dz;
+        double hDist = Math.hypot(dx, dz);
+        double reach = mc.playerController != null ? mc.playerController.getBlockReachDistance() : 4.0D;
+        boolean withinInteraction = (distSq <= reach * reach || hDist <= 2.5D);
+        if (withinInteraction && mc.thePlayer.onGround) {
             explorer.target = explorer.puzzleMasterTarget;
             explorer.puzzleMasterTarget = null;
             explorer.movingToPuzzleCenter = false;
@@ -257,7 +270,7 @@ public final class PuzzleCenterNavigator {
             explorer.excavationRoute.clear();
             explorer.excavationSearch = null;
         }
-        if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+        if (LootGameSolverConfig.staircaseEnabled && !explorer.inDungeonRoom(mc) && explorer.selectDigEntrance(mc)) {
             explorer.walking = true;
             explorer.status = explorer.digging ? "Planning an entry to the board center"
                 : "Moving to a safe board entrance";

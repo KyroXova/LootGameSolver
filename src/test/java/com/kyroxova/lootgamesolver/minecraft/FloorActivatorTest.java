@@ -15,5 +15,7 @@ public class FloorActivatorTest {
             LootGamesBridge.isFloorActivatorName("ru.timeconqueror.lootgames.common.block.SudokuActivatorBlock"));
         assertFalse(LootGamesBridge.isFloorActivatorName("ru.timeconqueror.lootgames.common.block.PuzzleMasterBlock"));
         assertFalse(LootGamesBridge.isFloorActivatorName("net.minecraft.block.BlockStone"));
+        assertTrue(LootGamesBridge.isMasterTile("ru.timeconqueror.lootgames.common.block.tile.PuzzleMasterTile"));
+        assertFalse(LootGamesBridge.isMasterTile("ru.timeconqueror.lootgames.common.block.tile.GOLMasterTile"));
     }
 }

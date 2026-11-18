@@ -168,7 +168,7 @@ final class AutoPuzzleCoordinator {
                 rewardCenter = activator.clone();
                 floorActivatorPosition = activator;
                 floorActivatorClicked = false;
-                if (withinInteractionReach(mc, activator) && mc.thePlayer.boundingBox.minY >= activator[1] + 0.9D
+                if (withinInteractionReach(mc, activator)
                     && puzzleBridge.hasClearView(activator)) {
                     state = State.REVEALING;
                     puzzleWaitTicks = 0;
@@ -207,10 +207,7 @@ final class AutoPuzzleCoordinator {
                 return;
             }
             if (autoPuzzlePosition != null) {
-                double dx = autoPuzzlePosition[0] + 0.5D - mc.thePlayer.posX;
-                double dz = autoPuzzlePosition[2] + 0.5D - mc.thePlayer.posZ;
-                double hDist = Math.hypot(dx, dz);
-                if (hDist > 2.2D) {
+                if (!withinInteractionReach(mc, autoPuzzlePosition)) {
                     if (exploration != null && !exploration.navigating()) {
                         exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
                     }
@@ -419,6 +416,9 @@ final class AutoPuzzleCoordinator {
     }
 
     void startPuzzleSolver(Minecraft mc, LootGamesBridge puzzleBridge, SolverSession session, ClientHooks hooks) {
+        if (hooks != null && hooks.getExploration() != null && hooks.getExploration().navigating()) {
+            hooks.getExploration().stop(mc, "Solving puzzle in progress");
+        }
         if (state != State.REVEALING_NEXT_STAGE) {
             Object game = puzzleBridge.nearbyGame(true);
             int level = puzzleBridge.currentMinesweeperLevel(game);

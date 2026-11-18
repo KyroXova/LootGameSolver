@@ -46,11 +46,14 @@ public final class ClientHooks {
     private int detectCounter = 0;
     private final LootGamesBridge puzzleBridge = new LootGamesBridge();
     private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+    private final PuzzleTileNavigator tileNavigator = new PuzzleTileNavigator();
     private final RoomOpenWatchdog roomOpenWatchdog = new RoomOpenWatchdog();
     private final RewardChestLooter rewardLooter = new RewardChestLooter();
     private final RewardChestLooter preLootPacker = new RewardChestLooter();
     private final TrashCleanup trashCleanup = new TrashCleanup();
     private StorageRecoveryController storageRecovery;
+    private boolean storageResumeChecked;
+    private int storageResumeWait;
     private boolean rewardReturnPending;
     private boolean rewardPreCleanupPending;
     private boolean rewardPrePackingAttempted;
@@ -65,8 +68,8 @@ public final class ClientHooks {
     private int exploreHoldTicks;
     private int checkpointClearDoneTicks;
     private boolean wasInsideRoom;
-    private boolean solverMovementOwned;
     private World puzzleWorld;
+    private long totalActiveTicks = 0L;
 
     private final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
 
@@ -156,6 +159,10 @@ public final class ClientHooks {
         return worldRenderer;
     }
 
+    public Explorer getExploration() {
+        return exploration;
+    }
+
     @SubscribeEvent
     public void onKeyInput(cpw.mods.fml.common.gameevent.InputEvent.KeyInputEvent event) {}
 
@@ -201,6 +208,7 @@ public final class ClientHooks {
             StorageRecoveryController.Result result = storageRecovery.tick(mc);
             if (result == StorageRecoveryController.Result.WORKING) return;
             PendingLootStore.Checkpoint checkpoint = storageRecovery.checkpoint();
+            String storageFailure = storageRecovery.failureReason();
             storageRecovery = null;
             puzzleWorld = mc.theWorld;
             if (result == StorageRecoveryController.Result.RETURNED && mc.theWorld != null && mc.thePlayer != null) {
@@ -211,9 +219,17 @@ public final class ClientHooks {
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
                         "\u00a7a[LootGameSolver] Storage trip complete; resuming saved rewards."));
+            } else if (result == StorageRecoveryController.Result.RETURNED_UNSTORED) {
+                rewardReturnPending = false;
+                rewardPreCleanupPending = false;
+                if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] Returned to rewards, but storage was unavailable or full. Empty bags or storage, then use /lgs resumeLoot."));
             } else {
                 rewardReturnPending = false;
                 rewardPreCleanupPending = false;
+                if (storageFailure != null && mc.thePlayer != null) mc.thePlayer.addChatMessage(
+                    new net.minecraft.util.ChatComponentText("\u00a7e[LootGameSolver] " + storageFailure));
                 if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
                         "\u00a7e[LootGameSolver] Storage recovery stopped. Your unfinished rewards remain saved; check storage and use /lgs resumeLoot when back nearby."));
@@ -229,6 +245,8 @@ public final class ClientHooks {
             if (exploration != null) exploration.setInventoryMaintenance(false);
             inventoryMaintenanceStage = 0;
             inventoryMaintenanceCooldown = 0;
+            storageResumeChecked = false;
+            storageResumeWait = 0;
             wasInsideRoom = false;
             trashCleanup.reset();
             if (preLootPacker.active()) preLootPacker.cancel(mc);
@@ -248,6 +266,27 @@ public final class ClientHooks {
                 releaseMovementKeys(mc);
                 puzzleCompletion.clear();
                 autoPuzzle.reset();
+            }
+        }
+        if (!storageResumeChecked && mc.thePlayer != null
+            && mc.theWorld != null
+            && mc.currentScreen == null
+            && !session.isActive()
+            && !rewardReturnPending
+            && ++storageResumeWait >= 60) {
+            storageResumeChecked = true;
+            PendingLootStore.Checkpoint saved = rewardLooter.pendingCheckpoint();
+            if (saved != null) {
+                StorageRecoveryController recovery = new StorageRecoveryController();
+                ensureInventoryBaseline(mc);
+                if (recovery.resumeAtStorage(mc, saved, inventoryBaseline)) {
+                    storageRecovery = recovery;
+                    explorationDriven = true;
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7a[LootGameSolver] Resuming the interrupted storage trip."));
+                    return;
+                }
             }
         }
         trashCleanup.advanceCooldown();
@@ -405,6 +444,7 @@ public final class ClientHooks {
             return;
         }
         if (mc.currentScreen != null) {
+            tileNavigator.pause(true);
             if (session.inventoryTransferActive()) session.tick();
             else session.pauseForScreen();
             return;
@@ -415,6 +455,9 @@ public final class ClientHooks {
             && mc.thePlayer.ticksExisted % 20 == 0
             && exploration.inDungeonRoom(mc)) {
             int[] center = puzzleBridge.nearbyFloorActivator();
+            if (center == null) {
+                center = puzzleBridge.nearbyMasterBlock(exploration.verifiedRoomCenter(mc));
+            }
             if (center == null) {
                 Object game = puzzleBridge.nearbyGame(true);
                 if (game != null) center = puzzleBridge.gameCenter(game);
@@ -441,7 +484,8 @@ public final class ClientHooks {
                 && (exploration.navigating() || (explorationDriven && !autoPuzzle.isIdle()));
             int[] room = watchingRoom ? exploration.verifiedRoomCenter(mc) : null;
             RoomOpenWatchdog.Action recovery = roomOpenWatchdog.tick(room, watchingRoom);
-            if (room != null) exploration.setAutomationStatus(roomOpenWatchdog.status());
+            if (room != null && (recovery == RoomOpenWatchdog.Action.RETRY || autoPuzzle.isIdle()))
+                exploration.setAutomationStatus(roomOpenWatchdog.status());
             if (recovery != RoomOpenWatchdog.Action.WAIT) {
                 int[] rewards = nearbyRewardCenter(mc);
                 if (rewards != null) {
@@ -465,9 +509,10 @@ public final class ClientHooks {
                         new net.minecraft.util.ChatComponentText(
                             "\u00a7e[LootGameSolver] Could not open this room after three retries; moving on."));
                 } else {
+                    int[] master = puzzleBridge.nearbyMasterBlock(room);
                     int[] floor = puzzleBridge.nearbyFloorActivator();
                     Object game = puzzleBridge.nearbyGame(true);
-                    int[] center = floor != null ? floor : game == null ? room : puzzleBridge.gameCenter(game);
+                    int[] center = master != null ? master : (floor != null ? floor : (game == null ? room : puzzleBridge.gameCenter(game)));
                     exploration.stop(mc, "Retrying room puzzle");
                     explorationDriven = true;
                     autoPuzzle.startManual(center != null ? center : room, floor, mc.theWorld, puzzleCompletion);
@@ -476,7 +521,16 @@ public final class ClientHooks {
         }
 
         if (session.isActive()) {
+            if (exploration != null && exploration.navigating()) {
+                exploration.stop(mc, "Solving puzzle in progress");
+            }
+            tileNavigator.pause(false);
             handleAutoMovement(mc);
+        } else tileNavigator.stop();
+
+        if (session.isActive() || autoPuzzle.isActive()
+            || (exploration != null && (exploration.navigating() || rewardReturnPending))) {
+            totalActiveTicks++;
         }
     }
 
@@ -728,44 +782,41 @@ public final class ClientHooks {
         double distSq = dx * dx + dy * dy + dz * dz;
         double distXZ = Math.sqrt(dx * dx + dz * dz);
 
-        double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
-        if ((distSq > reach * reach || !LootGamesBridge.topFaceVisible(mc, block)) && distXZ > 0.75D) {
-            double speed = 0.10D;
+        // Smooth humanized camera rotation to face target block
+        float targetYaw = (float) (Math.atan2(dz, dx) * 180.0D / Math.PI) - 90.0F;
+        float targetPitch = (float) (-(Math.atan2(dy, distXZ) * 180.0D / Math.PI));
+        mc.thePlayer.rotationYaw = updateRotation(mc.thePlayer.rotationYaw, targetYaw, 45.0F);
+        mc.thePlayer.rotationPitch = updateRotation(mc.thePlayer.rotationPitch, targetPitch, 35.0F);
+
+        // Step towards target block if outside interaction reach
+        if (distSq > 7.84D) {
+            double speed = 0.28D;
             if (distXZ > 0.1D) {
-                mc.thePlayer.motionX = (dx / distXZ) * speed;
-                mc.thePlayer.motionZ = (dz / distXZ) * speed;
-                solverMovementOwned = true;
+                mc.thePlayer.motionX += (dx / distXZ) * speed;
+                mc.thePlayer.motionZ += (dz / distXZ) * speed;
+                mc.thePlayer.setSprinting(true);
             }
-            if (mc.thePlayer.capabilities.isFlying) {
-                if (Math.abs(dy) > 0.8D) {
-                    mc.thePlayer.motionY = dy > 0 ? 0.15D : -0.15D;
-                }
-            } else if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) {
+            if (dy > 1.0D && mc.thePlayer.onGround) {
                 mc.thePlayer.jump();
             }
-        } else if (solverMovementOwned) {
-            mc.thePlayer.motionX = 0;
-            mc.thePlayer.motionZ = 0;
-            solverMovementOwned = false;
+        } else {
+            mc.thePlayer.setSprinting(false);
+            if (mc.thePlayer.movementInput != null) {
+                mc.thePlayer.movementInput.moveForward = 0.0F;
+            }
         }
     }
 
-    private float updateRotation(float current, float target, float maxStep) {
-        float diff = current - target;
-        while (diff >= 180.0F) diff -= 360.0F;
-        while (diff < -180.0F) diff += 360.0F;
+    private static float updateRotation(float current, float target, float maxStep) {
+        float diff = net.minecraft.util.MathHelper.wrapAngleTo180_float(target - current);
         if (diff > maxStep) diff = maxStep;
         if (diff < -maxStep) diff = -maxStep;
-        return current - diff;
+        return current + diff;
     }
 
     void releaseMovementKeys(Minecraft mc) {
+        tileNavigator.stop();
         if (mc.thePlayer != null) {
-            if (solverMovementOwned) {
-                mc.thePlayer.motionX = 0;
-                mc.thePlayer.motionZ = 0;
-                solverMovementOwned = false;
-            }
             mc.thePlayer.setSprinting(false);
             if (mc.thePlayer.movementInput != null) {
                 mc.thePlayer.movementInput.moveForward = 0.0F;
@@ -825,7 +876,12 @@ public final class ClientHooks {
             String autoColor = autoActive ? "\u00A7c" : "\u00A77";
             String holoColor = holoActive ? "\u00A7e" : "\u00A77";
 
-            String line1 = "\u00A7b\u00A7lLoot Game Solver";
+            long totalSeconds = totalActiveTicks / 20L;
+            long hours = totalSeconds / 3600L;
+            long minutes = (totalSeconds % 3600L) / 60L;
+            long seconds = totalSeconds % 60L;
+            String timerStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
+            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7f" + timerStr + " \u00A77]";
             int dist = exploration != null ? exploration.checkpointDistance(mc) : 0;
             String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
             String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle

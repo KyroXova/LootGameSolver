@@ -81,6 +81,10 @@ public final class SolverSession {
     }
 
     public void tick() {
+        tick(true);
+    }
+
+    void tick(boolean allowInteraction) {
         bridge.tick();
         Minecraft client = Minecraft.getMinecraft();
         if (sudokuTransfer.active()) {
@@ -124,7 +128,7 @@ public final class SolverSession {
             lastSnapshotSignature = currentSnapshot.signature;
         }
 
-        if (mode == null) return;
+        if (mode == null || !allowInteraction) return;
 
         long now = System.currentTimeMillis();
         if (now - lastActionAt < LootGameSolverConfig.clickDelayMs) return;

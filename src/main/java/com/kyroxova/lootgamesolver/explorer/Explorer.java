@@ -428,7 +428,25 @@ public class Explorer {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (solved && BaritoneTransitCoordinator
             .needsSurfaceExit(insideDungeonRoom(mc), mc.theWorld.canBlockSeeTheSky(x, y, z))) {
-            if (!baritoneCoordinator.beginSurfaceExit(mc, this)) stop(mc, "No safe surface destination found");
+            if (staircaseDugPath != null && staircaseDugPath.size() >= 2) {
+                route.clear();
+                for (int i = staircaseDugPath.size() - 1; i >= 0; i--) {
+                    int[] p = staircaseDugPath.get(i);
+                    route.add(new int[] { p[0], p[1], p[2], 0 });
+                }
+                returning = true;
+                returnAvailable = false;
+                resumeSearchAfterReturn = true;
+                walking = true;
+                searching = false;
+                digging = false;
+                status = "Ascending dug path to surface";
+                return;
+            }
+            if (!baritoneCoordinator.beginSurfaceExit(mc, this)) {
+                if (LootGameSolverConfig.staircaseEnabled && beginDiggingToSurface(mc)) return;
+                stop(mc, "No safe surface destination found");
+            }
             return;
         }
         continueProgressiveSearch(mc, solved);
@@ -693,6 +711,7 @@ public class Explorer {
     public String navigationStatus() {
         if (status != null && status.startsWith("Retry ")) return status;
         if (baritoneCoordinator.active() && baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
+            if (baritoneCoordinator.shoreMove) return "Swimming to Shore";
             if (baritoneCoordinator.surfaceMove || baritoneCoordinator.returnMove) return "Ascending to Surface";
             if (baritoneCoordinator.structureMove) return "Navigating to Puzzle";
             if (baritoneCoordinator.centerMove) return "Moving to Board";
@@ -845,7 +864,7 @@ public class Explorer {
             }
         }
         BaritoneNavigationBridge.Start baritoneStart = baritoneNavigation
-            .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+            .startStructureApproach(target.xCoord, target.yCoord, target.zCoord);
         if (baritoneStart == BaritoneNavigationBridge.Start.STARTED) {
             baritoneCoordinator.structureMove = true;
             baritoneCoordinator.preRouting = false;
@@ -1112,7 +1131,7 @@ public class Explorer {
         if (mc.thePlayer == null || mc.theWorld == null || target == null) return;
         if (!searching && navigationInput == null) {
             BaritoneNavigationBridge.Start started = baritoneNavigation
-                .startAdjacent(target.xCoord, target.yCoord, target.zCoord);
+                .startStructureApproach(target.xCoord, target.yCoord, target.zCoord);
             if (started == BaritoneNavigationBridge.Start.STARTED) {
                 rememberBaritoneReturnPoint(mc);
                 baritoneCoordinator.structureMove = true;
@@ -2023,6 +2042,7 @@ public class Explorer {
         if (digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
                 net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
+                if (plant == net.minecraft.init.Blocks.snow_layer && mc.theWorld.getBlockMetadata(next[0], by, next[2]) <= 1) continue;
                 if (FoliagePolicy.canClear(
                     isFoliage(plant),
                     mc.theWorld.getTileEntity(next[0], by, next[2]) != null,
@@ -2813,6 +2833,10 @@ public class Explorer {
 
     private boolean beginDiggingAtCurrentPosition(Minecraft mc) {
         return excavationPlanner.beginDiggingAtCurrentPosition(mc, this);
+    }
+
+    public boolean beginDiggingToSurface(Minecraft mc) {
+        return excavationPlanner.beginDiggingToSurface(mc, this);
     }
 
     private List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {

@@ -67,6 +67,15 @@ public final class BaritoneNavigationBridge {
         return start(x, 0, z, 2, false);
     }
 
+    public void disablePlacement() {
+        try {
+            Class<?> api = Class.forName("baritone.api.BaritoneAPI");
+            Object settings = api.getMethod("getSettings").invoke(null);
+            Object allowPlace = settings.getClass().getField("allowPlace").get(settings);
+            allowPlace.getClass().getField("value").set(allowPlace, false);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
         return start(x, y, z, kind, forbidBreaking, false);
     }
@@ -81,6 +90,15 @@ public final class BaritoneNavigationBridge {
             return Start.FAILED;
         }
         try {
+            try {
+                Object settings = api.getMethod("getSettings").invoke(null);
+                Object allowPlace = settings.getClass().getField("allowPlace").get(settings);
+                allowPlace.getClass().getField("value").set(allowPlace, kind == 3);
+                try {
+                    Object allowInventory = settings.getClass().getField("allowInventory").get(settings);
+                    allowInventory.getClass().getField("value").set(allowInventory, true);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             Object provider = api.getMethod("getProvider")
                 .invoke(null);
             Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");

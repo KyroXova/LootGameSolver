@@ -183,10 +183,13 @@ final class RewardChestLooter {
                 mc.thePlayer.posX,
                 mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
                 mc.thePlayer.posZ);
-            if (mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D) > 2.25D
-                || index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null)
-                failedChestViews.add(chestView);
-            chestView = null;
+            boolean arrived = mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D) <= 2.25D;
+            if (arrived) {
+                if (index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null) {
+                    failedChestViews.add(chestView);
+                }
+                chestView = null;
+            }
         }
         if (exploration != null) exploration.consumePuzzleCenterArrival();
         if (backpackTransfer.active()) {
@@ -429,7 +432,7 @@ final class RewardChestLooter {
         double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
-        if (dx * dx + dy * dy + dz * dz > reach * reach || horizontal > 2.8D) {
+        if (dx * dx + dy * dy + dz * dz > reach * reach) {
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
             else status = "Finding a safe position beside the reward chest";
@@ -488,8 +491,13 @@ final class RewardChestLooter {
         }
         if (!com.kyroxova.lootgamesolver.minecraft.BaritoneBlockBridge
             .click(mc, pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec, false)) {
-            status = "Chest interaction unavailable";
-            return;
+            boolean direct = mc.playerController
+                .onPlayerRightClick(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem(), pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec);
+            mc.thePlayer.swingItem();
+            if (!direct) {
+                status = "Chest interaction unavailable";
+                return;
+            }
         }
         chestAim.reset();
         if (exploration != null) exploration.clearAim();
