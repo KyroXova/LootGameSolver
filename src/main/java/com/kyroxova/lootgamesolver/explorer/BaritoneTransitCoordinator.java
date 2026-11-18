@@ -363,6 +363,12 @@ public final class BaritoneTransitCoordinator {
                     if (hDist <= 6.0D || explorer.baritoneNavigation.completed()) {
                         preRouting = false;
                         explorer.baritoneNavigation.stop();
+                        if (mc.thePlayer.isInWater() && explorer.findDryEntrance(mc)) {
+                            structureMove = false;
+                            explorer.walking = true;
+                            explorer.searching = false;
+                            return true;
+                        }
                         BaritoneNavigationBridge.Start start = explorer.baritoneNavigation
                             .startAdjacent(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
                         if (start == BaritoneNavigationBridge.Start.STARTED) {
