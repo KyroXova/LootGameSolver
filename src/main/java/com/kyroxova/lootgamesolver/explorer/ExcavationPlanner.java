@@ -70,7 +70,16 @@ public final class ExcavationPlanner {
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (!safe(mc.theWorld, x, y, z) || !dryShore(mc.theWorld, x, y, z)) return false;
+        explorer.entranceSurfaceY = y;
+        explorer.entrySurfacePoint = new int[] { x, y, z };
+        explorer.staircaseDugPath.clear();
+        explorer.staircaseDugPath.add(new int[] { x, y, z });
         explorer.route.clear();
+        explorer.entranceCandidates.clear();
+        explorer.extendedFrom = null;
+        explorer.approachPlan = null;
+        explorer.approachAnchor = null;
+        explorer.approachReady = false;
         explorer.walkingSearch = null;
         explorer.continuationSearch = null;
         explorer.excavationSearch = null;

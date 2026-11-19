@@ -23,6 +23,7 @@ public final class BaritoneTransitCoordinator {
     public boolean surfaceMove;
     public boolean shoreMove;
     private int[] shoreGoal;
+    private int shoreArrivalWait;
     private boolean surfaceWaiting;
     private boolean surfaceSolved;
     private int surfaceWait;
@@ -57,6 +58,7 @@ public final class BaritoneTransitCoordinator {
         surfaceMove = false;
         shoreMove = false;
         shoreGoal = null;
+        shoreArrivalWait = 0;
         surfaceWaiting = false;
         surfaceWait = 0;
         surfaceStallTicks = 0;
@@ -136,6 +138,7 @@ public final class BaritoneTransitCoordinator {
 
     void beginShoreMove(int[] goal) {
         shoreGoal = goal.clone();
+        shoreArrivalWait = 0;
         shoreMove = true;
     }
 
@@ -180,17 +183,31 @@ public final class BaritoneTransitCoordinator {
                 explorer.walking = false;
                 return true;
             }
+            int x = (int) Math.floor(mc.thePlayer.posX);
+            int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            boolean near = nearShoreGoal(x, y, z, shoreGoal);
+            if (near && mc.thePlayer.onGround
+                && !mc.thePlayer.isInWater()
+                && ExplorerTerrain.dryShore(mc.theWorld, x, y, z)
+                && ExplorerTerrain.safe(mc.theWorld, x, y, z)) {
+                explorer.baritoneNavigation.stop();
+                shoreMove = false;
+                shoreGoal = null;
+                if (explorer.excavationPlanner.beginDiggingAtCurrentPosition(mc, explorer)) {
+                    explorer.walking = true;
+                    explorer.searching = false;
+                    return false;
+                }
+                explorer.stop(mc, "Unable to start excavation from the dry entrance");
+                return true;
+            }
             if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) return true;
-            boolean arrived = explorer.baritoneNavigation.completed()
-                && ExplorerTerrain.dryShore(mc.theWorld, shoreGoal[0], shoreGoal[1], shoreGoal[2]);
+            if (near && !mc.thePlayer.onGround && ++shoreArrivalWait <= 20) return true;
             explorer.baritoneNavigation.stop();
             shoreMove = false;
             shoreGoal = null;
-            if (arrived) {
-                explorer.seekingDryEntrance = true;
-                explorer.entranceCandidates.clear();
-                explorer.status = "Reached dry entrance";
-            } else if (!explorer.findDryEntrance(mc)) {
+            if (!explorer.findDryEntrance(mc)) {
                 explorer.stop(mc, "No safe route to a dry entrance");
                 return true;
             }
@@ -534,5 +551,10 @@ public final class BaritoneTransitCoordinator {
 
     static boolean rewardApproachProgress(double dx, double dz) {
         return dx * dx + dz * dz >= 0.09D;
+    }
+
+    static boolean nearShoreGoal(int x, int y, int z, int[] goal) {
+        int dx = x - goal[0], dz = z - goal[2];
+        return dx * dx + dz * dz <= 2 && Math.abs(y - goal[1]) <= 1;
     }
 }
