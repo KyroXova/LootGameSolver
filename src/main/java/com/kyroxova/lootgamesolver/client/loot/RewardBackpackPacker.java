@@ -154,7 +154,14 @@ public final class RewardBackpackPacker {
         }
         Container container = mc.thePlayer.openContainer;
         String name = container.getClass().getName();
-        boolean isBackpack = InventoryProtection.backpackContainer(name) && backpackSlot >= 0
+        int nonPlayerSlots = 0;
+        for (Object obj : container.inventorySlots) {
+            Slot s = (Slot) obj;
+            if (s.inventory != mc.thePlayer.inventory) {
+                nonPlayerSlots++;
+            }
+        }
+        boolean isBackpack = InventoryProtection.backpackContainer(name) && nonPlayerSlots >= 4 && backpackSlot >= 0
             && isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot));
         if (packOpening && mc.currentScreen instanceof GuiContainer && !isBackpack) {
             mc.thePlayer.closeScreen();
@@ -164,6 +171,13 @@ public final class RewardBackpackPacker {
             looter.oldSlot = -1;
             int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
             if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
+            if (temporaryBag && bagHotbar >= 0 && bagHotbar < backpackTried.length) backpackTried[bagHotbar] = true;
+            if (temporaryBag && mc.thePlayer != null && !restoringBag) {
+                backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced);
+                restoringBag = true;
+            }
+            temporaryBag = false;
+            temporaryBagUsed = false;
             backpackSlot = -1;
             openWait = 0;
             looter.waiting = 5;
@@ -226,9 +240,10 @@ public final class RewardBackpackPacker {
             looter.oldSlot = -1;
             int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
             if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
+            if (temporaryBag && bagHotbar >= 0 && bagHotbar < backpackTried.length) backpackTried[bagHotbar] = true;
             if (packMoved) {
                 preferredBagSlot = temporaryBag ? bagHotbar : backpackSlot;
-            } else if (preferredBagSlot == attemptedSlot) {
+            } else if (preferredBagSlot == attemptedSlot || (temporaryBag && preferredBagSlot == bagHotbar)) {
                 preferredBagSlot = -1;
             }
             backpackSlot = -1;
@@ -251,6 +266,13 @@ public final class RewardBackpackPacker {
                 looter.oldSlot = -1;
                 int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
                 if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
+                if (temporaryBag && bagHotbar >= 0 && bagHotbar < backpackTried.length) backpackTried[bagHotbar] = true;
+                if (temporaryBag && mc.thePlayer != null && !restoringBag) {
+                    backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced);
+                    restoringBag = true;
+                }
+                temporaryBag = false;
+                temporaryBagUsed = false;
                 backpackSlot = -1;
                 packOpening = false;
                 openWait = 0;

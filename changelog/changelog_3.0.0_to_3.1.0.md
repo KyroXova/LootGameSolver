@@ -16,6 +16,8 @@
 
 ## Fixes & Improvements
 
+- **Non-storage container & jetpack exclusion**: Explicitly excluded jetpacks, copters, battery packs, flux packs, capacitors, chargers, sleeping bags, and specialized item containers (< 4 storage slots) from being opened during backpack packing and storage unload, eliminating infinite open/close loops.
+- **Windows checkpoint atomic replacement**: Fixed file save failures on Windows caused by `ATOMIC_MOVE` locking destination files in `PendingLootStore`, `LootedChestStore`, `MinedDropStore`, `SolvedStructureStore`, and `AccessTrailStore`.
 - **Backpack packing & loot recovery loops**: Fixed false "Bags Full or Unavailable" state when backpacks were partly empty or when no packable items remained. Added cooldown protection to prevent infinite 20-tick restart loops when reward collection pauses.
 - **Movement & input ownership**: Eliminated post-room movement stutter by cleanly restoring wrapped movement input when Baritone navigation takes control.
 - **Reward chest line-of-sight & pit view**: Ensured reward chests are only opened within direct player reach and unobstructed crosshair line-of-sight. Added detection to step off chests if standing directly on them, and refined pit floor approach rules so all chests are collected before the explorer can depart.

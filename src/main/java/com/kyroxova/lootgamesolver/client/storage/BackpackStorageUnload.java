@@ -83,15 +83,29 @@ public final class BackpackStorageUnload {
                 String name = mc.thePlayer.openContainer.getClass()
                     .getName()
                     .toLowerCase(Locale.ROOT);
-                if (!InventoryProtection.backpackContainer(name)) return Result.FAILED;
+                if (!InventoryProtection.backpackContainer(name)) {
+                    mc.thePlayer.closeScreen();
+                    finished[source] = true;
+                    return restore(mc, Result.WORKING);
+                }
                 IInventory contents = null;
+                int containerSlots = 0;
                 for (Object value : mc.thePlayer.openContainer.inventorySlots) {
                     IInventory candidate = ((Slot) value).inventory;
                     if (candidate == mc.thePlayer.inventory) continue;
-                    if (contents != null && contents != candidate) return Result.FAILED;
+                    containerSlots++;
+                    if (contents != null && contents != candidate) {
+                        mc.thePlayer.closeScreen();
+                        finished[source] = true;
+                        return restore(mc, Result.WORKING);
+                    }
                     contents = candidate;
                 }
-                if (contents == null) return Result.FAILED;
+                if (contents == null || containerSlots < 4) {
+                    mc.thePlayer.closeScreen();
+                    finished[source] = true;
+                    return restore(mc, Result.WORKING);
+                }
                 withdraw = new VerifiedBackpackUnload(mc.thePlayer.openContainer, contents, ledger);
                 phase = Phase.WITHDRAW;
                 return Result.WORKING;

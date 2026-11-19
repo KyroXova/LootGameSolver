@@ -15,23 +15,53 @@ public final class InventoryProtection {
 
     public static boolean bag(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
+        String unlocalized = "";
+        try {
+            unlocalized = stack.getUnlocalizedName();
+        } catch (Throwable ignored) {}
         return bagIdentity(
             String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())),
             stack.getItem()
                 .getClass()
-                .getName());
+                .getName(),
+            unlocalized);
     }
 
     public static boolean bagIdentity(String registryName, String className) {
-        String id = registryName.toLowerCase(Locale.ROOT);
-        String type = className.toLowerCase(Locale.ROOT);
+        return bagIdentity(registryName, className, "");
+    }
+
+    public static boolean bagIdentity(String registryName, String className, String unlocalizedName) {
+        String id = registryName == null ? "" : registryName.toLowerCase(Locale.ROOT);
+        String type = className == null ? "" : className.toLowerCase(Locale.ROOT);
+        String unloc = unlocalizedName == null ? "" : unlocalizedName.toLowerCase(Locale.ROOT);
         int colon = id.indexOf(':');
         if (colon >= 0) id = id.substring(colon + 1);
         int dot = Math.max(type.lastIndexOf('.'), type.lastIndexOf('$'));
         if (dot >= 0) type = type.substring(dot + 1);
-        // Consumable reward bags are not portable storage and must never be opened here.
-        if (id.contains("lootbag") || id.contains("loot_bag") || type.contains("lootbag") || type.contains("loot_bag"))
+
+        if (id.contains("lootbag") || id.contains("loot_bag") || type.contains("lootbag") || type.contains("loot_bag")
+            || id.contains("jetpack") || type.contains("jetpack") || unloc.contains("jetpack")
+            || id.contains("copter") || type.contains("copter") || unloc.contains("copter")
+            || id.contains("batpack") || type.contains("batpack") || unloc.contains("batpack")
+            || id.contains("lappack") || type.contains("lappack") || unloc.contains("lappack")
+            || id.contains("energypack") || type.contains("energypack") || unloc.contains("energypack")
+            || id.contains("fluxpack") || type.contains("fluxpack") || unloc.contains("fluxpack")
+            || id.contains("capacitor") || type.contains("capacitor") || unloc.contains("capacitor")
+            || id.contains("battery") || type.contains("battery") || unloc.contains("battery")
+            || id.contains("charger") || type.contains("charger") || unloc.contains("charger")
+            || id.contains("charging") || type.contains("charging") || unloc.contains("charging")
+            || id.contains("sleeping") || type.contains("sleeping") || unloc.contains("sleeping")
+            || id.contains("feedbag") || type.contains("feedbag") || unloc.contains("feedbag")
+            || id.contains("lunch") || type.contains("lunch") || unloc.contains("lunch")
+            || id.contains("trash") || type.contains("trash") || unloc.contains("trash")
+            || id.contains("quiver") || type.contains("quiver") || unloc.contains("quiver")
+            || id.contains("focus") || type.contains("focus") || unloc.contains("focus")
+            || id.contains("wand") || type.contains("wand") || unloc.contains("wand")
+            || id.contains("seedbag") || type.contains("seedbag") || unloc.contains("seedbag")) {
             return false;
+        }
+
         return id.contains("backpack") || type.contains("backpack")
             || id.contains("knapsack")
             || id.contains("satchel")
@@ -48,12 +78,23 @@ public final class InventoryProtection {
             return true;
         int dot = type.lastIndexOf('.');
         if (dot >= 0) type = type.substring(dot + 1);
+        if (type.contains("jetpack") || type.contains("copter")
+            || type.contains("batpack") || type.contains("lappack")
+            || type.contains("energypack") || type.contains("fluxpack")
+            || type.contains("capacitor") || type.contains("battery")
+            || type.contains("charger") || type.contains("charging")
+            || type.contains("quiver") || type.contains("focus")
+            || type.contains("wand") || type.contains("seedbag")
+            || type.contains("lunch") || type.contains("trash")
+            || type.contains("sleeping") || type.contains("feedbag")) {
+            return false;
+        }
         return (type.contains("backpack") || type.contains("knapsack")
             || type.contains("satchel")
             || type.contains("bag")
             || type.contains("pouch")
             || type.contains("holding")
-            || type.contains("iteminventory")) && !type.contains("jetpack") && !type.contains("copter");
+            || type.contains("iteminventory"));
     }
 
     public static boolean essential(ItemStack stack) {

@@ -22,10 +22,26 @@ public class InventoryProtectionTest {
         assertFalse(
             InventoryProtection
                 .bagIdentity("adventurebackpack:coalJetpack", "com.darkona.adventurebackpack.item.ItemCoalJetpack"));
+        assertFalse(
+            InventoryProtection
+                .bagIdentity("simplyjetpacks:jetpack", "tonius.simplyjetpacks.item.ItemJetpack"));
+        assertFalse(
+            InventoryProtection
+                .bagIdentity("ic2:itemArmorBatpack", "ic2.core.item.armor.ItemArmorBatpack"));
+        assertFalse(
+            InventoryProtection
+                .bagIdentity("openblocks:sleeping_bag", "openblocks.common.item.ItemSleepingBag"));
+        assertFalse(
+            InventoryProtection
+                .bagIdentity("thaumcraft:focuspouch", "thaumcraft.common.items.wands.ItemFocusPouch"));
         assertTrue(
             InventoryProtection
                 .bagIdentity("adventurebackpack:backpack", "com.darkona.adventurebackpack.item.ItemAdventureBackpack"));
+        assertTrue(
+            InventoryProtection
+                .bagIdentity("forestry:minerBag", "forestry.apiculture.items.ItemMiningBag"));
         assertFalse(InventoryProtection.backpackContainer("com.darkona.adventurebackpack.inventory.ContainerJetpack"));
+        assertFalse(InventoryProtection.backpackContainer("thaumcraft.common.container.ContainerFocusPouch"));
         assertTrue(InventoryProtection.backpackContainer("com.darkona.adventurebackpack.inventory.ContainerBackpack"));
         assertTrue(InventoryProtection.backpackContainer("de.eydamos.guiadvanced.ContainerWindow"));
     }
