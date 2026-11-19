@@ -268,6 +268,8 @@ public final class BaritoneTransitCoordinator {
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
                 if (surfaceGoal == null || routeFailures >= 3) {
                     surfaceMove = false;
+                    if (explorer.insideDungeonRoom(mc) && explorer.startRoomExitSearch(mc)) return true;
+                    if (explorer.startSavedReturn(mc, true, 128)) return true;
                     if (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingToSurface(mc)) return true;
                     explorer.stop(mc, "No safe surface route found");
                 } else {

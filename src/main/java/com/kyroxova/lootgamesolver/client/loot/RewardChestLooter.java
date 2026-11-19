@@ -320,7 +320,7 @@ public final class RewardChestLooter {
                 collecting = false;
                 index++;
                 openWait = 0;
-                waiting = 4;
+                waiting = 2;
                 status = "Chest collected";
                 return;
             }
@@ -329,7 +329,7 @@ public final class RewardChestLooter {
                 mc.thePlayer.closeScreen();
                 opened = false;
                 openWait = 0;
-                waiting = 4;
+                waiting = 2;
             }
             index = nextChest;
         }
@@ -427,7 +427,7 @@ public final class RewardChestLooter {
             }
             pendingSlot = best;
             pendingCount = beforeCount;
-            waiting = 5;
+            waiting = 2;
             status = "Collecting reward items";
             return;
         }
@@ -450,7 +450,7 @@ public final class RewardChestLooter {
         Vec3 eye = Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         net.minecraft.util.MovingObjectPosition hit = visibleChest(mc, eye, pos);
-        if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach || isStandingOnChest(mc, pos)) {
+        if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach) {
             if (!collecting) {
                 for (int i = index + 1; i < chests.size(); i++) {
                     net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
@@ -466,12 +466,12 @@ public final class RewardChestLooter {
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
             else if (active) status = "Finding a clear view of the reward chest";
-            waiting = 10;
+            waiting = 6;
             return;
         }
         double hitX = hit.hitVec.xCoord - eye.xCoord, hitY = hit.hitVec.yCoord - eye.yCoord;
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
-        float targetYaw = AimHelper.calculateYaw(hitX, hitZ);
+        float targetYaw = Math.hypot(hitX, hitZ) < 0.05D ? mc.thePlayer.rotationYaw : AimHelper.calculateYaw(hitX, hitZ);
         float targetPitch = AimHelper.calculatePitch(hitX, hitY, hitZ);
         if (!turnToward(mc, exploration, targetYaw, targetPitch)) {
             chestAim.reset();
@@ -483,16 +483,16 @@ public final class RewardChestLooter {
             .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
         net.minecraft.util.MovingObjectPosition crosshair = mc.objectMouseOver;
         boolean matches = mc.renderViewEntity == mc.thePlayer
-            && VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach);
-        if (!chestAim.ready(
-            pos[0],
-            pos[1],
-            pos[2],
-            matches,
-            matches ? Math.sqrt(eye.squareDistanceTo(crosshair.hitVec)) : Double.POSITIVE_INFINITY,
-            Math.min(4D, mc.playerController.getBlockReachDistance()),
-            net.minecraft.util.MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw),
-            targetPitch - mc.thePlayer.rotationPitch)) {
+            && (VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach)
+                || (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2]
+                    && eye.squareDistanceTo(aimed.hitVec) <= reach * reach));
+        net.minecraft.util.MovingObjectPosition clickTarget = (crosshair != null && crosshair.blockX == pos[0]
+            && crosshair.blockY == pos[1] && crosshair.blockZ == pos[2])
+            ? crosshair : (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2] ? aimed : hit);
+        float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw);
+        float pitchError = targetPitch - mc.thePlayer.rotationPitch;
+        if (!matches || eye.squareDistanceTo(clickTarget.hitVec) > reach * reach
+            || Math.abs(yawError) > 4.5F || Math.abs(pitchError) > 4.5F) {
             status = "Facing reward chest";
             return;
         }
@@ -507,8 +507,8 @@ public final class RewardChestLooter {
             pos[0],
             pos[1],
             pos[2],
-            crosshair.sideHit,
-            crosshair.hitVec);
+            clickTarget.sideHit,
+            clickTarget.hitVec);
         mc.thePlayer.swingItem();
         if (!direct) {
             status = "Chest interaction unavailable";
@@ -517,7 +517,7 @@ public final class RewardChestLooter {
         chestAim.reset();
         if (exploration != null) exploration.clearAim();
         opened = true;
-        waiting = 12;
+        waiting = 4;
         status = "Opening reward chest";
     }
 
@@ -559,17 +559,17 @@ public final class RewardChestLooter {
 
     public static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
         if (exploration != null) {
-            exploration.lookSmooth(yaw, pitch);
+            exploration.look(yaw, pitch, true);
         } else {
             float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
             float pitchDelta = pitch - mc.thePlayer.rotationPitch;
-            float yawStep = Math.max(-6F, Math.min(6F, yawDelta));
-            float pitchStep = Math.max(-6F, Math.min(6F, pitchDelta));
+            float yawStep = Math.max(-15F, Math.min(15F, yawDelta));
+            float pitchStep = Math.max(-15F, Math.min(15F, pitchDelta));
             mc.thePlayer.setAngles(yawStep / 0.15F, -pitchStep / 0.15F);
         }
         float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
         float pitchError = pitch - mc.thePlayer.rotationPitch;
-        return Math.abs(yawError) < 2.5F && Math.abs(pitchError) < 2.5F;
+        return Math.abs(yawError) < 4.0F && Math.abs(pitchError) < 4.0F;
     }
 
     public boolean hasPackableItems(Minecraft mc) {
@@ -622,10 +622,6 @@ public final class RewardChestLooter {
     }
 
     private boolean isStandingOnChest(Minecraft mc, int[] chest) {
-        if (mc == null || mc.thePlayer == null || chest == null) return false;
-        return (int) Math.floor(mc.thePlayer.posX) == chest[0]
-            && (int) Math.floor(mc.thePlayer.posZ) == chest[2]
-            && mc.thePlayer.boundingBox.minY >= chest[1] - 0.2D
-            && mc.thePlayer.boundingBox.minY <= chest[1] + 1.2D;
+        return false;
     }
 }

@@ -269,8 +269,13 @@ public class ExplorerGoalCoordinator {
                 int ex = (int) Math.floor(mc.thePlayer.posX);
                 int ey = (int) Math.floor(mc.thePlayer.boundingBox.minY);
                 int ez = (int) Math.floor(mc.thePlayer.posZ);
-                if (mc.theWorld.canBlockSeeTheSky(ex, ey, ez)) explorer.continueProgressiveSearch(mc, true);
-                else if (!explorer.startSavedReturn(mc, true, 128) && !explorer.digTowardSavedExit(mc)) explorer.retryExitLater(mc);
+                if (mc.theWorld.canBlockSeeTheSky(ex, ey, ez)) {
+                    explorer.continueProgressiveSearch(mc, true);
+                } else if (explorer.baritoneCoordinator.beginSurfaceExit(mc, explorer)) {
+                    return;
+                } else if (!explorer.startSavedReturn(mc, true, 128) && !explorer.digTowardSavedExit(mc)) {
+                    explorer.retryExitLater(mc);
+                }
                 return;
             }
             if (ReturnRoutePolicy.shouldContinueSavedTrailJoin(explorer.rejoiningSavedTrail, explorer.returnTrailRoute)) {

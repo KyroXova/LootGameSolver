@@ -15,7 +15,7 @@ public final class RewardChestView {
     public static net.minecraft.util.MovingObjectPosition visibleChest(Minecraft mc, Vec3 eye, int[] pos) {
         double[] offsets = { 0.5D, 0.3D, 0.7D };
         net.minecraft.util.MovingObjectPosition side = null;
-        for (double y : new double[] { 0.8D, 0.5D, 0.2D }) for (double x : offsets) for (double z : offsets) {
+        for (double y : new double[] { 0.875D, 0.8D, 0.5D, 0.2D }) for (double x : offsets) for (double z : offsets) {
             Vec3 point = Vec3.createVectorHelper(pos[0] + x, pos[1] + y, pos[2] + z);
             if (eye.squareDistanceTo(point) > 16D) continue;
             net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);

@@ -28,7 +28,31 @@ public final class NavigationSteering {
     }
 
     public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
-        return baritoneActive;
+        return baritoneActive && (interacting || attacking || cooldown > 0);
+    }
+
+    public static Float pathLookHeading(java.util.List<int[]> route, double posX, double posZ) {
+        if (route == null || route.size() < 2) return null;
+        for (int i = 0; i < route.size(); i++) {
+            int[] point = route.get(i);
+            double dx = point[0] + 0.5D - posX;
+            double dz = point[2] + 0.5D - posZ;
+            double distSq = dx * dx + dz * dz;
+            if (distSq >= 0.8D) {
+                int nextIdx = Math.min(i + 1, route.size() - 1);
+                int[] nextPoint = route.get(nextIdx);
+                double tx = (point[0] + nextPoint[0]) * 0.5D + 0.5D;
+                double tz = (point[2] + nextPoint[2]) * 0.5D + 0.5D;
+                return (float) Math.toDegrees(Math.atan2(tz - posZ, tx - posX)) - 90F;
+            }
+        }
+        int[] last = route.get(route.size() - 1);
+        double dx = last[0] + 0.5D - posX;
+        double dz = last[2] + 0.5D - posZ;
+        if (dx * dx + dz * dz >= 0.25D) {
+            return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+        }
+        return null;
     }
 
     public static Float walkingHeading(double vx, double vz, float fallback, java.util.List<int[]> route) {
@@ -68,11 +92,11 @@ public final class NavigationSteering {
     }
 
     public static float cameraStep(float current, float desired, double seconds) {
-        return cameraStep(current, desired, seconds, 0.12D, 220D);
+        return cameraStep(current, desired, seconds, 0.09D, 300D);
     }
 
     public static float interactionCameraStep(float current, float desired, double seconds) {
-        return cameraStep(current, desired, seconds, 0.06D, 300D);
+        return cameraStep(current, desired, seconds, 0.04D, 500D);
     }
 
     private static float cameraStep(float current, float desired, double seconds, double smoothing, double speed) {

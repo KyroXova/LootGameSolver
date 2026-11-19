@@ -375,6 +375,9 @@ public class Explorer {
             returning = false;
             digging = false;
             returnDigging = false;
+            if (insideDungeonRoom(mc) && startRoomExitSearch(mc)) {
+                return;
+            }
             if (!baritoneCoordinator.beginSurfaceExit(mc, this)) {
                 if (LootGameSolverConfig.staircaseEnabled && beginDiggingToSurface(mc)) return;
                 stop(mc, "No safe surface destination found");
@@ -561,7 +564,7 @@ public class Explorer {
 
     public void renderCamera(Minecraft mc) {
         if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
-        boolean baritoneActive = baritoneCoordinator.active();
+        boolean baritoneActive = baritoneCoordinator.active() || baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
         boolean attacking = mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
         if (NavigationSteering.yieldCameraToBaritone(
             baritoneActive,
@@ -580,6 +583,20 @@ public class Explorer {
             camera.render(mc, world, false);
             return;
         }
+
+        List<int[]> currentRoute = null;
+        if (baritoneCoordinator.active() && !baritoneCoordinator.routePreview.isEmpty()) {
+            currentRoute = baritoneCoordinator.routePreview;
+        } else if (!route.isEmpty()) {
+            currentRoute = route;
+        }
+        if (currentRoute != null && currentRoute.size() >= 2) {
+            Float lookHeading = NavigationSteering.pathLookHeading(currentRoute, mc.thePlayer.posX, mc.thePlayer.posZ);
+            if (lookHeading != null) {
+                camera.look(lookHeading, 0F);
+            }
+        }
+
         camera.render(mc, world, true);
     }
 

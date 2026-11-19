@@ -43,8 +43,23 @@ public class NavigationSteeringTest {
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, true, false, 0));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 3));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, true, 0));
-        assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
+        assertFalse(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
         assertFalse(NavigationSteering.yieldCameraToBaritone(false, true, true, 3));
+    }
+
+    @Test
+    public void pathLookHeadingFollowsDiagonalAndStraightPaths() {
+        // Diagonal path with 2 blocks
+        java.util.List<int[]> diagonal = java.util.Arrays.asList(new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 });
+        Float heading = NavigationSteering.pathLookHeading(diagonal, 0.5D, 0.5D);
+        org.junit.Assert.assertNotNull(heading);
+        assertEquals(-45F, heading.floatValue(), 1.0F);
+
+        // Straight North path (dz < 0)
+        java.util.List<int[]> north = java.util.Arrays.asList(new int[] { 0, 64, 0 }, new int[] { 0, 64, -2 });
+        Float northHeading = NavigationSteering.pathLookHeading(north, 0.5D, 0.5D);
+        org.junit.Assert.assertNotNull(northHeading);
+        assertEquals(-180F, northHeading.floatValue(), 1.0F);
     }
 
     @Test

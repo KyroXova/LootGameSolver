@@ -126,7 +126,7 @@ public final class BaritoneNavigationBridge {
                     .get(settings);
                 allowPlace.getClass()
                     .getField("value")
-                    .set(allowPlace, kind == 3);
+                    .set(allowPlace, kind == 3 || (!forbidBreaking && kind != 2));
                 try {
                     Object allowInventory = settings.getClass()
                         .getField("allowInventory")
