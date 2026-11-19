@@ -25,9 +25,9 @@ public final class ExplorerCamera {
             lastUserMouseTime = nowMs;
         }
 
-        // Keep mouse aim unlocked to player use if mouse was moved within the last 10 seconds (only for walking
+        // Keep mouse aim unlocked to player use if mouse was moved within the last second (only for walking
         // steering)
-        if (!force && nowMs - lastUserMouseTime < 10_000L) {
+        if (!force && nowMs - lastUserMouseTime < 1_000L) {
             return;
         }
 

@@ -28,11 +28,20 @@ public final class NavigationSteering {
     }
 
     public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
-        return baritoneActive;
+        return baritoneActive && (interacting || attacking || cooldown > 0);
     }
 
     public static Float pathLookHeading(java.util.List<int[]> route, double posX, double posZ) {
-        if (route == null || route.size() < 2) return null;
+        if (route == null || route.isEmpty()) return null;
+        if (route.size() == 1) {
+            int[] point = route.get(0);
+            double dx = point[0] + 0.5D - posX;
+            double dz = point[2] + 0.5D - posZ;
+            if (dx * dx + dz * dz > 0.04D) {
+                return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+            }
+            return null;
+        }
         int closestIdx = 0;
         double minDistSq = Double.MAX_VALUE;
         for (int i = 0; i < route.size(); i++) {
@@ -45,26 +54,31 @@ public final class NavigationSteering {
                 closestIdx = i;
             }
         }
-        int targetIdx = Math.min(closestIdx + 1, route.size() - 1);
-        if (targetIdx == closestIdx && closestIdx > 0) {
-            int[] prev = route.get(closestIdx - 1);
-            int[] curr = route.get(closestIdx);
-            double dx = curr[0] - prev[0];
-            double dz = curr[2] - prev[2];
-            if (dx * dx + dz * dz > 0.01D) {
-                return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
-            }
-            return null;
+        int targetIdx;
+        if (minDistSq > 0.5D && closestIdx > 0) {
+            targetIdx = closestIdx;
+        } else {
+            targetIdx = Math.min(closestIdx + 1, route.size() - 1);
         }
         int[] target = route.get(targetIdx);
         double dx = target[0] + 0.5D - posX;
         double dz = target[2] + 0.5D - posZ;
-        if (dx * dx + dz * dz < 0.09D && targetIdx + 1 < route.size()) {
+        if (dx * dx + dz * dz < 0.16D && targetIdx + 1 < route.size()) {
             target = route.get(targetIdx + 1);
             dx = target[0] + 0.5D - posX;
             dz = target[2] + 0.5D - posZ;
         }
-        if (dx * dx + dz * dz < 0.01D) return null;
+        if (dx * dx + dz * dz < 0.01D) {
+            if (targetIdx > 0) {
+                int[] prev = route.get(targetIdx - 1);
+                dx = target[0] - prev[0];
+                dz = target[2] - prev[2];
+                if (dx * dx + dz * dz > 0.01D) {
+                    return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+                }
+            }
+            return null;
+        }
         return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
     }
 

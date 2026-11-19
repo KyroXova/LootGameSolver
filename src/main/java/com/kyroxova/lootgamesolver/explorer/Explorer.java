@@ -584,10 +584,21 @@ public class Explorer {
             return;
         }
 
-        if (!route.isEmpty() && route.size() >= 2) {
-            Float lookHeading = NavigationSteering.pathLookHeading(route, mc.thePlayer.posX, mc.thePlayer.posZ);
+        List<int[]> currentRoute = null;
+        if (baritoneActive && !baritoneCoordinator.routePreview.isEmpty()) {
+            currentRoute = baritoneCoordinator.routePreview;
+        } else if (!route.isEmpty()) {
+            currentRoute = route;
+        }
+
+        if (currentRoute != null && !currentRoute.isEmpty()) {
+            Float lookHeading = NavigationSteering.pathLookHeading(currentRoute, mc.thePlayer.posX, mc.thePlayer.posZ);
             if (lookHeading != null) {
-                camera.look(lookHeading, 0F);
+                float targetPitch = 0F;
+                if (!baritoneActive) {
+                    targetPitch = cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
+                }
+                camera.look(lookHeading, targetPitch);
             }
         }
 

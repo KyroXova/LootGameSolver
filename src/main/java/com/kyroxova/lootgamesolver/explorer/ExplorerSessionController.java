@@ -83,7 +83,6 @@ public class ExplorerSessionController {
         }
         if (explorer.baritoneCoordinator.tick(mc, explorer)) return true;
         if (!explorer.digging && !explorer.returnDigging) explorer.miningDriver.releaseMiningInput(mc, explorer);
-        explorer.camera.clear();
         baritoneActive = explorer.baritoneCoordinator.active()
             || explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
         if (explorer.walking && !baritoneActive && mc.thePlayer != null && explorer.navigationInput == null) {

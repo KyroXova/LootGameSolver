@@ -161,7 +161,7 @@ public final class BaritoneTransitCoordinator {
                     }
                 }
             }
-            if (++previewTick % 5 == 0) {
+            if (routePreview.isEmpty() || ++previewTick % 2 == 0) {
                 routePreview.clear();
                 routePreview.addAll(explorer.baritoneNavigation.route());
             }

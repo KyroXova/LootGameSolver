@@ -43,7 +43,7 @@ public class NavigationSteeringTest {
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, true, false, 0));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 3));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, true, 0));
-        assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
+        assertFalse(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
         assertFalse(NavigationSteering.yieldCameraToBaritone(false, true, true, 3));
     }
 

@@ -120,13 +120,13 @@ public final class BaritoneNavigationBridge {
                     .get(settings);
                 surfaceOnly.getClass()
                     .getField("value")
-                    .set(surfaceOnly, kind == 2 && !com.kyroxova.lootgamesolver.config.LootGameSolverConfig.caveMode);
+                    .set(surfaceOnly, false);
                 Object allowPlace = settings.getClass()
                     .getField("allowPlace")
                     .get(settings);
                 allowPlace.getClass()
                     .getField("value")
-                    .set(allowPlace, kind == 3 || (!forbidBreaking && kind != 2));
+                    .set(allowPlace, kind == 3);
                 try {
                     Object allowInventory = settings.getClass()
                         .getField("allowInventory")

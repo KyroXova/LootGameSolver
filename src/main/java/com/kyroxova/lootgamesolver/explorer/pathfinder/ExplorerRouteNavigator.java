@@ -320,13 +320,11 @@ public class ExplorerRouteNavigator {
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : explorer.cameraPitchDirection > 0 ? -10F : explorer.cameraPitchDirection < 0 ? 30F : 0F;
-        Float straightHeading = NavigationSteering.straightHeading(explorer.route, px, py, pz);
-        boolean steerCamera = straightHeading != null;
-        if (!centering && steerCamera) explorer.look(straightHeading, desiredPitch);
-        else if (!centering) explorer.camera.clear();
+        Float pathHeading = NavigationSteering.pathLookHeading(explorer.route, mc.thePlayer.posX, mc.thePlayer.posZ);
+        if (!centering && pathHeading != null) explorer.look(pathHeading, desiredPitch);
         explorer.status = centering ? "Centering on supported ground"
             : explorer.returning ? "Returning along saved access path" : "Following checked route";
-        if (!centering && steerCamera && Math.abs(turn) > 60F) {
+        if (!centering && Math.abs(turn) > 55F) {
             explorer.stalled = 0;
             explorer.lastDistance = Double.MAX_VALUE;
             mc.thePlayer.setSprinting(false);
@@ -336,6 +334,10 @@ public class ExplorerRouteNavigator {
         if (distance >= explorer.lastDistance - 0.005D) explorer.stalled++;
         else explorer.stalled = 0;
         explorer.lastDistance = distance;
+        if (explorer.stalled >= 8 && explorer.stalled <= 24 && mc.thePlayer.onGround && explorer.navigationInput != null) {
+            explorer.navigationInput.hop = true;
+            explorer.navigationInput.forward = 1.0F;
+        }
         if (explorer.stalled > 40) {
             explorer.stalled = 0;
             explorer.lastDistance = Double.MAX_VALUE;

@@ -62,7 +62,7 @@ public final class ExplorerRouteFollower {
         boolean inWater = mc.thePlayer.isInWater();
         boolean stepUp = next[1] > footY || climbRewardChest || climbSurface || mc.thePlayer.isCollidedHorizontally;
         boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
-        input.hop = (stepUp && Math.abs(turn) < 45F && jumpDistance && (mc.thePlayer.onGround || inWater))
+        input.hop = (stepUp && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally) && jumpDistance && (mc.thePlayer.onGround || inWater))
             || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)
             || chestPitJump
             || inWater;
@@ -82,6 +82,7 @@ public final class ExplorerRouteFollower {
                 .getFoodLevel() > 6;
         if (wantSprint) {
             input.forward = 1.0F;
+            if (Math.abs(turn) < 25F) input.sideways = 0.0F;
         } else if (inWater && Math.abs(turn) < 60F) {
             input.forward = 1.0F;
         }
