@@ -61,7 +61,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startPuzzleTileApproach(int x, int y, int z) {
-        return start(x, y, z, 0, true, true);
+        return start(x, y, z, 0, true, false);
     }
 
     public Start startWithPlacementWithoutBreaking(int x, int y, int z) {

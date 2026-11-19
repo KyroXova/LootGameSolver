@@ -38,7 +38,13 @@ public final class PuzzleTileNavigator {
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance() - 0.2D);
-        boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
+        double closeReach = 2.4D;
+        boolean inCloseReach = withinReach(dx, dy, dz, closeReach) && LootGamesBridge.topFaceVisible(mc, target);
+        boolean inMaxReach = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
+        boolean arrivedAtGoal = goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
+            || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
+            || navigation.completed();
+        boolean reachable = inCloseReach || (inMaxReach && arrivedAtGoal);
         if (!java.util.Arrays.equals(tile, target)) {
             if (!keepApproachForNewTile(
                 mc,
@@ -51,9 +57,7 @@ public final class PuzzleTileNavigator {
             tried.clear();
         }
         if (reachable) {
-            if (goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
-                || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
-                || navigation.completed()) {
+            if (arrivedAtGoal) {
                 if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
                     && !net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint))
                     mc.thePlayer.setSprinting(false);
@@ -64,21 +68,30 @@ public final class PuzzleTileNavigator {
         if (goal != null) {
             double goalDx = goal[0] + 0.5D - mc.thePlayer.posX;
             double goalDz = goal[2] + 0.5D - mc.thePlayer.posZ;
-            boolean sprint = goalDx * goalDx + goalDz * goalDz > 2.25D && mc.thePlayer.onGround
+            boolean sprint = goalDx * goalDx + goalDz * goalDz > 0.49D && mc.thePlayer.onGround
                 && !mc.thePlayer.isSneaking()
                 && mc.thePlayer.getFoodStats()
                     .getFoodLevel() > 6;
             if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) {
                 navigation.setSprinting(sprint);
-                if (sprint) mc.thePlayer.setSprinting(true);
+                if (sprint) {
+                    mc.thePlayer.setSprinting(true);
+                    if (mc.gameSettings != null && mc.gameSettings.keyBindSprint != null) {
+                        net.minecraft.client.settings.KeyBinding
+                            .setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
+                    }
+                }
             }
             double mx = mc.thePlayer.posX - lastX, mz = mc.thePlayer.posZ - lastZ;
-            if (mx * mx + mz * mz >= 0.09D) {
+            if (mx * mx + mz * mz >= 0.04D) {
                 lastX = mc.thePlayer.posX;
                 lastZ = mc.thePlayer.posZ;
                 stalled = 0;
             } else stalled++;
-            if (navigation.state() == BaritoneNavigationBridge.State.RUNNING && stalled < 160) return true;
+            if (stalled >= 6 && stalled <= 18 && mc.thePlayer.onGround) {
+                mc.thePlayer.jump();
+            }
+            if (navigation.state() == BaritoneNavigationBridge.State.RUNNING && stalled < 30) return true;
             tried.add(goal);
             stopRoute();
         }
@@ -92,15 +105,21 @@ public final class PuzzleTileNavigator {
             if (used || !ExplorerTerrain.puzzleCenterStandable(mc.theWorld, x, y, z)
                 || !ExplorerTerrain.safe(mc.theWorld, x, y, z)) continue;
             double cx = x + 0.5D - target[0] - 0.5D, cz = z + 0.5D - target[2] - 0.5D;
-            if (!withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
+            double distToTile = Math.hypot(cx, cz);
+            if (distToTile < 0.8D || !withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
                 || !LootGamesBridge.topFaceVisibleFrom(mc, target, x + 0.5D, y + mc.thePlayer.getEyeHeight(), z + 0.5D))
                 continue;
             candidates.add(candidate);
         }
-        candidates.sort(
-            (a, b) -> Double.compare(
+        candidates.sort((a, b) -> {
+            double distA = Math.hypot(a[0] + 0.5D - target[0] - 0.5D, a[2] + 0.5D - target[2] - 0.5D);
+            double distB = Math.hypot(b[0] + 0.5D - target[0] - 0.5D, b[2] + 0.5D - target[2] - 0.5D);
+            int comp = Double.compare(Math.abs(distA - 1.5D), Math.abs(distB - 1.5D));
+            if (comp != 0) return comp;
+            return Double.compare(
                 mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1], a[2] + 0.5D),
-                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1], b[2] + 0.5D)));
+                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1], b[2] + 0.5D));
+        });
         for (int[] candidate : candidates) {
             BaritoneNavigationBridge.Start result = navigation
                 .startPuzzleTileApproach(candidate[0], candidate[1], candidate[2]);
@@ -112,7 +131,7 @@ public final class PuzzleTileNavigator {
                 lastZ = mc.thePlayer.posZ;
                 return true;
             }
-            if (result == BaritoneNavigationBridge.Start.BUSY) return ++busyTicks < 100;
+            if (result == BaritoneNavigationBridge.Start.BUSY) return ++busyTicks < 20;
             tried.add(candidate);
         }
         return false;

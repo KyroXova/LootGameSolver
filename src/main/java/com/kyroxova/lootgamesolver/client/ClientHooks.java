@@ -734,6 +734,13 @@ public final class ClientHooks {
             tileNavigator.stop();
             session.cancel("No safe route to a visible puzzle tile");
             if (exploration != null) exploration.setAutomationStatus("Puzzle tile unreachable; explorer held");
+        } else if (tileNavigator.moving()) {
+            double tx = block[0] + 0.5D - mc.thePlayer.posX;
+            double tz = block[2] + 0.5D - mc.thePlayer.posZ;
+            float yaw = AimHelper.calculateYaw(tx, tz);
+            if (exploration != null) {
+                exploration.lookSmooth(yaw, 25.0F);
+            }
         }
     }
 
