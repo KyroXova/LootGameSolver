@@ -14,6 +14,7 @@ public final class ExplorerTerrain {
         net.minecraft.block.Block block = world.getBlock(x, y, z);
         if (block == net.minecraft.init.Blocks.air) return true;
         if (block == net.minecraft.init.Blocks.snow_layer && world.getBlockMetadata(x, y, z) <= 1) return true;
+        if (block == net.minecraft.init.Blocks.waterlily) return true;
         if (block.getMaterial() == net.minecraft.block.material.Material.leaves) return false;
         if (block.getMaterial()
             .isLiquid()) return false;
@@ -37,7 +38,7 @@ public final class ExplorerTerrain {
 
     public static boolean dryShore(World world, int x, int y, int z) {
         if (!solidCheckpoint(world, x, y, z)) return false;
-        for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -2; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) for (int dy = -2; dy <= 1; dy++) {
             if (!world.blockExists(x + dx, y + dy, z + dz) || world.getBlock(x + dx, y + dy, z + dz)
                 .getMaterial()
                 .isLiquid()) return false;
@@ -73,8 +74,8 @@ public final class ExplorerTerrain {
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
                 if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
                 if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
-                if (block.getMaterial()
-                    .isLiquid() || block == Blocks.fire
+                if (block.getMaterial() == net.minecraft.block.material.Material.lava
+                    || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.web
                     || block == Blocks.portal) return false;
@@ -91,15 +92,12 @@ public final class ExplorerTerrain {
                 .getMaterial() == net.minecraft.block.material.Material.water;
             boolean waterBelow = world.getBlock(x, y - 1, z)
                 .getMaterial() == net.minecraft.block.material.Material.water;
-            if (waterAtFeet && !liquidBelow && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) {
+            if (waterAtFeet && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) {
                 return true;
             }
-            if (!liquidAtFeet && waterBelow
+            if (!liquidAtFeet && (waterBelow || world.getBlock(x, y - 1, z) == Blocks.waterlily)
                 && passable(world, x, y, z)
-                && passable(world, x, y + 1, z)
-                && world.getBlock(x, y - 2, z)
-                    .getMaterial()
-                    .isSolid()) {
+                && passable(world, x, y + 1, z)) {
                 return true;
             }
             return false;

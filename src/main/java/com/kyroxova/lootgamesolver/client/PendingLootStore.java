@@ -26,9 +26,13 @@ final class PendingLootStore {
     }
 
     boolean save(String world, int dimension, int[] center, MiniGame game) {
+        return save(world, dimension, center, game, false);
+    }
+
+    boolean save(String world, int dimension, int[] center, MiniGame game, boolean overwrite) {
         if (world == null || center == null || center.length != 3) return false;
         Checkpoint existing = load();
-        if (existing != null && (!world.equals(existing.world) || dimension != existing.dimension
+        if (!overwrite && existing != null && (!world.equals(existing.world) || dimension != existing.dimension
             || !java.util.Arrays.equals(center, existing.center))) return false;
         Checkpoint checkpoint = new Checkpoint();
         checkpoint.world = world;

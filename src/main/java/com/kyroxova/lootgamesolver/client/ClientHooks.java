@@ -31,6 +31,11 @@ public final class ClientHooks {
 
     private static boolean resumeLootRequested;
     private static boolean travelModeRefreshRequested;
+    private static boolean clearCheckpointRequested;
+
+    static void requestClearCheckpoint() {
+        clearCheckpointRequested = true;
+    }
 
     static void requestTravelModeRefresh() {
         travelModeRefreshRequested = true;
@@ -67,6 +72,7 @@ public final class ClientHooks {
     private int inventoryMaintenanceStage;
     private int inventoryMaintenanceWait;
     private int inventoryMaintenanceCooldown;
+    private int rewardLooterCooldown;
     private boolean explorationDriven;
     private InventoryBaseline inventoryBaseline;
     private int[] rewardCenter;
@@ -332,6 +338,7 @@ public final class ClientHooks {
         }
         trashCleanup.advanceCooldown();
         if (inventoryMaintenanceCooldown > 0) inventoryMaintenanceCooldown--;
+        if (rewardLooterCooldown > 0) rewardLooterCooldown--;
         if (exploration != null && mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
             boolean inside = exploration.inDungeonRoom(mc);
             wasInsideRoom = inside;
@@ -339,7 +346,9 @@ public final class ClientHooks {
         if (exploration != null) {
             boolean roomWork = autoPuzzle.isActive() || session.isActive()
                 || rewardReturnPending
-                || storageRecovery != null;
+                || storageRecovery != null
+                || rewardLooter.active()
+                || (exploration.inDungeonRoom(mc) && rewardLooter.hasUncollectedCluster(mc, exploration.verifiedRoomCenter(mc)));
             if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
             if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc, rewardLooter.expectedView());
             exploration.tick(mc, session.isActive(), roomWork);
@@ -364,6 +373,15 @@ public final class ClientHooks {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (clearCheckpointRequested) {
+            clearCheckpointRequested = false;
+            rewardLooter.clearCheckpoint();
+            if (exploration != null) exploration.clearLastCheckpoint(mc);
+            rewardLooterCooldown = 0;
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7a[LootGameSolver] Checkpoint cleared."));
+        }
         if (resumeLootRequested) {
             resumeLootRequested = false;
             PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
@@ -433,6 +451,7 @@ public final class ClientHooks {
                 rewardLooter.cancel(mc);
                 rewardReturnPending = false;
                 rewardPreCleanupPending = false;
+                rewardLooterCooldown = 100;
                 if (exploration != null && exploration.navigating()) exploration.stop(mc, "Reward collection paused");
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
@@ -474,6 +493,7 @@ public final class ClientHooks {
                 if ("Reward chest unreachable; collection paused".equals(rewardLooter.status())) {
                     rewardReturnPending = false;
                     rewardPreCleanupPending = false;
+                    rewardLooterCooldown = 100;
                     if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
                     return;
                 }
@@ -483,6 +503,7 @@ public final class ClientHooks {
                     if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
                     rewardReturnPending = false;
                     rewardPreCleanupPending = false;
+                    rewardLooterCooldown = 100;
                     if (exploration != null) exploration.stop(mc, "Reward collection paused");
                     mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText(
                         "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
@@ -509,6 +530,7 @@ public final class ClientHooks {
                         boolean saved = rewardLooter.saveCheckpoint(mc) != null;
                         rewardReturnPending = false;
                         rewardPreCleanupPending = false;
+                        rewardLooterCooldown = 100;
                         mc.thePlayer.addChatMessage(
                             new net.minecraft.util.ChatComponentText(
                                 "\u00A7e[LootGameSolver] " + rewardLooter.status()
@@ -542,6 +564,7 @@ public final class ClientHooks {
                 || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED))
             && (autoPuzzle.isIdle() || autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
             && !session.isActive()
+            && rewardLooterCooldown == 0
             && mc.thePlayer.ticksExisted % 20 == 0
             && (exploration.inDungeonRoom(mc)
                 || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED

@@ -80,11 +80,20 @@ final class MarkedStorageDeposit {
                         && ((InventoryLargeChest) chest).isPartOfLargeChest(inventory)) opened = chest;
                     else if (vanillaChestView(mc, opening, inventory, chest)) opened = chest;
                 }
+                IInventory binnieWindowInv = null;
+                BinnieCompartmentAdapter binnie = BinnieCompartmentAdapter.detect(mc.thePlayer.openContainer);
+                if (binnie != null) {
+                    IInventory machineInv = binnie.getMachineInventory();
+                    if (machineInv != null && (machineInv == inventory || opening.loadedInventory(mc) == machineInv)) {
+                        opened = machineInv;
+                    }
+                    binnieWindowInv = binnie.getWindowInventory();
+                }
                 boolean matching = false;
                 for (Object value : mc.thePlayer.openContainer.inventorySlots) {
                     IInventory slotInventory = ((Slot) value).inventory;
                     if (slotInventory == opened) matching = true;
-                    else if (slotInventory != mc.thePlayer.inventory) return Result.FAILED;
+                    else if (slotInventory != mc.thePlayer.inventory && (binnieWindowInv == null || slotInventory != binnieWindowInv)) return Result.FAILED;
                 }
                 if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
                 transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);

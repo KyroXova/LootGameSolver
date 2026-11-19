@@ -13,6 +13,11 @@ public class PuzzleTileNavigatorTest {
         org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(false, true, true));
         org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(true, false, true));
         org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(true, true, false));
+        int[] goal = { 10, 64, -3 };
+        int[] target = { 11, 64, -3 };
+        assertTrue(PuzzleTileNavigator.keepApproachForNewTile(null, goal, target, 3.5D, true, true));
+        assertFalse(PuzzleTileNavigator.keepApproachForNewTile(null, goal, target, 3.5D, false, false));
+        assertFalse(PuzzleTileNavigator.keepApproachForNewTile(null, null, target, 3.5D, true, true));
     }
 
     @Test

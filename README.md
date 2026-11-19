@@ -45,6 +45,7 @@ The explorer can:
 - Select tools, clear obstructions, and avoid known hazardous plants, traps, and liquids.
 - Open boards, solve games, and resume an unfinished game inside a structure.
 - Collect reward chests and move eligible items into supported backpacks.
+- Automatically deposit collected loot into marked home or warp storage targets (including Binnie's multi-page Compartments) and return to complete unfinished rooms.
 - Use food and the Extra Utilities Healing Axe while exploring.
 - Clean unwanted inventory items when the trash-can command is available, while protecting backpacks, tools, food, and a stack of building material.
 
@@ -64,6 +65,30 @@ Structure discovery is progressive. The explorer checks loaded LootGames structu
 | **Hold G** | Clear the last checkpoint and replan |
 
 Keys can be changed in Minecraft's Controls menu. The HUD shows solver and explorer status, the selected structure, and hold-G progress. Navigation pauses for open menus, manual movement, damage, or flight.
+
+## Commands
+
+Manage storage destinations, marked targets, checkpoints, and navigation preferences with `/lootgamesolver` (alias `/lgs`):
+
+| Command | Description |
+| --- | --- |
+| `/lgs help [command]` | Show command list or detailed help for a specific command. |
+| `/lgs setHome` | Select your existing `/home` command as the storage destination. |
+| `/lgs setWarp <name>` | Select `/warp <name>` as the storage destination (`returnLooting` is reserved). |
+| `/lgs setChest` / `/lgs setStorage` | Mark the looked-at inventory block, entity, or Binnie Compartment for storage deposits. |
+| `/lgs clearChest` | Unmark the looked-at storage target. |
+| `/lgs clearChests` | Remove all marked storage targets for the current world. |
+| `/lgs clearWarp` | Clear the home or warp destination while keeping marked targets saved. |
+| `/lgs clearStorage` | Clear destination and all targets, and disable recovery. |
+| `/lgs enable` / `/lgs disable` | Enable or disable automated storage recovery trips. |
+| `/lgs storageStatus` | Display configured destination, target count, and recovery preference. |
+| `/lgs resumeLoot` | Resume saved reward collection when you are back near the dungeon room. |
+| `/lgs clearCheckpoint` | Clear saved loot collection and navigation checkpoints. |
+| `/lgs caveMode [on\|off\|status]` | Allow subterranean pathing or prefer surface travel for long-distance routes. |
+
+### Multi-Page Storage Containers
+
+When depositing into marked storage, LootGameSolver supports multi-page storage containers such as Binnie's Compartments (Wood, Copper, Bronze, Iron, Gold, and Diamond). The depositor cycles through all available tabs, verifies slot acceptance on each page, and deposits eligible loot while strictly protecting carried gear, weapons, tools, and backpacks.
 
 ## Installation
 

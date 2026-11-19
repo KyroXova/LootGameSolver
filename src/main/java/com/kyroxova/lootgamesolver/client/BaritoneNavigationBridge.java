@@ -357,40 +357,44 @@ public final class BaritoneNavigationBridge {
     }
 
     public void stop() {
-        boolean ownsGoal = false;
-        try {
-            if (process != null && processApi != null && goal != null) {
+        boolean owns = true;
+        if (process != null && processApi != null) {
+            try {
                 Object current = processApi.getMethod("getGoal")
                     .invoke(process);
-                ownsGoal = current == goal;
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        if (ownsGoal && inputHandler != null && inputHandlerApi != null && clickSprint != null) {
-            try {
-                inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
-                    .invoke(inputHandler, clickSprint, false);
+                owns = (current == null || current == goal);
+                if (owns) {
+                    Class.forName("baritone.api.process.IBaritoneProcess")
+                        .getMethod("onLostControl")
+                        .invoke(process);
+                }
             } catch (ReflectiveOperationException | LinkageError ignored) {}
         }
-        try {
-            if (ownsGoal) {
-                Class.forName("baritone.api.process.IBaritoneProcess")
-                    .getMethod("onLostControl")
-                    .invoke(process);
+        if (owns) {
+            if (inputHandler != null && inputHandlerApi != null) {
+                try {
+                    if (clickSprint != null) {
+                        inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
+                            .invoke(inputHandler, clickSprint, false);
+                    }
+                    inputHandlerApi.getMethod("clearAllKeys")
+                        .invoke(inputHandler);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
             }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        if (ownsGoal && pathing != null && pathingApi != null) {
-            try {
-                pathingApi.getMethod("cancelEverything")
-                    .invoke(pathing);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
-            try {
-                pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
-                    .invoke(pathing, false, false, false);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
-            try {
-                pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
-                    .invoke(pathing, (Boolean) null);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            if (pathing != null && pathingApi != null) {
+                try {
+                    pathingApi.getMethod("cancelEverything")
+                        .invoke(pathing);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                try {
+                    pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
+                        .invoke(pathing, false, false, false);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                try {
+                    pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
+                        .invoke(pathing, (Boolean) null);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            }
         }
         process = null;
         goal = null;

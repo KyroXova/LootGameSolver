@@ -40,19 +40,24 @@ final class PuzzleTileNavigator {
         boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
         if (!java.util.Arrays.equals(tile, target)) {
             if (!keepApproachForNewTile(
+                mc,
+                goal,
+                target,
+                reach,
                 reachable,
-                goal != null,
                 navigation.state() == BaritoneNavigationBridge.State.RUNNING)) stop();
             tile = target.clone();
             tried.clear();
         }
-        if (reachable && (goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
-            || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
-            || navigation.completed())) {
-            if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
-                && !net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint))
-                mc.thePlayer.setSprinting(false);
-            stopRoute();
+        if (reachable) {
+            if (goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
+                || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
+                || navigation.completed()) {
+                if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
+                    && !net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint))
+                    mc.thePlayer.setSprinting(false);
+                stopRoute();
+            }
             return true;
         }
         if (goal != null) {
@@ -124,6 +129,19 @@ final class PuzzleTileNavigator {
 
     static boolean keepApproachForNewTile(boolean reachable, boolean hasGoal, boolean running) {
         return reachable && hasGoal && running;
+    }
+
+    static boolean keepApproachForNewTile(Minecraft mc, int[] goal, int[] newTarget, double reach, boolean reachable,
+        boolean running) {
+        if (!running || goal == null || newTarget == null) return false;
+        if (reachable) return true;
+        if (mc == null || mc.theWorld == null || mc.thePlayer == null) return false;
+        double eyeHeight = mc.thePlayer.getEyeHeight();
+        double cx = goal[0] + 0.5D - newTarget[0] - 0.5D;
+        double cz = goal[2] + 0.5D - newTarget[2] - 0.5D;
+        double cy = eyeHeight + 0.001D;
+        if (cx * cx + cz * cz > 4D || !withinReach(cx, cy, cz, reach)) return false;
+        return LootGamesBridge.topFaceVisibleFrom(mc, newTarget, goal[0] + 0.5D, goal[1] + eyeHeight, goal[2] + 0.5D);
     }
 
     static boolean sameFeetBlock(double x, double y, double z, int[] pos) {

@@ -187,9 +187,13 @@ final class RewardChestLooter {
 
     PendingLootStore.Checkpoint saveCheckpoint(Minecraft mc) {
         if (mc == null || mc.theWorld == null || checkpointCenter == null) return null;
-        if (!pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, checkpointCenter, gameType))
+        if (!pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, checkpointCenter, gameType, true))
             return null;
         return pendingLoot.load();
+    }
+
+    boolean clearCheckpoint() {
+        return pendingLoot.clear();
     }
 
     int[] rewardCenter() {
@@ -432,14 +436,29 @@ final class RewardChestLooter {
             if (pendingSlot >= 0) {
                 ItemStack after = chest.getStackInSlot(pendingSlot);
                 if (after != null && after.stackSize >= pendingCount) {
-                    mc.thePlayer.closeScreen();
-                    opened = false;
+                    boolean inventoryHasSpace = mc.thePlayer.inventory.getFirstEmptyStack() >= 0;
+                    if (!inventoryHasSpace && hasPackableItems(mc)) {
+                        mc.thePlayer.closeScreen();
+                        opened = false;
+                        pendingSlot = -1;
+                        packing = true;
+                        packOpening = false;
+                        packMoved = false;
+                        backpackSlot = -1;
+                        status = "Moving collected rewards into a backpack";
+                        return;
+                    }
+                    if (!inventoryHasSpace) {
+                        mc.thePlayer.closeScreen();
+                        opened = false;
+                        pendingSlot = -1;
+                        active = false;
+                        status = "Inventory and backpacks full; rewards remain in chest";
+                        saveCheckpoint(mc);
+                        return;
+                    }
+                    queueIndex++;
                     pendingSlot = -1;
-                    packing = true;
-                    packOpening = false;
-                    packMoved = false;
-                    backpackSlot = -1;
-                    status = "Moving collected rewards into a backpack";
                     return;
                 }
                 pendingSlot = -1;
@@ -496,7 +515,7 @@ final class RewardChestLooter {
         Vec3 eye = Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         net.minecraft.util.MovingObjectPosition hit = visibleChest(mc, eye, pos);
-        if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach) {
+        if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach || isStandingOnChest(mc, pos)) {
             if (!collecting) {
                 for (int i = index + 1; i < chests.size(); i++) {
                     net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
@@ -778,8 +797,13 @@ final class RewardChestLooter {
             if (packingOnly && !hasPackableItems(mc)) status = "Inventory packing finished";
             else if (packingOnly) status = "No available backpack; items kept";
             else if (!collecting && index >= chests.size() && !hasPackableItems(mc)) status = "Reward chests collected";
+            else if (mc.thePlayer.inventory.getFirstEmptyStack() >= 0) {
+                packing = false;
+                status = "Resuming reward collection";
+                return;
+            }
             else status = "Inventory and backpacks full; rewards remain in chest";
-            if (hasPackableItems(mc) || collecting) {
+            if ((hasPackableItems(mc) || collecting) && mc.thePlayer.inventory.getFirstEmptyStack() < 0) {
                 boolean saved = center == null || saveCheckpoint(mc) != null;
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
@@ -986,5 +1010,13 @@ final class RewardChestLooter {
         if (dx == 0 && dz == 1) return 3;
         if (dx == -1 && dz == 0) return 4;
         return 0;
+    }
+
+    private boolean isStandingOnChest(Minecraft mc, int[] chest) {
+        if (mc == null || mc.thePlayer == null || chest == null) return false;
+        return (int) Math.floor(mc.thePlayer.posX) == chest[0]
+            && (int) Math.floor(mc.thePlayer.posZ) == chest[2]
+            && mc.thePlayer.boundingBox.minY >= chest[1] - 0.2D
+            && mc.thePlayer.boundingBox.minY <= chest[1] + 1.2D;
     }
 }

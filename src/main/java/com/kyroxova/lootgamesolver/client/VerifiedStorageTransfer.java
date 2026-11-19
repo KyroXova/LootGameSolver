@@ -22,6 +22,7 @@ final class VerifiedStorageTransfer {
     private final StorageLootLedger ledger;
     private final InventoryBaseline baseline;
     private final int window;
+    private final BinnieCompartmentAdapter binnie;
     private final boolean[] rejected = new boolean[36];
     private ItemStack pending;
     private VerifiedContainerClick click;
@@ -31,6 +32,10 @@ final class VerifiedStorageTransfer {
         return moved;
     }
 
+    BinnieCompartmentAdapter binnieAdapter() {
+        return binnie;
+    }
+
     VerifiedStorageTransfer(Container container, IInventory destination, StorageLootLedger ledger,
         InventoryBaseline baseline) {
         this.container = container;
@@ -38,6 +43,7 @@ final class VerifiedStorageTransfer {
         this.ledger = ledger;
         this.baseline = baseline;
         this.window = container.windowId;
+        this.binnie = BinnieCompartmentAdapter.detect(container);
     }
 
     Result tick(Minecraft mc) {
@@ -47,6 +53,7 @@ final class VerifiedStorageTransfer {
             || container.windowId != window
             || mc.thePlayer.inventory.getItemStack() != null
             || destination == mc.thePlayer.inventory) return Result.FAILED;
+        if (binnie != null && binnie.isSyncing()) return Result.WORKING;
         if (pending != null) {
             VerifiedContainerClick.Result reply = click.tick();
             if (reply == VerifiedContainerClick.Result.WAITING) return Result.WORKING;
@@ -85,7 +92,16 @@ final class VerifiedStorageTransfer {
             }
             return Result.WORKING;
         }
-        return remaining ? Result.FULL_OR_REJECTED : Result.DONE;
+        if (remaining) {
+            if (binnie != null && binnie.canSwitchToNextTab()) {
+                if (binnie.switchToNextTab(mc)) {
+                    java.util.Arrays.fill(rejected, false);
+                    return Result.WORKING;
+                }
+            }
+            return Result.FULL_OR_REJECTED;
+        }
+        return Result.DONE;
     }
 
     void cancel() {
@@ -111,6 +127,7 @@ final class VerifiedStorageTransfer {
         for (Object value : container.inventorySlots) {
             Slot slot = (Slot) value;
             if (slot.inventory != destination || !slot.isItemValid(stack)) continue;
+            if (binnie != null && !binnie.isSlotOnCurrentTab(slot.getSlotIndex())) continue;
             ItemStack current = slot.getStack();
             if (current == null || (current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack)
                 && current.stackSize < Math.min(current.getMaxStackSize(), slot.getSlotStackLimit()))) return true;

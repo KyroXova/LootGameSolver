@@ -138,7 +138,6 @@ public final class RoomExit {
             net.minecraft.block.Block block = world.getBlock(x, by, z);
             if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z)) || block.getMaterial()
                 .isLiquid()
-                || block instanceof net.minecraft.block.BlockFalling
                 || !passable(world, x, by, z) && !explorer.excavationTerrain.excavatable(world, x, by, z)) return false;
         }
         return true;
@@ -156,8 +155,7 @@ public final class RoomExit {
         for (int by = next[1] + 1; by >= next[1]; by--) {
             if (passable(world, next[0], by, next[2])) continue;
             net.minecraft.block.Block block = world.getBlock(next[0], by, next[2]);
-            if (block instanceof net.minecraft.block.BlockFalling
-                || ContactHazards.dangerous(block, world.getBlockMetadata(next[0], by, next[2]))
+            if (ContactHazards.dangerous(block, world.getBlockMetadata(next[0], by, next[2]))
                 || !explorer.excavationTerrain.excavatable(world, next[0], by, next[2])) return false;
             return explorer.minePlannedBlock(mc, next[0], by, next[2], next[1]);
         }

@@ -1391,12 +1391,27 @@ public class Explorer {
             if (digging || returnDigging) sustain.notifyBlockMined();
             sustain.tick(mc, walking, walking && !digging && !returnDigging);
         }
+        boolean baritoneActive = baritoneCoordinator.active()
+            || baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
+        if (baritoneActive && navigationInput != null) {
+            if (mc.thePlayer != null && mc.thePlayer.movementInput == navigationInput) {
+                mc.thePlayer.movementInput = navigationInput.original;
+            }
+            navigationInput = null;
+        }
         if (baritoneCoordinator.tick(mc, this)) return;
         if (!digging && !returnDigging) releaseMiningInput(mc);
         camera.clear();
-        if (walking && mc.thePlayer != null && navigationInput == null) {
+        baritoneActive = baritoneCoordinator.active()
+            || baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
+        if (walking && !baritoneActive && mc.thePlayer != null && navigationInput == null) {
             navigationInput = new NavigationInput(mc.thePlayer.movementInput);
             mc.thePlayer.movementInput = navigationInput;
+        } else if (baritoneActive && navigationInput != null) {
+            if (mc.thePlayer != null && mc.thePlayer.movementInput == navigationInput) {
+                mc.thePlayer.movementInput = navigationInput.original;
+            }
+            navigationInput = null;
         }
         if (navigationInput != null) {
             navigationInput.forward = 0;
@@ -2334,8 +2349,10 @@ public class Explorer {
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
-        boolean steerCamera = NavigationSteering.straightHeading(route, px, py, pz) != null;
-        if (!centering && steerCamera) look(desired, desiredPitch);
+        Float straightHeading = NavigationSteering.straightHeading(route, px, py, pz);
+        boolean steerCamera = straightHeading != null;
+        if (!centering && steerCamera) look(straightHeading, desiredPitch);
+        else if (!centering) camera.clear();
         status = centering ? "Centering on supported ground"
             : returning ? "Returning along saved access path" : "Following checked route";
         if (!centering && steerCamera && Math.abs(turn) > 60F) {
@@ -3015,7 +3032,7 @@ public class Explorer {
             boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling && obstruction.blockX == nx
                 && obstruction.blockZ == nz
                 && obstruction.blockY > by
-                && obstruction.blockY <= y + 2
+                && obstruction.blockY <= y + 4
                 && visible instanceof net.minecraft.block.BlockFalling
                 && excavationTerrain.excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
             if (aimPoint == null && (fallingObstruction || FoliagePolicy.canClear(

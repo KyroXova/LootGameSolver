@@ -18,7 +18,7 @@ import com.kyroxova.lootgamesolver.explorer.Explorer;
 public final class StorageCommand extends CommandBase {
 
     private static final String[] SUBCOMMANDS = { "help", "setHome", "setWarp", "setChest", "setStorage", "clearChest",
-        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot", "caveMode" };
+        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot", "clearCheckpoint", "caveMode" };
 
     @Override
     public String getCommandName() {
@@ -32,7 +32,7 @@ public final class StorageCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/lgs help [command] | caveMode [on|off|status] | setHome | setWarp <name> | setChest | setStorage [name] | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
+        return "/lgs help [command] | caveMode [on|off|status] | setHome | setWarp <name> | setChest | setStorage [name] | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot | clearCheckpoint";
     }
 
     @Override
@@ -60,6 +60,11 @@ public final class StorageCommand extends CommandBase {
         String world = Explorer.worldIdentity(mc);
         if ("resumeLoot".equalsIgnoreCase(args.length == 0 ? "" : args[0])) {
             ClientHooks.requestResumeLoot();
+            return;
+        }
+        if ("clearCheckpoint".equalsIgnoreCase(args.length == 0 ? "" : args[0])
+            || "resetCheckpoint".equalsIgnoreCase(args.length == 0 ? "" : args[0])) {
+            ClientHooks.requestClearCheckpoint();
             return;
         }
         if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
@@ -209,6 +214,9 @@ public final class StorageCommand extends CommandBase {
                 return "/lgs storageStatus - Show the destination, number of targets, and enabled setting.";
             case "resumeloot":
                 return "/lgs resumeLoot - Resume saved reward collection when you are back near its location.";
+            case "clearcheckpoint":
+            case "resetcheckpoint":
+                return "/lgs clearCheckpoint - Clear saved loot and room navigation checkpoints.";
             default:
                 return null;
         }
