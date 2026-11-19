@@ -118,14 +118,7 @@ public final class StorageRecoveryController {
                     bogo = new BogoDropOffBridge.Session();
                     if (!bogo.start()) {
                         bogo = null;
-                        if (returnAfterDepositFailure(mc)) return Result.WORKING;
-                        trip.fail();
-                        return Result.FAILED;
                     }
-                } else {
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7e[LootGameSolver] Nearby drop-off skipped to protect carried gear; using marked storage."));
                 }
             }
         }
@@ -134,14 +127,14 @@ public final class StorageRecoveryController {
             if (response < 0 || ++dropOffWait > 600) {
                 bogo.close();
                 bogo = null;
-                if (returnAfterDepositFailure(mc)) return Result.WORKING;
-                trip.fail();
-                return Result.FAILED;
+            } else if (response == 0) {
+                return Result.WORKING;
+            } else if (++dropOffSettle < 5) {
+                return Result.WORKING;
+            } else {
+                bogo.close();
+                bogo = null;
             }
-            if (response == 0) return Result.WORKING;
-            if (++dropOffSettle < 5) return Result.WORKING;
-            bogo.close();
-            bogo = null;
         }
         if (deposit == null) deposit = new StorageDepositCoordinator(LootGameSolverConfig.storageTargets, baseline);
         StorageDepositCoordinator.Result result = deposit.tick(mc);

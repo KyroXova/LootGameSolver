@@ -13,7 +13,7 @@ public final class ExplorerTerrain {
         if (!world.blockExists(x, y, z)) return false;
         net.minecraft.block.Block block = world.getBlock(x, y, z);
         if (block == net.minecraft.init.Blocks.air) return true;
-        if (block == net.minecraft.init.Blocks.snow_layer) return true;
+        if (block == net.minecraft.init.Blocks.snow_layer && world.getBlockMetadata(x, y, z) <= 3) return true;
         if (block == net.minecraft.init.Blocks.waterlily) return true;
         if (block.getMaterial() == net.minecraft.block.material.Material.leaves) return false;
         if (block.getMaterial()
@@ -144,14 +144,14 @@ public final class ExplorerTerrain {
         net.minecraft.block.Block at = world.getBlock(x, y, z);
         net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
         if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
-        if (box != null && box.maxY > y
-            && box.maxY < y + 1D
+        if (box != null && box.maxY >= y + 0.05D
             && box.minX < x + 0.5D
             && box.maxX > x + 0.5D
             && box.minZ < z + 0.5D
             && box.maxZ > z + 0.5D) return box.maxY;
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
-        if (below.isNormalCube()) return y;
+        if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
+            || below == net.minecraft.init.Blocks.ice || below == net.minecraft.init.Blocks.packed_ice) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
         if (belowBox != null && belowBox.maxY >= y
             && belowBox.minX < x + 0.5D

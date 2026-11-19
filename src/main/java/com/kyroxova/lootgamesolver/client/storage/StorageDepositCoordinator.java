@@ -23,6 +23,7 @@ public final class StorageDepositCoordinator {
     private final InventoryBaseline baseline;
     private final StorageLootLedger ledger = new StorageLootLedger();
     private final BackpackStorageUnload bags;
+    private final java.util.Set<String> fullTargets = new java.util.HashSet<String>();
     private MarkedStorageDeposit deposit;
     private Phase phase = Phase.DEPOSIT;
     private boolean needsSpace;
@@ -55,7 +56,7 @@ public final class StorageDepositCoordinator {
             phase = Phase.UNLOAD;
             return Result.WORKING;
         }
-        if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline);
+        if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline, fullTargets);
         MarkedStorageDeposit.Result result = deposit.tick(mc);
         if (result == MarkedStorageDeposit.Result.WORKING) return Result.WORKING;
         if (result != MarkedStorageDeposit.Result.DONE || (needsSpace && deposit.moved() == 0)) return fail(mc);

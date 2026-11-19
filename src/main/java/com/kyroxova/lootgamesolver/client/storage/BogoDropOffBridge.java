@@ -26,24 +26,7 @@ public final class BogoDropOffBridge {
     }
 
     public static boolean safeToRequest(Minecraft mc) {
-        if (mc == null || mc.thePlayer == null) return false;
-        int first = 0;
-        if (mc.isSingleplayer()) {
-            try {
-                Class<?> config = Class.forName("com.cleanroommc.bogosorter.common.config.BogoSorterConfig");
-                Object dropOff = config.getField("dropOff")
-                    .get(null);
-                if (!dropOff.getClass()
-                    .getField("enableHotbarDropOff")
-                    .getBoolean(dropOff)) first = 9;
-            } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
-                return false;
-            }
-        }
-        for (int slot = first; slot < 36; slot++)
-            if (InventoryProtection.essential(mc.thePlayer.inventory.getStackInSlot(slot))) return false;
-        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
-        if (reserve >= first && reserve < 36) return false;
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return false;
         return true;
     }
 

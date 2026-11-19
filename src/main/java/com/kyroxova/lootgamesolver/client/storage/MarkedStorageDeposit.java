@@ -27,7 +27,10 @@ public final class MarkedStorageDeposit {
     private final World world;
     private final StorageLootLedger ledger;
     private final InventoryBaseline baseline;
-    private int next, wait, oldSlot = -1, moved;
+    private final java.util.Set<String> fullTargets;
+    private final boolean[] attempted;
+    private int currentTargetIndex = -1;
+    private int wait, oldSlot = -1, moved;
     private StorageTarget opening;
     private StorageTarget approach;
     private final BaritoneNavigationBridge navigation = new BaritoneNavigationBridge();
@@ -37,10 +40,17 @@ public final class MarkedStorageDeposit {
     private VerifiedStorageTransfer transfer;
 
     public MarkedStorageDeposit(Minecraft mc, String[] targets, StorageLootLedger ledger, InventoryBaseline baseline) {
+        this(mc, targets, ledger, baseline, new java.util.HashSet<String>());
+    }
+
+    public MarkedStorageDeposit(Minecraft mc, String[] targets, StorageLootLedger ledger, InventoryBaseline baseline,
+        java.util.Set<String> fullTargets) {
         world = mc.theWorld;
         this.targets = targets.clone();
         this.ledger = ledger;
         this.baseline = baseline;
+        this.fullTargets = fullTargets != null ? fullTargets : new java.util.HashSet<String>();
+        this.attempted = new boolean[this.targets.length];
     }
 
     public Result tick(Minecraft mc) {
@@ -60,7 +70,11 @@ public final class MarkedStorageDeposit {
             boolean reached = navigation.completed();
             navigation.stop();
             approach = null;
-            if (reached && ++approachRetries <= 2) next--;
+            if (reached && ++approachRetries <= 2) {
+                if (currentTargetIndex >= 0 && currentTargetIndex < attempted.length) {
+                    attempted[currentTargetIndex] = false;
+                }
+            }
         }
         if (transfer != null) {
             VerifiedStorageTransfer.Result result = transfer.tick(mc);
@@ -70,6 +84,11 @@ public final class MarkedStorageDeposit {
             mc.thePlayer.closeScreen();
             transfer = null;
             inventory = null;
+            if (result == VerifiedStorageTransfer.Result.FULL_OR_REJECTED) {
+                if (currentTargetIndex >= 0 && currentTargetIndex < targets.length) {
+                    fullTargets.add(targets[currentTargetIndex]);
+                }
+            }
             if (result == VerifiedStorageTransfer.Result.DONE) return Result.DONE;
             return Result.WORKING;
         }
@@ -111,13 +130,38 @@ public final class MarkedStorageDeposit {
         }
         if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer)
             return Result.FAILED;
-        while (next < targets.length) {
-            StorageTarget target = StorageTarget.parse(targets[next++]);
-            if (target == null) continue;
-            IInventory candidate = target.loadedInventory(mc);
-            double[] pos = target.loadedPosition(mc);
-            if (candidate == null || pos == null) continue;
-            double distance = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
+        while (true) {
+            int bestIndex = -1;
+            double bestDistSq = Double.MAX_VALUE;
+            StorageTarget bestTarget = null;
+            double[] bestPos = null;
+            IInventory bestCandidate = null;
+
+            for (int i = 0; i < targets.length; i++) {
+                if (attempted[i] || fullTargets.contains(targets[i])) continue;
+                StorageTarget target = StorageTarget.parse(targets[i]);
+                if (target == null) continue;
+                IInventory candidate = target.loadedInventory(mc);
+                double[] pos = target.loadedPosition(mc);
+                if (candidate == null || pos == null) continue;
+                double distSq = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestIndex = i;
+                    bestTarget = target;
+                    bestPos = pos;
+                    bestCandidate = candidate;
+                }
+            }
+
+            if (bestIndex < 0) break;
+            attempted[bestIndex] = true;
+            currentTargetIndex = bestIndex;
+
+            StorageTarget target = bestTarget;
+            IInventory candidate = bestCandidate;
+            double[] pos = bestPos;
+            double distance = bestDistSq;
             if (distance > 6.25D) {
                 if (distance > 64D) continue;
                 if (approach(target, pos)) return Result.WORKING;
@@ -165,7 +209,7 @@ public final class MarkedStorageDeposit {
                 if (approach(target, pos)) return Result.WORKING;
                 continue;
             }
-            int targetIndex = next - 1;
+            int targetIndex = bestIndex;
             if (aimIndex != targetIndex) {
                 aimIndex = targetIndex;
                 aimTicks = 0;
@@ -197,7 +241,7 @@ public final class MarkedStorageDeposit {
                     && eye.squareDistanceTo(crosshair.hitVec) <= reach * reach);
             if (!visible || Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
                 if (++aimTicks <= 20) {
-                    next--;
+                    attempted[bestIndex] = false;
                     return Result.WORKING;
                 }
                 aimIndex = -1;
@@ -285,8 +329,8 @@ public final class MarkedStorageDeposit {
     }
 
     private boolean approach(StorageTarget target, double[] pos) {
-        if (lastApproachIndex != next - 1) {
-            lastApproachIndex = next - 1;
+        if (lastApproachIndex != currentTargetIndex) {
+            lastApproachIndex = currentTargetIndex;
             approachRetries = 0;
         }
         if (approachRetries > 2) return false;
