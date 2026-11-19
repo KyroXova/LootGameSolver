@@ -10,33 +10,32 @@ import org.junit.Test;
 public class NavigationSteeringTest {
 
     @Test
-    public void shortDiagonalStepsDoNotNeedCameraSteering() {
-        assertTrue(
-            NavigationSteering.shortDiagonal(
-                java.util.Arrays.asList(new int[] { -2, 64, -2 }, new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 }),
-                0,
-                64,
-                0));
-        assertTrue(
-            NavigationSteering.shortDiagonal(
+    public void cameraOnlyTracksStraightRunsOfThreeOrMoreBlocks() {
+        assertNull(
+            NavigationSteering.straightHeading(
                 java.util.Arrays.asList(new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 }, new int[] { 2, 64, 2 }),
                 0,
                 64,
                 0));
-        assertFalse(
-            NavigationSteering.shortDiagonal(
-                java.util.Arrays.asList(
-                    new int[] { 1, 64, 1 },
-                    new int[] { 2, 64, 2 },
-                    new int[] { 3, 64, 3 },
-                    new int[] { 4, 64, 4 }),
+        assertNull(
+            NavigationSteering.straightHeading(
+                java.util.Arrays.asList(new int[] { 1, 64, 0 }, new int[] { 1, 64, 1 }, new int[] { 2, 64, 1 }),
                 0,
                 64,
                 0));
-        assertFalse(
-            NavigationSteering.shortDiagonal(java.util.Collections.singletonList(new int[] { 1, 64, 0 }), 0, 64, 0));
-        assertFalse(
-            NavigationSteering.shortDiagonal(java.util.Collections.singletonList(new int[] { 1, 65, 1 }), 0, 64, 0));
+        assertEquals(
+            -45F,
+            NavigationSteering.straightHeading(
+                java.util.Arrays.asList(
+                    new int[] { -2, 64, -2 },
+                    new int[] { 0, 64, 0 },
+                    new int[] { 1, 64, 1 },
+                    new int[] { 2, 64, 2 },
+                    new int[] { 3, 64, 3 }),
+                0,
+                64,
+                0),
+            0F);
     }
 
     @Test

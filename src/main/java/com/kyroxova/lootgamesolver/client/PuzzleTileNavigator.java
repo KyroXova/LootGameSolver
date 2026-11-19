@@ -33,16 +33,19 @@ final class PuzzleTileNavigator {
             stop();
             return false;
         }
-        if (!java.util.Arrays.equals(tile, target)) {
-            stop();
-            tile = target.clone();
-            tried.clear();
-        }
         double dx = target[0] + 0.5D - mc.thePlayer.posX;
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
         double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
         boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
+        if (!java.util.Arrays.equals(tile, target)) {
+            if (!keepApproachForNewTile(
+                reachable,
+                goal != null,
+                navigation.state() == BaritoneNavigationBridge.State.RUNNING)) stop();
+            tile = target.clone();
+            tried.clear();
+        }
         if (reachable && (goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
             || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
             || navigation.completed())) {
@@ -117,6 +120,10 @@ final class PuzzleTileNavigator {
 
     static boolean withinReach(double dx, double dy, double dz, double reach) {
         return reach > 0 && dx * dx + dy * dy + dz * dz <= reach * reach;
+    }
+
+    static boolean keepApproachForNewTile(boolean reachable, boolean hasGoal, boolean running) {
+        return reachable && hasGoal && running;
     }
 
     static boolean sameFeetBlock(double x, double y, double z, int[] pos) {

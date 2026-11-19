@@ -11,8 +11,6 @@ import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 
-import com.kyroxova.lootgamesolver.minecraft.BaritoneBlockBridge;
-
 /** Opens marked, reachable inventories and verifies each deposit before continuing. */
 final class MarkedStorageDeposit {
 
@@ -32,6 +30,7 @@ final class MarkedStorageDeposit {
     private StorageTarget approach;
     private final BaritoneNavigationBridge navigation = new BaritoneNavigationBridge();
     private int approachTicks, approachRetries, lastApproachIndex = -1;
+    private int aimIndex = -1, aimTicks;
     private IInventory inventory;
     private VerifiedStorageTransfer transfer;
 
@@ -155,12 +154,60 @@ final class MarkedStorageDeposit {
                 if (approach(target, pos)) return Result.WORKING;
                 continue;
             }
+            int targetIndex = next - 1;
+            if (aimIndex != targetIndex) {
+                aimIndex = targetIndex;
+                aimTicks = 0;
+            }
+            Vec3 aimPoint = target.entity == null ? hit.hitVec
+                : Vec3
+                    .createVectorHelper(pos[0], ((Entity) candidate).posY + ((Entity) candidate).height * 0.5D, pos[2]);
+            double ax = aimPoint.xCoord - eye.xCoord, ay = aimPoint.yCoord - eye.yCoord,
+                az = aimPoint.zCoord - eye.zCoord;
+            float yaw = (float) Math.toDegrees(Math.atan2(az, ax)) - 90F;
+            float pitch = (float) -Math.toDegrees(Math.atan2(ay, Math.hypot(ax, az)));
+            float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+            float pitchError = pitch - mc.thePlayer.rotationPitch;
+            if (Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
+                float yawStep = Math.max(-6F, Math.min(6F, yawError));
+                float pitchStep = Math.max(-6F, Math.min(6F, pitchError));
+                mc.thePlayer.setAngles(yawStep / 0.15F, -pitchStep / 0.15F);
+            }
+            double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+            MovingObjectPosition crosshair = mc.objectMouseOver;
+            Vec3 look = mc.thePlayer.getLook(1F);
+            MovingObjectPosition ray = world
+                .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
+            boolean visible = mc.renderViewEntity == mc.thePlayer && (target.entity == null
+                ? VisibleBlockInteraction.matches(crosshair, ray, eye, target.x, target.y, target.z, reach)
+                : crosshair != null && crosshair.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
+                    && crosshair.entityHit == candidate
+                    && crosshair.hitVec != null
+                    && eye.squareDistanceTo(crosshair.hitVec) <= reach * reach);
+            if (!visible || Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
+                if (++aimTicks <= 80) {
+                    next--;
+                    return Result.WORKING;
+                }
+                aimIndex = -1;
+                continue;
+            }
+            aimIndex = -1;
             oldSlot = mc.thePlayer.inventory.currentItem;
             mc.thePlayer.inventory.currentItem = empty;
             mc.playerController.updateController();
             boolean sent;
             if (target.entity == null) {
-                sent = BaritoneBlockBridge.click(mc, target.x, target.y, target.z, hit.sideHit, hit.hitVec, false);
+                sent = mc.playerController.onPlayerRightClick(
+                    mc.thePlayer,
+                    mc.theWorld,
+                    mc.thePlayer.getHeldItem(),
+                    target.x,
+                    target.y,
+                    target.z,
+                    crosshair.sideHit,
+                    crosshair.hitVec);
+                mc.thePlayer.swingItem();
             } else {
                 // This method sends the packet even if the client-side interaction returns false.
                 mc.playerController.interactWithEntitySendPacket(mc.thePlayer, (Entity) candidate);

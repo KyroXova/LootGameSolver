@@ -527,17 +527,15 @@ final class RewardChestLooter {
         Vec3 look = mc.thePlayer.getLook(1.0F);
         net.minecraft.util.MovingObjectPosition aimed = mc.theWorld
             .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
-        boolean matches = aimed != null
-            && aimed.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
-            && aimed.blockX == pos[0]
-            && aimed.blockY == pos[1]
-            && aimed.blockZ == pos[2];
+        net.minecraft.util.MovingObjectPosition crosshair = mc.objectMouseOver;
+        boolean matches = mc.renderViewEntity == mc.thePlayer
+            && VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach);
         if (!chestAim.ready(
             pos[0],
             pos[1],
             pos[2],
             matches,
-            Math.sqrt(eye.squareDistanceTo(hit.hitVec)),
+            matches ? Math.sqrt(eye.squareDistanceTo(crosshair.hitVec)) : Double.POSITIVE_INFINITY,
             Math.min(4D, mc.playerController.getBlockReachDistance()),
             net.minecraft.util.MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw),
             targetPitch - mc.thePlayer.rotationPitch)) {
@@ -548,22 +546,19 @@ final class RewardChestLooter {
             status = "Release sneak to open reward chest";
             return;
         }
-        if (!com.kyroxova.lootgamesolver.minecraft.BaritoneBlockBridge
-            .click(mc, pos[0], pos[1], pos[2], aimed.sideHit, aimed.hitVec, false)) {
-            boolean direct = mc.playerController.onPlayerRightClick(
-                mc.thePlayer,
-                mc.theWorld,
-                mc.thePlayer.getHeldItem(),
-                pos[0],
-                pos[1],
-                pos[2],
-                aimed.sideHit,
-                aimed.hitVec);
-            mc.thePlayer.swingItem();
-            if (!direct) {
-                status = "Chest interaction unavailable";
-                return;
-            }
+        boolean direct = mc.playerController.onPlayerRightClick(
+            mc.thePlayer,
+            mc.theWorld,
+            mc.thePlayer.getHeldItem(),
+            pos[0],
+            pos[1],
+            pos[2],
+            crosshair.sideHit,
+            crosshair.hitVec);
+        mc.thePlayer.swingItem();
+        if (!direct) {
+            status = "Chest interaction unavailable";
+            return;
         }
         chestAim.reset();
         if (exploration != null) exploration.clearAim();
@@ -645,27 +640,20 @@ final class RewardChestLooter {
         Container container = mc.thePlayer.openContainer;
         String name = container.getClass()
             .getName();
-        boolean isBackpack = name.startsWith("de.eydamos.backpack.") || name.startsWith("de.eydamos.guiadvanced.")
-            || name.startsWith("com.darkona.adventurebackpack.")
-            || name.startsWith("forestry.")
-            || name.toLowerCase(java.util.Locale.ROOT)
-                .contains("backpack")
-            || name.toLowerCase(java.util.Locale.ROOT)
-                .contains("bag")
-            || (mc.currentScreen instanceof GuiContainer && !(mc.currentScreen instanceof GuiChest)
-                && !(mc.thePlayer.openContainer instanceof ContainerChest)
-                && mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer);
-        if (packOpening && mc.currentScreen instanceof GuiChest) {
-            // Exclude chest containers from backpack transfers, including shared package names.
+        boolean isBackpack = InventoryProtection.backpackContainer(name) && backpackSlot >= 0
+            && isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot));
+        if (packOpening && mc.currentScreen instanceof GuiContainer && !isBackpack) {
             mc.thePlayer.closeScreen();
             restoreBackpackAim(mc);
             packOpening = false;
+            if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
+            oldSlot = -1;
             int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
             if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
             backpackSlot = -1;
             openWait = 0;
             waiting = 5;
-            status = "Avoiding chest while opening backpack";
+            status = "Unexpected container; trying another backpack";
             return;
         }
         if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
@@ -856,7 +844,7 @@ final class RewardChestLooter {
 
     private static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
         if (exploration != null) {
-            exploration.look(yaw, pitch, true);
+            exploration.lookSmooth(yaw, pitch);
         } else {
             float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
             float pitchDelta = pitch - mc.thePlayer.rotationPitch;

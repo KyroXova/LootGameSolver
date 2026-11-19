@@ -20,6 +20,9 @@ public class StatusTextTest {
         assertEquals("Low Air Underwater", StatusText.explorer("Stopped: low air underwater"));
         assertEquals("Pre-routing to Puzzle", StatusText.explorer("Pre-routing to structure above dungeon"));
         assertEquals("Clearing Foliage", StatusText.explorer("Clearing room foliage"));
+        assertEquals(
+            "Bags Full or Unavailable",
+            StatusText.explorer("Inventory and backpacks full; rewards remain in chest"));
     }
 
     @Test

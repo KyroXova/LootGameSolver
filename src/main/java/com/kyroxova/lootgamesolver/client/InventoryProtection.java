@@ -15,20 +15,40 @@ final class InventoryProtection {
 
     static boolean bag(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
-        String id = String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem()))
-            .toLowerCase(Locale.ROOT);
-        String type = stack.getItem()
-            .getClass()
-            .getName()
-            .toLowerCase(Locale.ROOT);
+        return bagIdentity(
+            String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())),
+            stack.getItem()
+                .getClass()
+                .getName());
+    }
+
+    static boolean bagIdentity(String registryName, String className) {
+        String id = registryName.toLowerCase(Locale.ROOT);
+        String type = className.toLowerCase(Locale.ROOT);
+        int colon = id.indexOf(':');
+        if (colon >= 0) id = id.substring(colon + 1);
+        int dot = Math.max(type.lastIndexOf('.'), type.lastIndexOf('$'));
+        if (dot >= 0) type = type.substring(dot + 1);
         // Consumable reward bags are not portable storage and must never be opened here.
         if (id.contains("lootbag") || id.contains("loot_bag") || type.contains("lootbag") || type.contains("loot_bag"))
             return false;
         return id.contains("backpack") || type.contains("backpack")
-            || id.contains(":knapsack")
-            || id.contains(":satchel")
+            || id.contains("knapsack")
+            || id.contains("satchel")
             || id.contains("bag")
             || type.contains("bag");
+    }
+
+    static boolean backpackContainer(String name) {
+        if (name == null) return false;
+        String type = name.toLowerCase(Locale.ROOT);
+        if (type.startsWith("de.eydamos.guiadvanced.") || type.startsWith("de.eydamos.backpack.inventory.container."))
+            return true;
+        int dot = type.lastIndexOf('.');
+        if (dot >= 0) type = type.substring(dot + 1);
+        return (type.contains("backpack") || type.contains("knapsack")
+            || type.contains("satchel")
+            || type.contains("bag")) && !type.contains("jetpack") && !type.contains("copter");
     }
 
     static boolean essential(ItemStack stack) {

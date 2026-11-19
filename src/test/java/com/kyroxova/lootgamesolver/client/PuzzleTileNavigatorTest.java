@@ -7,6 +7,14 @@ import org.junit.Test;
 
 public class PuzzleTileNavigatorTest {
 
+    @org.junit.Test
+    public void retainsMovementOnlyWhenNewTileIsReachableAndRouteIsActive() {
+        org.junit.Assert.assertTrue(PuzzleTileNavigator.keepApproachForNewTile(true, true, true));
+        org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(false, true, true));
+        org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(true, false, true));
+        org.junit.Assert.assertFalse(PuzzleTileNavigator.keepApproachForNewTile(true, true, false));
+    }
+
     @Test
     public void considersVerticalDistanceWhenApproachingTile() {
         assertTrue(PuzzleTileNavigator.withinReach(3, 1, 0, 4));

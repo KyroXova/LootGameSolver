@@ -840,21 +840,17 @@ public class Explorer {
                 camera.clear();
                 return;
             }
-            if (NavigationSteering.shortDiagonal(
+            Float heading = NavigationSteering.straightHeading(
                 baritoneCoordinator.routePreview,
                 (int) Math.floor(mc.thePlayer.posX),
                 (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ))) {
+                (int) Math.floor(mc.thePlayer.posZ));
+            if (heading == null) {
                 camera.clear();
                 return;
             }
-            double vx = mc.thePlayer.motionX, vz = mc.thePlayer.motionZ;
-            Float heading = NavigationSteering
-                .walkingHeading(vx, vz, mc.thePlayer.rotationYaw, baritoneCoordinator.routePreview);
-            if (heading != null) {
-                camera.look(heading, 0F);
-                camera.render(mc, world, true);
-            }
+            camera.look(heading, 0F);
+            camera.render(mc, world, true);
         } else camera.render(mc, world, true);
     }
 
@@ -864,6 +860,10 @@ public class Explorer {
 
     public void look(float yaw, float pitch, boolean force) {
         camera.look(yaw, pitch, force);
+    }
+
+    public void lookSmooth(float yaw, float pitch) {
+        camera.lookSmooth(yaw, pitch);
     }
 
     public void clearAim() {
@@ -2334,11 +2334,11 @@ public class Explorer {
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
-        boolean shortDiagonal = NavigationSteering.shortDiagonal(route, px, py, pz);
-        if (!centering && !shortDiagonal) look(desired, desiredPitch);
+        boolean steerCamera = NavigationSteering.straightHeading(route, px, py, pz) != null;
+        if (!centering && steerCamera) look(desired, desiredPitch);
         status = centering ? "Centering on supported ground"
             : returning ? "Returning along saved access path" : "Following checked route";
-        if (!centering && !shortDiagonal && Math.abs(turn) > 60F) {
+        if (!centering && steerCamera && Math.abs(turn) > 60F) {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
             mc.thePlayer.setSprinting(false);

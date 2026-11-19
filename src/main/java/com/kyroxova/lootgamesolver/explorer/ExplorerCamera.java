@@ -10,6 +10,7 @@ final class ExplorerCamera {
     private long lastFrame;
     private long lastUserMouseTime;
     private boolean force;
+    private boolean smoothForced;
 
     void render(Minecraft mc, World world, boolean walking) {
         long nowNano = System.nanoTime();
@@ -29,9 +30,10 @@ final class ExplorerCamera {
             return;
         }
 
-        float yaw = walking && !force ? NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds)
+        float yaw = (walking && !force) || smoothForced
+            ? NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds)
             : NavigationSteering.interactionCameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds);
-        float pitch = walking && !force
+        float pitch = (walking && !force) || smoothForced
             ? NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, targetPitch, seconds)
             : NavigationSteering.interactionCameraStep(mc.thePlayer.rotationPitch, targetPitch, seconds);
         mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
@@ -45,17 +47,25 @@ final class ExplorerCamera {
         targetYaw = yaw;
         targetPitch = pitch;
         this.force = force;
+        this.smoothForced = false;
         active = true;
+    }
+
+    void lookSmooth(float yaw, float pitch) {
+        look(yaw, pitch, true);
+        smoothForced = true;
     }
 
     void clear() {
         active = false;
         force = false;
+        smoothForced = false;
     }
 
     void reset() {
         active = false;
         force = false;
+        smoothForced = false;
         lastFrame = 0;
         lastUserMouseTime = 0;
     }

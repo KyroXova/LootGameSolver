@@ -82,9 +82,7 @@ final class BackpackStorageUnload {
                 String name = mc.thePlayer.openContainer.getClass()
                     .getName()
                     .toLowerCase(Locale.ROOT);
-                if (!(name.contains("backpack") || name.contains("bag")
-                    || name.startsWith("forestry.")
-                    || name.startsWith("de.eydamos.guiadvanced."))) return Result.FAILED;
+                if (!InventoryProtection.backpackContainer(name)) return Result.FAILED;
                 IInventory contents = null;
                 for (Object value : mc.thePlayer.openContainer.inventorySlots) {
                     IInventory candidate = ((Slot) value).inventory;

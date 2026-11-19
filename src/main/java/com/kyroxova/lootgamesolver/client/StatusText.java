@@ -13,7 +13,7 @@ public final class StatusText {
         String text = detail.toLowerCase(Locale.ROOT);
 
         if (text.contains("swim") || text.contains("shore")) return "Swimming to Shore";
-        if (text.contains("full") && text.contains("rewards remain")) return "Inventory Full";
+        if (text.contains("full") && text.contains("rewards remain")) return "Bags Full or Unavailable";
         if (text.contains("backpack") || text.contains("packing")) return "Packing Backpack Loot";
         if (text.contains("chest") || text.contains("reward")) {
             if (text.contains("jump") || text.contains("clear of")) return "Leaving Chests";

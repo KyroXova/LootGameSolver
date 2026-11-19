@@ -19,6 +19,15 @@ public class InventoryProtectionTest {
     public void distinguishesConsumableLootBagsFromBackpacks() {
         assertFalse(InventoryProtection.bag(new ItemStack(new LootBagItem())));
         assertTrue(InventoryProtection.bag(new ItemStack(new BackpackItem())));
+        assertFalse(
+            InventoryProtection
+                .bagIdentity("adventurebackpack:coalJetpack", "com.darkona.adventurebackpack.item.ItemCoalJetpack"));
+        assertTrue(
+            InventoryProtection
+                .bagIdentity("adventurebackpack:backpack", "com.darkona.adventurebackpack.item.ItemAdventureBackpack"));
+        assertFalse(InventoryProtection.backpackContainer("com.darkona.adventurebackpack.inventory.ContainerJetpack"));
+        assertTrue(InventoryProtection.backpackContainer("com.darkona.adventurebackpack.inventory.ContainerBackpack"));
+        assertTrue(InventoryProtection.backpackContainer("de.eydamos.guiadvanced.ContainerWindow"));
     }
 
     @Test

@@ -2,7 +2,7 @@ package com.kyroxova.lootgamesolver.explorer;
 
 final class NavigationSteering {
 
-    static boolean shortDiagonal(java.util.List<int[]> route, int x, int y, int z) {
+    static Float straightHeading(java.util.List<int[]> route, int x, int y, int z) {
         int directionX = 0, directionZ = 0, steps = 0;
         int start = 0;
         for (int i = 0; i < route.size(); i++) {
@@ -15,16 +15,16 @@ final class NavigationSteering {
         for (int i = start; i < route.size(); i++) {
             int[] next = route.get(i);
             int dx = next[0] - x, dz = next[2] - z;
-            if (dx == 0 && dz == 0 && next[1] == y) continue;
-            if (Math.abs(dx) != 1 || Math.abs(dz) != 1 || next[1] != y) break;
+            if (dx == 0 && dz == 0) continue;
+            if (Math.abs(dx) > 1 || Math.abs(dz) > 1) break;
             if (steps > 0 && (dx != directionX || dz != directionZ)) break;
             directionX = dx;
             directionZ = dz;
             x = next[0];
             z = next[2];
-            if (++steps > 3) return false;
+            if (++steps >= 3) return (float) Math.toDegrees(Math.atan2(directionZ, directionX)) - 90F;
         }
-        return steps > 0;
+        return null;
     }
 
     static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {

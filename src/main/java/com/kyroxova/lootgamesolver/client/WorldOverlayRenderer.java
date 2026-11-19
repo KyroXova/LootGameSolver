@@ -175,7 +175,7 @@ public final class WorldOverlayRenderer {
 
             SolverAction firstAction = actions.get(0);
             int[] firstBlock = session.getBlockPos(firstAction.position);
-            if (firstBlock != null) {
+            if (!solving && firstBlock != null) {
                 double fdx = firstBlock[0] + 0.5D - mc.thePlayer.posX;
                 double fdy = firstBlock[1] + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
                 double fdz = firstBlock[2] + 0.5D - mc.thePlayer.posZ;
