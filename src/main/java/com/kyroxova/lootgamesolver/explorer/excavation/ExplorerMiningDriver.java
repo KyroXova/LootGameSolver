@@ -85,7 +85,7 @@ public class ExplorerMiningDriver {
                 z,
                 nx,
                 nz,
-                visible == Blocks.snow_layer))) {
+                false))) {
                 mineX = obstruction.blockX;
                 mineY = obstruction.blockY;
                 mineZ = obstruction.blockZ;

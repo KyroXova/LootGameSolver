@@ -13,7 +13,7 @@ public final class ExplorerTerrain {
         if (!world.blockExists(x, y, z)) return false;
         net.minecraft.block.Block block = world.getBlock(x, y, z);
         if (block == net.minecraft.init.Blocks.air) return true;
-        if (block == net.minecraft.init.Blocks.snow_layer && world.getBlockMetadata(x, y, z) <= 1) return true;
+        if (block == net.minecraft.init.Blocks.snow_layer) return true;
         if (block == net.minecraft.init.Blocks.waterlily) return true;
         if (block.getMaterial() == net.minecraft.block.material.Material.leaves) return false;
         if (block.getMaterial()

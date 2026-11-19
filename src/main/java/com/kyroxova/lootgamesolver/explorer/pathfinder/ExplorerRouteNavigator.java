@@ -159,8 +159,7 @@ public class ExplorerRouteNavigator {
         if (explorer.digging && mc.thePlayer.onGround && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1) {
             for (int by = py; by <= py + 1; by++) {
                 net.minecraft.block.Block plant = mc.theWorld.getBlock(next[0], by, next[2]);
-                if (plant == net.minecraft.init.Blocks.snow_layer
-                    && mc.theWorld.getBlockMetadata(next[0], by, next[2]) <= 1) continue;
+                if (plant == net.minecraft.init.Blocks.snow_layer) continue;
                 if (FoliagePolicy.canClear(
                     isFoliage(plant),
                     mc.theWorld.getTileEntity(next[0], by, next[2]) != null,

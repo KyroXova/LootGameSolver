@@ -544,9 +544,7 @@ public final class ClientHooks {
         // Poll dormant board detection less often; poll every tick while solving.
         detectCounter++;
         if (session.isActive() || detectCounter % 20 == 0) {
-            session.tick(
-                !tileNavigator.moving() || session.getGame() == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
-                    || session.getGame() == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER);
+            session.tick(!tileNavigator.moving());
         }
 
         autoPuzzle.tick(mc, puzzleBridge, exploration, session, puzzleCompletion, rewardLooter, this);
@@ -741,6 +739,8 @@ public final class ClientHooks {
         tileNavigator.stop();
         if (mc.thePlayer != null) {
             mc.thePlayer.setSprinting(false);
+            mc.thePlayer.motionX = 0;
+            mc.thePlayer.motionZ = 0;
             if (mc.thePlayer.movementInput != null) {
                 mc.thePlayer.movementInput.moveForward = 0.0F;
                 mc.thePlayer.movementInput.jump = false;

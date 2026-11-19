@@ -438,7 +438,7 @@ public final class ExcavationPlanner {
         World w = mc.theWorld;
         for (int by = y; by <= y + 1; by++) {
             net.minecraft.block.Block plant = w.getBlock(x, by, z);
-            if (plant == net.minecraft.init.Blocks.snow_layer && w.getBlockMetadata(x, by, z) <= 1) continue;
+            if (plant == net.minecraft.init.Blocks.snow_layer) continue;
             if (FoliagePolicy.canClear(
                 isFoliage(plant),
                 w.getTileEntity(x, by, z) != null,
@@ -508,7 +508,7 @@ public final class ExcavationPlanner {
                 nx,
                 nz,
                 b == Blocks.snow_layer)) return explorer.minePlannedBlock(mc, nx, by, nz, destinationY);
-            if (passable(w, nx, by, nz)) continue;
+            if (b == Blocks.snow_layer || passable(w, nx, by, nz)) continue;
             return explorer.minePlannedBlock(mc, nx, by, nz, destinationY);
         }
         explorer.digTicks = 0;

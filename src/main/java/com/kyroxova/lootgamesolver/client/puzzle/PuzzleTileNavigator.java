@@ -17,9 +17,10 @@ public final class PuzzleTileNavigator {
     private int[] tile, goal;
     private int stalled, busyTicks;
     private double lastX, lastZ;
+    private boolean directMoving;
 
     public boolean moving() {
-        return goal != null;
+        return directMoving || goal != null;
     }
 
     public void pause(boolean paused) {
@@ -37,10 +38,37 @@ public final class PuzzleTileNavigator {
         double dx = target[0] + 0.5D - mc.thePlayer.posX;
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
+        double distXZ = Math.hypot(dx, dz);
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance() - 0.2D);
-        double closeReach = 2.4D;
-        boolean inCloseReach = withinReach(dx, dy, dz, closeReach) && LootGamesBridge.topFaceVisible(mc, target);
+        double closeReach = 2.2D;
+        boolean inCloseReach = (distXZ <= 1.6D || withinReach(dx, dy, dz, closeReach))
+            && LootGamesBridge.topFaceVisible(mc, target);
         boolean inMaxReach = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
+
+        if (inCloseReach) {
+            stop();
+            return true;
+        }
+
+        double floorY = target[1] + 1;
+        boolean inRoom = Math.abs(mc.thePlayer.posY - floorY) < 1.4D
+            && distXZ < 8.0D
+            && LootGamesBridge.topFaceVisible(mc, target);
+
+        if (inRoom) {
+            stopRoute();
+            double speed = 0.30D;
+            mc.thePlayer.motionX = (dx / distXZ) * speed;
+            mc.thePlayer.motionZ = (dz / distXZ) * speed;
+            mc.thePlayer.setSprinting(true);
+            if (mc.thePlayer.isCollidedHorizontally && mc.thePlayer.onGround) {
+                mc.thePlayer.jump();
+            }
+            directMoving = true;
+            return true;
+        }
+
+        directMoving = false;
         boolean arrivedAtGoal = goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
             || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
             || navigation.completed();
@@ -168,6 +196,7 @@ public final class PuzzleTileNavigator {
 
     public void stop() {
         stopRoute();
+        directMoving = false;
         tile = null;
         tried.clear();
         busyTicks = 0;
