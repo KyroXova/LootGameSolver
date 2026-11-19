@@ -29,8 +29,11 @@ final class ExplorerCamera {
             return;
         }
 
-        float yaw = NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds);
-        float pitch = NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, targetPitch, seconds);
+        float yaw = walking && !force ? NavigationSteering.cameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds)
+            : NavigationSteering.interactionCameraStep(mc.thePlayer.rotationYaw, targetYaw, seconds);
+        float pitch = walking && !force
+            ? NavigationSteering.cameraStep(mc.thePlayer.rotationPitch, targetPitch, seconds)
+            : NavigationSteering.interactionCameraStep(mc.thePlayer.rotationPitch, targetPitch, seconds);
         mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
     }
 

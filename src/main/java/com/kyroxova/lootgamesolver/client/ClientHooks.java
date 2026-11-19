@@ -528,13 +528,21 @@ public final class ClientHooks {
             else session.pauseForScreen();
             return;
         }
-        if (exploration != null && exploration.navigating()
-            && autoPuzzle.isIdle()
+        if (exploration != null
+            && (exploration.navigating()
+                || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED))
+            && (autoPuzzle.isIdle() || autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
             && !session.isActive()
             && mc.thePlayer.ticksExisted % 20 == 0
-            && exploration.inDungeonRoom(mc)) {
-            int[] cluster = nearbyRewardCenter(mc, exploration.verifiedRoomCenter(mc));
+            && (exploration.inDungeonRoom(mc)
+                || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED
+                    && autoPuzzle.getRewardCenter() != null))) {
+            int[] anchor = exploration.verifiedRoomCenter(mc);
+            if (anchor == null && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
+                anchor = autoPuzzle.getRewardCenter();
+            int[] cluster = nearbyRewardCenter(mc, anchor);
             if (cluster != null && rewardLooter.hasUncollectedCluster(mc, cluster)) {
+                autoPuzzle.reset();
                 exploration.prepareRewardCollection(mc, cluster);
                 rewardCenter = cluster;
                 explorationDriven = true;
@@ -546,6 +554,7 @@ public final class ClientHooks {
                 exploration.setAutomationStatus("Collecting reward chests");
                 return;
             }
+            if (!exploration.navigating()) return;
             int[] center = puzzleBridge.nearbyFloorActivator();
             if (center == null) {
                 center = puzzleBridge.nearbyMasterBlock(exploration.verifiedRoomCenter(mc));

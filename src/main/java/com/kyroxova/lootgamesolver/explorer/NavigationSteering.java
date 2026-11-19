@@ -4,7 +4,16 @@ final class NavigationSteering {
 
     static boolean shortDiagonal(java.util.List<int[]> route, int x, int y, int z) {
         int directionX = 0, directionZ = 0, steps = 0;
-        for (int[] next : route) {
+        int start = 0;
+        for (int i = 0; i < route.size(); i++) {
+            int[] position = route.get(i);
+            if (position[0] == x && position[1] == y && position[2] == z) {
+                start = i + 1;
+                break;
+            }
+        }
+        for (int i = start; i < route.size(); i++) {
+            int[] next = route.get(i);
             int dx = next[0] - x, dz = next[2] - z;
             if (dx == 0 && dz == 0 && next[1] == y) continue;
             if (Math.abs(dx) != 1 || Math.abs(dz) != 1 || next[1] != y) break;
@@ -59,11 +68,19 @@ final class NavigationSteering {
     }
 
     static float cameraStep(float current, float desired, double seconds) {
+        return cameraStep(current, desired, seconds, 0.12D, 220D);
+    }
+
+    static float interactionCameraStep(float current, float desired, double seconds) {
+        return cameraStep(current, desired, seconds, 0.06D, 300D);
+    }
+
+    private static float cameraStep(float current, float desired, double seconds, double smoothing, double speed) {
         float error = turn(current, desired, 180F) - current;
         if (Math.abs(error) < 0.08F) return error;
         double elapsed = Math.max(0, Math.min(0.05D, seconds));
-        float eased = (float) (error * (1D - Math.exp(-elapsed / 0.06D)));
-        float maximum = (float) (300D * elapsed);
+        float eased = (float) (error * (1D - Math.exp(-elapsed / smoothing)));
+        float maximum = (float) (speed * elapsed);
         return Math.max(-maximum, Math.min(maximum, eased));
     }
 

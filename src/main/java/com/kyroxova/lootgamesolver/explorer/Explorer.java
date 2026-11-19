@@ -832,10 +832,14 @@ public class Explorer {
             || returnDigging
             || attacking;
         if (isMining) {
-            camera.render(mc, world, true);
+            camera.render(mc, world, false);
             return;
         }
         if (baritoneCoordinator.active()) {
+            if (baritoneCoordinator.routePreview.isEmpty()) {
+                camera.clear();
+                return;
+            }
             if (NavigationSteering.shortDiagonal(
                 baritoneCoordinator.routePreview,
                 (int) Math.floor(mc.thePlayer.posX),

@@ -13,6 +13,12 @@ public class NavigationSteeringTest {
     public void shortDiagonalStepsDoNotNeedCameraSteering() {
         assertTrue(
             NavigationSteering.shortDiagonal(
+                java.util.Arrays.asList(new int[] { -2, 64, -2 }, new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 }),
+                0,
+                64,
+                0));
+        assertTrue(
+            NavigationSteering.shortDiagonal(
                 java.util.Arrays.asList(new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 }, new int[] { 2, 64, 2 }),
                 0,
                 64,
@@ -80,7 +86,7 @@ public class NavigationSteeringTest {
     public void halfTurnSettlesQuicklyWithoutOvershooting() {
         for (int fps : new int[] { 30, 60, 144 }) {
             float angle = 0;
-            for (int frame = 0; frame < fps; frame++) {
+            for (int frame = 0; frame < 2 * fps; frame++) {
                 angle += NavigationSteering.cameraStep(angle, 179F, 1D / fps);
                 assertTrue(angle >= 0 && angle <= 179F);
             }
@@ -108,7 +114,7 @@ public class NavigationSteeringTest {
             }
             assertEquals(181F, yaw, 0.08F);
             yaw = 0F;
-            for (int i = 0; i < fps; i++) yaw += NavigationSteering.cameraStep(yaw, 90F, 1D / fps);
+            for (int i = 0; i < 2 * fps; i++) yaw += NavigationSteering.cameraStep(yaw, 90F, 1D / fps);
             assertEquals(90F, yaw, 0.1F);
         }
         assertEquals(0F, NavigationSteering.cameraStep(0, 90, 0), 0F);
