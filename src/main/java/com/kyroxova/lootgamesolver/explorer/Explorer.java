@@ -580,7 +580,7 @@ public class Explorer {
             || returnDigging
             || attacking;
         if (isMining) {
-            camera.render(mc, world, false);
+            camera.clear();
             return;
         }
 

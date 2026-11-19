@@ -19,7 +19,7 @@ public final class MiningAimGate {
             stable = 0;
             return false;
         }
-        return ++stable >= 2;
+        return ++stable >= 1;
     }
 
     public void reset() {

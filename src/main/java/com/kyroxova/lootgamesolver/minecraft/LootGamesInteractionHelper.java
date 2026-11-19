@@ -117,7 +117,9 @@ public final class LootGamesInteractionHelper {
 
         float yaw = AimHelper.calculateYaw(dx, dz);
         float pitch = AimHelper.calculatePitch(dx, dy, dz);
-        return AimHelper.stepTurn(player, yaw, pitch, 45.0F, 35.0F, 15.0F, 15.0F);
+        player.rotationYaw = yaw;
+        player.rotationPitch = pitch;
+        return true;
     }
 
     public static boolean prepareExactCenterAndAim(EntityPlayer player, int x, int y, int z) {
@@ -138,7 +140,9 @@ public final class LootGamesInteractionHelper {
         float yaw = AimHelper.calculateYaw(dx, dz);
         double dy = y + 0.5D - player.posY - player.getEyeHeight();
         float pitch = (float) (-Math.atan2(dy, horizontal) * 180.0D / Math.PI);
-        return AimHelper.stepTurn(player, yaw, pitch, 35.0F, 25.0F, 2.0F, 2.0F);
+        player.rotationYaw = yaw;
+        player.rotationPitch = pitch;
+        return true;
     }
 
     public static boolean activateMaster(Minecraft mc, int x, int y, int z) {

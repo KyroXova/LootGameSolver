@@ -128,6 +128,14 @@ public final class BaritoneNavigationBridge {
                     .getField("value")
                     .set(allowPlace, kind == 3);
                 try {
+                    Object sprint = settings.getClass()
+                        .getField("sprint")
+                        .get(settings);
+                    sprint.getClass()
+                        .getField("value")
+                        .set(sprint, true);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                try {
                     Object allowInventory = settings.getClass()
                         .getField("allowInventory")
                         .get(settings);
@@ -350,8 +358,13 @@ public final class BaritoneNavigationBridge {
     public void setSprinting(boolean sprint) {
         if (inputHandler != null && inputHandlerApi != null && clickSprint != null) {
             try {
-                inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
-                    .invoke(inputHandler, clickSprint, sprint);
+                for (java.lang.reflect.Method m : inputHandlerApi.getMethods()) {
+                    if ("setInputForceState".equals(m.getName()) && m.getParameterTypes().length == 2
+                        && m.getParameterTypes()[1] == boolean.class) {
+                        m.invoke(inputHandler, clickSprint, sprint);
+                        break;
+                    }
+                }
             } catch (ReflectiveOperationException | LinkageError ignored) {}
         }
     }
@@ -374,8 +387,13 @@ public final class BaritoneNavigationBridge {
             if (inputHandler != null && inputHandlerApi != null) {
                 try {
                     if (clickSprint != null) {
-                        inputHandlerApi.getMethod("setInputForceState", clickSprint.getClass(), boolean.class)
-                            .invoke(inputHandler, clickSprint, false);
+                        for (java.lang.reflect.Method m : inputHandlerApi.getMethods()) {
+                            if ("setInputForceState".equals(m.getName()) && m.getParameterTypes().length == 2
+                                && m.getParameterTypes()[1] == boolean.class) {
+                                m.invoke(inputHandler, clickSprint, false);
+                                break;
+                            }
+                        }
                     }
                     inputHandlerApi.getMethod("clearAllKeys")
                         .invoke(inputHandler);

@@ -141,12 +141,18 @@ public class ExplorerMiningDriver {
         double aimZ = aimPoint.zCoord - mc.thePlayer.posZ;
         float yaw = (float) (Math.atan2(aimZ, aimX) * 180D / Math.PI) - 90F;
         float pitch = (float) (-Math.atan2(aimY, Math.sqrt(aimX * aimX + aimZ * aimZ)) * 180D / Math.PI);
-        explorer.look(yaw, pitch);
+        mc.thePlayer.rotationYaw = yaw;
+        mc.thePlayer.rotationPitch = pitch;
+        explorer.clearAim();
         net.minecraft.util.MovingObjectPosition hit = mc.objectMouseOver;
         boolean matches = hit != null && hit.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
             && hit.blockX == mineX
             && hit.blockY == mineY
             && hit.blockZ == mineZ;
+        if (!matches) {
+            hit = com.kyroxova.lootgamesolver.minecraft.LootGamesInteractionHelper.visibleTarget(mc, mineX, mineY, mineZ);
+            if (hit != null) matches = true;
+        }
         float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
         if (!explorer.miningAim.ready(
             mineX,

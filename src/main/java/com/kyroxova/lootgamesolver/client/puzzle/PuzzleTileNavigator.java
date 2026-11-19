@@ -57,12 +57,7 @@ public final class PuzzleTileNavigator {
             tried.clear();
         }
         if (reachable) {
-            if (arrivedAtGoal) {
-                if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
-                    && !net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint))
-                    mc.thePlayer.setSprinting(false);
-                stopRoute();
-            }
+            stopRoute();
             return true;
         }
         if (goal != null) {
@@ -112,13 +107,11 @@ public final class PuzzleTileNavigator {
             candidates.add(candidate);
         }
         candidates.sort((a, b) -> {
-            double distA = Math.hypot(a[0] + 0.5D - target[0] - 0.5D, a[2] + 0.5D - target[2] - 0.5D);
-            double distB = Math.hypot(b[0] + 0.5D - target[0] - 0.5D, b[2] + 0.5D - target[2] - 0.5D);
-            int comp = Double.compare(Math.abs(distA - 1.5D), Math.abs(distB - 1.5D));
-            if (comp != 0) return comp;
-            return Double.compare(
-                mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1], a[2] + 0.5D),
-                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1], b[2] + 0.5D));
+            double targetDistA = Math.hypot(a[0] + 0.5D - target[0] - 0.5D, a[2] + 0.5D - target[2] - 0.5D);
+            double targetDistB = Math.hypot(b[0] + 0.5D - target[0] - 0.5D, b[2] + 0.5D - target[2] - 0.5D);
+            double playerDistA = mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1], a[2] + 0.5D);
+            double playerDistB = mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1], b[2] + 0.5D);
+            return Double.compare(playerDistA + targetDistA * targetDistA * 2.0D, playerDistB + targetDistB * targetDistB * 2.0D);
         });
         for (int[] candidate : candidates) {
             BaritoneNavigationBridge.Start result = navigation
