@@ -24,6 +24,7 @@ public final class LootGameSolverConfig {
     public static int explorationSearchLimit = 400;
     public static boolean explorationEnabled = true;
     public static boolean staircaseEnabled = true;
+    public static boolean caveMode = false;
     public static int spiralWidth = 3;
     public static boolean discardAllMinedOres = true;
     public static String[] discardOreItems = new String[0];
@@ -45,6 +46,11 @@ public final class LootGameSolverConfig {
         enabled = cfg.getBoolean("enabled", Configuration.CATEGORY_GENERAL, enabled, "Master switch.");
         explorationEnabled = cfg
             .getBoolean("enabled", "explorationBeta", true, "Enable experimental nearby finder and walking.");
+        caveMode = cfg.getBoolean(
+            "caveMode",
+            "explorationBeta",
+            false,
+            "Allow Explorer to travel through caves between structures.");
         staircaseEnabled = cfg.getBoolean(
             "staircaseEnabled",
             "explorationBeta",
@@ -112,6 +118,15 @@ public final class LootGameSolverConfig {
         if (configuration != null) {
             configuration.get("display", "showOverlay", true)
                 .set(visible);
+            configuration.save();
+        }
+    }
+
+    public static void setCaveMode(boolean enabled) {
+        caveMode = enabled;
+        if (configuration != null) {
+            configuration.get("explorationBeta", "caveMode", false)
+                .set(enabled);
             configuration.save();
         }
     }

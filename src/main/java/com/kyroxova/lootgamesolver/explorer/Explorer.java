@@ -438,6 +438,35 @@ public class Explorer {
         }
     }
 
+    public void refreshTravelMode(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
+        if (!LootGameSolverConfig.caveMode && (baritoneCoordinator.searchMove || baritoneCoordinator.preRouting)) {
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            if (mc.theWorld.getHeightValue(x, z) - y > 6) {
+                baritoneNavigation.stop();
+                baritoneCoordinator.reset();
+                if (!baritoneCoordinator.beginSurfaceExit(mc, this, false))
+                    stop(mc, "No safe surface destination found");
+                return;
+            }
+        }
+        if (baritoneCoordinator.searchMove) {
+            int x = baritoneCoordinator.searchX, z = baritoneCoordinator.searchZ;
+            baritoneNavigation.stop();
+            baritoneCoordinator.reset();
+            baritoneCoordinator.searchX = x;
+            baritoneCoordinator.searchZ = z;
+            baritoneCoordinator.searchMove = true;
+            baritoneCoordinator.searchNext = true;
+            baritoneCoordinator.searchHandoff = true;
+        } else if (baritoneCoordinator.structureMove && baritoneCoordinator.preRouting && target != null) {
+            baritoneNavigation.stop();
+            baritoneCoordinator.reset();
+            routeToStructure(mc);
+        }
+    }
+
     public boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
         return puzzleCenter.moveToPuzzleCenter(mc, this, center);
     }
@@ -906,7 +935,9 @@ public class Explorer {
         if (target == null || mc == null || mc.thePlayer == null || mc.theWorld == null) return;
         rememberBaritoneReturnPoint(mc);
         double playerY = mc.thePlayer.boundingBox.minY;
-        if (playerY > target.yCoord + 5) {
+        double horizontal = Math
+            .hypot(mc.thePlayer.posX - target.xCoord - 0.5D, mc.thePlayer.posZ - target.zCoord - 0.5D);
+        if (playerY > target.yCoord + 5 || (!LootGameSolverConfig.caveMode && horizontal > 6D)) {
             BaritoneNavigationBridge.Start start = baritoneNavigation.startHorizontal(target.xCoord, target.zCoord);
             if (start == BaritoneNavigationBridge.Start.STARTED) {
                 baritoneCoordinator.structureMove = true;
@@ -1162,6 +1193,13 @@ public class Explorer {
         entranceCandidates.clear();
         scan(mc);
         if (target == null) {
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            if (!LootGameSolverConfig.caveMode && mc.theWorld.getHeightValue(x, z) - y > 6) {
+                if (!baritoneCoordinator.beginSurfaceExit(mc, this, false))
+                    stop(mc, "No safe surface destination found");
+                return;
+            }
             int[] next = search.next();
             if (next != null) {
                 BaritoneNavigationBridge.Start started = baritoneNavigation.startHorizontal(next[0], next[1]);
@@ -2793,7 +2831,7 @@ public class Explorer {
         return new ExplorerWalkingTerrain(
             terrainWorld,
             blockedWalkNodes,
-            surfaceStart,
+            surfaceStart && !LootGameSolverConfig.caveMode,
             protectedJourney,
             structureApproach,
             gx,

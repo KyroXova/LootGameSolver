@@ -28,6 +28,12 @@ public class StorageCommandTest {
         assertTrue(set.contains("setWarp"));
         assertTrue(set.contains("setChest"));
         assertTrue(set.contains("setStorage"));
+        assertTrue(
+            command.addTabCompletionOptions(null, new String[] { "caveMode", "" })
+                .contains("on"));
+        assertTrue(
+            command.addTabCompletionOptions(null, new String[] { "caveMode", "" })
+                .contains("off"));
         assertEquals(
             1,
             command.addTabCompletionOptions(null, new String[] { "help", "res" })

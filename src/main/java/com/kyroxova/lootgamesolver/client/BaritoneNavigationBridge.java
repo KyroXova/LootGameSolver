@@ -10,6 +10,23 @@ import net.minecraft.client.Minecraft;
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
 public final class BaritoneNavigationBridge {
 
+    public static void disableChatCommands() {
+        try {
+            Object settings = Class.forName("baritone.api.BaritoneAPI")
+                .getMethod("getSettings")
+                .invoke(null);
+            Object setting = settings.getClass()
+                .getField("embeddedChatDisabled")
+                .get(settings);
+            setting.getClass()
+                .getField("value")
+                .set(setting, true);
+        } catch (ReflectiveOperationException | LinkageError failure) {
+            com.kyroxova.lootgamesolver.LootGameSolver.LOG
+                .warn("Could not disable embedded Baritone chat commands", failure);
+        }
+    }
+
     public enum Start {
         STARTED,
         ABSENT,
@@ -98,6 +115,12 @@ public final class BaritoneNavigationBridge {
             try {
                 Object settings = api.getMethod("getSettings")
                     .invoke(null);
+                Object surfaceOnly = settings.getClass()
+                    .getField("surfaceOnly")
+                    .get(settings);
+                surfaceOnly.getClass()
+                    .getField("value")
+                    .set(surfaceOnly, kind == 2 && !com.kyroxova.lootgamesolver.config.LootGameSolverConfig.caveMode);
                 Object allowPlace = settings.getClass()
                     .getField("allowPlace")
                     .get(settings);

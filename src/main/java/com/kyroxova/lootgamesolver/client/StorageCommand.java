@@ -18,7 +18,7 @@ import com.kyroxova.lootgamesolver.explorer.Explorer;
 public final class StorageCommand extends CommandBase {
 
     private static final String[] SUBCOMMANDS = { "help", "setHome", "setWarp", "setChest", "setStorage", "clearChest",
-        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot" };
+        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot", "caveMode" };
 
     @Override
     public String getCommandName() {
@@ -32,7 +32,7 @@ public final class StorageCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/lgs help [command] | setHome | setWarp <name> | setChest | setStorage [name] | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
+        return "/lgs help [command] | caveMode [on|off|status] | setHome | setWarp <name> | setChest | setStorage [name] | clearChest | clearChests | clearWarp | clearStorage | enable | disable | storageStatus | resumeLoot";
     }
 
     @Override
@@ -45,6 +45,8 @@ public final class StorageCommand extends CommandBase {
         if (args == null || args.length == 0) return new ArrayList<String>();
         if (args.length == 1 || (args.length == 2 && "help".equalsIgnoreCase(args[0])))
             return getListOfStringsMatchingLastWord(args, SUBCOMMANDS);
+        if (args.length == 2 && "caveMode".equalsIgnoreCase(args[0]))
+            return getListOfStringsMatchingLastWord(args, "on", "off", "status");
         return new ArrayList<String>();
     }
 
@@ -68,6 +70,18 @@ public final class StorageCommand extends CommandBase {
                 reply(sender, "Commands (use /lgs help <command> for details):");
                 for (String command : SUBCOMMANDS) reply(sender, commandHelp(command));
             }
+        } else if ("caveMode".equalsIgnoreCase(args[0])) {
+            if (args.length == 2 && ("on".equalsIgnoreCase(args[1]) || "off".equalsIgnoreCase(args[1]))) {
+                LootGameSolverConfig.setCaveMode("on".equalsIgnoreCase(args[1]));
+                ClientHooks.requestTravelModeRefresh();
+            } else if (args.length != 1 && !(args.length == 2 && "status".equalsIgnoreCase(args[1]))) {
+                reply(sender, commandHelp("caveMode"));
+                return;
+            }
+            reply(
+                sender,
+                "Cave mode " + (LootGameSolverConfig.caveMode ? "enabled: cave travel allowed."
+                    : "disabled: Explorer travels near the surface."));
         } else if ("enable".equalsIgnoreCase(args[0]) || "disable".equalsIgnoreCase(args[0])) {
             boolean enable = "enable".equalsIgnoreCase(args[0]);
             LootGameSolverConfig.setStorageEnabled(enable);
@@ -167,6 +181,8 @@ public final class StorageCommand extends CommandBase {
     static String commandHelp(String command) {
         if (command == null) return null;
         switch (command.toLowerCase(java.util.Locale.ROOT)) {
+            case "cavemode":
+                return "/lgs caveMode [on|off|status] - Allow cave travel or prefer surface routes; structure access remains allowed.";
             case "help":
                 return "/lgs help [command] - List commands or describe one command.";
             case "sethome":

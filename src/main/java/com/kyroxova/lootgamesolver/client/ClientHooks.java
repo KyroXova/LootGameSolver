@@ -30,6 +30,11 @@ import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent;
 public final class ClientHooks {
 
     private static boolean resumeLootRequested;
+    private static boolean travelModeRefreshRequested;
+
+    static void requestTravelModeRefresh() {
+        travelModeRefreshRequested = true;
+    }
 
     static void requestResumeLoot() {
         resumeLootRequested = true;
@@ -225,6 +230,10 @@ public final class ClientHooks {
     @SubscribeEvent
     public void clientTick(ClientTickEvent event) {
         if (event.phase != cpw.mods.fml.common.gameevent.TickEvent.Phase.END) return;
+        if (travelModeRefreshRequested && exploration != null && !automationPaused) {
+            travelModeRefreshRequested = false;
+            exploration.refreshTravelMode(Minecraft.getMinecraft());
+        }
 
         Minecraft mc = Minecraft.getMinecraft();
         checkKeyToggles();
