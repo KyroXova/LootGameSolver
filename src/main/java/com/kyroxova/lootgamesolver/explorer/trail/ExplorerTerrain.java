@@ -145,13 +145,15 @@ public final class ExplorerTerrain {
         net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
         if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
         if (box != null && box.maxY >= y + 0.05D
+            && (box.maxY < y + 1D || at == net.minecraft.init.Blocks.snow_layer)
             && box.minX < x + 0.5D
             && box.maxX > x + 0.5D
             && box.minZ < z + 0.5D
             && box.maxZ > z + 0.5D) return box.maxY;
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
         if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
-            || below == net.minecraft.init.Blocks.ice || below == net.minecraft.init.Blocks.packed_ice) return y;
+            || below == net.minecraft.init.Blocks.ice || below == net.minecraft.init.Blocks.packed_ice
+            || below == net.minecraft.init.Blocks.snow) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
         if (belowBox != null && belowBox.maxY >= y
             && belowBox.minX < x + 0.5D
