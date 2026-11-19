@@ -584,14 +584,8 @@ public class Explorer {
             return;
         }
 
-        List<int[]> currentRoute = null;
-        if (baritoneCoordinator.active() && !baritoneCoordinator.routePreview.isEmpty()) {
-            currentRoute = baritoneCoordinator.routePreview;
-        } else if (!route.isEmpty()) {
-            currentRoute = route;
-        }
-        if (currentRoute != null && currentRoute.size() >= 2) {
-            Float lookHeading = NavigationSteering.pathLookHeading(currentRoute, mc.thePlayer.posX, mc.thePlayer.posZ);
+        if (!route.isEmpty() && route.size() >= 2) {
+            Float lookHeading = NavigationSteering.pathLookHeading(route, mc.thePlayer.posX, mc.thePlayer.posZ);
             if (lookHeading != null) {
                 camera.look(lookHeading, 0F);
             }

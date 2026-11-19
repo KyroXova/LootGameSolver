@@ -28,31 +28,44 @@ public final class NavigationSteering {
     }
 
     public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
-        return baritoneActive && (interacting || attacking || cooldown > 0);
+        return baritoneActive;
     }
 
     public static Float pathLookHeading(java.util.List<int[]> route, double posX, double posZ) {
         if (route == null || route.size() < 2) return null;
+        int closestIdx = 0;
+        double minDistSq = Double.MAX_VALUE;
         for (int i = 0; i < route.size(); i++) {
             int[] point = route.get(i);
             double dx = point[0] + 0.5D - posX;
             double dz = point[2] + 0.5D - posZ;
             double distSq = dx * dx + dz * dz;
-            if (distSq >= 0.8D) {
-                int nextIdx = Math.min(i + 1, route.size() - 1);
-                int[] nextPoint = route.get(nextIdx);
-                double tx = (point[0] + nextPoint[0]) * 0.5D + 0.5D;
-                double tz = (point[2] + nextPoint[2]) * 0.5D + 0.5D;
-                return (float) Math.toDegrees(Math.atan2(tz - posZ, tx - posX)) - 90F;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                closestIdx = i;
             }
         }
-        int[] last = route.get(route.size() - 1);
-        double dx = last[0] + 0.5D - posX;
-        double dz = last[2] + 0.5D - posZ;
-        if (dx * dx + dz * dz >= 0.25D) {
-            return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+        int targetIdx = Math.min(closestIdx + 1, route.size() - 1);
+        if (targetIdx == closestIdx && closestIdx > 0) {
+            int[] prev = route.get(closestIdx - 1);
+            int[] curr = route.get(closestIdx);
+            double dx = curr[0] - prev[0];
+            double dz = curr[2] - prev[2];
+            if (dx * dx + dz * dz > 0.01D) {
+                return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
+            }
+            return null;
         }
-        return null;
+        int[] target = route.get(targetIdx);
+        double dx = target[0] + 0.5D - posX;
+        double dz = target[2] + 0.5D - posZ;
+        if (dx * dx + dz * dz < 0.09D && targetIdx + 1 < route.size()) {
+            target = route.get(targetIdx + 1);
+            dx = target[0] + 0.5D - posX;
+            dz = target[2] + 0.5D - posZ;
+        }
+        if (dx * dx + dz * dz < 0.01D) return null;
+        return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90F;
     }
 
     public static Float walkingHeading(double vx, double vz, float fallback, java.util.List<int[]> route) {

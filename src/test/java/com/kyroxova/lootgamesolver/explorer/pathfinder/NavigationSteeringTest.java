@@ -43,7 +43,7 @@ public class NavigationSteeringTest {
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, true, false, 0));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 3));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, true, 0));
-        assertFalse(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
+        assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 0));
         assertFalse(NavigationSteering.yieldCameraToBaritone(false, true, true, 3));
     }
 
@@ -60,6 +60,16 @@ public class NavigationSteeringTest {
         Float northHeading = NavigationSteering.pathLookHeading(north, 0.5D, 0.5D);
         org.junit.Assert.assertNotNull(northHeading);
         assertEquals(-180F, northHeading.floatValue(), 1.0F);
+
+        // Player moving along route: does not look backwards at passed nodes
+        java.util.List<int[]> multiStep = java.util.Arrays.asList(
+            new int[] { 0, 64, 0 },
+            new int[] { 0, 64, 5 },
+            new int[] { 0, 64, 10 });
+        // Player is at (0.5, 5.2), moving towards (0, 64, 10)
+        Float forwardHeading = NavigationSteering.pathLookHeading(multiStep, 0.5D, 5.2D);
+        org.junit.Assert.assertNotNull(forwardHeading);
+        assertEquals(0F, forwardHeading.floatValue(), 1.0F); // Facing South (+Z), not North (-Z)
     }
 
     @Test
