@@ -43,6 +43,7 @@ final class RewardChestLooter {
 
     private final boolean[] backpackTried = new boolean[36];
     private final boolean[] slotRejectedForCurrentBag = new boolean[36];
+    private final List<ItemStack> itemRejectedForCurrentBag = new ArrayList<ItemStack>();
     private final InventoryToolTransfer backpackTransfer = new InventoryToolTransfer();
     private final MiningAimGate chestAim = new MiningAimGate();
     private final LootedChestStore lootedChests = new LootedChestStore(
@@ -523,7 +524,9 @@ final class RewardChestLooter {
             status = "Facing reward chest";
             return;
         }
-        net.minecraft.util.MovingObjectPosition aimed = mc.objectMouseOver;
+        Vec3 look = mc.thePlayer.getLook(1.0F);
+        net.minecraft.util.MovingObjectPosition aimed = mc.theWorld
+            .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
         boolean matches = aimed != null
             && aimed.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK
             && aimed.blockX == pos[0]
@@ -634,6 +637,7 @@ final class RewardChestLooter {
             restoreBackpackAim(mc, exploration);
             packOpening = true;
             java.util.Arrays.fill(slotRejectedForCurrentBag, false);
+            itemRejectedForCurrentBag.clear();
             openWait = 0;
             waiting = 5;
             return;
@@ -676,7 +680,7 @@ final class RewardChestLooter {
                 if (sourceChanged && bagCount > packPendingBagCount) {
                     packMoved = true;
                 } else if (sourceChanged) {
-                    java.util.Arrays.fill(slotRejectedForCurrentBag, true);
+                    itemRejectedForCurrentBag.add(packPendingStack.copy());
                 } else {
                     if (pending != null && pending.inventory == mc.thePlayer.inventory) {
                         int playerSlot = pending.getSlotIndex();
@@ -695,6 +699,7 @@ final class RewardChestLooter {
                 if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0
                     || playerSlot >= 36
                     || slotRejectedForCurrentBag[playerSlot]
+                    || rejectedForBag(stack)
                     || !isPackable(mc, playerSlot, stack)) continue;
                 if (!slot.canTakeStack(mc.thePlayer)) continue;
                 if (!backpackHasSpace(container, mc, stack)) {
@@ -844,6 +849,7 @@ final class RewardChestLooter {
         if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
         packOpening = true;
         java.util.Arrays.fill(slotRejectedForCurrentBag, false);
+        itemRejectedForCurrentBag.clear();
         openWait = 0;
         waiting = 5;
     }
@@ -894,6 +900,14 @@ final class RewardChestLooter {
         return false;
     }
 
+    private boolean rejectedForBag(ItemStack stack) {
+        if (stack == null) return false;
+        for (ItemStack rejected : itemRejectedForCurrentBag) {
+            if (rejected.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(rejected, stack)) return true;
+        }
+        return false;
+    }
+
     private static int backpackItemCount(Container container, Minecraft mc, ItemStack stack) {
         if (stack == null) return 0;
         int count = 0;
@@ -912,7 +926,14 @@ final class RewardChestLooter {
         if (temporaryBag && slotIndex == bagSource) return false;
         if (InventoryProtection.bag(stack)) return false;
         if (ExplorerSustain.isHealingAxe(stack)) return false;
-        if (InventoryProtection.essential(stack)) return false;
+        boolean healingAxe = false;
+        for (int i = 0; i < 36; i++) {
+            if (ExplorerSustain.isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
+                healingAxe = true;
+                break;
+            }
+        }
+        if (InventoryProtection.essentialForPacking(stack, baseline, slotIndex, healingAxe)) return false;
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
         if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())

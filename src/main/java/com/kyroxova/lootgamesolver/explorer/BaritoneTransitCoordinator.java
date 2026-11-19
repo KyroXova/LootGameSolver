@@ -257,16 +257,16 @@ public final class BaritoneTransitCoordinator {
                     surfaceLastY = mc.thePlayer.posY;
                     surfaceLastZ = mc.thePlayer.posZ;
                     surfaceStallTicks = 0;
-                } else surfaceStallTicks++;
+                } else
+                    surfaceStallTicks = surfaceIdleTicks(surfaceStallTicks, explorer.baritoneNavigation.isBreaking());
                 if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING
-                    && surfaceStallTicks < 600) return true;
+                    && surfaceStallTicks < 160) return true;
                 explorer.baritoneNavigation.stop();
                 surfaceStallTicks = 0;
                 surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
                 if (surfaceGoal == null || routeFailures >= 3) {
                     surfaceMove = false;
-                    if (explorer.insideDungeonRoom(mc) && LootGameSolverConfig.staircaseEnabled
-                        && explorer.beginDiggingToSurface(mc)) return true;
+                    if (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingToSurface(mc)) return true;
                     explorer.stop(mc, "No safe surface route found");
                 } else {
                     surfaceWaiting = true;
@@ -556,5 +556,9 @@ public final class BaritoneTransitCoordinator {
     static boolean nearShoreGoal(int x, int y, int z, int[] goal) {
         int dx = x - goal[0], dz = z - goal[2];
         return dx * dx + dz * dz <= 2 && Math.abs(y - goal[1]) <= 1;
+    }
+
+    static int surfaceIdleTicks(int ticks, boolean breaking) {
+        return breaking ? 0 : ticks + 1;
     }
 }

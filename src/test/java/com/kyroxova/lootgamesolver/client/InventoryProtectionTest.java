@@ -20,4 +20,22 @@ public class InventoryProtectionTest {
         assertFalse(InventoryProtection.bag(new ItemStack(new LootBagItem())));
         assertTrue(InventoryProtection.bag(new ItemStack(new BackpackItem())));
     }
+
+    @Test
+    public void packingKeepsCarriedDurableGearButAcceptsFramesAndNewDurableLoot() {
+        ItemStack frame = new ItemStack(new forestry.apiculture.items.ItemHiveFrame());
+        ItemStack gear = new ItemStack(new Item().setMaxDamage(100));
+        ItemStack loot = new ItemStack(new Item().setMaxDamage(100));
+        ItemStack[] contents = new ItemStack[36];
+        contents[10] = frame;
+        contents[11] = gear;
+        InventoryBaseline baseline = new InventoryBaseline(contents);
+        assertFalse(InventoryProtection.essentialForPacking(frame, baseline, 10, false));
+        assertTrue(InventoryProtection.essentialForPacking(gear, baseline, 11, false));
+        assertFalse(InventoryProtection.essentialForPacking(loot, baseline, 12, false));
+        assertTrue(InventoryProtection.essentialForPacking(loot, baseline, 2, false));
+        ItemStack food = new ItemStack(new net.minecraft.item.ItemFood(1, false));
+        assertTrue(InventoryProtection.essentialForPacking(food, baseline, 12, false));
+        assertFalse(InventoryProtection.essentialForPacking(food, baseline, 12, true));
+    }
 }

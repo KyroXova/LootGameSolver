@@ -14,14 +14,18 @@ final class RewardChestView {
     private RewardChestView() {}
 
     static net.minecraft.util.MovingObjectPosition visibleChest(Minecraft mc, Vec3 eye, int[] pos) {
-        double[] offsets = { 0.2D, 0.5D, 0.8D };
-        for (double y : offsets) for (double x : offsets) for (double z : offsets) {
+        double[] offsets = { 0.5D, 0.3D, 0.7D };
+        net.minecraft.util.MovingObjectPosition side = null;
+        for (double y : new double[] { 0.8D, 0.5D, 0.2D }) for (double x : offsets) for (double z : offsets) {
             Vec3 point = Vec3.createVectorHelper(pos[0] + x, pos[1] + y, pos[2] + z);
             if (eye.squareDistanceTo(point) > 16D) continue;
             net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
-            if (hit != null && hit.blockX == pos[0] && hit.blockY == pos[1] && hit.blockZ == pos[2]) return hit;
+            if (hit != null && hit.blockX == pos[0] && hit.blockY == pos[1] && hit.blockZ == pos[2]) {
+                if (hit.sideHit == 1) return hit;
+                if (side == null) side = hit;
+            }
         }
-        return null;
+        return side;
     }
 
     static int[] findAndMove(Minecraft mc, Explorer exploration, int[] chest, int[] center,
