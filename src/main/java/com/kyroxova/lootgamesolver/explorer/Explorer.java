@@ -1,6 +1,38 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.*;
+import com.kyroxova.lootgamesolver.explorer.excavation.BlockPlacer;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPlanner;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationTerrain;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExplorerMiningDriver;
+import com.kyroxova.lootgamesolver.explorer.excavation.FallingBlockWaiter;
+import com.kyroxova.lootgamesolver.explorer.excavation.MiningAimGate;
+import com.kyroxova.lootgamesolver.explorer.excavation.MiningAttackInput;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.BaritoneTransitCoordinator;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ExplorerRouteFollower;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ExplorerRouteNavigator;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ExplorerRoutePlanner;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ExplorerTransitCoordinator;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationControlPolicy;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationInput;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSteering;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.OpenExitSearch;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ReturnNavigator;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.WalkPathfinder;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerChestPitNav;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerRoomCoordinator;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerRoomGeometry;
+import com.kyroxova.lootgamesolver.explorer.structure.ProgressiveSearch;
+import com.kyroxova.lootgamesolver.explorer.structure.PuzzleCenterNavigator;
+import com.kyroxova.lootgamesolver.explorer.structure.RoomEntry;
+import com.kyroxova.lootgamesolver.explorer.structure.RoomExit;
+import com.kyroxova.lootgamesolver.explorer.structure.SavedStructureFinder;
+import com.kyroxova.lootgamesolver.explorer.structure.SolvedStructureStore;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTrailCoordinator;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTrailSession;
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.*;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -19,164 +51,164 @@ import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 public class Explorer {
 
     public static final boolean ENABLED = true;
-    final List<int[]> route = new ArrayList<int[]>();
-    World world;
-    SavedStructureFinder savedFinder;
-    TileEntity target;
-    int ticks;
-    int stalled;
-    int stallRecoveries;
-    final java.util.Set<Long> blockedWalkNodes = new java.util.LinkedHashSet<Long>();
-    double lastDistance = Double.MAX_VALUE;
-    boolean walking;
-    boolean digging;
-    int savedSlot = -1;
-    int digTicks;
-    final FallingBlockWaiter fallingBlocks = new FallingBlockWaiter();
-    int toolWaitTicks;
-    boolean waitingForTool;
-    String status = "Scanning loaded terrain";
-    ProgressiveSearch search;
-    boolean searching;
-    NavigationInput navigationInput;
-    int stairX;
-    int stairZ;
-    int stairSteps;
-    boolean seekingDryEntrance;
-    boolean entranceSelected;
-    final List<int[]> entranceCandidates = new ArrayList<int[]>();
-    int entranceCandidate;
-    double segmentX;
-    double segmentZ;
-    final MiningAimGate miningAim = new MiningAimGate();
+    public final List<int[]> route = new ArrayList<int[]>();
+    public World world;
+    public SavedStructureFinder savedFinder;
+    public TileEntity target;
+    public int ticks;
+    public int stalled;
+    public int stallRecoveries;
+    public final java.util.Set<Long> blockedWalkNodes = new java.util.LinkedHashSet<Long>();
+    public double lastDistance = Double.MAX_VALUE;
+    public boolean walking;
+    public boolean digging;
+    public int savedSlot = -1;
+    public int digTicks;
+    public final FallingBlockWaiter fallingBlocks = new FallingBlockWaiter();
+    public int toolWaitTicks;
+    public boolean waitingForTool;
+    public String status = "Scanning loaded terrain";
+    public ProgressiveSearch search;
+    public boolean searching;
+    public NavigationInput navigationInput;
+    public int stairX;
+    public int stairZ;
+    public int stairSteps;
+    public boolean seekingDryEntrance;
+    public boolean entranceSelected;
+    public final List<int[]> entranceCandidates = new ArrayList<int[]>();
+    public int entranceCandidate;
+    public double segmentX;
+    public double segmentZ;
+    public final MiningAimGate miningAim = new MiningAimGate();
 
-    final ExplorerSustain sustain = new ExplorerSustain();
-    int settlingTicks;
-    ExcavationPathfinder excavationSearch;
-    int[] roofEscapeGoal;
-    final List<int[]> excavationRoute = new ArrayList<int[]>();
-    final List<int[]> rejectedSteps = new ArrayList<int[]>();
-    final List<int[]> navigationPreview = new ArrayList<int[]>();
+    public final ExplorerSustain sustain = new ExplorerSustain();
+    public int settlingTicks;
+    public ExcavationPathfinder excavationSearch;
+    public int[] roofEscapeGoal;
+    public final List<int[]> excavationRoute = new ArrayList<int[]>();
+    public final List<int[]> rejectedSteps = new ArrayList<int[]>();
+    public final List<int[]> navigationPreview = new ArrayList<int[]>();
     private int[] previewHead;
     private int previewSize = -1;
-    int excavationReplans;
-    int exitRecoveryTicks;
-    int exitRecoveryAttempts;
-    OpenExitSearch openExitSearch;
-    boolean followingOpenExit;
-    final ExplorerCamera camera = new ExplorerCamera();
-    int searchGoalX, searchGoalZ;
-    int[] extendedFrom;
-    int approachAttempts;
-    int[] knownStructure;
-    boolean roomWorkActive;
-    ExcavationPathfinder approachPlan;
-    int[] approachAnchor;
-    boolean approachReady;
-    final InventoryToolTransfer toolTransfer = new InventoryToolTransfer();
-    final BlockPlacer blockPlacer = new BlockPlacer(toolTransfer, camera);
-    final MiningAttackInput miningAttack = new MiningAttackInput();
-    long miningTarget = Long.MIN_VALUE;
-    int miningSlot = -1;
-    int aimTicks;
-    final ExplorerTrailSession trail = new ExplorerTrailSession(
+    public int excavationReplans;
+    public int exitRecoveryTicks;
+    public int exitRecoveryAttempts;
+    public OpenExitSearch openExitSearch;
+    public boolean followingOpenExit;
+    public final ExplorerCamera camera = new ExplorerCamera();
+    public int searchGoalX, searchGoalZ;
+    public int[] extendedFrom;
+    public int approachAttempts;
+    public int[] knownStructure;
+    public boolean roomWorkActive;
+    public ExcavationPathfinder approachPlan;
+    public int[] approachAnchor;
+    public boolean approachReady;
+    public final InventoryToolTransfer toolTransfer = new InventoryToolTransfer();
+    public final BlockPlacer blockPlacer = new BlockPlacer(toolTransfer, camera);
+    public final MiningAttackInput miningAttack = new MiningAttackInput();
+    public long miningTarget = Long.MIN_VALUE;
+    public int miningSlot = -1;
+    public int aimTicks;
+    public final ExplorerTrailSession trail = new ExplorerTrailSession(
         new File(new File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"), "access-trails.json"));
-    boolean returning, returnAvailable;
-    int cameraPitchDirection;
-    int pitchLastY;
-    double pitchLandingX, pitchLandingZ;
-    int miningCameraCooldownTicks;
-    int inventoryMiningCooldownTicks;
-    boolean returnDigging;
-    TileEntity returnOriginalTarget;
-    List<int[]> returnAfterDig;
-    boolean returnDigResumeSearch;
-    boolean rejoiningSavedTrail;
-    int returnJoinX, returnJoinY, returnJoinZ;
-    List<int[]> returnDigSource;
-    int returnDigAnchorIndex;
-    final ExplorerRoomGeometry roomGeometry = new ExplorerRoomGeometry();
-    String excavationMode = "Access route";
-    int routeRetryTicks;
-    String routeRetryStatus = "";
-    int[] entrySurfacePoint;
-    final ExplorerRouteFollower routeFollower = new ExplorerRouteFollower();
-    boolean escapingChestPit;
-    final ExplorerChestPitNav chestPitNav = new ExplorerChestPitNav();
-    final RoomEntry roomEntry = new RoomEntry();
-    final RoomExit roomExit = new RoomExit();
-    final WalkPathfinder walkPathfinder = new WalkPathfinder();
-    final PuzzleCenterNavigator puzzleCenter = new PuzzleCenterNavigator();
-    final ExcavationPlanner excavationPlanner = new ExcavationPlanner();
-    final ReturnNavigator returnNav = new ReturnNavigator();
-    final List<int[]> staircaseDugPath = new ArrayList<int[]>();
-    int entranceSurfaceY = 64;
-    boolean resumeSearchAfterReturn;
-    List<int[]> roomExitCandidates;
-    int roomExitCandidateIndex;
-    int[] activeRoomExit;
-    boolean roomExitPlanning;
-    boolean roomExitNeedsResume;
-    boolean roomExitCrossing;
-    int roomExitJumpRetries;
+    public boolean returning, returnAvailable;
+    public int cameraPitchDirection;
+    public int pitchLastY;
+    public double pitchLandingX, pitchLandingZ;
+    public int miningCameraCooldownTicks;
+    public int inventoryMiningCooldownTicks;
+    public boolean returnDigging;
+    public TileEntity returnOriginalTarget;
+    public List<int[]> returnAfterDig;
+    public boolean returnDigResumeSearch;
+    public boolean rejoiningSavedTrail;
+    public int returnJoinX, returnJoinY, returnJoinZ;
+    public List<int[]> returnDigSource;
+    public int returnDigAnchorIndex;
+    public final ExplorerRoomGeometry roomGeometry = new ExplorerRoomGeometry();
+    public String excavationMode = "Access route";
+    public int routeRetryTicks;
+    public String routeRetryStatus = "";
+    public int[] entrySurfacePoint;
+    public final ExplorerRouteFollower routeFollower = new ExplorerRouteFollower();
+    public boolean escapingChestPit;
+    public final ExplorerChestPitNav chestPitNav = new ExplorerChestPitNav();
+    public final RoomEntry roomEntry = new RoomEntry();
+    public final RoomExit roomExit = new RoomExit();
+    public final WalkPathfinder walkPathfinder = new WalkPathfinder();
+    public final PuzzleCenterNavigator puzzleCenter = new PuzzleCenterNavigator();
+    public final ExcavationPlanner excavationPlanner = new ExcavationPlanner();
+    public final ReturnNavigator returnNav = new ReturnNavigator();
+    public final List<int[]> staircaseDugPath = new ArrayList<int[]>();
+    public int entranceSurfaceY = 64;
+    public boolean resumeSearchAfterReturn;
+    public List<int[]> roomExitCandidates;
+    public int roomExitCandidateIndex;
+    public int[] activeRoomExit;
+    public boolean roomExitPlanning;
+    public boolean roomExitNeedsResume;
+    public boolean roomExitCrossing;
+    public int roomExitJumpRetries;
 
-    List<int[]> roomEntryCandidates;
-    int roomEntryCandidateIndex;
-    int[] activeRoomEntry;
-    boolean roomEntryPlanning;
-    boolean roomEntryCrossing;
-    boolean roomEntrySearchNeedsResume;
-    boolean walkingSearchNeedsResume;
+    public List<int[]> roomEntryCandidates;
+    public int roomEntryCandidateIndex;
+    public int[] activeRoomEntry;
+    public boolean roomEntryPlanning;
+    public boolean roomEntryCrossing;
+    public boolean roomEntrySearchNeedsResume;
+    public boolean walkingSearchNeedsResume;
 
-    GroundPathfinder.Search walkingSearch;
-    int[] snowRecoveryTarget;
-    boolean walkingPlanFailed;
-    GroundPathfinder.Search continuationSearch;
-    final ExcavationTerrain excavationTerrain = new ExcavationTerrain();
-    int continuationX, continuationZ;
-    final SolvedStructureStore solvedStructures = new SolvedStructureStore(
+    public GroundPathfinder.Search walkingSearch;
+    public int[] snowRecoveryTarget;
+    public boolean walkingPlanFailed;
+    public GroundPathfinder.Search continuationSearch;
+    public final ExcavationTerrain excavationTerrain = new ExcavationTerrain();
+    public int continuationX, continuationZ;
+    public final SolvedStructureStore solvedStructures = new SolvedStructureStore(
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "solved-structures.json"));
-    final SolvedStructureStore blockedStructures = new SolvedStructureStore(
+    public final SolvedStructureStore blockedStructures = new SolvedStructureStore(
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "blocked-structures.json"));
-    boolean puzzleArrivalPending;
-    ExcavationPathfinder existingAccessPlan;
-    boolean planningExistingAccess;
-    boolean existingAccessChecked;
-    boolean movingToPuzzleCenter;
-    boolean movingToRewardView;
-    final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
-    final BaritoneTransitCoordinator baritoneCoordinator = new BaritoneTransitCoordinator();
-    boolean puzzleCenterArrivalPending;
-    TileEntity puzzleMasterTarget;
-    GroundPathfinder.Search returnJoinSearch;
-    List<int[]> returnTrailRoute;
-    float searchYaw;
+    public boolean puzzleArrivalPending;
+    public ExcavationPathfinder existingAccessPlan;
+    public boolean planningExistingAccess;
+    public boolean existingAccessChecked;
+    public boolean movingToPuzzleCenter;
+    public boolean movingToRewardView;
+    public final BaritoneNavigationBridge baritoneNavigation = new BaritoneNavigationBridge();
+    public final BaritoneTransitCoordinator baritoneCoordinator = new BaritoneTransitCoordinator();
+    public boolean puzzleCenterArrivalPending;
+    public TileEntity puzzleMasterTarget;
+    public GroundPathfinder.Search returnJoinSearch;
+    public List<int[]> returnTrailRoute;
+    public float searchYaw;
 
-    final ExplorerMiningDriver miningDriver = new ExplorerMiningDriver();
-    final ExplorerRoutePlanner routePlanner = new ExplorerRoutePlanner();
-    final ExplorerSearchCoordinator searchCoordinator = new ExplorerSearchCoordinator();
-    final ExplorerRouteNavigator routeNavigator = new ExplorerRouteNavigator();
-    final ExplorerGoalCoordinator goalCoordinator = new ExplorerGoalCoordinator();
-    final ExplorerRoomCoordinator roomCoordinator = new ExplorerRoomCoordinator();
-    final ExplorerTrailCoordinator trailCoordinator = new ExplorerTrailCoordinator();
-    final ExplorerTransitCoordinator transitCoordinator = new ExplorerTransitCoordinator();
-    final ExplorerSessionController sessionController = new ExplorerSessionController();
+    public final ExplorerMiningDriver miningDriver = new ExplorerMiningDriver();
+    public final ExplorerRoutePlanner routePlanner = new ExplorerRoutePlanner();
+    public final ExplorerSearchCoordinator searchCoordinator = new ExplorerSearchCoordinator();
+    public final ExplorerRouteNavigator routeNavigator = new ExplorerRouteNavigator();
+    public final ExplorerGoalCoordinator goalCoordinator = new ExplorerGoalCoordinator();
+    public final ExplorerRoomCoordinator roomCoordinator = new ExplorerRoomCoordinator();
+    public final ExplorerTrailCoordinator trailCoordinator = new ExplorerTrailCoordinator();
+    public final ExplorerTransitCoordinator transitCoordinator = new ExplorerTransitCoordinator();
+    public final ExplorerSessionController sessionController = new ExplorerSessionController();
 
     public String explorationAction() {
         return returnAvailable ? "Return" : returning ? "Stop" : "Explore";
     }
 
-    double waypointLabelY;
+    public double waypointLabelY;
 
     public double waypointLabelY() {
         return waypointLabelY;
     }
 
-    boolean reachableBoard(Minecraft mc) {
+    public boolean reachableBoard(Minecraft mc) {
         if (returning || searching
             || movingToPuzzleCenter
             || knownStructure == null
@@ -186,8 +218,8 @@ public class Explorer {
             .visibleMasterFace(mc, target.xCoord, target.yCoord, target.zCoord) != null;
     }
 
-    boolean pausedForControl;
-    boolean inventoryMaintenance;
+    public boolean pausedForControl;
+    public boolean inventoryMaintenance;
 
     public void setInventoryMaintenance(boolean active) {
         inventoryMaintenance = active;
@@ -230,7 +262,7 @@ public class Explorer {
         return knownStructure == null ? null : knownStructure.clone();
     }
 
-    void signalPuzzleArrival(Minecraft mc, String message) {
+    public void signalPuzzleArrival(Minecraft mc, String message) {
         int[] position = target != null ? new int[] { target.xCoord, target.yCoord, target.zCoord }
             : knownStructure == null ? null : knownStructure.clone();
         stop(mc, message);
@@ -304,7 +336,7 @@ public class Explorer {
         return puzzleCenter.moveToRewardView(mc, this, center);
     }
 
-    boolean reachPuzzleCenter(Minecraft mc) {
+    public boolean reachPuzzleCenter(Minecraft mc) {
         return puzzleCenter.reachPuzzleCenter(mc, this);
     }
 
@@ -352,23 +384,23 @@ public class Explorer {
         continueProgressiveSearch(mc, solved);
     }
 
-    void retryExitLater(Minecraft mc) {
+    public void retryExitLater(Minecraft mc) {
         searchCoordinator.retryExitLater(mc, this);
     }
 
-    void continueProgressiveSearch(Minecraft mc, boolean solved) {
+    public void continueProgressiveSearch(Minecraft mc, boolean solved) {
         searchCoordinator.continueProgressiveSearch(mc, this, solved);
     }
 
-    void beginAccessTrail(Minecraft mc) {
+    public void beginAccessTrail(Minecraft mc) {
         trailCoordinator.beginAccessTrail(mc, this);
     }
 
-    boolean reuseSavedAccessPath(Minecraft mc) {
+    public boolean reuseSavedAccessPath(Minecraft mc) {
         return false;
     }
 
-    boolean beginExistingAccessSearch(Minecraft mc) {
+    public boolean beginExistingAccessSearch(Minecraft mc) {
         if (!LootGameSolverConfig.staircaseEnabled || mc.thePlayer == null
             || mc.theWorld == null
             || target == null
@@ -392,100 +424,100 @@ public class Explorer {
         return true;
     }
 
-    void recordAccessPoint(int x, int y, int z) {
+    public void recordAccessPoint(int x, int y, int z) {
         trailCoordinator.recordAccessPoint(this, x, y, z);
     }
 
-    void persistAccessTrail(boolean force) {
+    public void persistAccessTrail(boolean force) {
         trailCoordinator.persistAccessTrail(this, force);
     }
 
-    void removePersistedTrail() {
+    public void removePersistedTrail() {
         trailCoordinator.removePersistedTrail(this);
     }
 
-    boolean startSavedReturn(Minecraft mc, boolean resumeSearch, int maxJoinDistance) {
+    public boolean startSavedReturn(Minecraft mc, boolean resumeSearch, int maxJoinDistance) {
         return false;
     }
 
-    boolean savedRouteWalkable(Minecraft mc, List<int[]> points) {
+    public boolean savedRouteWalkable(Minecraft mc, List<int[]> points) {
         return returnNav.savedRouteWalkable(mc, this, points);
     }
 
-    void clearReturnTransits() {
+    public void clearReturnTransits() {
         returnNav.clearReturnTransits(this);
     }
 
-    boolean startChestPitReturn(Minecraft mc, boolean resumeSearch) {
+    public boolean startChestPitReturn(Minecraft mc, boolean resumeSearch) {
         return chestPitNav.start(mc, this, resumeSearch);
     }
 
-    boolean advanceChestPitReturn(Minecraft mc) {
+    public boolean advanceChestPitReturn(Minecraft mc) {
         return chestPitNav.advance(mc, this);
     }
 
-    void clearChestPitSearch() {
+    public void clearChestPitSearch() {
         chestPitNav.reset();
         escapingChestPit = false;
     }
 
-    boolean startRoomExitSearch(Minecraft mc) {
+    public boolean startRoomExitSearch(Minecraft mc) {
         return roomCoordinator.startRoomExitSearch(mc, this);
     }
 
-    boolean startNextRoomExitSearch(Minecraft mc) {
+    public boolean startNextRoomExitSearch(Minecraft mc) {
         return roomCoordinator.startNextRoomExitSearch(mc, this);
     }
 
-    boolean startRoomEntrySearch(Minecraft mc) {
+    public boolean startRoomEntrySearch(Minecraft mc) {
         return roomCoordinator.startRoomEntrySearch(mc, this);
     }
 
-    boolean startNextRoomEntrySearch(Minecraft mc) {
+    public boolean startNextRoomEntrySearch(Minecraft mc) {
         return roomCoordinator.startNextRoomEntrySearch(mc, this);
     }
 
-    void appendRoomExitWaypoint(int[] exit, int offset) {
+    public void appendRoomExitWaypoint(int[] exit, int offset) {
         roomCoordinator.appendRoomExitWaypoint(this, exit, offset);
     }
 
-    boolean clearRoomExitObstruction(Minecraft mc, int[] next, int x, int y, int z) {
+    public boolean clearRoomExitObstruction(Minecraft mc, int[] next, int x, int y, int z) {
         return roomCoordinator.clearRoomExitObstruction(mc, this, next, x, y, z);
     }
 
-    boolean insideDungeonRoom(Minecraft mc) {
+    public boolean insideDungeonRoom(Minecraft mc) {
         return roomCoordinator.insideDungeonRoom(mc, this);
     }
 
-    boolean clearableExitColumn(World world, int x, int y, int z) {
+    public boolean clearableExitColumn(World world, int x, int y, int z) {
         return roomCoordinator.clearableExitColumn(world, this, x, y, z);
     }
 
-    boolean planRoofEscape(Minecraft mc) {
+    public boolean planRoofEscape(Minecraft mc) {
         return roomCoordinator.planRoofEscape(mc, this);
     }
 
-    boolean rerouteSavedReturn(Minecraft mc, int firstCheckpoint) {
+    public boolean rerouteSavedReturn(Minecraft mc, int firstCheckpoint) {
         return returnNav.rerouteSavedReturn(mc, this, firstCheckpoint);
     }
 
-    boolean digTowardSavedExit(Minecraft mc) {
+    public boolean digTowardSavedExit(Minecraft mc) {
         return returnNav.digTowardSavedExit(mc, this);
     }
 
-    boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
+    public boolean startReturnDig(Minecraft mc, List<int[]> savedRoute) {
         return returnNav.startReturnDig(mc, this, savedRoute);
     }
 
-    boolean planReturnDigToAnchor(Minecraft mc, int anchorIndex) {
+    public boolean planReturnDigToAnchor(Minecraft mc, int anchorIndex) {
         return returnNav.planReturnDigToAnchor(mc, this, anchorIndex);
     }
 
-    boolean tryNextReturnDigAnchor(Minecraft mc) {
+    public boolean tryNextReturnDigAnchor(Minecraft mc) {
         return returnNav.tryNextReturnDigAnchor(mc, this);
     }
 
-    void resumeSavedReturnAfterDig() {
+    public void resumeSavedReturnAfterDig() {
         returnNav.resumeSavedReturnAfterDig(this);
     }
 
@@ -583,7 +615,7 @@ public class Explorer {
         camera.clear();
     }
 
-    void rememberBaritoneReturnPoint(Minecraft mc) {
+    public void rememberBaritoneReturnPoint(Minecraft mc) {
         baritoneCoordinator.rememberReturnPoint(mc);
     }
 
@@ -723,7 +755,7 @@ public class Explorer {
         routeNavigator.advanceRoute(mc, this);
     }
 
-    void updateRoutePreview(Minecraft mc) {
+    public void updateRoutePreview(Minecraft mc) {
         int[] head = route.isEmpty() ? null : route.get(0);
         if (head != previewHead || route.size() != previewSize) {
             previewHead = head;
@@ -763,33 +795,33 @@ public class Explorer {
         }
     }
 
-    boolean jumpOutOfRewardPit(Minecraft mc) {
+    public boolean jumpOutOfRewardPit(Minecraft mc) {
         return routeNavigator.jumpOutOfRewardPit(mc, this);
     }
 
-    boolean tryPlaceReturnStep(Minecraft mc, int[] next) {
+    public boolean tryPlaceReturnStep(Minecraft mc, int[] next) {
         boolean active = blockPlacer.tryPlaceReturnStep(mc, next, returning);
         if (blockPlacer.status() != null) status = blockPlacer.status();
         return active;
     }
 
-    boolean recoverableRouteFailure(String message) {
+    public boolean recoverableRouteFailure(String message) {
         return searchCoordinator.recoverableRouteFailure(message);
     }
 
-    void queueRouteRetry(Minecraft mc, String message) {
+    public void queueRouteRetry(Minecraft mc, String message) {
         searchCoordinator.queueRouteRetry(mc, this, message);
     }
 
-    void retryCurrentRoute(Minecraft mc, String reason) {
+    public void retryCurrentRoute(Minecraft mc, String reason) {
         searchCoordinator.retryCurrentRoute(mc, this, reason);
     }
 
-    void markBlockedWalkNode(int x, int y, int z) {
+    public void markBlockedWalkNode(int x, int y, int z) {
         searchCoordinator.markBlockedWalkNode(this, x, y, z);
     }
 
-    boolean swimToNearestShore(Minecraft mc) {
+    public boolean swimToNearestShore(Minecraft mc) {
         return routeNavigator.swimToNearestShore(mc, this);
     }
 
@@ -886,37 +918,37 @@ public class Explorer {
         status = compactStatus(message);
     }
 
-    void scan(Minecraft mc) {
+    public void scan(Minecraft mc) {
         searchCoordinator.scan(mc, this);
     }
 
-    boolean nextSearchLeg(Minecraft mc) {
+    public boolean nextSearchLeg(Minecraft mc) {
         return searchCoordinator.nextSearchLeg(mc, this);
     }
 
-    GroundPathfinder.Terrain walkingTerrain(final World terrainWorld) {
+    public GroundPathfinder.Terrain walkingTerrain(final World terrainWorld) {
         return routePlanner.walkingTerrain(Minecraft.getMinecraft(), this, terrainWorld);
     }
 
-    void extendRoute(Minecraft mc) {
+    public void extendRoute(Minecraft mc) {
         routePlanner.extendRoute(mc, this);
     }
 
-    void plan(final Minecraft mc) {
+    public void plan(final Minecraft mc) {
         routePlanner.plan(mc, this);
     }
 
-    void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
+    public void singleStep(Minecraft mc, int x, int y, int z, boolean center) {
         segmentX = mc.thePlayer.posX;
         segmentZ = mc.thePlayer.posZ;
         route.add(new int[] { x, y, z, center ? 2 : 0 });
     }
 
-    void appendRoutePoint(List<int[]> points, int[] point) {
+    public void appendRoutePoint(List<int[]> points, int[] point) {
         ExplorerGeometry.appendRoutePoint(points, point);
     }
 
-    boolean beginDiggingAtCurrentPosition(Minecraft mc) {
+    public boolean beginDiggingAtCurrentPosition(Minecraft mc) {
         return excavationPlanner.beginDiggingAtCurrentPosition(mc, this);
     }
 
@@ -924,39 +956,39 @@ public class Explorer {
         return excavationPlanner.beginDiggingToSurface(mc, this);
     }
 
-    List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
+    public List<int[]> patternedAccess(Minecraft mc, int x, int y, int z) {
         return excavationPlanner.patternedAccess(mc, this, x, y, z);
     }
 
-    boolean stairStep(Minecraft mc) {
+    public boolean stairStep(Minecraft mc) {
         return excavationPlanner.stairStep(mc, this);
     }
 
-    boolean clearSnowForExcavation(Minecraft mc, int x, int y, int z) {
+    public boolean clearSnowForExcavation(Minecraft mc, int x, int y, int z) {
         return excavationPlanner.clearSnowForExcavation(mc, this, x, y, z);
     }
 
-    boolean selectDigEntrance(Minecraft mc) {
+    public boolean selectDigEntrance(Minecraft mc) {
         return excavationPlanner.selectDigEntrance(mc, this);
     }
 
-    boolean findDryEntrance(Minecraft mc) {
+    public boolean findDryEntrance(Minecraft mc) {
         return excavationPlanner.findDryEntrance(mc, this);
     }
 
-    boolean attemptStairStep(Minecraft mc, int destinationY) {
+    public boolean attemptStairStep(Minecraft mc, int destinationY) {
         return excavationPlanner.attemptStairStep(mc, this, destinationY);
     }
 
-    int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ, int destinationY) {
+    public int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ, int destinationY) {
         return excavationPlanner.foliageSupportY(w, this, x, foliageY, z, playerX, footY, playerZ, destinationY);
     }
 
-    boolean minePlannedBlock(Minecraft mc, int nx, int by, int nz, int destinationY) {
+    public boolean minePlannedBlock(Minecraft mc, int nx, int by, int nz, int destinationY) {
         return miningDriver.minePlannedBlock(mc, this, nx, by, nz, destinationY);
     }
 
-    void releaseMiningWhileSandFalls(Minecraft mc) {
+    public void releaseMiningWhileSandFalls(Minecraft mc) {
         miningDriver.releaseMiningWhileSandFalls(mc, this);
     }
 

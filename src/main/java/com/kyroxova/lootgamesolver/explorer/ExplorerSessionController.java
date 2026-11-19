@@ -1,5 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
+import com.kyroxova.lootgamesolver.explorer.excavation.BlockPlacer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationControlPolicy;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationInput;
+import com.kyroxova.lootgamesolver.explorer.structure.SavedStructureFinder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.tileentity.TileEntity;

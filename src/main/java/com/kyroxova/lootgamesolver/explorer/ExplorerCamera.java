@@ -1,9 +1,10 @@
 package com.kyroxova.lootgamesolver.explorer;
 
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSteering;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
-final class ExplorerCamera {
+public final class ExplorerCamera {
 
     private boolean active;
     private float targetYaw, targetPitch;
@@ -12,7 +13,7 @@ final class ExplorerCamera {
     private boolean force;
     private boolean smoothForced;
 
-    void render(Minecraft mc, World world, boolean walking) {
+    public void render(Minecraft mc, World world, boolean walking) {
         long nowNano = System.nanoTime();
         double seconds = lastFrame == 0 ? 1D / 60D : (nowNano - lastFrame) / 1_000_000_000D;
         lastFrame = nowNano;
@@ -39,11 +40,11 @@ final class ExplorerCamera {
         mc.thePlayer.setAngles(yaw / 0.15F, -pitch / 0.15F);
     }
 
-    void look(float yaw, float pitch) {
+    public void look(float yaw, float pitch) {
         look(yaw, pitch, false);
     }
 
-    void look(float yaw, float pitch, boolean force) {
+    public void look(float yaw, float pitch, boolean force) {
         targetYaw = yaw;
         targetPitch = pitch;
         this.force = force;
@@ -51,18 +52,18 @@ final class ExplorerCamera {
         active = true;
     }
 
-    void lookSmooth(float yaw, float pitch) {
+    public void lookSmooth(float yaw, float pitch) {
         look(yaw, pitch, true);
         smoothForced = true;
     }
 
-    void clear() {
+    public void clear() {
         active = false;
         force = false;
         smoothForced = false;
     }
 
-    void reset() {
+    public void reset() {
         active = false;
         force = false;
         smoothForced = false;

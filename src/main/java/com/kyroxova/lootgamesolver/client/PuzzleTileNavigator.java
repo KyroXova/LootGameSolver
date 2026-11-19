@@ -5,7 +5,7 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 
-import com.kyroxova.lootgamesolver.explorer.ExplorerTerrain;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
 /** Routes to a visible tile face without breaking or placing puzzle blocks. */

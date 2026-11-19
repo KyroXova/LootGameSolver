@@ -1,5 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -41,9 +42,9 @@ final class RewardChestView {
                     break;
                 }
                 if (failed
-                    || !com.kyroxova.lootgamesolver.explorer.ExplorerTerrain
+                    || !com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain
                         .puzzleCenterStandable(mc.theWorld, x, floorY + 1, z)
-                    || !com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.safe(mc.theWorld, x, floorY + 1, z))
+                    || !com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe(mc.theWorld, x, floorY + 1, z))
                     continue;
                 Vec3 eye = Vec3.createVectorHelper(x + 0.5D, floorY + 1D + mc.thePlayer.getEyeHeight(), z + 0.5D);
                 if (visibleChest(mc, eye, chest) != null) positions.add(new int[] { x, floorY, z });

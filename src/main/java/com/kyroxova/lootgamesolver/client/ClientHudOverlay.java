@@ -1,5 +1,6 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 import org.lwjgl.opengl.GL11;
 
 import net.minecraft.client.Minecraft;

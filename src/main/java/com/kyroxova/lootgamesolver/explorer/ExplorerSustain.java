@@ -25,11 +25,11 @@ public final class ExplorerSustain {
         mineDelayTicks = 50;
     }
 
-    boolean busy() {
+    public boolean busy() {
         return eating || transfer.active();
     }
 
-    boolean tick(Minecraft mc, boolean walking, boolean moving) {
+    public boolean tick(Minecraft mc, boolean walking, boolean moving) {
         if (mc.thePlayer == null || mc.theWorld == null || mc.playerController == null) return false;
         if (!walking) {
             stop(mc);
@@ -123,7 +123,7 @@ public final class ExplorerSustain {
         return -1;
     }
 
-    static boolean safeFood(String id, int metadata) {
+    public static boolean safeFood(String id, int metadata) {
         String name = id.toLowerCase(java.util.Locale.ROOT);
         if (name.equals("minecraft:golden_apple") || name.equals("minecraft:rotten_flesh")
             || name.equals("minecraft:spider_eye")
@@ -172,7 +172,7 @@ public final class ExplorerSustain {
         KeyBinding.setKeyBindState(key, physical);
     }
 
-    void stop(Minecraft mc) {
+    public void stop(Minecraft mc) {
         if (eating && mc.gameSettings != null) releaseUse(mc);
         eating = false;
         transfer.cancel(mc);

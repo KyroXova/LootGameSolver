@@ -1,6 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import static com.kyroxova.lootgamesolver.explorer.ExplorerTerrain.dryShore;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ReturnRoutePolicy;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.dryShore;
 
 import java.util.List;
 

@@ -1,6 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import static com.kyroxova.lootgamesolver.explorer.ExplorerGeometry.supportKey;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerStructureDiscovery;
+import com.kyroxova.lootgamesolver.explorer.structure.ProgressiveSearch;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;

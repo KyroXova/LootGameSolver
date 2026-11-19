@@ -2,7 +2,7 @@ package com.kyroxova.lootgamesolver.client;
 
 import net.minecraft.client.Minecraft;
 
-import com.kyroxova.lootgamesolver.explorer.ExplorerTerrain;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 
 /** Finds and centers on a supported, clear three-by-three area before setting a return warp. */
 final class ReturnWarpPositioner {

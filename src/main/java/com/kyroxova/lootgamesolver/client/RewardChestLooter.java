@@ -26,7 +26,7 @@ import net.minecraftforge.common.ChestGenHooks;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
-import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
+import com.kyroxova.lootgamesolver.explorer.excavation.MiningAimGate;
 
 final class RewardChestLooter {
 
