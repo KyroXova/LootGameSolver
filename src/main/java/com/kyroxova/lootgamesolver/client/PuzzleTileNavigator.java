@@ -15,7 +15,7 @@ final class PuzzleTileNavigator {
     private final List<int[]> tried = new ArrayList<int[]>();
     private int[] tile, goal;
     private int stalled, busyTicks;
-    private double lastX, lastY, lastZ;
+    private double lastX, lastZ;
 
     boolean moving() {
         return goal != null;
@@ -43,7 +43,7 @@ final class PuzzleTileNavigator {
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
         double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
         boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
-        if (reachable && (goal == null || withinReach(dx, dy, dz, Math.min(3D, reach))
+        if (reachable && (goal == null || navigation.state() != BaritoneNavigationBridge.State.RUNNING
             || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
             || navigation.completed())) {
             if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
@@ -63,10 +63,9 @@ final class PuzzleTileNavigator {
                 navigation.setSprinting(sprint);
                 if (sprint) mc.thePlayer.setSprinting(true);
             }
-            double mx = mc.thePlayer.posX - lastX, my = mc.thePlayer.posY - lastY, mz = mc.thePlayer.posZ - lastZ;
-            if (mx * mx + my * my + mz * mz >= 0.09D) {
+            double mx = mc.thePlayer.posX - lastX, mz = mc.thePlayer.posZ - lastZ;
+            if (mx * mx + mz * mz >= 0.09D) {
                 lastX = mc.thePlayer.posX;
-                lastY = mc.thePlayer.posY;
                 lastZ = mc.thePlayer.posZ;
                 stalled = 0;
             } else stalled++;
@@ -101,7 +100,6 @@ final class PuzzleTileNavigator {
                 stalled = 0;
                 busyTicks = 0;
                 lastX = mc.thePlayer.posX;
-                lastY = mc.thePlayer.posY;
                 lastZ = mc.thePlayer.posZ;
                 return true;
             }

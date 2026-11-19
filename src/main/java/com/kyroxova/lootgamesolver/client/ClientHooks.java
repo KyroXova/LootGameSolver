@@ -67,6 +67,7 @@ public final class ClientHooks {
     private int[] rewardCenter;
     private boolean exploreKeyHeld;
     private boolean automationPaused, pausedOnThisPress;
+    private long explorePausedAt;
     private boolean exploreHoldActionDone;
     private int exploreHoldTicks;
     private int checkpointClearDoneTicks;
@@ -92,6 +93,10 @@ public final class ClientHooks {
 
     static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused, boolean pausedOnPress) {
         return wasHeld && !holdAction && paused && !pausedOnPress;
+    }
+
+    static boolean quickExploreRecovery(long pausedAt, long now) {
+        return pausedAt > 0 && now >= pausedAt && now - pausedAt <= 2000;
     }
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
@@ -552,7 +557,9 @@ public final class ClientHooks {
         // Poll dormant board detection less often; poll every tick while solving.
         detectCounter++;
         if (session.isActive() || detectCounter % 20 == 0) {
-            session.tick(!tileNavigator.moving());
+            session.tick(
+                !tileNavigator.moving() || session.getGame() == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU
+                    || session.getGame() == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER);
         }
 
         autoPuzzle.tick(mc, puzzleBridge, exploration, session, puzzleCompletion, rewardLooter, this);
@@ -698,6 +705,7 @@ public final class ClientHooks {
                 pausedOnThisPress = false;
                 if (pauseOnExplorePress(automationPaused, active)) {
                     setAutomationPaused(mc, true);
+                    explorePausedAt = System.currentTimeMillis();
                     pausedOnThisPress = true;
                 }
             }
@@ -732,6 +740,7 @@ public final class ClientHooks {
         } else {
             if (!exploreKeyHeld && explorePressed && pauseOnExplorePress(automationPaused, active)) {
                 setAutomationPaused(mc, true);
+                explorePausedAt = System.currentTimeMillis();
                 pausedOnThisPress = true;
             }
             if (resumeOnExploreRelease(
@@ -740,6 +749,12 @@ public final class ClientHooks {
                 automationPaused,
                 pausedOnThisPress)) {
                 setAutomationPaused(mc, false);
+                if (quickExploreRecovery(explorePausedAt, System.currentTimeMillis())) {
+                    if (session.isActive()) tileNavigator.stop();
+                    else if (!rewardReturnPending && storageRecovery == null && exploration != null)
+                        exploration.recoverActiveRoute(mc);
+                }
+                explorePausedAt = 0;
             } else {
                 runExploreAction = !automationPaused && !pausedOnThisPress
                     && (exploreKeyHeld ? !exploreHoldActionDone : explorePressed);

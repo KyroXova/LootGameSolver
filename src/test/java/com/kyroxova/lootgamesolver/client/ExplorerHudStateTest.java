@@ -45,4 +45,12 @@ public class ExplorerHudStateTest {
         assertTrue(ClientHooks.resumeOnExploreRelease(true, false, true, false));
         assertFalse(ClientHooks.resumeOnExploreRelease(true, true, true, false));
     }
+
+    @Test
+    public void quickResumeRequestsRecoveryOnlyWithinTwoSeconds() {
+        assertTrue(ClientHooks.quickExploreRecovery(1000, 3000));
+        assertFalse(ClientHooks.quickExploreRecovery(1000, 3001));
+        assertFalse(ClientHooks.quickExploreRecovery(0, 1000));
+        assertFalse(ClientHooks.quickExploreRecovery(1000, 999));
+    }
 }

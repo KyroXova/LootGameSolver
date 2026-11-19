@@ -420,6 +420,24 @@ public class Explorer {
         }
     }
 
+    public void recoverActiveRoute(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
+        if (baritoneCoordinator.surfaceMove || returning) {
+            baritoneNavigation.stop();
+            baritoneCoordinator.reset();
+            route.clear();
+            returning = false;
+            if (!baritoneCoordinator.beginSurfaceExit(mc, this)) retryExitLater(mc);
+        } else if (baritoneCoordinator.structureMove && target != null) {
+            baritoneNavigation.stop();
+            baritoneCoordinator.reset();
+            routeToStructure(mc);
+        } else {
+            stalled = 0;
+            lastDistance = Double.MAX_VALUE;
+        }
+    }
+
     public boolean moveToPuzzleCenter(Minecraft mc, int[] center) {
         return puzzleCenter.moveToPuzzleCenter(mc, this, center);
     }
@@ -463,21 +481,10 @@ public class Explorer {
         int z = (int) Math.floor(mc.thePlayer.posZ);
         if (solved && BaritoneTransitCoordinator
             .needsSurfaceExit(insideDungeonRoom(mc), mc.theWorld.canBlockSeeTheSky(x, y, z))) {
-            if (staircaseDugPath != null && staircaseDugPath.size() >= 2) {
-                route.clear();
-                for (int i = staircaseDugPath.size() - 1; i >= 0; i--) {
-                    int[] p = staircaseDugPath.get(i);
-                    route.add(new int[] { p[0], p[1], p[2], 0 });
-                }
-                returning = true;
-                returnAvailable = false;
-                resumeSearchAfterReturn = true;
-                walking = true;
-                searching = false;
-                digging = false;
-                status = "Ascending dug path to surface";
-                return;
-            }
+            route.clear();
+            returning = false;
+            digging = false;
+            returnDigging = false;
             if (!baritoneCoordinator.beginSurfaceExit(mc, this)) {
                 if (LootGameSolverConfig.staircaseEnabled && beginDiggingToSurface(mc)) return;
                 stop(mc, "No safe surface destination found");
@@ -512,6 +519,10 @@ public class Explorer {
         openExitSearch = null;
         followingOpenExit = false;
         if (mc.playerController != null) mc.playerController.resetBlockRemoving();
+        if (LootGameSolverConfig.staircaseEnabled && baritoneCoordinator.beginSurfaceExit(mc, this)) {
+            returning = false;
+            return;
+        }
         status = "Exit blocked; retrying saved tunnel and safe alternatives";
     }
 
