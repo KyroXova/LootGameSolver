@@ -775,7 +775,8 @@ final class RewardChestLooter {
                 temporaryBag = false;
                 temporaryBagUsed = false;
             }
-            if (packingOnly) status = "No available backpack; items kept";
+            if (packingOnly && !hasPackableItems(mc)) status = "Inventory packing finished";
+            else if (packingOnly) status = "No available backpack; items kept";
             else if (!collecting && index >= chests.size() && !hasPackableItems(mc)) status = "Reward chests collected";
             else status = "Inventory and backpacks full; rewards remain in chest";
             if (hasPackableItems(mc) || collecting) {

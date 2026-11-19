@@ -481,6 +481,15 @@ public final class ClientHooks {
                     || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
                     if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
+                    rewardReturnPending = false;
+                    rewardPreCleanupPending = false;
+                    if (exploration != null) exploration.stop(mc, "Reward collection paused");
+                    mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText(
+                        "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
+                            + (rewardLooter.pendingCheckpoint() != null
+                                ? "Use /lgs resumeLoot after making space."
+                                : "Could not save the reward checkpoint.")));
+                    return;
                 }
                 if (rewardLooter.completed()) {
                     if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
