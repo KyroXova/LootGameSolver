@@ -30,21 +30,18 @@ import com.kyroxova.lootgamesolver.explorer.MiningAimGate;
 
 final class RewardChestLooter {
 
-    private final List<int[]> chests = new ArrayList<int[]>();
-    private final List<RewardLootPolicy.Entry> discovered = new ArrayList<RewardLootPolicy.Entry>();
-    private List<RewardLootPolicy.Entry> queue = new ArrayList<RewardLootPolicy.Entry>();
-    private final Map<Long, ItemStack> scanned = new HashMap<Long, ItemStack>();
-    private InventoryBaseline baseline;
-    private MinedDropTracker minedDrops;
+    final List<int[]> chests = new ArrayList<int[]>();
+    final List<RewardLootPolicy.Entry> discovered = new ArrayList<RewardLootPolicy.Entry>();
+    List<RewardLootPolicy.Entry> queue = new ArrayList<RewardLootPolicy.Entry>();
+    final Map<Long, ItemStack> scanned = new HashMap<Long, ItemStack>();
+    InventoryBaseline baseline;
+    MinedDropTracker minedDrops;
 
     void setMinedDrops(MinedDropTracker value) {
         minedDrops = value;
     }
 
-    private final boolean[] backpackTried = new boolean[36];
-    private final boolean[] slotRejectedForCurrentBag = new boolean[36];
-    private final List<ItemStack> itemRejectedForCurrentBag = new ArrayList<ItemStack>();
-    private final InventoryToolTransfer backpackTransfer = new InventoryToolTransfer();
+    final RewardBackpackPacker backpackPacker = new RewardBackpackPacker();
     private final MiningAimGate chestAim = new MiningAimGate();
     private final LootedChestStore lootedChests = new LootedChestStore(
         new java.io.File(
@@ -54,7 +51,7 @@ final class RewardChestLooter {
         new java.io.File(
             new java.io.File(Minecraft.getMinecraft().mcDataDir, "config/lootgamesolver"),
             "pending-loot.json"));
-    private int[] center;
+    int[] center;
     private int[] checkpointCenter;
     private int[] chestView;
     private final List<int[]> failedChestViews = new ArrayList<int[]>();
@@ -62,24 +59,12 @@ final class RewardChestLooter {
     private int failedViewRounds;
     private int chestDiscoveryQuietTicks;
     private MiniGame gameType;
-    private int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
-    private int queueIndex, backpackSlot = -1, oldSlot = -1;
-    private int packPendingSlot = -1, packPendingCount;
-    private ItemStack packPendingStack;
-    private int packPendingBagCount;
-    private int backpackTransferAttempts;
-    private int backpackAimTicks;
-    private float backpackOldYaw;
-    private boolean active, opened, collecting, packing, packOpening, packMoved;
+    int ticks, index, waiting, openWait, pendingSlot = -1, pendingCount;
+    int queueIndex, oldSlot = -1;
+    boolean active, opened, collecting, packing;
     private boolean existingInventoryPackRequested;
-    private boolean packingOnly;
-    private boolean backpackAimSaved;
-    private boolean backpackAiming;
-    private boolean temporaryBag, temporaryBagUsed, restoringBag;
-    private int bagSource, bagHotbar;
-    private int preferredBagSlot = -1;
-    private ItemStack bagDisplaced;
-    private String status = "";
+    boolean packingOnly;
+    String status = "";
 
     void setBaseline(InventoryBaseline value) {
         baseline = value;
@@ -103,32 +88,15 @@ final class RewardChestLooter {
         opened = false;
         collecting = false;
         packing = false;
-        packOpening = false;
-        packMoved = false;
         existingInventoryPackRequested = false;
         packingOnly = false;
         queueIndex = 0;
-        backpackSlot = -1;
-        backpackTransferAttempts = 0;
         oldSlot = -1;
-        packPendingSlot = -1;
-        packPendingStack = null;
-        backpackAimSaved = false;
-        backpackAiming = false;
-        backpackAimTicks = 0;
         chestAim.reset();
-        temporaryBag = false;
-        temporaryBagUsed = false;
-        restoringBag = false;
-        bagDisplaced = null;
-        preferredBagSlot = -1;
         discovered.clear();
         queue.clear();
         scanned.clear();
-        for (int i = 0; i < 36; i++) {
-            backpackTried[i] = false;
-            slotRejectedForCurrentBag[i] = false;
-        }
+        backpackPacker.reset();
         active = true;
         chests.clear();
         status = "Waiting for reward chests";
@@ -201,14 +169,9 @@ final class RewardChestLooter {
     }
 
     void cancel(Minecraft mc) {
-        backpackTransfer.cancel(mc);
+        backpackPacker.cancel(mc, oldSlot);
         if ((opened || packing) && mc.thePlayer != null && mc.currentScreen instanceof GuiContainer)
             mc.thePlayer.closeScreen();
-        if (temporaryBag && temporaryBagUsed && mc.thePlayer != null && !restoringBag) {
-            backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced);
-        }
-        if (mc.thePlayer != null && oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-        restoreBackpackAim(mc);
         active = false;
         opened = false;
     }
@@ -263,40 +226,10 @@ final class RewardChestLooter {
             }
         }
         if (exploration != null) exploration.consumePuzzleCenterArrival();
-        if (backpackTransfer.active()) {
-            if (!backpackTransfer.tick(mc)) {
-                if (bagSource >= 0 && bagSource < backpackTried.length) backpackTried[bagSource] = true;
-                if (bagHotbar >= 0 && bagHotbar < backpackTried.length) backpackTried[bagHotbar] = true;
-                temporaryBag = false;
-                temporaryBagUsed = false;
-                restoringBag = false;
-                backpackSlot = -1;
-                waiting = 10;
-                status = "Trying another backpack";
-            } else if (!backpackTransfer.active() && restoringBag) {
-                temporaryBag = false;
-                temporaryBagUsed = false;
-                restoringBag = false;
-                backpackSlot = -1;
-            }
-            return;
-        }
-        boolean structureFinished = (!packing && !collecting && index >= chests.size()) || (packingOnly && !packing);
-        if (temporaryBag && temporaryBagUsed && !packOpening && mc.currentScreen == null && structureFinished) {
-            if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
-                restoringBag = true;
-                status = "Restoring hotbar";
-            } else {
-                status = "Hotbar changed; bag kept";
-                temporaryBag = false;
-                temporaryBagUsed = false;
-                restoringBag = false;
-                backpackSlot = -1;
-            }
-            return;
-        }
+        if (backpackPacker.handleTransfer(mc, this)) return;
+        if (backpackPacker.handleHotbarRestore(mc, this)) return;
         if (packingOnly) {
-            if (packing) tickBackpack(mc, exploration);
+            if (packing) backpackPacker.tick(mc, exploration, this);
             else {
                 active = false;
                 status = "Inventory packing finished";
@@ -320,7 +253,7 @@ final class RewardChestLooter {
             return;
         }
         if (packing) {
-            tickBackpack(mc, exploration);
+            backpackPacker.tick(mc, exploration, this);
             return;
         }
         while (!collecting && index < chests.size()
@@ -333,17 +266,14 @@ final class RewardChestLooter {
             }
             if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
             opened = false;
-            if (compactBackpackHotbar(mc)) return;
             if (!existingInventoryPackRequested && hasPackableItems(mc)) {
                 existingInventoryPackRequested = true;
                 packing = true;
-                packOpening = false;
-                packMoved = false;
-                backpackSlot = -1;
-                for (int i = 0; i < backpackTried.length; i++) {
-                    backpackTried[i] = false;
-                    slotRejectedForCurrentBag[i] = false;
-                }
+                backpackPacker.packOpening = false;
+                backpackPacker.packMoved = false;
+                backpackPacker.backpackSlot = -1;
+                java.util.Arrays.fill(backpackPacker.backpackTried, false);
+                java.util.Arrays.fill(backpackPacker.slotRejectedForCurrentBag, false);
                 status = "Packing leftover inventory items";
                 return;
             }
@@ -442,9 +372,9 @@ final class RewardChestLooter {
                         opened = false;
                         pendingSlot = -1;
                         packing = true;
-                        packOpening = false;
-                        packMoved = false;
-                        backpackSlot = -1;
+                        backpackPacker.packOpening = false;
+                        backpackPacker.packMoved = false;
+                        backpackPacker.backpackSlot = -1;
                         status = "Moving collected rewards into a backpack";
                         return;
                     }
@@ -462,7 +392,7 @@ final class RewardChestLooter {
                     return;
                 }
                 pendingSlot = -1;
-                java.util.Arrays.fill(backpackTried, false);
+                java.util.Arrays.fill(backpackPacker.backpackTried, false);
                 if (after == null) queueIndex++;
                 else return;
             }
@@ -536,8 +466,8 @@ final class RewardChestLooter {
         }
         double hitX = hit.hitVec.xCoord - eye.xCoord, hitY = hit.hitVec.yCoord - eye.yCoord;
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
-        float targetYaw = (float) (Math.atan2(hitZ, hitX) * 180D / Math.PI) - 90F;
-        float targetPitch = (float) (-Math.atan2(hitY, Math.hypot(hitX, hitZ)) * 180D / Math.PI);
+        float targetYaw = AimHelper.calculateYaw(hitX, hitZ);
+        float targetPitch = AimHelper.calculatePitch(hitX, hitY, hitZ);
         if (!turnToward(mc, exploration, targetYaw, targetPitch)) {
             chestAim.reset();
             status = "Facing reward chest";
@@ -622,252 +552,7 @@ final class RewardChestLooter {
         return chestView != null;
     }
 
-    private void tickBackpack(Minecraft mc, Explorer exploration) {
-        if (waiting > 0) {
-            waiting--;
-            return;
-        }
-        if (backpackAiming) {
-            if (mc.currentScreen != null || backpackSlot < 0
-                || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
-                backpackAiming = false;
-                restoreBackpackAim(mc, exploration);
-                return;
-            }
-            if (!turnToward(mc, exploration, backpackOldYaw, -90F)) {
-                backpackAimTicks = 0;
-                status = "Facing clear space";
-                return;
-            }
-            if (++backpackAimTicks < 2) return;
-            if (!BaritoneInventoryBridge.useHotbarItem(mc, backpackSlot)) {
-                backpackAiming = false;
-                restoreBackpackAim(mc, exploration);
-                status = "Backpack interaction unavailable";
-                return;
-            }
-            if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
-            backpackAiming = false;
-            restoreBackpackAim(mc, exploration);
-            packOpening = true;
-            java.util.Arrays.fill(slotRejectedForCurrentBag, false);
-            itemRejectedForCurrentBag.clear();
-            openWait = 0;
-            waiting = 5;
-            return;
-        }
-        Container container = mc.thePlayer.openContainer;
-        String name = container.getClass()
-            .getName();
-        boolean isBackpack = InventoryProtection.backpackContainer(name) && backpackSlot >= 0
-            && isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot));
-        if (packOpening && mc.currentScreen instanceof GuiContainer && !isBackpack) {
-            mc.thePlayer.closeScreen();
-            restoreBackpackAim(mc);
-            packOpening = false;
-            if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-            oldSlot = -1;
-            int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
-            if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
-            backpackSlot = -1;
-            openWait = 0;
-            waiting = 5;
-            status = "Unexpected container; trying another backpack";
-            return;
-        }
-        if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
-            if (packPendingSlot >= 0) {
-                Slot pending = packPendingSlot < container.inventorySlots.size() ? container.getSlot(packPendingSlot)
-                    : null;
-                ItemStack remaining = pending == null ? null : pending.getStack();
-                int bagCount = backpackItemCount(container, mc, packPendingStack);
-                boolean sourceChanged = remaining == null || !remaining.isItemEqual(packPendingStack)
-                    || !ItemStack.areItemStackTagsEqual(remaining, packPendingStack)
-                    || remaining.stackSize < packPendingCount;
-                if (sourceChanged && bagCount > packPendingBagCount) {
-                    packMoved = true;
-                } else if (sourceChanged) {
-                    itemRejectedForCurrentBag.add(packPendingStack.copy());
-                } else {
-                    if (pending != null && pending.inventory == mc.thePlayer.inventory) {
-                        int playerSlot = pending.getSlotIndex();
-                        if (playerSlot >= 0 && playerSlot < slotRejectedForCurrentBag.length) {
-                            slotRejectedForCurrentBag[playerSlot] = true;
-                        }
-                    }
-                }
-                packPendingSlot = -1;
-                packPendingStack = null;
-            }
-            for (Object obj : container.inventorySlots) {
-                Slot slot = (Slot) obj;
-                int playerSlot = slot.getSlotIndex();
-                ItemStack stack = slot.getStack();
-                if (slot.inventory != mc.thePlayer.inventory || playerSlot < 0
-                    || playerSlot >= 36
-                    || slotRejectedForCurrentBag[playerSlot]
-                    || rejectedForBag(stack)
-                    || !isPackable(mc, playerSlot, stack)) continue;
-                if (!slot.canTakeStack(mc.thePlayer)) continue;
-                if (!backpackHasSpace(container, mc, stack)) {
-                    slotRejectedForCurrentBag[playerSlot] = true;
-                    continue;
-                }
-                int beforeCount = stack.stackSize;
-                packPendingStack = stack.copy();
-                packPendingBagCount = backpackItemCount(container, mc, stack);
-                if (!BaritoneInventoryBridge.quickMove(mc, slot.slotNumber)) {
-                    status = "Backpack transfer unavailable";
-                    return;
-                }
-                packPendingSlot = slot.slotNumber;
-                packPendingCount = beforeCount;
-                waiting = 5;
-                return;
-            }
-            mc.thePlayer.closeScreen();
-            restoreBackpackAim(mc);
-            packOpening = false;
-            if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-            oldSlot = -1;
-            int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
-            if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
-            if (packMoved) {
-                preferredBagSlot = temporaryBag ? bagHotbar : backpackSlot;
-            } else if (preferredBagSlot == attemptedSlot) {
-                preferredBagSlot = -1;
-            }
-            backpackSlot = -1;
-            waiting = 5;
-            openWait = 0;
-            if (collecting && queueIndex < queue.size() && packMoved) {
-                packing = false;
-                packMoved = false;
-                status = "Resuming reward collection";
-            } else if (!hasPackableItems(mc)) {
-                packing = false;
-                packMoved = false;
-            }
-            return;
-        }
-        if (packOpening) {
-            if (++openWait > 40) {
-                restoreBackpackAim(mc);
-                if (oldSlot >= 0) mc.thePlayer.inventory.currentItem = oldSlot;
-                oldSlot = -1;
-                int attemptedSlot = temporaryBag ? bagSource : backpackSlot;
-                if (attemptedSlot >= 0 && attemptedSlot < backpackTried.length) backpackTried[attemptedSlot] = true;
-                backpackSlot = -1;
-                packOpening = false;
-                openWait = 0;
-                waiting = 5;
-            }
-            return;
-        }
-        restoreBackpackAim(mc);
-        if (mc.currentScreen != null) {
-            status = "Close the open screen to use a backpack";
-            return;
-        }
-        if (backpackSlot < 0 || !isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) {
-            backpackSlot = -1;
-            if (temporaryBag && !backpackTried[bagSource]
-                && isBackpack(mc.thePlayer.inventory.getStackInSlot(bagHotbar))) backpackSlot = bagHotbar;
-            if (backpackSlot < 0 && preferredBagSlot >= 0
-                && preferredBagSlot < 36
-                && !backpackTried[preferredBagSlot]
-                && isBackpack(mc.thePlayer.inventory.getStackInSlot(preferredBagSlot))) backpackSlot = preferredBagSlot;
-            for (int i = 0; backpackSlot < 0 && i < 36; i++)
-                if (!backpackTried[i] && isBackpack(mc.thePlayer.inventory.getStackInSlot(i))) {
-                    backpackSlot = i;
-                    break;
-                }
-        }
-        if (backpackSlot < 0) {
-            if (temporaryBag && temporaryBagUsed && !restoringBag) {
-                if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
-                    restoringBag = true;
-                    status = "Restoring hotbar";
-                    return;
-                }
-                status = "Hotbar changed; bag kept";
-                temporaryBag = false;
-                temporaryBagUsed = false;
-            }
-            if (packingOnly && !hasPackableItems(mc)) status = "Inventory packing finished";
-            else if (packingOnly) status = "No available backpack; items kept";
-            else if (!collecting && index >= chests.size() && !hasPackableItems(mc)) status = "Reward chests collected";
-            else if (mc.thePlayer.inventory.getFirstEmptyStack() >= 0) {
-                packing = false;
-                status = "Resuming reward collection";
-                return;
-            }
-            else status = "Inventory and backpacks full; rewards remain in chest";
-            if ((hasPackableItems(mc) || collecting) && mc.thePlayer.inventory.getFirstEmptyStack() < 0) {
-                boolean saved = center == null || saveCheckpoint(mc) != null;
-                mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] Inventory or backpacks are full or unavailable. Please make space."
-                            + (collecting ? " Uncollected rewards remain in the chest." : "")
-                            + (saved ? "" : " Could not save the loot checkpoint.")));
-            }
-            packing = false;
-            active = false;
-            return;
-        }
-        if (backpackSlot >= 9) {
-            int selected = backpackSlot;
-            boolean hotbarFull = true;
-            for (int i = 0; i < 9; i++) {
-                if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-                    hotbarFull = false;
-                    break;
-                }
-            }
-            if (hotbarFull && temporaryBag && temporaryBagUsed && bagHotbar >= 0 && !restoringBag) {
-                if (backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
-                    restoringBag = true;
-                    status = "Making space in hotbar";
-                    return;
-                }
-            }
-            backpackSlot = -1;
-            if (backpackTransfer.start(mc, selected, baseline)) {
-                backpackTransferAttempts = 0;
-                bagSource = selected;
-                bagHotbar = backpackTransfer.hotbarSlot();
-                ItemStack displaced = mc.thePlayer.inventory.getStackInSlot(bagHotbar);
-                bagDisplaced = displaced == null ? null : displaced.copy();
-                temporaryBag = true;
-                temporaryBagUsed = false;
-                return;
-            }
-            if (++backpackTransferAttempts >= 20) {
-                backpackTried[selected] = true;
-                backpackTransferAttempts = 0;
-                status = "Backpack unavailable";
-            }
-            waiting = 2;
-            return;
-        }
-        if (oldSlot < 0) oldSlot = mc.thePlayer.inventory.currentItem;
-        mc.thePlayer.inventory.currentItem = backpackSlot;
-        mc.playerController.updateController();
-        packMoved = false;
-        if (!BaritoneInventoryBridge.useHotbarItem(mc, backpackSlot)) {
-            status = "Backpack interaction unavailable";
-            waiting = 5;
-            return;
-        }
-        if (temporaryBag && backpackSlot == bagHotbar) temporaryBagUsed = true;
-        packOpening = true;
-        java.util.Arrays.fill(slotRejectedForCurrentBag, false);
-        itemRejectedForCurrentBag.clear();
-        openWait = 0;
-        waiting = 5;
-    }
-
-    private static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
+    static boolean turnToward(Minecraft mc, Explorer exploration, float yaw, float pitch) {
         if (exploration != null) {
             exploration.lookSmooth(yaw, pitch);
         } else {
@@ -882,93 +567,12 @@ final class RewardChestLooter {
         return Math.abs(yawError) < 2.5F && Math.abs(pitchError) < 2.5F;
     }
 
-    private void restoreBackpackAim(Minecraft mc) {
-        restoreBackpackAim(mc, null);
+    boolean hasPackableItems(Minecraft mc) {
+        return backpackPacker.hasPackableItems(mc, baseline, minedDrops);
     }
 
-    private void restoreBackpackAim(Minecraft mc, Explorer exploration) {
-        if (!backpackAimSaved || mc.thePlayer == null) return;
-        backpackAimSaved = false;
-        if (exploration != null) exploration.clearAim();
-    }
-
-    private boolean compactBackpackHotbar(Minecraft mc) {
-        // Keep backpacks in the hotbar while in structure / looting instead of repeatedly moving them back and forth
-        return false;
-    }
-
-    private static boolean isBackpack(ItemStack stack) {
-        return InventoryProtection.bag(stack);
-    }
-
-    private static boolean backpackHasSpace(Container container, Minecraft mc, ItemStack stack) {
-        for (Object obj : container.inventorySlots) {
-            Slot slot = (Slot) obj;
-            if (slot.inventory == mc.thePlayer.inventory || !slot.isItemValid(stack)) continue;
-            ItemStack existing = slot.getStack();
-            if (existing == null) return true;
-            if (existing.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(existing, stack)
-                && existing.stackSize < Math.min(existing.getMaxStackSize(), slot.getSlotStackLimit())) return true;
-        }
-        return false;
-    }
-
-    private boolean rejectedForBag(ItemStack stack) {
-        if (stack == null) return false;
-        for (ItemStack rejected : itemRejectedForCurrentBag) {
-            if (rejected.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(rejected, stack)) return true;
-        }
-        return false;
-    }
-
-    private static int backpackItemCount(Container container, Minecraft mc, ItemStack stack) {
-        if (stack == null) return 0;
-        int count = 0;
-        for (Object obj : container.inventorySlots) {
-            Slot slot = (Slot) obj;
-            ItemStack existing = slot.getStack();
-            if (slot.inventory != mc.thePlayer.inventory && existing != null
-                && existing.isItemEqual(stack)
-                && ItemStack.areItemStackTagsEqual(existing, stack)) count += existing.stackSize;
-        }
-        return count;
-    }
-
-    private boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack) {
-        if (stack == null || stack.stackSize <= 0) return false;
-        if (temporaryBag && slotIndex == bagSource) return false;
-        if (InventoryProtection.bag(stack)) return false;
-        if (ExplorerSustain.isHealingAxe(stack)) return false;
-        boolean healingAxe = false;
-        for (int i = 0; i < 36; i++) {
-            if (ExplorerSustain.isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
-                healingAxe = true;
-                break;
-            }
-        }
-        if (InventoryProtection.essentialForPacking(stack, baseline, slotIndex, healingAxe)) return false;
-        if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
-        String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-        if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
-            || (minedDrops != null && minedDrops.containsTracked(MinedDropTracker.inventory(mc), slotIndex)))
-            return false;
-        if (id != null && id.toLowerCase(java.util.Locale.ROOT)
-            .contains("torch")) return false;
-        return true;
-    }
-
-    private boolean hasPackableItems(Minecraft mc) {
-        if (mc == null || mc.thePlayer == null) return false;
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            if (isPackable(mc, i, stack)) return true;
-        }
-        return false;
-    }
-
-    private static boolean isReservedBuildingStack(Minecraft mc, int slot, ItemStack stack) {
-        if (mc == null || stack == null) return false;
-        return slot == TrashCleanup.findBuildingReserveSlot(mc);
+    boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack) {
+        return backpackPacker.isPackable(mc, slotIndex, stack, baseline, minedDrops);
     }
 
     private static long slotKey(int chest, int slot) {

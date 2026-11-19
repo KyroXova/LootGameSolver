@@ -13,6 +13,90 @@ import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public class ExplorerRouteNavigator {
 
+    public boolean handleReturnAndExitRecovery(Minecraft mc, Explorer explorer) {
+        if (explorer.returning && explorer.resumeSearchAfterReturn && !explorer.insideDungeonRoom(mc)) {
+            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+            int z = (int) Math.floor(mc.thePlayer.posZ);
+            int[] entrance = explorer.trail.points.pointAt(0);
+            boolean reachedMouth = entrance != null && Math.abs(x - entrance[0]) + Math.abs(z - entrance[2]) <= 1
+                && y >= entrance[1]
+                && Math.abs(y - entrance[1]) <= 2
+                && ExplorerTerrain.solidCheckpoint(mc.theWorld, x, y, z);
+            if (reachedMouth || mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+                explorer.continueProgressiveSearch(mc, true);
+                return true;
+            }
+        }
+        if (explorer.returning && explorer.escapingChestPit && mc.thePlayer.onGround && !isRewardChestPit(mc)) {
+            explorer.escapingChestPit = false;
+            explorer.clearChestPitSearch();
+            explorer.route.clear();
+            explorer.returnJoinSearch = null;
+            explorer.returnTrailRoute = null;
+            explorer.stalled = 0;
+            explorer.lastDistance = Double.MAX_VALUE;
+            if (explorer.insideDungeonRoom(mc) && explorer.startRoomExitSearch(mc)) return true;
+            if (explorer.startSavedReturn(mc, explorer.resumeSearchAfterReturn, 128)) return true;
+            explorer.retryExitLater(mc);
+            return true;
+        }
+        if (explorer.returning && isRewardChestPit(mc) && jumpOutOfRewardPit(mc, explorer)) return true;
+        if (explorer.exitRecoveryTicks > 0) {
+            if (--explorer.exitRecoveryTicks == 0) {
+                if (explorer.startChestPitReturn(mc, explorer.resumeSearchAfterReturn)) return true;
+                explorer.blockedWalkNodes.clear();
+                final net.minecraft.world.World exitWorld = mc.theWorld;
+                final GroundPathfinder.Terrain ground = explorer.walkingTerrain(exitWorld);
+                int sx = (int) Math.floor(mc.thePlayer.posX), sy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+                int sz = (int) Math.floor(mc.thePlayer.posZ);
+                explorer.openExitSearch = new OpenExitSearch(new OpenExitSearch.Terrain() {
+
+                    public boolean stand(int x, int y, int z) {
+                        return ground.stand(x, y, z);
+                    }
+
+                    public boolean clear(int x, int y, int z) {
+                        return ground.clear(x, y, z);
+                    }
+
+                    public boolean exit(int x, int y, int z) {
+                        if (!ExplorerTerrain.solidCheckpoint(exitWorld, x, y, z)) return false;
+                        int index = explorer.trail.points.nearestIndex(x, y, z, 0);
+                        if (explorer.trail.points.size() >= 2) return index >= 0 && index < explorer.trail.points.size() - 1;
+                        return exitWorld.canBlockSeeTheSky(x, y, z);
+                    }
+                }, sx, sy, sz);
+            }
+            return true;
+        }
+        if (explorer.openExitSearch != null) {
+            explorer.status = "Searching connected open blocks for an exit";
+            if (!explorer.openExitSearch.advance(96, System.nanoTime() + 3_000_000L)) return true;
+            java.util.List<int[]> openPath = explorer.openExitSearch.path();
+            explorer.openExitSearch = null;
+            if (!openPath.isEmpty()) {
+                explorer.route.clear();
+                explorer.route.addAll(openPath);
+                explorer.followingOpenExit = true;
+                explorer.segmentX = mc.thePlayer.posX;
+                explorer.segmentZ = mc.thePlayer.posZ;
+                explorer.status = "Following connected open route";
+                return true;
+            }
+            boolean started = explorer.startChestPitReturn(mc, true);
+            if (!started) started = ++explorer.exitRecoveryAttempts % 2 == 1 && explorer.digTowardSavedExit(mc);
+            if (!started) started = explorer.startSavedReturn(mc, true, 128);
+            if (!started) started = explorer.startRoomExitSearch(mc);
+            if (!started) explorer.retryExitLater(mc);
+            return true;
+        }
+        if (explorer.chestPitNav.active()) {
+            explorer.advanceChestPitReturn(mc);
+            return true;
+        }
+        return false;
+    }
+
     public boolean advanceRoute(Minecraft mc, Explorer explorer) {
         if (!explorer.digging && !explorer.returning
             && !explorer.roomExitCrossing

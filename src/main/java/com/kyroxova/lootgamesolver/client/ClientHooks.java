@@ -48,46 +48,41 @@ public final class ClientHooks {
     private static final ResourceLocation TEXTURE_UI_9SLICE = new ResourceLocation(
         "lootgamesolver",
         "textures/gui/ui_9slice.png");
-    private final SolverSession session = new SolverSession();
-    private final Explorer exploration = Explorer.ENABLED ? new Explorer() : null;
+    final SolverSession session = new SolverSession();
+    final Explorer exploration = Explorer.ENABLED ? new Explorer() : null;
     private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session, exploration);
-    private boolean lastAutoSolveKey = false;
-    private boolean lastOverlayKey = false;
+    final ClientKeyHandler keyHandler = new ClientKeyHandler();
     private int detectCounter = 0;
-    private final LootGamesBridge puzzleBridge = new LootGamesBridge();
-    private final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
-    private final PuzzleTileNavigator tileNavigator = new PuzzleTileNavigator();
+    final LootGamesBridge puzzleBridge = new LootGamesBridge();
+    final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+    final PuzzleTileNavigator tileNavigator = new PuzzleTileNavigator();
     private final RoomOpenWatchdog roomOpenWatchdog = new RoomOpenWatchdog();
-    private final RewardChestLooter rewardLooter = new RewardChestLooter();
-    private final RewardChestLooter preLootPacker = new RewardChestLooter();
-    private final TrashCleanup trashCleanup = new TrashCleanup();
+    final RewardChestLooter rewardLooter = new RewardChestLooter();
+    final RewardChestLooter preLootPacker = new RewardChestLooter();
+    final TrashCleanup trashCleanup = new TrashCleanup();
     private final MinedDropTracker minedDrops = new MinedDropTracker();
     private MinedDropStore minedDropStore;
-    private StorageRecoveryController storageRecovery;
+    StorageRecoveryController storageRecovery;
     private boolean storageResumeChecked;
     private int storageResumeWait;
-    private boolean rewardReturnPending;
-    private boolean rewardPreCleanupPending;
-    private boolean rewardPrePackingAttempted;
+    boolean rewardReturnPending;
+    boolean rewardPreCleanupPending;
+    boolean rewardPrePackingAttempted;
     private int inventoryMaintenanceStage;
     private int inventoryMaintenanceWait;
     private int inventoryMaintenanceCooldown;
     private int rewardLooterCooldown;
-    private boolean explorationDriven;
-    private InventoryBaseline inventoryBaseline;
-    private int[] rewardCenter;
-    private boolean exploreKeyHeld;
-    private boolean automationPaused, pausedOnThisPress;
-    private long explorePausedAt;
-    private boolean exploreHoldActionDone;
-    private int exploreHoldTicks;
-    private int checkpointClearDoneTicks;
-    private boolean wasInsideRoom;
+    boolean explorationDriven;
+    InventoryBaseline inventoryBaseline;
+    int[] rewardCenter;
+    boolean automationPaused;
+    int checkpointClearDoneTicks;
+    boolean wasInsideRoom;
     private World puzzleWorld;
-    private long totalActiveTicks = 0L;
-    private int solvedPuzzles;
+    long totalActiveTicks = 0L;
+    int solvedPuzzles;
 
-    private final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
+    final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
 
     void recordPuzzleSolved() {
         solvedPuzzles++;
@@ -111,85 +106,7 @@ public final class ClientHooks {
     }
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
-        if (texture == null || mc == null || mc.getTextureManager() == null) return;
-        mc.getTextureManager()
-            .bindTexture(texture);
-
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-
-        float t = 32.0F; // 32x32 texture sheet
-
-        int fillStartX = x + 12;
-        int fillEndX = x + width - 12;
-        int fillStartY = y + 12;
-        int fillEndY = y + height - 12;
-
-        for (int curY = fillStartY; curY < fillEndY; curY += 6) {
-            int drawH = Math.min(6, fillEndY - curY);
-            for (int curX = fillStartX; curX < fillEndX; curX += 6) {
-                int drawW = Math.min(6, fillEndX - curX);
-                drawSubTexture(curX, curY, 13, 13, drawW, drawH, drawW, drawH, t, t);
-            }
-        }
-
-        int topStartX = x + 12;
-        int topEndX = x + width - 12;
-        for (int curX = topStartX; curX < topEndX; curX += 6) {
-            int drawW = Math.min(6, topEndX - curX);
-            drawSubTexture(curX, y, 13, 0, drawW, 12, drawW, 12, t, t);
-        }
-
-        int botStartX = x + 12;
-        int botEndX = x + width - 12;
-        for (int curX = botStartX; curX < botEndX; curX += 6) {
-            int drawW = Math.min(6, botEndX - curX);
-            drawSubTexture(curX, y + height - 12, 13, 20, drawW, 12, drawW, 12, t, t);
-        }
-
-        int leftStartY = y + 12;
-        int leftEndY = y + height - 12;
-        for (int curY = leftStartY; curY < leftEndY; curY += 6) {
-            int drawH = Math.min(6, leftEndY - curY);
-            drawSubTexture(x, curY, 0, 13, 12, drawH, 12, drawH, t, t);
-        }
-
-        int rightStartY = y + 12;
-        int rightEndY = y + height - 12;
-        for (int curY = rightStartY; curY < rightEndY; curY += 6) {
-            int drawH = Math.min(6, rightEndY - curY);
-            drawSubTexture(x + width - 12, curY, 20, 13, 12, drawH, 12, drawH, t, t);
-        }
-
-        drawSubTexture(x, y, 0, 0, 12, 12, 12, 12, t, t);
-
-        drawSubTexture(x + width - 12, y, 20, 0, 12, 12, 12, 12, t, t);
-
-        drawSubTexture(x, y + height - 12, 0, 20, 12, 12, 12, 12, t, t);
-
-        drawSubTexture(x + width - 12, y + height - 12, 20, 20, 12, 12, 12, 12, t, t);
-    }
-
-    private static void drawSubTexture(int x, int y, float u, float v, float uWidth, float vHeight, int width,
-        int height, float texWidth, float texHeight) {
-        float f = 1.0F / texWidth;
-        float f1 = 1.0F / texHeight;
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
-        tessellator
-            .addVertexWithUV((double) x, (double) (y + height), 0.0D, (double) (u * f), (double) ((v + vHeight) * f1));
-        tessellator.addVertexWithUV(
-            (double) (x + width),
-            (double) (y + height),
-            0.0D,
-            (double) ((u + uWidth) * f),
-            (double) ((v + vHeight) * f1));
-        tessellator
-            .addVertexWithUV((double) (x + width), (double) y, 0.0D, (double) ((u + uWidth) * f), (double) (v * f1));
-        tessellator.addVertexWithUV((double) x, (double) y, 0.0D, (double) (u * f), (double) (v * f1));
-        tessellator.draw();
+        ClientHudOverlay.drawNineSlice(texture, x, y, width, height, mc);
     }
 
     public WorldOverlayRenderer getWorldRenderer() {
@@ -242,7 +159,7 @@ public final class ClientHooks {
         }
 
         Minecraft mc = Minecraft.getMinecraft();
-        checkKeyToggles();
+        keyHandler.checkKeyToggles(mc, this);
         if (automationPaused && mc.theWorld != null && mc.thePlayer != null) return;
         if (mc.theWorld == null || mc.thePlayer == null) automationPaused = false;
         if (storageRecovery != null) {
@@ -670,7 +587,7 @@ public final class ClientHooks {
         }
     }
 
-    private void startPuzzleSolver() {
+    void startPuzzleSolver() {
         autoPuzzle.startPuzzleSolver(Minecraft.getMinecraft(), puzzleBridge, session, this);
     }
 
@@ -710,7 +627,7 @@ public final class ClientHooks {
         return false;
     }
 
-    private void setAutomationPaused(Minecraft mc, boolean paused) {
+    void setAutomationPaused(Minecraft mc, boolean paused) {
         automationPaused = paused;
         tileNavigator.pause(paused);
         if (exploration != null) exploration.pauseAutomation(paused);
@@ -731,196 +648,6 @@ public final class ClientHooks {
 
     void ensureInventoryBaseline(Minecraft mc) {
         if (inventoryBaseline == null) captureInventoryBaseline(mc);
-    }
-
-    private void checkKeyToggles() {
-        Minecraft mc = Minecraft.getMinecraft();
-        boolean explorePressed = Keybinds.explore.isPressed();
-        boolean exploreDown = GameSettings.isKeyDown(Keybinds.explore);
-        boolean active = session.isActive() || autoPuzzle.isActive()
-            || rewardReturnPending
-            || storageRecovery != null
-            || (exploration != null && exploration.navigating());
-        boolean runExploreAction = false;
-        boolean acceptsExplore = mc.currentScreen == null
-            || mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiChest
-            || mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiInventory;
-        if (!acceptsExplore) {
-            exploreKeyHeld = false;
-            exploreHoldActionDone = false;
-            exploreHoldTicks = 0;
-        } else if (exploreDown) {
-            if (!exploreKeyHeld) {
-                exploreHoldTicks = 0;
-                pausedOnThisPress = false;
-                if (pauseOnExplorePress(automationPaused, active)) {
-                    setAutomationPaused(mc, true);
-                    explorePausedAt = System.currentTimeMillis();
-                    pausedOnThisPress = true;
-                }
-            }
-            exploreKeyHeld = true;
-            exploreHoldTicks++;
-            if (exploreHoldTicks >= 20 && !exploreHoldActionDone) {
-                exploreHoldActionDone = true;
-                checkpointClearDoneTicks = 12;
-                boolean clearedPaused = automationPaused;
-                if (automationPaused) {
-                    if (rewardReturnPending) rewardLooter.saveCheckpoint(mc);
-                    if (preLootPacker.active()) preLootPacker.cancel(mc);
-                    if (rewardLooter.active()) rewardLooter.cancel(mc);
-                    rewardReturnPending = false;
-                    if (storageRecovery != null) storageRecovery.cancel();
-                    storageRecovery = null;
-                    session.cancel("Automation cleared");
-                    tileNavigator.stop();
-                    autoPuzzle.reset();
-                    if (exploration != null && exploration.navigating()) exploration.stop(mc, "Automation cleared");
-                    setAutomationPaused(mc, false);
-                } else if (rewardReturnPending) {
-                    if (preLootPacker.active()) preLootPacker.cancel(mc);
-                    rewardLooter.cancel(mc);
-                    rewardReturnPending = false;
-                }
-                if (exploration != null && mc.thePlayer != null && mc.theWorld != null)
-                    exploration.clearLastCheckpoint(mc);
-                if (clearedPaused && exploration != null && exploration.navigating())
-                    exploration.stop(mc, "Automation cleared");
-            }
-        } else {
-            if (!exploreKeyHeld && explorePressed && pauseOnExplorePress(automationPaused, active)) {
-                setAutomationPaused(mc, true);
-                explorePausedAt = System.currentTimeMillis();
-                pausedOnThisPress = true;
-            }
-            if (resumeOnExploreRelease(
-                exploreKeyHeld || explorePressed,
-                exploreHoldActionDone,
-                automationPaused,
-                pausedOnThisPress)) {
-                setAutomationPaused(mc, false);
-                if (quickExploreRecovery(explorePausedAt, System.currentTimeMillis())) {
-                    if (session.isActive()) tileNavigator.stop();
-                    else if (!rewardReturnPending && storageRecovery == null && exploration != null)
-                        exploration.recoverActiveRoute(mc);
-                }
-                explorePausedAt = 0;
-            } else {
-                runExploreAction = !automationPaused && !pausedOnThisPress
-                    && (exploreKeyHeld ? !exploreHoldActionDone : explorePressed);
-            }
-            exploreKeyHeld = false;
-            exploreHoldActionDone = false;
-            exploreHoldTicks = 0;
-            pausedOnThisPress = false;
-        }
-        if (automationPaused) return;
-        if (exploration != null && runExploreAction
-            && mc.currentScreen == null
-            && mc.thePlayer != null
-            && mc.theWorld != null) {
-            if (!exploration.navigating() && !rewardReturnPending) {
-                inventoryBaseline = InventoryBaseline.capture(mc);
-                trashCleanup.setBaseline(inventoryBaseline);
-                rewardLooter.setBaseline(inventoryBaseline);
-            }
-            if (rewardReturnPending) {
-                if (preLootPacker.active()) preLootPacker.cancel(mc);
-                rewardLooter.cancel(mc);
-                rewardReturnPending = false;
-                if (exploration.navigating()) exploration.toggle(mc);
-                exploration.setAutomationStatus("Reward collection stopped");
-                return;
-            }
-            session.cancel("Exploration selected");
-            releaseMovementKeys(mc);
-            puzzleCompletion.clear();
-            autoPuzzle.reset();
-            if (!exploration.navigating()
-                && (exploration.inDungeonRoom(mc) || puzzleBridge.nearbyFloorActivator() != null
-                    || puzzleBridge.nearbyGame(true) != null)) {
-                explorationDriven = true;
-                int[] floor = puzzleBridge.nearbyFloorActivator();
-                Object nearbyGame = puzzleBridge.nearbyGame(true);
-                DetectedGame board = puzzleBridge.detect(true);
-                int[] boardCenter = floor != null ? floor
-                    : nearbyGame == null ? null : puzzleBridge.gameCenter(nearbyGame);
-                if (board != null) {
-                    if (boardCenter != null) autoPuzzle.setRewardCenter(boardCenter);
-                    startPuzzleSolver();
-                    exploration.setAutomationStatus("Solving active puzzle in room");
-                    return;
-                }
-                if (boardCenter != null) {
-                    autoPuzzle.startManual(boardCenter, floor, mc.theWorld, puzzleCompletion);
-                    exploration.setAutomationStatus("Opening puzzle in current room");
-                    return;
-                }
-                int[] rewards = nearbyRewardCenter(mc);
-                if (rewards != null) {
-                    exploration.prepareRewardCollection(mc, rewards);
-                    rewardCenter = rewards;
-                    ensureInventoryBaseline(mc);
-                    rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
-                    rewardPreCleanupPending = true;
-                    rewardPrePackingAttempted = false;
-                    rewardReturnPending = true;
-                    exploration.setAutomationStatus("Collecting reward chests");
-                    return;
-                }
-                exploration.toggle(mc);
-                return;
-            }
-            if (!exploration.navigating() && exploration.hasPendingReturn()) {
-                exploration.toggle(mc);
-                return;
-            }
-            int[] center = puzzleBridge.nearbyFloorActivator();
-            if (center == null) {
-                Object nearby = puzzleBridge.nearbyGame(true);
-                if (nearby != null) center = puzzleBridge.gameCenter(nearby);
-            }
-            if (!exploration.resumePuzzleInCurrentRoom(mc, center)) exploration.toggle(mc);
-        }
-        boolean autoSolvePressed = isKeyJustPressed(Keybinds.toggleAutoSolve, LootGameSolverConfig.solveKey);
-        boolean overlayPressed = isKeyJustPressed(Keybinds.toggleOverlay, LootGameSolverConfig.overlayKey);
-
-        if (autoSolvePressed) {
-            explorationDriven = false;
-            session.invalidateDormantCache();
-            if (session.isActive()) {
-                session.cancel("Auto-Solver Stopped");
-                releaseMovementKeys(mc);
-                if (autoPuzzle.isSolving()) autoPuzzle.setState(AutoPuzzleCoordinator.State.FAILED);
-            } else {
-                captureInventoryBaseline(mc);
-                session.start(ActionPlanner.Mode.SOLVE);
-                Object game = puzzleBridge.nearbyGame(true);
-                int level = puzzleBridge.currentMinesweeperLevel(game);
-                if (session.isActive()) {
-                    int[] currentCenter = game == null ? puzzleBridge.nearbyFloorActivator()
-                        : puzzleBridge.gameCenter(game);
-                    if (currentCenter != null) autoPuzzle.setRewardCenter(currentCenter);
-                    puzzleCompletion.begin();
-                    autoPuzzle.setState(AutoPuzzleCoordinator.State.SOLVING);
-                }
-                if (level >= 1 && level <= 4) {
-                    int[] currentCenter = puzzleBridge.gameCenter(game);
-                    if (currentCenter != null) autoPuzzle.setRewardCenter(currentCenter);
-                    puzzleCompletion.begin();
-                    if (session.isActive()) {
-                        autoPuzzle.setState(AutoPuzzleCoordinator.State.SOLVING);
-                    } else if (puzzleBridge.canOpenMinesweeperBoard(game)) {
-                        autoPuzzle.setState(AutoPuzzleCoordinator.State.REVEALING_NEXT_STAGE);
-                    }
-                }
-            }
-        }
-
-        if (overlayPressed) {
-            session.invalidateDormantCache();
-            LootGameSolverConfig.setOverlayVisible(!LootGameSolverConfig.showOverlay);
-        }
     }
 
     static int[] nearbyRewardCenter(Minecraft mc) {
@@ -967,29 +694,6 @@ public final class ClientHooks {
         return best;
     }
 
-    private boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {
-        if (Minecraft.getMinecraft().currentScreen != null) return false;
-        if (binding != null) return binding.isPressed();
-        int code = binding != null ? binding.getKeyCode() : fallbackCode;
-        if (code > 0 && code < 256) {
-            boolean down = Keyboard.isKeyDown(code);
-            if (binding == Keybinds.toggleAutoSolve) {
-                if (down && !lastAutoSolveKey) {
-                    lastAutoSolveKey = true;
-                    return true;
-                }
-                if (!down) lastAutoSolveKey = false;
-            } else if (binding == Keybinds.toggleOverlay) {
-                if (down && !lastOverlayKey) {
-                    lastOverlayKey = true;
-                    return true;
-                }
-                if (!down) lastOverlayKey = false;
-            }
-        }
-        return false;
-    }
-
     private void handleAutoMovement(Minecraft mc) {
         if (mc.thePlayer == null || mc.thePlayer.movementInput == null || mc.currentScreen != null) return;
         SolverAction targetAction = session.getActiveAction();
@@ -1028,113 +732,7 @@ public final class ClientHooks {
 
     @SubscribeEvent
     public void overlay(RenderGameOverlayEvent.Text event) {
-        if (!LootGameSolverConfig.enabled) return;
-        if (!LootGameSolverConfig.showOverlay && !session.isActive()
-            && !rewardReturnPending
-            && (exploration == null || !exploration.navigating())
-            && !wasInsideRoom
-            && !autoPuzzle.isActive()
-            && !exploreKeyHeld
-            && checkpointClearDoneTicks == 0) return;
-        DetectedGame cur = session.getCurrentDetectedGame();
-        if (cur == null && (exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
-
-        Minecraft mc = Minecraft.getMinecraft();
-        if (mc.thePlayer == null || mc.theWorld == null || mc.currentScreen != null) return;
-
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-        GL11.glPushMatrix();
-        try {
-            ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
-
-            String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
-            String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
-
-            String gameTitle = cur == null ? "Explorer"
-                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
-                    : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
-                        : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
-
-            String statusStr;
-            if (automationPaused) {
-                statusStr = "Paused";
-            } else if (session.isActive()) {
-                statusStr = compactStatus(session.getStatus());
-            } else if (exploration != null) {
-                statusStr = (exploration.navigating() || rewardReturnPending
-                    || autoPuzzle.isActive()
-                    || autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED) ? exploration.navigationStatus()
-                        : "Ready";
-            } else {
-                statusStr = "Ready";
-            }
-
-            boolean autoActive = !automationPaused && session.isActive();
-            boolean holoActive = LootGameSolverConfig.showOverlay;
-            boolean explorerActive = exploration != null && explorerHudActive(
-                exploration.navigating(),
-                rewardReturnPending,
-                explorationDriven,
-                session.isActive(),
-                autoPuzzle.isActive(),
-                storageRecovery != null);
-
-            String autoColor = automationPaused ? "\u00A7f" : autoActive ? "\u00A7c" : "\u00A77";
-            String holoColor = holoActive ? "\u00A7e" : "\u00A77";
-
-            long totalSeconds = totalActiveTicks / 20L;
-            long hours = totalSeconds / 3600L;
-            long minutes = (totalSeconds % 3600L) / 60L;
-            long seconds = totalSeconds % 60L;
-            String timerStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7d" + timerStr
-                + " \u00A77] [ \u00A76"
-                + solvedPuzzles
-                + " \u00A77]";
-            int dist = rewardReturnPending ? rewardLooter.chestDistance(mc)
-                : exploration != null ? exploration.checkpointDistance(mc) : 0;
-            String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
-            String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
-                + " \u00A78|\u00A7"
-                + (session.isActive() || explorerActive ? "a" : "e")
-                + " "
-                + statusStr
-                + distBadge;
-            String line3 = autoColor + "["
-                + autoKeyStr
-                + "] Auto \u00A78|\u00A77 "
-                + holoColor
-                + "["
-                + holoKeyStr
-                + "] Holograms";
-            if (exploration != null && LootGameSolverConfig.explorationEnabled) {
-                String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-                    + "] "
-                    + exploration.explorationAction();
-                int held = checkpointClearDoneTicks > 0 ? 20 : exploreKeyHeld ? exploreHoldTicks : 0;
-                line3 += " \u00A78|"
-                    + explorerKeyLabel(label, !automationPaused && explorerActive, held, automationPaused);
-            }
-            int width1 = mc.fontRenderer.getStringWidth(line1);
-            int width2 = mc.fontRenderer.getStringWidth(line2);
-            int width3 = mc.fontRenderer.getStringWidth(line3);
-            int maxWidth = Math.max(width1, Math.max(width2, width3));
-
-            int panelWidth = Math.max(170, maxWidth + 40);
-            int panelHeight = 44;
-            int x = resolution.getScaledWidth() - panelWidth - 15;
-            int y = resolution.getScaledHeight() - panelHeight - 55;
-
-            drawNineSlice(TEXTURE_UI_9SLICE, x, y, panelWidth, panelHeight, mc);
-
-            mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
-            mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
-            mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
-        } finally {
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-            GL11.glPopMatrix();
-            GL11.glPopAttrib();
-        }
+        ClientHudOverlay.render(this, event);
     }
 
     private static String compactStatus(String text) {
