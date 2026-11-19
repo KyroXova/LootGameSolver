@@ -43,13 +43,26 @@ final class PuzzleTileNavigator {
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
         double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
         boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
-        if (reachable && (goal == null
+        if (reachable && (goal == null || withinReach(dx, dy, dz, Math.min(3D, reach))
             || atApproachGoal(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY, mc.thePlayer.posZ, goal)
             || navigation.completed())) {
+            if (goal != null && navigation.state() == BaritoneNavigationBridge.State.RUNNING
+                && !net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindSprint))
+                mc.thePlayer.setSprinting(false);
             stopRoute();
             return true;
         }
         if (goal != null) {
+            double goalDx = goal[0] + 0.5D - mc.thePlayer.posX;
+            double goalDz = goal[2] + 0.5D - mc.thePlayer.posZ;
+            boolean sprint = goalDx * goalDx + goalDz * goalDz > 4D && mc.thePlayer.onGround
+                && !mc.thePlayer.isSneaking()
+                && mc.thePlayer.getFoodStats()
+                    .getFoodLevel() > 6;
+            if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) {
+                navigation.setSprinting(sprint);
+                if (sprint) mc.thePlayer.setSprinting(true);
+            }
             double mx = mc.thePlayer.posX - lastX, my = mc.thePlayer.posY - lastY, mz = mc.thePlayer.posZ - lastZ;
             if (mx * mx + my * my + mz * mz >= 0.09D) {
                 lastX = mc.thePlayer.posX;

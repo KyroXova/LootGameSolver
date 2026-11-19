@@ -87,6 +87,7 @@ final class AutoPuzzleCoordinator {
 
     void startFromExploration(int[] puzzlePos, World world, PuzzleCompletionGate puzzleCompletion) {
         autoPuzzlePosition = puzzlePos;
+        rewardCenter = puzzlePos == null ? null : puzzlePos.clone();
         floorActivatorPosition = null;
         floorActivatorClicked = false;
         state = State.OPENING;
@@ -408,6 +409,9 @@ final class AutoPuzzleCoordinator {
                 puzzleCompletion.clear();
                 state = State.IDLE;
                 int[] solvedPos = rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+                int[] room = exploration == null ? null : exploration.verifiedRoomCenter(mc);
+                int[] cluster = ClientHooks.nearbyRewardCenter(mc, room);
+                if (cluster != null) solvedPos = cluster;
                 if (exploration != null) {
                     exploration.markStructureSolved(mc, solvedPos);
                 }

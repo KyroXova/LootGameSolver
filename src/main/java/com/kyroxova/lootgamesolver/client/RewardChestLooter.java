@@ -137,6 +137,32 @@ final class RewardChestLooter {
         return active;
     }
 
+    int[] expectedView() {
+        return chestView == null ? null : chestView.clone();
+    }
+
+    boolean hasUncollectedCluster(Minecraft mc, int[] cluster) {
+        if (mc == null || mc.theWorld == null || cluster == null) return false;
+        String world = Explorer.worldIdentity(mc);
+        int dimension = mc.theWorld.provider.dimensionId;
+        for (Object obj : mc.theWorld.loadedTileEntityList) {
+            if (!(obj instanceof TileEntityChest)) continue;
+            TileEntity tile = (TileEntity) obj;
+            if (tile.yCoord == cluster[1]
+                && Math.abs(tile.xCoord - cluster[0]) + Math.abs(tile.zCoord - cluster[2]) == 1
+                && !lootedChests.contains(world, dimension, new int[] { tile.xCoord, tile.yCoord, tile.zCoord }))
+                return true;
+        }
+        return false;
+    }
+
+    int chestDistance(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return 0;
+        int[] pos = index < chests.size() ? chests.get(index) : center;
+        if (pos == null) return 0;
+        return (int) Math.round(Math.hypot(mc.thePlayer.posX - pos[0] - 0.5D, mc.thePlayer.posZ - pos[2] - 0.5D));
+    }
+
     boolean startInventoryPacking(Minecraft mc) {
         if (baseline == null || !hasPackableItems(mc)) return false;
         start(mc, null, MiniGame.UNKNOWN);
@@ -184,6 +210,19 @@ final class RewardChestLooter {
 
     void tick(Minecraft mc, Explorer exploration) {
         if (!active || mc.thePlayer == null || mc.theWorld == null) return;
+        if (exploration != null) exploration.suspendUnrelatedRouteForRewards(mc, chestView);
+        if (exploration != null && exploration.navigating() && chestView != null && index < chests.size()) {
+            Vec3 eye = Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ);
+            net.minecraft.util.MovingObjectPosition visible = visibleChest(mc, eye, chests.get(index));
+            double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+            if (visible != null && eye.squareDistanceTo(visible.hitVec) <= reach * reach) {
+                exploration.stopRewardView(mc);
+                chestView = null;
+            }
+        }
         if (exploration != null && exploration.navigating()) {
             status = "Moving toward reward chests";
             return;

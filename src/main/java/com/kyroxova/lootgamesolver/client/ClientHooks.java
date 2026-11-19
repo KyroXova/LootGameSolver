@@ -327,7 +327,7 @@ public final class ClientHooks {
                 || rewardReturnPending
                 || storageRecovery != null;
             if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
-            if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc);
+            if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc, rewardLooter.expectedView());
             exploration.tick(mc, session.isActive(), roomWork);
         }
         if (mc.thePlayer != null && mc.theWorld != null) {
@@ -519,6 +519,19 @@ public final class ClientHooks {
             && !session.isActive()
             && mc.thePlayer.ticksExisted % 20 == 0
             && exploration.inDungeonRoom(mc)) {
+            int[] cluster = nearbyRewardCenter(mc, exploration.verifiedRoomCenter(mc));
+            if (cluster != null && rewardLooter.hasUncollectedCluster(mc, cluster)) {
+                exploration.prepareRewardCollection(mc, cluster);
+                rewardCenter = cluster;
+                explorationDriven = true;
+                ensureInventoryBaseline(mc);
+                rewardLooter.start(mc, cluster, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
+                rewardPreCleanupPending = true;
+                rewardPrePackingAttempted = false;
+                rewardReturnPending = true;
+                exploration.setAutomationStatus("Collecting reward chests");
+                return;
+            }
             int[] center = puzzleBridge.nearbyFloorActivator();
             if (center == null) {
                 center = puzzleBridge.nearbyMasterBlock(exploration.verifiedRoomCenter(mc));
@@ -1013,7 +1026,8 @@ public final class ClientHooks {
                 + " \u00A77] [ \u00A76"
                 + solvedPuzzles
                 + " \u00A77]";
-            int dist = exploration != null ? exploration.checkpointDistance(mc) : 0;
+            int dist = rewardReturnPending ? rewardLooter.chestDistance(mc)
+                : exploration != null ? exploration.checkpointDistance(mc) : 0;
             String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
             String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
                 + " \u00A78|\u00A7"

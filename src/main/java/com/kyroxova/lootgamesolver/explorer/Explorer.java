@@ -78,6 +78,7 @@ public class Explorer {
     private World waypointScanWorld;
     private long waypointScanTick = Long.MIN_VALUE;
     private int[] waypointScanResult;
+    private boolean roomWorkActive;
     ExcavationPathfinder approachPlan;
     int[] approachAnchor;
     boolean approachReady;
@@ -328,6 +329,7 @@ public class Explorer {
 
     public int[] structureWaypoint() {
         Minecraft mc = Minecraft.getMinecraft();
+        if (roomWorkActive) return null;
         if (searching || baritoneCoordinator.searchMove) return null;
         if (knownStructure != null) return ExplorerStructureDiscovery.displayedPosition(mc, knownStructure);
         if (target != null) return null;
@@ -391,8 +393,22 @@ public class Explorer {
         }
     }
 
-    public void suspendUnrelatedRouteForRewards(Minecraft mc) {
-        if (walking && !movingToRewardView) stop(mc, "Reward collection in progress");
+    public void suspendUnrelatedRouteForRewards(Minecraft mc, int[] expectedView) {
+        boolean matching = rewardRouteMatches(
+            walking,
+            movingToRewardView,
+            target == null ? null : new int[] { target.xCoord, target.yCoord, target.zCoord },
+            expectedView);
+        if (walking && !matching) {
+            stop(mc, "Reward collection in progress");
+            target = null;
+            puzzleMasterTarget = null;
+            knownStructure = null;
+        }
+    }
+
+    public static boolean rewardRouteMatches(boolean walking, boolean rewardView, int[] target, int[] expected) {
+        return walking && rewardView && target != null && expected != null && java.util.Arrays.equals(target, expected);
     }
 
     public void pauseAutomation(boolean paused) {
@@ -978,8 +994,12 @@ public class Explorer {
     }
 
     public void prepareRewardCollection(Minecraft mc, int[] center) {
-        if (walking) stop(mc, "Reward collection started");
+        if (walking || baritoneCoordinator.active()) stop(mc, "Reward collection started");
         if (mc == null || mc.theWorld == null || center == null) return;
+        target = null;
+        puzzleMasterTarget = null;
+        movingToPuzzleCenter = false;
+        movingToRewardView = false;
         knownStructure = center.clone();
         trail.target = null;
         beginAccessTrail(mc);
@@ -1252,6 +1272,7 @@ public class Explorer {
     }
 
     public void tick(Minecraft mc, boolean solverActive, boolean roomWorkActive) {
+        this.roomWorkActive = roomWorkActive;
         if (inventoryMaintenance && mc.thePlayer != null && mc.theWorld != null) {
             baritoneNavigation.setPaused(true);
             if (navigationInput != null) {
