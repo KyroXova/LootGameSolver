@@ -37,7 +37,7 @@ public final class PuzzleTileNavigator {
         double dx = target[0] + 0.5D - mc.thePlayer.posX;
         double dy = target[1] + 0.999D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double dz = target[2] + 0.5D - mc.thePlayer.posZ;
-        double reach = Math.min(3.5D, mc.playerController.getBlockReachDistance() - 0.25D);
+        double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance() - 0.2D);
         boolean reachable = withinReach(dx, dy, dz, reach) && LootGamesBridge.topFaceVisible(mc, target);
         if (!java.util.Arrays.equals(tile, target)) {
             if (!keepApproachForNewTile(
@@ -64,7 +64,7 @@ public final class PuzzleTileNavigator {
         if (goal != null) {
             double goalDx = goal[0] + 0.5D - mc.thePlayer.posX;
             double goalDz = goal[2] + 0.5D - mc.thePlayer.posZ;
-            boolean sprint = goalDx * goalDx + goalDz * goalDz > 4D && mc.thePlayer.onGround
+            boolean sprint = goalDx * goalDx + goalDz * goalDz > 2.25D && mc.thePlayer.onGround
                 && !mc.thePlayer.isSneaking()
                 && mc.thePlayer.getFoodStats()
                     .getFoodLevel() > 6;
@@ -92,7 +92,7 @@ public final class PuzzleTileNavigator {
             if (used || !ExplorerTerrain.puzzleCenterStandable(mc.theWorld, x, y, z)
                 || !ExplorerTerrain.safe(mc.theWorld, x, y, z)) continue;
             double cx = x + 0.5D - target[0] - 0.5D, cz = z + 0.5D - target[2] - 0.5D;
-            if (cx * cx + cz * cz > 4D || !withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
+            if (!withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
                 || !LootGamesBridge.topFaceVisibleFrom(mc, target, x + 0.5D, y + mc.thePlayer.getEyeHeight(), z + 0.5D))
                 continue;
             candidates.add(candidate);
@@ -141,7 +141,7 @@ public final class PuzzleTileNavigator {
         double cx = goal[0] + 0.5D - newTarget[0] - 0.5D;
         double cz = goal[2] + 0.5D - newTarget[2] - 0.5D;
         double cy = eyeHeight + 0.001D;
-        if (cx * cx + cz * cz > 4D || !withinReach(cx, cy, cz, reach)) return false;
+        if (!withinReach(cx, cy, cz, reach)) return false;
         return LootGamesBridge.topFaceVisibleFrom(mc, newTarget, goal[0] + 0.5D, goal[1] + eyeHeight, goal[2] + 0.5D);
     }
 

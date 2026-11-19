@@ -580,23 +580,7 @@ public class Explorer {
             camera.render(mc, world, false);
             return;
         }
-        if (baritoneCoordinator.active()) {
-            if (baritoneCoordinator.routePreview.isEmpty()) {
-                camera.clear();
-                return;
-            }
-            Float heading = NavigationSteering.straightHeading(
-                baritoneCoordinator.routePreview,
-                (int) Math.floor(mc.thePlayer.posX),
-                (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                (int) Math.floor(mc.thePlayer.posZ));
-            if (heading == null) {
-                camera.clear();
-                return;
-            }
-            camera.look(heading, 0F);
-            camera.render(mc, world, true);
-        } else camera.render(mc, world, true);
+        camera.render(mc, world, true);
     }
 
     public void look(float yaw, float pitch) {

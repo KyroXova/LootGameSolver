@@ -21,7 +21,7 @@ public final class ClientHudOverlay {
 
     public static final ResourceLocation TEXTURE_UI_9SLICE = new ResourceLocation(
         "lootgamesolver",
-        "textures/gui/panel_9slice.png");
+        "textures/gui/ui_9slice.png");
 
     private ClientHudOverlay() {}
 

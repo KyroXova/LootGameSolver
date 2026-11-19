@@ -190,6 +190,7 @@ public final class ClientHooks {
                 rewardLooter.start(mc, rewardCenter, checkpoint.game);
                 rewardPreCleanupPending = false;
                 rewardReturnPending = true;
+                explorationDriven = exploration != null;
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
                         "\u00a7a[LootGameSolver] Storage trip complete; resuming saved rewards."));
@@ -418,8 +419,6 @@ public final class ClientHooks {
                     preLootPacker.tick(mc, null);
                     if (exploration != null) exploration.setAutomationStatus(preLootPacker.status());
                     if (preLootPacker.active()) return;
-                    if ("No available backpack; items kept".equals(preLootPacker.status())
-                        && startStorageRecovery(mc, rewardLooter.saveCheckpoint(mc))) return;
                 }
                 rewardPreCleanupPending = false;
                 rewardPrePackingAttempted = false;
@@ -434,8 +433,9 @@ public final class ClientHooks {
                     if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
                     return;
                 }
-                if (("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
-                    || "No available backpack; items kept".equals(rewardLooter.status())) && mc.currentScreen == null
+                if ("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+                    && mc.thePlayer != null && mc.thePlayer.inventory.getFirstEmptyStack() < 0
+                    && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
                     if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
                     rewardReturnPending = false;

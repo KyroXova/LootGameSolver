@@ -28,7 +28,7 @@ public final class NavigationSteering {
     }
 
     public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
-        return baritoneActive && (interacting || attacking || cooldown > 0);
+        return baritoneActive;
     }
 
     public static Float walkingHeading(double vx, double vz, float fallback, java.util.List<int[]> route) {

@@ -77,7 +77,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startAdjacentWithoutBreaking(int x, int y, int z) {
-        return start(x, y, z, 1, true, true);
+        return start(x, y, z, 1, true, false);
     }
 
     public Start startHorizontal(int x, int z) {

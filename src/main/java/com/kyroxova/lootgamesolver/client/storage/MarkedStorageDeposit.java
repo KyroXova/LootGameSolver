@@ -118,7 +118,7 @@ public final class MarkedStorageDeposit {
             double[] pos = target.loadedPosition(mc);
             if (candidate == null || pos == null) continue;
             double distance = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
-            if (distance > 16D) {
+            if (distance > 6.25D) {
                 if (distance > 64D) continue;
                 if (approach(target, pos)) return Result.WORKING;
                 continue;
@@ -196,11 +196,12 @@ public final class MarkedStorageDeposit {
                     && crosshair.hitVec != null
                     && eye.squareDistanceTo(crosshair.hitVec) <= reach * reach);
             if (!visible || Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
-                if (++aimTicks <= 80) {
+                if (++aimTicks <= 20) {
                     next--;
                     return Result.WORKING;
                 }
                 aimIndex = -1;
+                if (!visible && approach(target, pos)) return Result.WORKING;
                 continue;
             }
             aimIndex = -1;
