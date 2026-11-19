@@ -54,8 +54,18 @@ public final class PendingLootStore {
                     file.toPath(),
                     StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-                Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception e) {
+                try {
+                    Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception fallback) {
+                    Files.write(
+                        file.toPath(),
+                        new Gson().toJson(checkpoint)
+                            .getBytes(StandardCharsets.UTF_8));
+                    try {
+                        Files.deleteIfExists(pending.toPath());
+                    } catch (Exception ignored) {}
+                }
             }
             return true;
         } catch (IOException e) {

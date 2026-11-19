@@ -308,6 +308,11 @@ public final class ClientHooks {
         if (clearCheckpointRequested) {
             clearCheckpointRequested = false;
             rewardLooter.clearCheckpoint();
+            if (rewardLooter.active()) rewardLooter.cancel(mc);
+            if (preLootPacker.active()) preLootPacker.cancel(mc);
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            rewardCenter = null;
             if (exploration != null) exploration.clearLastCheckpoint(mc);
             rewardLooterCooldown = 0;
             mc.thePlayer.addChatMessage(
@@ -624,7 +629,10 @@ public final class ClientHooks {
     }
 
     private boolean startStorageRecovery(Minecraft mc, PendingLootStore.Checkpoint checkpoint) {
-        if (checkpoint == null || !java.util.Arrays.equals(rewardLooter.rewardCenter(), checkpoint.center))
+        if (checkpoint == null) return false;
+        int[] expectedCenter = rewardLooter.rewardCenter();
+        if (expectedCenter == null) expectedCenter = rewardCenter;
+        if (expectedCenter != null && !java.util.Arrays.equals(expectedCenter, checkpoint.center))
             return false;
         StorageRecoveryController recovery = new StorageRecoveryController();
         if (!recovery.start(mc, checkpoint, inventoryBaseline)) return false;

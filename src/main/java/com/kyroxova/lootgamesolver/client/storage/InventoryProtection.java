@@ -36,7 +36,9 @@ public final class InventoryProtection {
             || id.contains("knapsack")
             || id.contains("satchel")
             || id.contains("bag")
-            || type.contains("bag");
+            || type.contains("bag")
+            || id.contains("pouch")
+            || type.contains("pouch");
     }
 
     public static boolean backpackContainer(String name) {
@@ -48,7 +50,10 @@ public final class InventoryProtection {
         if (dot >= 0) type = type.substring(dot + 1);
         return (type.contains("backpack") || type.contains("knapsack")
             || type.contains("satchel")
-            || type.contains("bag")) && !type.contains("jetpack") && !type.contains("copter");
+            || type.contains("bag")
+            || type.contains("pouch")
+            || type.contains("holding")
+            || type.contains("iteminventory")) && !type.contains("jetpack") && !type.contains("copter");
     }
 
     public static boolean essential(ItemStack stack) {

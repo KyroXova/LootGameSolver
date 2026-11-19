@@ -84,6 +84,8 @@ public final class ClientKeyHandler {
                     if (hooks.preLootPacker.active()) hooks.preLootPacker.cancel(mc);
                     if (hooks.rewardLooter.active()) hooks.rewardLooter.cancel(mc);
                     hooks.rewardReturnPending = false;
+                    hooks.rewardPreCleanupPending = false;
+                    hooks.rewardCenter = null;
                     if (hooks.storageRecovery != null) hooks.storageRecovery.cancel();
                     hooks.storageRecovery = null;
                     hooks.session.cancel("Automation cleared");
@@ -95,6 +97,8 @@ public final class ClientKeyHandler {
                     if (hooks.preLootPacker.active()) hooks.preLootPacker.cancel(mc);
                     hooks.rewardLooter.cancel(mc);
                     hooks.rewardReturnPending = false;
+                    hooks.rewardPreCleanupPending = false;
+                    hooks.rewardCenter = null;
                 }
                 if (hooks.exploration != null && mc.thePlayer != null && mc.theWorld != null)
                     hooks.exploration.clearLastCheckpoint(mc);

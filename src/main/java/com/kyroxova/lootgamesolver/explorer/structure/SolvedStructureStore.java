@@ -75,8 +75,18 @@ public final class SolvedStructureStore {
                 file.toPath(),
                 StandardCopyOption.REPLACE_EXISTING,
                 StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-            Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
+            try {
+                Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception fallback) {
+                Files.write(
+                    file.toPath(),
+                    GSON.toJson(data)
+                        .getBytes(StandardCharsets.UTF_8));
+                try {
+                    Files.deleteIfExists(pending.toPath());
+                } catch (Exception ignored) {}
+            }
         }
     }
 

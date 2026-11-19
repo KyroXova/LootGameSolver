@@ -109,8 +109,15 @@ public final class AccessTrailStore {
                 file.toPath(),
                 StandardCopyOption.REPLACE_EXISTING,
                 StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-            Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
+            try {
+                Files.move(pending.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception fallback) {
+                Files.write(file.toPath(), bytes);
+                try {
+                    Files.deleteIfExists(pending.toPath());
+                } catch (Exception ignored) {}
+            }
         }
     }
 
