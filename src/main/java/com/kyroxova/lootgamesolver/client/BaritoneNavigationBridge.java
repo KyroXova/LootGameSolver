@@ -327,7 +327,7 @@ public final class BaritoneNavigationBridge {
         }
     }
 
-    static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y, int z)
+    public static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y, int z)
         throws ReflectiveOperationException {
         return processApi.getMethod("getGoal")
             .invoke(process) == null

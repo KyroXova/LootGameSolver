@@ -1,5 +1,7 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
+import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
 import org.lwjgl.input.Keyboard;
 
 import net.minecraft.client.Minecraft;
@@ -13,17 +15,17 @@ import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 
-final class ClientKeyHandler {
+public final class ClientKeyHandler {
 
-    boolean exploreKeyHeld;
-    int exploreHoldTicks;
-    boolean exploreHoldActionDone;
-    boolean pausedOnThisPress;
-    long explorePausedAt;
+    public boolean exploreKeyHeld;
+    public int exploreHoldTicks;
+    public boolean exploreHoldActionDone;
+    public boolean pausedOnThisPress;
+    public long explorePausedAt;
     private boolean lastAutoSolveKey;
     private boolean lastOverlayKey;
 
-    boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {
+    public boolean isKeyJustPressed(KeyBinding binding, int fallbackCode) {
         if (Minecraft.getMinecraft().currentScreen != null) return false;
         if (binding != null) return binding.isPressed();
         int code = binding != null ? binding.getKeyCode() : fallbackCode;
@@ -46,7 +48,7 @@ final class ClientKeyHandler {
         return false;
     }
 
-    void checkKeyToggles(Minecraft mc, ClientHooks hooks) {
+    public void checkKeyToggles(Minecraft mc, ClientHooks hooks) {
         boolean explorePressed = Keybinds.explore.isPressed();
         boolean exploreDown = GameSettings.isKeyDown(Keybinds.explore);
         boolean active = hooks.session.isActive() || hooks.autoPuzzle.isActive()

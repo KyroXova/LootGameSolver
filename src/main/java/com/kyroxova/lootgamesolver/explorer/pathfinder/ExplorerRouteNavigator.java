@@ -4,7 +4,7 @@ import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
-import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.isRewardChestPit;
+import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChestPit;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.staircaseDirection;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFoliage;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
@@ -12,7 +12,7 @@ import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 
-import com.kyroxova.lootgamesolver.client.RewardChestGeometry;
+import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public class ExplorerRouteNavigator {

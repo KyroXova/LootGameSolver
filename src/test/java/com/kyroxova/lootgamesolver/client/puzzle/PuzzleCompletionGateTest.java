@@ -1,0 +1,40 @@
+package com.kyroxova.lootgamesolver.client.puzzle;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+public class PuzzleCompletionGateTest {
+
+    @Test
+    public void onlyCurrentServerWinCompletesThePuzzle() {
+        PuzzleCompletionGate gate = new PuzzleCompletionGate();
+        assertFalse(gate.won(true));
+        gate.begin();
+        assertFalse(gate.won(true));
+        gate.message("msg.lootgames.win");
+        assertTrue(gate.won(true));
+        assertFalse(gate.won(false));
+    }
+
+    @Test
+    public void lossCannotBeOverriddenByLaterWinMessage() {
+        PuzzleCompletionGate gate = new PuzzleCompletionGate();
+        gate.begin();
+        gate.message("msg.lootgames.lose");
+        gate.message("msg.lootgames.win");
+        assertFalse(gate.won(true));
+    }
+
+    @Test
+    public void stageCompletionDoesNotCompleteTheGame() {
+        PuzzleCompletionGate gate = new PuzzleCompletionGate();
+        gate.begin();
+        gate.message("msg.lootgames.stage_complete");
+        assertTrue(gate.stageCompleted());
+        assertFalse(gate.won(true));
+        gate.clearStageCompleted();
+        assertFalse(gate.stageCompleted());
+    }
+}

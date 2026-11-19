@@ -1,8 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
+import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
-import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.isRewardChestPit;
-import static com.kyroxova.lootgamesolver.client.RewardChestGeometry.rewardChestAhead;
+import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChestPit;
+import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.rewardChestAhead;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.walkSurfaceY;
 

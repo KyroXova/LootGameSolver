@@ -1,5 +1,6 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;

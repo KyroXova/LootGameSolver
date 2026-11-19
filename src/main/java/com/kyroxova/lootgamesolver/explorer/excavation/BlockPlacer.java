@@ -11,7 +11,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 
-import com.kyroxova.lootgamesolver.client.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
 
 public final class BlockPlacer {
 

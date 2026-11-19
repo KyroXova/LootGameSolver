@@ -10,7 +10,7 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
-import com.kyroxova.lootgamesolver.client.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
 
 public final class ExplorerSustain {
 

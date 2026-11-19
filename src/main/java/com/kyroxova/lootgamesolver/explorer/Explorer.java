@@ -44,8 +44,8 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
-import com.kyroxova.lootgamesolver.client.InventoryToolTransfer;
-import com.kyroxova.lootgamesolver.client.StatusText;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.client.ui.StatusText;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public class Explorer {

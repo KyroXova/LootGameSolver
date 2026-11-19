@@ -1,5 +1,20 @@
 package com.kyroxova.lootgamesolver.client;
 
+import com.kyroxova.lootgamesolver.client.loot.MinedDropStore;
+import com.kyroxova.lootgamesolver.client.loot.MinedDropTracker;
+import com.kyroxova.lootgamesolver.client.loot.PendingLootStore;
+import com.kyroxova.lootgamesolver.client.loot.RewardChestLooter;
+import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
+import com.kyroxova.lootgamesolver.client.puzzle.PuzzleCompletionGate;
+import com.kyroxova.lootgamesolver.client.puzzle.PuzzleTileNavigator;
+import com.kyroxova.lootgamesolver.client.puzzle.RoomOpenWatchdog;
+import com.kyroxova.lootgamesolver.client.puzzle.SolverSession;
+import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
+import com.kyroxova.lootgamesolver.client.storage.StorageRecoveryController;
+import com.kyroxova.lootgamesolver.client.storage.TrashCleanup;
+import com.kyroxova.lootgamesolver.client.ui.ClientHudOverlay;
+import com.kyroxova.lootgamesolver.client.ui.StatusText;
+import com.kyroxova.lootgamesolver.client.ui.WorldOverlayRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -33,75 +48,75 @@ public final class ClientHooks {
     private static boolean travelModeRefreshRequested;
     private static boolean clearCheckpointRequested;
 
-    static void requestClearCheckpoint() {
+    public static void requestClearCheckpoint() {
         clearCheckpointRequested = true;
     }
 
-    static void requestTravelModeRefresh() {
+    public static void requestTravelModeRefresh() {
         travelModeRefreshRequested = true;
     }
 
-    static void requestResumeLoot() {
+    public static void requestResumeLoot() {
         resumeLootRequested = true;
     }
 
     private static final ResourceLocation TEXTURE_UI_9SLICE = new ResourceLocation(
         "lootgamesolver",
         "textures/gui/ui_9slice.png");
-    final SolverSession session = new SolverSession();
-    final Explorer exploration = Explorer.ENABLED ? new Explorer() : null;
+    public final SolverSession session = new SolverSession();
+    public final Explorer exploration = Explorer.ENABLED ? new Explorer() : null;
     private final WorldOverlayRenderer worldRenderer = new WorldOverlayRenderer(session, exploration);
-    final ClientKeyHandler keyHandler = new ClientKeyHandler();
+    public final ClientKeyHandler keyHandler = new ClientKeyHandler();
     private int detectCounter = 0;
-    final LootGamesBridge puzzleBridge = new LootGamesBridge();
-    final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
-    final PuzzleTileNavigator tileNavigator = new PuzzleTileNavigator();
+    public final LootGamesBridge puzzleBridge = new LootGamesBridge();
+    public final PuzzleCompletionGate puzzleCompletion = new PuzzleCompletionGate();
+    public final PuzzleTileNavigator tileNavigator = new PuzzleTileNavigator();
     private final RoomOpenWatchdog roomOpenWatchdog = new RoomOpenWatchdog();
-    final RewardChestLooter rewardLooter = new RewardChestLooter();
-    final RewardChestLooter preLootPacker = new RewardChestLooter();
-    final TrashCleanup trashCleanup = new TrashCleanup();
+    public final RewardChestLooter rewardLooter = new RewardChestLooter();
+    public final RewardChestLooter preLootPacker = new RewardChestLooter();
+    public final TrashCleanup trashCleanup = new TrashCleanup();
     private final MinedDropTracker minedDrops = new MinedDropTracker();
     private MinedDropStore minedDropStore;
-    StorageRecoveryController storageRecovery;
+    public StorageRecoveryController storageRecovery;
     private boolean storageResumeChecked;
     private int storageResumeWait;
-    boolean rewardReturnPending;
-    boolean rewardPreCleanupPending;
-    boolean rewardPrePackingAttempted;
+    public boolean rewardReturnPending;
+    public boolean rewardPreCleanupPending;
+    public boolean rewardPrePackingAttempted;
     private int inventoryMaintenanceStage;
     private int inventoryMaintenanceWait;
     private int inventoryMaintenanceCooldown;
     private int rewardLooterCooldown;
-    boolean explorationDriven;
-    InventoryBaseline inventoryBaseline;
-    int[] rewardCenter;
-    boolean automationPaused;
-    int checkpointClearDoneTicks;
-    boolean wasInsideRoom;
+    public boolean explorationDriven;
+    public InventoryBaseline inventoryBaseline;
+    public int[] rewardCenter;
+    public boolean automationPaused;
+    public int checkpointClearDoneTicks;
+    public boolean wasInsideRoom;
     private World puzzleWorld;
-    long totalActiveTicks = 0L;
-    int solvedPuzzles;
+    public long totalActiveTicks = 0L;
+    public int solvedPuzzles;
 
-    final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
+    public final AutoPuzzleCoordinator autoPuzzle = new AutoPuzzleCoordinator();
 
-    void recordPuzzleSolved() {
+    public void recordPuzzleSolved() {
         solvedPuzzles++;
     }
 
-    static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven, boolean solving,
+    public static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven, boolean solving,
         boolean opening, boolean storage) {
         return navigating || looting || (explorationDriven && (solving || opening || storage));
     }
 
-    static boolean pauseOnExplorePress(boolean paused, boolean active) {
+    public static boolean pauseOnExplorePress(boolean paused, boolean active) {
         return !paused && active;
     }
 
-    static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused, boolean pausedOnPress) {
+    public static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused, boolean pausedOnPress) {
         return wasHeld && !holdAction && paused && !pausedOnPress;
     }
 
-    static boolean quickExploreRecovery(long pausedAt, long now) {
+    public static boolean quickExploreRecovery(long pausedAt, long now) {
         return pausedAt > 0 && now >= pausedAt && now - pausedAt <= 2000;
     }
 
@@ -587,24 +602,24 @@ public final class ClientHooks {
         }
     }
 
-    void startPuzzleSolver() {
+    public void startPuzzleSolver() {
         autoPuzzle.startPuzzleSolver(Minecraft.getMinecraft(), puzzleBridge, session, this);
     }
 
-    boolean isExplorationDriven() {
+    public boolean isExplorationDriven() {
         return explorationDriven;
     }
 
-    void setRewardPreCleanupPending(boolean pending) {
+    public void setRewardPreCleanupPending(boolean pending) {
         this.rewardPreCleanupPending = pending;
         this.rewardPrePackingAttempted = false;
     }
 
-    void setRewardReturnPending(boolean pending) {
+    public void setRewardReturnPending(boolean pending) {
         this.rewardReturnPending = pending;
     }
 
-    void setRewardCenter(int[] center) {
+    public void setRewardCenter(int[] center) {
         rewardCenter = center == null ? null : center.clone();
     }
 
@@ -618,7 +633,7 @@ public final class ClientHooks {
         return true;
     }
 
-    InventoryBaseline getInventoryBaseline() {
+    public InventoryBaseline getInventoryBaseline() {
         return inventoryBaseline;
     }
 
@@ -627,7 +642,7 @@ public final class ClientHooks {
         return false;
     }
 
-    void setAutomationPaused(Minecraft mc, boolean paused) {
+    public void setAutomationPaused(Minecraft mc, boolean paused) {
         automationPaused = paused;
         tileNavigator.pause(paused);
         if (exploration != null) exploration.pauseAutomation(paused);
@@ -639,32 +654,32 @@ public final class ClientHooks {
         }
     }
 
-    void captureInventoryBaseline(Minecraft mc) {
+    public void captureInventoryBaseline(Minecraft mc) {
         inventoryBaseline = InventoryBaseline.capture(mc);
         trashCleanup.setBaseline(inventoryBaseline);
         rewardLooter.setBaseline(inventoryBaseline);
         preLootPacker.setBaseline(inventoryBaseline);
     }
 
-    void ensureInventoryBaseline(Minecraft mc) {
+    public void ensureInventoryBaseline(Minecraft mc) {
         if (inventoryBaseline == null) captureInventoryBaseline(mc);
     }
 
-    static int[] nearbyRewardCenter(Minecraft mc) {
+    public static int[] nearbyRewardCenter(Minecraft mc) {
         return nearbyRewardCenter(mc, null);
     }
 
-    static boolean rewardClusterMatches(int[] anchor, int x, int y, int z) {
+    public static boolean rewardClusterMatches(int[] anchor, int x, int y, int z) {
         return anchor == null
             || (Math.abs(anchor[0] - x) <= 5 && Math.abs(anchor[2] - z) <= 5 && Math.abs(anchor[1] - y) <= 5);
     }
 
-    static boolean rewardCollectionTooFar(double x, double y, double z, int[] center) {
+    public static boolean rewardCollectionTooFar(double x, double y, double z, int[] center) {
         double dx = x - (center[0] + 0.5D), dz = z - (center[2] + 0.5D);
         return dx * dx + dz * dz > 32D * 32D || Math.abs(y - center[1]) > 24D;
     }
 
-    static int[] nearbyRewardCenter(Minecraft mc, int[] anchor) {
+    public static int[] nearbyRewardCenter(Minecraft mc, int[] anchor) {
         java.util.List<net.minecraft.tileentity.TileEntityChest> nearby = new java.util.ArrayList<>();
         for (Object value : mc.theWorld.loadedTileEntityList) {
             if (!(value instanceof net.minecraft.tileentity.TileEntityChest)) continue;
@@ -714,7 +729,7 @@ public final class ClientHooks {
         }
     }
 
-    void releaseMovementKeys(Minecraft mc) {
+    public void releaseMovementKeys(Minecraft mc) {
         tileNavigator.stop();
         if (mc.thePlayer != null) {
             mc.thePlayer.setSprinting(false);
@@ -739,11 +754,11 @@ public final class ClientHooks {
         return StatusText.solver(text);
     }
 
-    static String explorerKeyLabel(String label, boolean active, int heldTicks) {
+    public static String explorerKeyLabel(String label, boolean active, int heldTicks) {
         return explorerKeyLabel(label, active, heldTicks, false);
     }
 
-    static String explorerKeyLabel(String label, boolean active, int heldTicks, boolean paused) {
+    public static String explorerKeyLabel(String label, boolean active, int heldTicks, boolean paused) {
         String base = paused ? "\u00A7f" : active ? "\u00A7a" : "\u00A77";
         if (heldTicks < 5) return base + label;
         int filled = Math.min(label.length(), Math.max(0, (heldTicks - 4) * label.length() / 16));

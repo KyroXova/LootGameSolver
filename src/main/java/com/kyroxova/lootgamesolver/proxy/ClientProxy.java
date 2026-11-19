@@ -1,10 +1,11 @@
 package com.kyroxova.lootgamesolver.proxy;
 
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.kyroxova.lootgamesolver.client.ClientHooks;
 import com.kyroxova.lootgamesolver.client.Keybinds;
-import com.kyroxova.lootgamesolver.client.StorageCommand;
+import com.kyroxova.lootgamesolver.client.storage.StorageCommand;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;

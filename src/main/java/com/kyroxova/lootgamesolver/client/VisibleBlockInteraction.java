@@ -3,11 +3,11 @@ package com.kyroxova.lootgamesolver.client;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 
-final class VisibleBlockInteraction {
+public final class VisibleBlockInteraction {
 
     private VisibleBlockInteraction() {}
 
-    static boolean matches(MovingObjectPosition crosshair, MovingObjectPosition ray, Vec3 eye, int x, int y, int z,
+    public static boolean matches(MovingObjectPosition crosshair, MovingObjectPosition ray, Vec3 eye, int x, int y, int z,
         double reach) {
         if (eye == null || reach <= 0
             || !target(crosshair, x, y, z)

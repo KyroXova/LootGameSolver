@@ -5,11 +5,11 @@ import java.lang.reflect.Method;
 import net.minecraft.client.Minecraft;
 
 /** Uses the optional Baritone inventory API while retaining standalone operation. */
-final class BaritoneInventoryBridge {
+public final class BaritoneInventoryBridge {
 
     private BaritoneInventoryBridge() {}
 
-    static boolean useHotbarItem(Minecraft mc, int slot) {
+    public static boolean useHotbarItem(Minecraft mc, int slot) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -36,15 +36,15 @@ final class BaritoneInventoryBridge {
         }
     }
 
-    static boolean quickMove(Minecraft mc, int slot) {
+    public static boolean quickMove(Minecraft mc, int slot) {
         return click(mc, slot, "QUICK_MOVE", 0);
     }
 
-    static boolean swapOpenContainer(Minecraft mc, int slot, int hotbar) {
+    public static boolean swapOpenContainer(Minecraft mc, int slot, int hotbar) {
         return click(mc, slot, "HOTBAR_SWAP", hotbar);
     }
 
-    static boolean leftClick(Minecraft mc, int slot) {
+    public static boolean leftClick(Minecraft mc, int slot) {
         return click(mc, slot, "LEFT", 0);
     }
 
