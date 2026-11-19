@@ -50,10 +50,10 @@ final class RewardChestView {
         positions.sort((a, b) -> {
             int da = Math.abs(a[0] - chest[0]) + Math.abs(a[2] - chest[2]);
             int db = Math.abs(b[0] - chest[0]) + Math.abs(b[2] - chest[2]);
-            return da != db ? Integer.compare(da, db)
-                : Double.compare(
-                    mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1] + 1D, a[2] + 0.5D),
-                    mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1] + 1D, b[2] + 0.5D));
+            int distance = Double.compare(
+                mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1] + 1D, a[2] + 0.5D),
+                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1] + 1D, b[2] + 0.5D));
+            return distance != 0 ? distance : Integer.compare(da, db);
         });
         for (int[] position : positions) if (exploration.moveToRewardView(mc, position)) {
             return position;

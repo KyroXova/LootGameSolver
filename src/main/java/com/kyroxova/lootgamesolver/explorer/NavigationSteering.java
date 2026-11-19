@@ -2,6 +2,22 @@ package com.kyroxova.lootgamesolver.explorer;
 
 final class NavigationSteering {
 
+    static boolean shortDiagonal(java.util.List<int[]> route, int x, int y, int z) {
+        int directionX = 0, directionZ = 0, steps = 0;
+        for (int[] next : route) {
+            int dx = next[0] - x, dz = next[2] - z;
+            if (dx == 0 && dz == 0 && next[1] == y) continue;
+            if (Math.abs(dx) != 1 || Math.abs(dz) != 1 || next[1] != y) break;
+            if (steps > 0 && (dx != directionX || dz != directionZ)) break;
+            directionX = dx;
+            directionZ = dz;
+            x = next[0];
+            z = next[2];
+            if (++steps > 3) return false;
+        }
+        return steps > 0;
+    }
+
     static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
         return baritoneActive && (interacting || attacking || cooldown > 0);
     }

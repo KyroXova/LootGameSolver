@@ -218,6 +218,19 @@ final class RewardChestLooter {
                 mc.thePlayer.posZ);
             net.minecraft.util.MovingObjectPosition visible = visibleChest(mc, eye, chests.get(index));
             double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+            if ((visible == null || eye.squareDistanceTo(visible.hitVec) > reach * reach) && !collecting) {
+                for (int i = index + 1; i < chests.size(); i++) {
+                    if (lootedChests
+                        .contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i)))
+                        continue;
+                    net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
+                    if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach) {
+                        java.util.Collections.swap(chests, index, i);
+                        visible = other;
+                        break;
+                    }
+                }
+            }
             if (visible != null && eye.squareDistanceTo(visible.hitVec) <= reach * reach) {
                 exploration.stopRewardView(mc);
                 chestView = null;
@@ -479,20 +492,16 @@ final class RewardChestLooter {
         double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
-        if (dx * dx + dy * dy + dz * dz > reach * reach) {
-            if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
-                status = "Moving toward reward chests";
-            else if (active) status = "Finding a safe position beside the reward chest";
-            waiting = 10;
-            return;
-        }
         Vec3 eye = Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         net.minecraft.util.MovingObjectPosition hit = visibleChest(mc, eye, pos);
-        if (hit == null || hit.blockX != pos[0] || hit.blockY != pos[1] || hit.blockZ != pos[2]) {
+        if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach) {
             if (!collecting) {
                 for (int i = index + 1; i < chests.size(); i++) {
-                    if (visibleChest(mc, eye, chests.get(i)) != null) {
+                    net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
+                    if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach
+                        && !lootedChests
+                            .contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i))) {
                         java.util.Collections.swap(chests, index, i);
                         status = "Opening a visible reward chest";
                         return;

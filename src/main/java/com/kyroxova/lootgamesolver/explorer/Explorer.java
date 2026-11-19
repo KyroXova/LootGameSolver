@@ -796,6 +796,14 @@ public class Explorer {
             return;
         }
         if (baritoneCoordinator.active()) {
+            if (NavigationSteering.shortDiagonal(
+                baritoneCoordinator.routePreview,
+                (int) Math.floor(mc.thePlayer.posX),
+                (int) Math.floor(mc.thePlayer.boundingBox.minY),
+                (int) Math.floor(mc.thePlayer.posZ))) {
+                camera.clear();
+                return;
+            }
             double vx = mc.thePlayer.motionX, vz = mc.thePlayer.motionZ;
             Float heading = NavigationSteering
                 .walkingHeading(vx, vz, mc.thePlayer.rotationYaw, baritoneCoordinator.routePreview);
@@ -2273,10 +2281,11 @@ public class Explorer {
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
         float desiredPitch = swimming ? 0F : cameraPitchDirection > 0 ? -10F : cameraPitchDirection < 0 ? 30F : 0F;
-        if (!centering) look(desired, desiredPitch);
+        boolean shortDiagonal = NavigationSteering.shortDiagonal(route, px, py, pz);
+        if (!centering && !shortDiagonal) look(desired, desiredPitch);
         status = centering ? "Centering on supported ground"
             : returning ? "Returning along saved access path" : "Following checked route";
-        if (!centering && Math.abs(turn) > 60F) {
+        if (!centering && !shortDiagonal && Math.abs(turn) > 60F) {
             stalled = 0;
             lastDistance = Double.MAX_VALUE;
             mc.thePlayer.setSprinting(false);

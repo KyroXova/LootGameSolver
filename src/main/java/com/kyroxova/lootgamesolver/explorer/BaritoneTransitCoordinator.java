@@ -38,7 +38,7 @@ public final class BaritoneTransitCoordinator {
     public int handoffTicks;
     private int routeFailures;
     private int rewardViewStalled;
-    private double rewardViewX, rewardViewY, rewardViewZ;
+    private double rewardViewX, rewardViewZ;
     boolean breaking;
     public final List<int[]> routePreview = new ArrayList<int[]>();
     public int previewTick;
@@ -491,11 +491,9 @@ public final class BaritoneTransitCoordinator {
             } else {
                 if (explorer.movingToRewardView) {
                     double dx = mc.thePlayer.posX - rewardViewX;
-                    double dy = mc.thePlayer.posY - rewardViewY;
                     double dz = mc.thePlayer.posZ - rewardViewZ;
-                    if (dx * dx + dy * dy + dz * dz >= 0.09D) {
+                    if (rewardApproachProgress(dx, dz)) {
                         rewardViewX = mc.thePlayer.posX;
-                        rewardViewY = mc.thePlayer.posY;
                         rewardViewZ = mc.thePlayer.posZ;
                         rewardViewStalled = 0;
                     } else if (++rewardViewStalled >= 160) {
@@ -532,5 +530,9 @@ public final class BaritoneTransitCoordinator {
             }
         }
         return false;
+    }
+
+    static boolean rewardApproachProgress(double dx, double dz) {
+        return dx * dx + dz * dz >= 0.09D;
     }
 }

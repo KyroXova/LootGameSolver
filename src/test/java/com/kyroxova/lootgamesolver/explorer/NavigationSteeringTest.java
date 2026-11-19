@@ -10,6 +10,30 @@ import org.junit.Test;
 public class NavigationSteeringTest {
 
     @Test
+    public void shortDiagonalStepsDoNotNeedCameraSteering() {
+        assertTrue(
+            NavigationSteering.shortDiagonal(
+                java.util.Arrays.asList(new int[] { 0, 64, 0 }, new int[] { 1, 64, 1 }, new int[] { 2, 64, 2 }),
+                0,
+                64,
+                0));
+        assertFalse(
+            NavigationSteering.shortDiagonal(
+                java.util.Arrays.asList(
+                    new int[] { 1, 64, 1 },
+                    new int[] { 2, 64, 2 },
+                    new int[] { 3, 64, 3 },
+                    new int[] { 4, 64, 4 }),
+                0,
+                64,
+                0));
+        assertFalse(
+            NavigationSteering.shortDiagonal(java.util.Collections.singletonList(new int[] { 1, 64, 0 }), 0, 64, 0));
+        assertFalse(
+            NavigationSteering.shortDiagonal(java.util.Collections.singletonList(new int[] { 1, 65, 1 }), 0, 64, 0));
+    }
+
+    @Test
     public void yieldsTheWalkingCameraDuringBaritoneInteractions() {
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, true, false, 0));
         assertTrue(NavigationSteering.yieldCameraToBaritone(true, false, false, 3));
