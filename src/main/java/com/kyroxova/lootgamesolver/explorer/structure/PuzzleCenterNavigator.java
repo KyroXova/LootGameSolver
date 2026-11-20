@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.samePosition;
 
 import net.minecraft.client.Minecraft;
@@ -10,6 +7,8 @@ import net.minecraft.tileentity.TileEntity;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
 
 public final class PuzzleCenterNavigator {
 

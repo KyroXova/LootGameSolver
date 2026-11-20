@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client.ui;
 
-import com.kyroxova.lootgamesolver.client.ExplorationBeta;
-import com.kyroxova.lootgamesolver.client.puzzle.SolverSession;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +15,8 @@ import net.minecraftforge.client.event.RenderWorldLastEvent;
 
 import org.lwjgl.opengl.GL11;
 
+import com.kyroxova.lootgamesolver.client.ExplorationBeta;
+import com.kyroxova.lootgamesolver.client.puzzle.SolverSession;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.CellPosition;
 import com.kyroxova.lootgamesolver.core.MiniGame;
@@ -97,7 +97,8 @@ public final class WorldOverlayRenderer {
         drawFloatingText(text, x, y, z, color, mc, 0.025F);
     }
 
-    public static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc, float scale) {
+    public static void drawFloatingText(String text, double x, double y, double z, int color, Minecraft mc,
+        float scale) {
         FontRenderer font = mc.fontRenderer;
         RenderManager rm = RenderManager.instance;
 

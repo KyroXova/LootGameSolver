@@ -1,11 +1,5 @@
 package com.kyroxova.lootgamesolver.client.loot;
 
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
-import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
-import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
-import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
-import com.kyroxova.lootgamesolver.client.storage.TrashCleanup;
-import com.kyroxova.lootgamesolver.client.storage.TrashPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,6 +11,12 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
+import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
+import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.client.storage.TrashCleanup;
+import com.kyroxova.lootgamesolver.client.storage.TrashPolicy;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
 
@@ -153,7 +153,8 @@ public final class RewardBackpackPacker {
             return;
         }
         Container container = mc.thePlayer.openContainer;
-        String name = container.getClass().getName();
+        String name = container.getClass()
+            .getName();
         int nonPlayerSlots = 0;
         for (Object obj : container.inventorySlots) {
             Slot s = (Slot) obj;
@@ -161,7 +162,8 @@ public final class RewardBackpackPacker {
                 nonPlayerSlots++;
             }
         }
-        boolean isBackpack = InventoryProtection.backpackContainer(name) && nonPlayerSlots >= 4 && backpackSlot >= 0
+        boolean isBackpack = InventoryProtection.backpackContainer(name) && nonPlayerSlots >= 4
+            && backpackSlot >= 0
             && isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot));
         if (packOpening && mc.currentScreen instanceof GuiContainer && !isBackpack) {
             mc.thePlayer.closeScreen();
@@ -186,7 +188,8 @@ public final class RewardBackpackPacker {
         }
         if (packOpening && mc.currentScreen instanceof GuiContainer && isBackpack) {
             if (packPendingSlot >= 0) {
-                Slot pending = packPendingSlot < container.inventorySlots.size() ? container.getSlot(packPendingSlot) : null;
+                Slot pending = packPendingSlot < container.inventorySlots.size() ? container.getSlot(packPendingSlot)
+                    : null;
                 ItemStack remaining = pending == null ? null : pending.getStack();
                 int bagCount = backpackItemCount(container, mc, packPendingStack);
                 boolean sourceChanged = remaining == null || !remaining.isItemEqual(packPendingStack)
@@ -311,9 +314,11 @@ public final class RewardBackpackPacker {
                 temporaryBag = false;
                 temporaryBagUsed = false;
             }
-            if (looter.packingOnly && !hasPackableItems(mc, looter.baseline, looter.minedDrops)) looter.status = "Inventory packing finished";
+            if (looter.packingOnly && !hasPackableItems(mc, looter.baseline, looter.minedDrops))
+                looter.status = "Inventory packing finished";
             else if (looter.packingOnly) looter.status = "No available backpack; items kept";
-            else if (!looter.collecting && looter.index >= looter.chests.size() && !hasPackableItems(mc, looter.baseline, looter.minedDrops)) looter.status = "Reward chests collected";
+            else if (!looter.collecting && looter.index >= looter.chests.size()
+                && !hasPackableItems(mc, looter.baseline, looter.minedDrops)) looter.status = "Reward chests collected";
             else if (mc.thePlayer.inventory.getFirstEmptyStack() >= 0) {
                 looter.packing = false;
                 looter.status = "Resuming reward collection";
@@ -321,7 +326,8 @@ public final class RewardBackpackPacker {
             } else {
                 looter.status = "Inventory and backpacks full; rewards remain in chest";
             }
-            if ((hasPackableItems(mc, looter.baseline, looter.minedDrops) || looter.collecting) && mc.thePlayer.inventory.getFirstEmptyStack() < 0) {
+            if ((hasPackableItems(mc, looter.baseline, looter.minedDrops) || looter.collecting)
+                && mc.thePlayer.inventory.getFirstEmptyStack() < 0) {
                 boolean saved = looter.center == null || looter.saveCheckpoint(mc) != null;
                 mc.thePlayer.addChatMessage(
                     new net.minecraft.util.ChatComponentText(
@@ -428,7 +434,8 @@ public final class RewardBackpackPacker {
         return count;
     }
 
-    public boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack, InventoryBaseline baseline, MinedDropTracker minedDrops) {
+    public boolean isPackable(Minecraft mc, int slotIndex, ItemStack stack, InventoryBaseline baseline,
+        MinedDropTracker minedDrops) {
         if (stack == null || stack.stackSize <= 0) return false;
         if (temporaryBag && slotIndex == bagSource) return false;
         if (InventoryProtection.bag(stack)) return false;
@@ -446,7 +453,8 @@ public final class RewardBackpackPacker {
         if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
             || (minedDrops != null && minedDrops.containsTracked(MinedDropTracker.inventory(mc), slotIndex)))
             return false;
-        if (id != null && id.toLowerCase(java.util.Locale.ROOT).contains("torch")) return false;
+        if (id != null && id.toLowerCase(java.util.Locale.ROOT)
+            .contains("torch")) return false;
         return true;
     }
 

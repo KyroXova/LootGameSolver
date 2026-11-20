@@ -1,11 +1,11 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 public class ExplorerRoomCoordinator {
 
@@ -102,7 +102,8 @@ public class ExplorerRoomCoordinator {
         explorer.stop(mc, "Skipping unopenable room");
         explorer.knownStructure = center.clone();
         try {
-            explorer.blockedStructures.mark(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, center, center);
+            explorer.blockedStructures
+                .mark(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, center, center);
         } catch (java.io.IOException e) {
             explorer.status = "Could not save blocked room";
             return;

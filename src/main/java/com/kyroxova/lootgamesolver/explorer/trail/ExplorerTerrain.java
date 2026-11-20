@@ -76,8 +76,7 @@ public final class ExplorerTerrain {
                 net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
                 if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
                 if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
-                if (block.getMaterial() == net.minecraft.block.material.Material.lava
-                    || block == Blocks.fire
+                if (block.getMaterial() == net.minecraft.block.material.Material.lava || block == Blocks.fire
                     || block == Blocks.cactus
                     || block == Blocks.web
                     || block == Blocks.portal) return false;
@@ -156,7 +155,8 @@ public final class ExplorerTerrain {
                 net.minecraft.block.Block underSnow = world.getBlock(x, y - 1, z);
                 if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
                     || underSnow == net.minecraft.init.Blocks.air
-                    || underSnow.getMaterial().isLiquid()) {
+                    || underSnow.getMaterial()
+                        .isLiquid()) {
                     return -1D;
                 }
             }
@@ -165,7 +165,8 @@ public final class ExplorerTerrain {
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
         if (below.getMaterial() == net.minecraft.block.material.Material.leaves) return -1D;
         if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
-            || below == net.minecraft.init.Blocks.ice || below == net.minecraft.init.Blocks.packed_ice
+            || below == net.minecraft.init.Blocks.ice
+            || below == net.minecraft.init.Blocks.packed_ice
             || below == net.minecraft.init.Blocks.snow) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
         if (belowBox != null && belowBox.maxY >= y

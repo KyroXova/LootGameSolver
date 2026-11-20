@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.config;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
 import java.io.File;
 
 import net.minecraftforge.common.config.Configuration;

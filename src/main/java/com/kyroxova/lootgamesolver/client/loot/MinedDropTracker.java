@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client.loot;
 
-import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
-import com.kyroxova.lootgamesolver.client.storage.TrashPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -10,6 +8,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
+
+import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
+import com.kyroxova.lootgamesolver.client.storage.TrashPolicy;
 
 /** Tracks inventory increases observed during explorer mining, without treating old items as mined. */
 public final class MinedDropTracker {

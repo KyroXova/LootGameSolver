@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChestPit;
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.rewardChestAhead;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
@@ -62,7 +60,9 @@ public final class ExplorerRouteFollower {
         boolean inWater = mc.thePlayer.isInWater();
         boolean stepUp = next[1] > footY || climbRewardChest || climbSurface || mc.thePlayer.isCollidedHorizontally;
         boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
-        input.hop = (stepUp && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally) && jumpDistance && (mc.thePlayer.onGround || inWater))
+        input.hop = (stepUp && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally)
+            && jumpDistance
+            && (mc.thePlayer.onGround || inWater))
             || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)
             || chestPitJump
             || inWater;

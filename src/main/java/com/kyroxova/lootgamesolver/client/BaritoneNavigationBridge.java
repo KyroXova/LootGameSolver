@@ -58,19 +58,24 @@ public final class BaritoneNavigationBridge {
         try {
             if (isCachedMethod == null) {
                 Class<?> api = Class.forName("baritone.api.BaritoneAPI");
-                Object provider = api.getMethod("getProvider").invoke(null);
+                Object provider = api.getMethod("getProvider")
+                    .invoke(null);
                 if (provider == null) return false;
                 Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
-                Object baritone = providerApi.getMethod("getPrimaryBaritone").invoke(provider);
+                Object baritone = providerApi.getMethod("getPrimaryBaritone")
+                    .invoke(provider);
                 if (baritone == null) return false;
                 Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
-                Object worldProvider = baritoneApi.getMethod("getWorldProvider").invoke(baritone);
+                Object worldProvider = baritoneApi.getMethod("getWorldProvider")
+                    .invoke(baritone);
                 if (worldProvider == null) return false;
                 Class<?> worldProviderApi = Class.forName("baritone.api.cache.IWorldProvider");
-                Object currentWorld = worldProviderApi.getMethod("getCurrentWorld").invoke(worldProvider);
+                Object currentWorld = worldProviderApi.getMethod("getCurrentWorld")
+                    .invoke(worldProvider);
                 if (currentWorld == null) return false;
                 Class<?> worldDataApi = Class.forName("baritone.api.cache.IWorldData");
-                cachedWorld = worldDataApi.getMethod("getCachedWorld").invoke(currentWorld);
+                cachedWorld = worldDataApi.getMethod("getCachedWorld")
+                    .invoke(currentWorld);
                 if (cachedWorld == null) return false;
                 Class<?> cachedWorldApi = Class.forName("baritone.api.cache.ICachedWorld");
                 isCachedMethod = cachedWorldApi.getMethod("isCached", int.class, int.class);
@@ -366,8 +371,8 @@ public final class BaritoneNavigationBridge {
         }
     }
 
-    public static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y, int z)
-        throws ReflectiveOperationException {
+    public static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y,
+        int z) throws ReflectiveOperationException {
         return processApi.getMethod("getGoal")
             .invoke(process) == null
             && processApi.getMethod("mostRecentGoal")

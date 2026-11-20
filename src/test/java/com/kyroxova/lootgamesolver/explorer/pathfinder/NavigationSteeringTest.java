@@ -62,10 +62,8 @@ public class NavigationSteeringTest {
         assertEquals(-180F, northHeading.floatValue(), 1.0F);
 
         // Player moving along route: does not look backwards at passed nodes
-        java.util.List<int[]> multiStep = java.util.Arrays.asList(
-            new int[] { 0, 64, 0 },
-            new int[] { 0, 64, 5 },
-            new int[] { 0, 64, 10 });
+        java.util.List<int[]> multiStep = java.util.Arrays
+            .asList(new int[] { 0, 64, 0 }, new int[] { 0, 64, 5 }, new int[] { 0, 64, 10 });
         // Player is at (0.5, 5.2), moving towards (0, 64, 10)
         Float forwardHeading = NavigationSteering.pathLookHeading(multiStep, 0.5D, 5.2D);
         org.junit.Assert.assertNotNull(forwardHeading);

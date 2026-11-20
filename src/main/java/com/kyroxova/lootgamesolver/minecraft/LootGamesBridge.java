@@ -1,7 +1,6 @@
 package com.kyroxova.lootgamesolver.minecraft;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.play.client.C0BPacketEntityAction;
 import net.minecraft.util.MovingObjectPosition;
 
@@ -33,10 +32,14 @@ public final class LootGamesBridge implements MiniGameDetector {
     public boolean clearMinesweeperObstruction(int[] position) {
         Minecraft mc = Minecraft.getMinecraft();
         if (position == null || position.length < 3 || mc.theWorld == null || mc.thePlayer == null) return false;
-        String type = mc.theWorld.getBlock(position[0], position[1], position[2]).getClass().getName();
+        String type = mc.theWorld.getBlock(position[0], position[1], position[2])
+            .getClass()
+            .getName();
         if (!type.equals(LootGamesTileAccess.LOOTGAMES_PKG + "common.block.MSActivatorBlock")) {
             Object game = nearbyGame(true);
-            if (game == null || !game.getClass().getName().equals(LootGamesTileAccess.MS_GAME)) return false;
+            if (game == null || !game.getClass()
+                .getName()
+                .equals(LootGamesTileAccess.MS_GAME)) return false;
         }
         return foliageClearer.clearLine(mc, position[0], position[1], position[2]);
     }
@@ -89,7 +92,8 @@ public final class LootGamesBridge implements MiniGameDetector {
         Object game = LootGamesTileAccess.findNearbyGame(mc.theWorld, mc.thePlayer, forceScan);
         if (game == null) return null;
         try {
-            String name = game.getClass().getName();
+            String name = game.getClass()
+                .getName();
             if (LootGamesTileAccess.MS_GAME.equals(name)) return actionTracker.readMinesweeper(game);
             if (LootGamesTileAccess.SDK_GAME.equals(name)) return actionTracker.readSudoku(game);
             if (LootGamesTileAccess.GOL_GAME.equals(name)) return actionTracker.readGameOfLight(game);
@@ -110,26 +114,28 @@ public final class LootGamesBridge implements MiniGameDetector {
             releasePendingSneak(mc);
             int[] block = actionTracker.boardBlock(detected.game, action.position);
 
-            if (detected.type == MiniGame.MINESWEEPER
-                && foliageClearer.clearLine(mc, block[0], block[1], block[2])) return false;
+            if (detected.type == MiniGame.MINESWEEPER && foliageClearer.clearLine(mc, block[0], block[1], block[2]))
+                return false;
 
-            if (!LootGamesInteractionHelper.preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2], true)) {
+            if (!LootGamesInteractionHelper
+                .preparePlayerPositionAndAim(mc.thePlayer, block[0], block[1], block[2], true)) {
                 return false;
             }
             MovingObjectPosition visible = LootGamesInteractionHelper.visibleTarget(mc, block[0], block[1], block[2]);
             if (visible == null || visible.sideHit != 1) return false;
             boolean attack = action.type == SolverAction.Type.REVEAL && detected.type != MiniGame.GAME_OF_LIGHT;
             if (!attack && !LootGamesInteractionHelper.selectSafeInteractionItem(mc)) return false;
-            boolean shouldSneak = detected.type == MiniGame.SUDOKU
-                && action.type == SolverAction.Type.SET_VALUE
+            boolean shouldSneak = detected.type == MiniGame.SUDOKU && action.type == SolverAction.Type.SET_VALUE
                 && sudokuReverseClick;
             boolean wasSneaking = mc.thePlayer.isSneaking();
             if (shouldSneak && !wasSneaking) {
-                mc.getNetHandler().addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, shouldSneak ? 1 : 2));
+                mc.getNetHandler()
+                    .addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, shouldSneak ? 1 : 2));
                 mc.thePlayer.setSneaking(shouldSneak);
             }
             try {
-                return BaritoneBlockBridge.click(mc, block[0], block[1], block[2], visible.sideHit, visible.hitVec, attack);
+                return BaritoneBlockBridge
+                    .click(mc, block[0], block[1], block[2], visible.sideHit, visible.hitVec, attack);
             } finally {
                 if (shouldSneak && !wasSneaking) {
                     pendingSneakRelease = true;
@@ -154,7 +160,8 @@ public final class LootGamesBridge implements MiniGameDetector {
         if (!pendingSneakRelease) return;
         pendingSneakRelease = false;
         if (mc.thePlayer == null || mc.getNetHandler() == null) return;
-        mc.getNetHandler().addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, restoreSneaking ? 1 : 2));
+        mc.getNetHandler()
+            .addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, restoreSneaking ? 1 : 2));
         mc.thePlayer.setSneaking(restoreSneaking);
     }
 
@@ -225,7 +232,8 @@ public final class LootGamesBridge implements MiniGameDetector {
     }
 
     public boolean activateBoardCenter(Object game) {
-        return LootGamesInteractionHelper.activateBoardCenter(Minecraft.getMinecraft(), game, gameCenter(game), foliageClearer);
+        return LootGamesInteractionHelper
+            .activateBoardCenter(Minecraft.getMinecraft(), game, gameCenter(game), foliageClearer);
     }
 
     public boolean requiresMinesweeperOpeningClick(DetectedGame detected) {

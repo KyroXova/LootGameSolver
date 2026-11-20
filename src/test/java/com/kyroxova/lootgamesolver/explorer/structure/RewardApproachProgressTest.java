@@ -1,10 +1,11 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.pathfinder.BaritoneTransitCoordinator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+
+import com.kyroxova.lootgamesolver.explorer.pathfinder.BaritoneTransitCoordinator;
 
 public class RewardApproachProgressTest {
 

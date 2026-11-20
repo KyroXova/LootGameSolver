@@ -1,11 +1,12 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.client.C16PacketClientStatus;
+
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 
 public final class InventoryToolTransfer {
 

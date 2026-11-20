@@ -1,11 +1,5 @@
 package com.kyroxova.lootgamesolver.client.ui;
 
-import com.kyroxova.lootgamesolver.client.ClientHooks;
-import com.kyroxova.lootgamesolver.client.Keybinds;
-import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import org.lwjgl.opengl.GL11;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -14,6 +8,11 @@ import net.minecraft.client.settings.GameSettings;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 
+import org.lwjgl.opengl.GL11;
+
+import com.kyroxova.lootgamesolver.client.ClientHooks;
+import com.kyroxova.lootgamesolver.client.Keybinds;
+import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 
@@ -61,7 +60,8 @@ public final class ClientHudOverlay {
             } else if (hooks.exploration != null) {
                 statusStr = (hooks.exploration.navigating() || hooks.rewardReturnPending
                     || hooks.autoPuzzle.isActive()
-                    || hooks.autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED) ? hooks.exploration.navigationStatus()
+                    || hooks.autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
+                        ? hooks.exploration.navigationStatus()
                         : "Ready";
             } else {
                 statusStr = "Ready";
@@ -109,9 +109,10 @@ public final class ClientHudOverlay {
                 String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                     + "] "
                     + hooks.exploration.explorationAction();
-                int held = hooks.checkpointClearDoneTicks > 0 ? 20 : hooks.keyHandler.exploreKeyHeld ? hooks.keyHandler.exploreHoldTicks : 0;
-                line3 += " \u00A78|"
-                    + ClientHooks.explorerKeyLabel(label, !hooks.automationPaused && explorerActive, held, hooks.automationPaused);
+                int held = hooks.checkpointClearDoneTicks > 0 ? 20
+                    : hooks.keyHandler.exploreKeyHeld ? hooks.keyHandler.exploreHoldTicks : 0;
+                line3 += " \u00A78|" + ClientHooks
+                    .explorerKeyLabel(label, !hooks.automationPaused && explorerActive, held, hooks.automationPaused);
             }
             int width1 = mc.fontRenderer.getStringWidth(line1);
             int width2 = mc.fontRenderer.getStringWidth(line2);
@@ -137,7 +138,8 @@ public final class ClientHudOverlay {
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {
         if (texture == null || mc == null || mc.getTextureManager() == null) return;
-        mc.getTextureManager().bindTexture(texture);
+        mc.getTextureManager()
+            .bindTexture(texture);
 
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glEnable(GL11.GL_BLEND);
@@ -199,9 +201,16 @@ public final class ClientHudOverlay {
         float f1 = 1.0F / texHeight;
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        tessellator.addVertexWithUV((double) x, (double) (y + height), 0.0D, (double) (u * f), (double) ((v + vHeight) * f1));
-        tessellator.addVertexWithUV((double) (x + width), (double) (y + height), 0.0D, (double) ((u + uWidth) * f), (double) ((v + vHeight) * f1));
-        tessellator.addVertexWithUV((double) (x + width), (double) y, 0.0D, (double) ((u + uWidth) * f), (double) (v * f1));
+        tessellator
+            .addVertexWithUV((double) x, (double) (y + height), 0.0D, (double) (u * f), (double) ((v + vHeight) * f1));
+        tessellator.addVertexWithUV(
+            (double) (x + width),
+            (double) (y + height),
+            0.0D,
+            (double) ((u + uWidth) * f),
+            (double) ((v + vHeight) * f1));
+        tessellator
+            .addVertexWithUV((double) (x + width), (double) y, 0.0D, (double) ((u + uWidth) * f), (double) (v * f1));
         tessellator.addVertexWithUV((double) x, (double) y, 0.0D, (double) (u * f), (double) (v * f1));
         tessellator.draw();
     }

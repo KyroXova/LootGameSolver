@@ -1,11 +1,12 @@
 package com.kyroxova.lootgamesolver.explorer.trail;
 
-import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPatterns;
 import static org.junit.Assert.*;
 
 import java.util.List;
 
 import org.junit.Test;
+
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPatterns;
 
 public class AccessTrailTest {
 

@@ -1,11 +1,12 @@
 package com.kyroxova.lootgamesolver.client.ui;
 
-import com.kyroxova.lootgamesolver.client.ClientHooks;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+
+import com.kyroxova.lootgamesolver.client.ClientHooks;
 
 public class ExplorerHudStateTest {
 

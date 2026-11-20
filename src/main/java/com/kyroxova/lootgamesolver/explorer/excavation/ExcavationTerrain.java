@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
-import com.kyroxova.lootgamesolver.explorer.trail.ContactHazards;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.*;
 
@@ -11,6 +8,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.client.DigToolSelector;
+import com.kyroxova.lootgamesolver.explorer.trail.ContactHazards;
 
 public final class ExcavationTerrain {
 

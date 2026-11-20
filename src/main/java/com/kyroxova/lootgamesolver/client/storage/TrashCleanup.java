@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
-import com.kyroxova.lootgamesolver.client.loot.MinedDropTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.inventory.ContainerChest;
@@ -11,6 +9,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
+
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
+import com.kyroxova.lootgamesolver.client.loot.MinedDropTracker;
 
 public final class TrashCleanup {
 

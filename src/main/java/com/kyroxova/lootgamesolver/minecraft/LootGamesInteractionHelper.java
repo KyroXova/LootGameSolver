@@ -24,7 +24,8 @@ public final class LootGamesInteractionHelper {
     }
 
     public static MovingObjectPosition visibleTarget(Minecraft mc, int x, int y, int z) {
-        Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         Vec3 look = mc.thePlayer.getLook(1.0F);
         double reach = mc.playerController.getBlockReachDistance();
         MovingObjectPosition hit = mc.theWorld
@@ -42,14 +43,20 @@ public final class LootGamesInteractionHelper {
 
     public static boolean hasClearView(Minecraft mc, int[] position) {
         if (position == null || position.length < 3 || mc.thePlayer == null || mc.theWorld == null) return false;
-        Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         Vec3 center = Vec3.createVectorHelper(position[0] + 0.5D, position[1] + 0.5D, position[2] + 0.5D);
         return targetHit(mc.theWorld.rayTraceBlocks(eye, center), position[0], position[1], position[2]);
     }
 
     public static boolean topFaceVisible(Minecraft mc, int[] position) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null || position == null) return false;
-        return topFaceVisibleFrom(mc, position, mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        return topFaceVisibleFrom(
+            mc,
+            position,
+            mc.thePlayer.posX,
+            mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+            mc.thePlayer.posZ);
     }
 
     public static boolean topFaceVisibleFrom(Minecraft mc, int[] position, double x, double y, double z) {
@@ -62,7 +69,8 @@ public final class LootGamesInteractionHelper {
 
     public static MovingObjectPosition visibleMasterFace(Minecraft mc, int x, int y, int z) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null || mc.playerController == null) return null;
-        Vec3 eye = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         double reach = Math.min(4.2D, mc.playerController.getBlockReachDistance());
         double[] offsets = { 0.5D, 0.15D, 0.85D };
         for (double ox : offsets) {
@@ -151,7 +159,10 @@ public final class LootGamesInteractionHelper {
         boolean valid = LootGamesTileAccess.isMasterBlock(master);
         if (!valid) {
             TileEntity te = mc.theWorld.getTileEntity(x, y, z);
-            if (te != null && LootGamesTileAccess.isMasterTile(te.getClass().getName())) valid = true;
+            if (te != null && LootGamesTileAccess.isMasterTile(
+                te.getClass()
+                    .getName()))
+                valid = true;
         }
         if (!valid) return false;
         if (!selectSafeInteractionItem(mc)) return false;
@@ -177,8 +188,11 @@ public final class LootGamesInteractionHelper {
             return false;
         int x = position[0], y = position[1], z = position[2];
         if (!LootGamesTileAccess.isFloorActivator(mc.theWorld.getBlock(x, y, z))) return false;
-        if (mc.theWorld.getBlock(x, y, z).getClass().getName().equals(LootGamesTileAccess.LOOTGAMES_PKG + "common.block.MSActivatorBlock")
-            && foliageClearer != null && foliageClearer.clearLine(mc, x, y, z)) {
+        if (mc.theWorld.getBlock(x, y, z)
+            .getClass()
+            .getName()
+            .equals(LootGamesTileAccess.LOOTGAMES_PKG + "common.block.MSActivatorBlock") && foliageClearer != null
+            && foliageClearer.clearLine(mc, x, y, z)) {
             return false;
         }
         if (!selectSafeInteractionItem(mc) || !preparePlayerPositionAndAim(mc.thePlayer, x, y, z)) return false;
@@ -200,14 +214,17 @@ public final class LootGamesInteractionHelper {
         return direct;
     }
 
-    public static boolean activateBoardCenter(Minecraft mc, Object game, int[] position, FoliageClearer foliageClearer) {
+    public static boolean activateBoardCenter(Minecraft mc, Object game, int[] position,
+        FoliageClearer foliageClearer) {
         try {
             if (game == null || mc.theWorld == null || mc.thePlayer == null || mc.playerController == null)
                 return false;
             if (position == null) return false;
             int x = position[0], y = position[1], z = position[2];
-            if (game.getClass().getName().equals(LootGamesTileAccess.MS_GAME)
-                && foliageClearer != null && foliageClearer.clearLine(mc, x, y, z)) return false;
+            if (game.getClass()
+                .getName()
+                .equals(LootGamesTileAccess.MS_GAME) && foliageClearer != null
+                && foliageClearer.clearLine(mc, x, y, z)) return false;
             double dx = x + 0.5D - mc.thePlayer.posX;
             double dy = y + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
             double dz = z + 0.5D - mc.thePlayer.posZ;

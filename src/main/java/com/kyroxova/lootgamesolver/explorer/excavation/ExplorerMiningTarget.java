@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFoliage;
 
 import net.minecraft.client.Minecraft;

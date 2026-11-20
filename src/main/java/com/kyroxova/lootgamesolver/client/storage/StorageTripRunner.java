@@ -1,8 +1,8 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.loot.PendingLootStore;
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.client.loot.PendingLootStore;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 

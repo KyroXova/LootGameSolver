@@ -1,12 +1,12 @@
 package com.kyroxova.lootgamesolver.client.puzzle;
 
-import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
-import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
 import java.util.Collections;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.client.storage.InventoryProtection;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.CellPosition;

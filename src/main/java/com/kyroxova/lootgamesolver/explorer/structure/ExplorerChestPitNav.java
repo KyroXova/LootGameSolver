@@ -1,9 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChest;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.solidCheckpoint;
 
@@ -13,6 +9,8 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
 
 public final class ExplorerChestPitNav {
 

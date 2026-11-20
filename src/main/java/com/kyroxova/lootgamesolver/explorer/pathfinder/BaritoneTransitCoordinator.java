@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,6 +8,8 @@ import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 
 public final class BaritoneTransitCoordinator {
 

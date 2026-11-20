@@ -1,11 +1,11 @@
 package com.kyroxova.lootgamesolver.client.puzzle;
 
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
@@ -51,8 +51,7 @@ public final class PuzzleTileNavigator {
         }
 
         double floorY = target[1] + 1;
-        boolean inRoom = Math.abs(mc.thePlayer.posY - floorY) < 1.4D
-            && distXZ < 8.0D
+        boolean inRoom = Math.abs(mc.thePlayer.posY - floorY) < 1.4D && distXZ < 8.0D
             && LootGamesBridge.topFaceVisible(mc, target);
 
         if (inRoom) {
@@ -139,7 +138,9 @@ public final class PuzzleTileNavigator {
             double targetDistB = Math.hypot(b[0] + 0.5D - target[0] - 0.5D, b[2] + 0.5D - target[2] - 0.5D);
             double playerDistA = mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1], a[2] + 0.5D);
             double playerDistB = mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1], b[2] + 0.5D);
-            return Double.compare(playerDistA + targetDistA * targetDistA * 2.0D, playerDistB + targetDistB * targetDistB * 2.0D);
+            return Double.compare(
+                playerDistA + targetDistA * targetDistA * 2.0D,
+                playerDistB + targetDistB * targetDistB * 2.0D);
         });
         for (int[] candidate : candidates) {
             BaritoneNavigationBridge.Start result = navigation
@@ -172,8 +173,8 @@ public final class PuzzleTileNavigator {
         return reachable && hasGoal && running;
     }
 
-    public static boolean keepApproachForNewTile(Minecraft mc, int[] goal, int[] newTarget, double reach, boolean reachable,
-        boolean running) {
+    public static boolean keepApproachForNewTile(Minecraft mc, int[] goal, int[] newTarget, double reach,
+        boolean reachable, boolean running) {
         if (!running || goal == null || newTarget == null) return false;
         if (reachable) return true;
         if (mc == null || mc.theWorld == null || mc.thePlayer == null) return false;

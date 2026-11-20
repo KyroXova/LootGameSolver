@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.solidCheckpoint;
 
 import java.util.List;

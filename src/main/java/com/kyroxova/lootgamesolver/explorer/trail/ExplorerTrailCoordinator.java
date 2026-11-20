@@ -1,12 +1,13 @@
 package com.kyroxova.lootgamesolver.explorer.trail;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.structure.ExplorerStructureDiscovery;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.samePosition;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerStructureDiscovery;
 
 public class ExplorerTrailCoordinator {
 
@@ -91,10 +92,13 @@ public class ExplorerTrailCoordinator {
         if (explorer.baritoneCoordinator != null && explorer.baritoneCoordinator.active()) {
             if (explorer.baritoneCoordinator.searchMove) {
                 return (int) Math.round(
-                    Math.hypot(px - (explorer.baritoneCoordinator.searchX + 0.5D), pz - (explorer.baritoneCoordinator.searchZ + 0.5D)));
+                    Math.hypot(
+                        px - (explorer.baritoneCoordinator.searchX + 0.5D),
+                        pz - (explorer.baritoneCoordinator.searchZ + 0.5D)));
             }
             if (explorer.target != null) {
-                return (int) Math.round(Math.hypot(px - (explorer.target.xCoord + 0.5D), pz - (explorer.target.zCoord + 0.5D)));
+                return (int) Math
+                    .round(Math.hypot(px - (explorer.target.xCoord + 0.5D), pz - (explorer.target.zCoord + 0.5D)));
             }
             if (explorer.baritoneCoordinator.returnPoint != null) {
                 return (int) Math.round(
@@ -104,10 +108,12 @@ public class ExplorerTrailCoordinator {
             }
         }
         if (explorer.target != null) {
-            return (int) Math.round(Math.hypot(px - (explorer.target.xCoord + 0.5D), pz - (explorer.target.zCoord + 0.5D)));
+            return (int) Math
+                .round(Math.hypot(px - (explorer.target.xCoord + 0.5D), pz - (explorer.target.zCoord + 0.5D)));
         }
         if (explorer.knownStructure != null) {
-            return (int) Math.round(Math.hypot(px - (explorer.knownStructure[0] + 0.5D), pz - (explorer.knownStructure[2] + 0.5D)));
+            return (int) Math
+                .round(Math.hypot(px - (explorer.knownStructure[0] + 0.5D), pz - (explorer.knownStructure[2] + 0.5D)));
         }
         if (!explorer.route.isEmpty()) {
             int[] last = explorer.route.get(explorer.route.size() - 1);
@@ -119,7 +125,8 @@ public class ExplorerTrailCoordinator {
     public int[] structureWaypoint(Minecraft mc, Explorer explorer) {
         if (explorer.roomWorkActive) return null;
         if (explorer.searching || explorer.baritoneCoordinator.searchMove) return null;
-        if (explorer.knownStructure != null) return ExplorerStructureDiscovery.displayedPosition(mc, explorer.knownStructure);
+        if (explorer.knownStructure != null)
+            return ExplorerStructureDiscovery.displayedPosition(mc, explorer.knownStructure);
         if (explorer.target != null) return null;
         if (mc != null && mc.theWorld != null && mc.thePlayer != null) {
             long now = mc.theWorld.getTotalWorldTime();
@@ -127,8 +134,12 @@ public class ExplorerTrailCoordinator {
                 return waypointScanResult == null ? null : waypointScanResult.clone();
             waypointScanWorld = mc.theWorld;
             waypointScanTick = now;
-            TileEntity found = ExplorerStructureDiscovery
-                .find(mc, explorer.savedFinder, explorer.solvedStructures, explorer.blockedStructures, Explorer.worldIdentity(mc));
+            TileEntity found = ExplorerStructureDiscovery.find(
+                mc,
+                explorer.savedFinder,
+                explorer.solvedStructures,
+                explorer.blockedStructures,
+                Explorer.worldIdentity(mc));
             if (found != null) {
                 int[] foundPosition = { found.xCoord, found.yCoord, found.zCoord };
                 explorer.waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, found);

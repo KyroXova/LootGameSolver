@@ -1,15 +1,15 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import com.kyroxova.lootgamesolver.explorer.excavation.BlockPlacer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationControlPolicy;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationInput;
-import com.kyroxova.lootgamesolver.explorer.structure.SavedStructureFinder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.tileentity.TileEntity;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.excavation.BlockPlacer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationControlPolicy;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationInput;
+import com.kyroxova.lootgamesolver.explorer.structure.SavedStructureFinder;
 
 public class ExplorerSessionController {
 
@@ -59,7 +59,8 @@ public class ExplorerSessionController {
                 || mc.thePlayer.capabilities.isFlying;
             if (explorer.baritoneCoordinator.breaking) explorer.sustain.notifyBlockMined();
             boolean sustaining = explorer.sustain.busy();
-            if (!interrupted || sustaining) sustaining = explorer.sustain.tick(mc, explorer.walking, !explorer.baritoneCoordinator.breaking);
+            if (!interrupted || sustaining)
+                sustaining = explorer.sustain.tick(mc, explorer.walking, !explorer.baritoneCoordinator.breaking);
             explorer.baritoneNavigation.setPaused(interrupted || sustaining);
             if (interrupted || sustaining) {
                 explorer.status = sustaining ? "Eating or preparing food"
@@ -71,7 +72,8 @@ public class ExplorerSessionController {
             }
         } else {
             if (explorer.digging || explorer.returnDigging) explorer.sustain.notifyBlockMined();
-            explorer.sustain.tick(mc, explorer.walking, explorer.walking && !explorer.digging && !explorer.returnDigging);
+            explorer.sustain
+                .tick(mc, explorer.walking, explorer.walking && !explorer.digging && !explorer.returnDigging);
         }
         boolean baritoneActive = explorer.baritoneCoordinator.active()
             || explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
@@ -157,7 +159,8 @@ public class ExplorerSessionController {
         }
         if (explorer.toolTransfer.active()) {
             explorer.status = "Moving tool using inventory screen";
-            if (!explorer.toolTransfer.tick(mc)) explorer.stop(mc, "Inventory transfer interrupted; inspect the tool slots");
+            if (!explorer.toolTransfer.tick(mc))
+                explorer.stop(mc, "Inventory transfer interrupted; inspect the tool slots");
             return true;
         }
         BlockPlacer.Outcome placement = explorer.blockPlacer.tick(mc, explorer.returning, explorer.route);
@@ -224,7 +227,12 @@ public class ExplorerSessionController {
                     : mc.thePlayer.hurtTime > 0 ? "Paused after damage" : "Paused: land and disable flight to resume";
             return true;
         }
-        if (explorer.sustain.tick(mc, true, !explorer.route.isEmpty() && !explorer.digging && !explorer.returnDigging && !explorer.blockPlacer.selectingBlock())) {
+        if (explorer.sustain.tick(
+            mc,
+            true,
+            !explorer.route.isEmpty() && !explorer.digging
+                && !explorer.returnDigging
+                && !explorer.blockPlacer.selectingBlock())) {
             explorer.status = "Eating or preparing food";
             return true;
         }

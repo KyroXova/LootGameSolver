@@ -1,7 +1,8 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 import net.minecraft.client.Minecraft;
+
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 
 /** Waits for an accepted transaction and a short inventory synchronization interval. */
 public final class VerifiedContainerClick {

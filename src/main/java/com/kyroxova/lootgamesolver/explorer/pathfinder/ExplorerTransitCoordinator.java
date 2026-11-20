@@ -1,10 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
-import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPolicy;
-import com.kyroxova.lootgamesolver.explorer.structure.ProgressiveSearch;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.dryShore;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 
@@ -12,6 +7,9 @@ import net.minecraft.client.Minecraft;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPolicy;
 
 public class ExplorerTransitCoordinator {
 
@@ -38,7 +36,8 @@ public class ExplorerTransitCoordinator {
             || !undergroundNearby(mc, explorer)) return;
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (mc.thePlayer.onGround && ExcavationPolicy.closeEntrance(x, z, explorer.target.xCoord, explorer.target.zCoord)
+        if (mc.thePlayer.onGround
+            && ExcavationPolicy.closeEntrance(x, z, explorer.target.xCoord, explorer.target.zCoord)
             && dryShore(mc.theWorld, x, y, z)
             && safe(mc.theWorld, x, y, z)) {
             explorer.entranceSurfaceY = y;
@@ -110,8 +109,8 @@ public class ExplorerTransitCoordinator {
             || explorer.route.size() > 8
             || !LootGameSolverConfig.staircaseEnabled) return;
         int[] end = explorer.route.get(explorer.route.size() - 1);
-        if (explorer.target.yCoord >= end[1] - 2 || Math.abs(end[0] - explorer.target.xCoord) + Math.abs(end[2] - explorer.target.zCoord) > 48)
-            return;
+        if (explorer.target.yCoord >= end[1] - 2
+            || Math.abs(end[0] - explorer.target.xCoord) + Math.abs(end[2] - explorer.target.zCoord) > 48) return;
         if (explorer.approachAnchor != end) {
             explorer.approachAnchor = end;
             explorer.approachPlan = null;
@@ -154,7 +153,8 @@ public class ExplorerTransitCoordinator {
 
     public void refreshTravelMode(Minecraft mc, Explorer explorer) {
         if (mc == null || mc.thePlayer == null || mc.theWorld == null) return;
-        if (!LootGameSolverConfig.caveMode && (explorer.baritoneCoordinator.searchMove || explorer.baritoneCoordinator.preRouting)) {
+        if (!LootGameSolverConfig.caveMode
+            && (explorer.baritoneCoordinator.searchMove || explorer.baritoneCoordinator.preRouting)) {
             int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int z = (int) Math.floor(mc.thePlayer.posZ);
             if (mc.theWorld.getHeightValue(x, z) - y > 6) {
@@ -175,21 +175,24 @@ public class ExplorerTransitCoordinator {
             explorer.baritoneCoordinator.searchMove = true;
             explorer.baritoneCoordinator.searchNext = true;
             explorer.baritoneCoordinator.searchHandoff = true;
-        } else if (explorer.baritoneCoordinator.structureMove && explorer.baritoneCoordinator.preRouting && explorer.target != null) {
-            explorer.baritoneNavigation.stop();
-            explorer.baritoneCoordinator.reset();
-            routeToStructure(mc, explorer);
-        }
+        } else if (explorer.baritoneCoordinator.structureMove && explorer.baritoneCoordinator.preRouting
+            && explorer.target != null) {
+                explorer.baritoneNavigation.stop();
+                explorer.baritoneCoordinator.reset();
+                routeToStructure(mc, explorer);
+            }
     }
 
     public void routeToStructure(Minecraft mc, Explorer explorer) {
         if (explorer.target == null || mc == null || mc.thePlayer == null || mc.theWorld == null) return;
         explorer.rememberBaritoneReturnPoint(mc);
         double playerY = mc.thePlayer.boundingBox.minY;
-        double horizontal = Math
-            .hypot(mc.thePlayer.posX - explorer.target.xCoord - 0.5D, mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+        double horizontal = Math.hypot(
+            mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+            mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
         if (playerY > explorer.target.yCoord + 5 || (!LootGameSolverConfig.caveMode && horizontal > 6D)) {
-            BaritoneNavigationBridge.Start start = explorer.baritoneNavigation.startHorizontal(explorer.target.xCoord, explorer.target.zCoord);
+            BaritoneNavigationBridge.Start start = explorer.baritoneNavigation
+                .startHorizontal(explorer.target.xCoord, explorer.target.zCoord);
             if (start == BaritoneNavigationBridge.Start.STARTED) {
                 explorer.baritoneCoordinator.structureMove = true;
                 explorer.baritoneCoordinator.preRouting = true;

@@ -40,25 +40,63 @@ public final class InventoryProtection {
         int dot = Math.max(type.lastIndexOf('.'), type.lastIndexOf('$'));
         if (dot >= 0) type = type.substring(dot + 1);
 
-        if (id.contains("lootbag") || id.contains("loot_bag") || type.contains("lootbag") || type.contains("loot_bag")
-            || id.contains("jetpack") || type.contains("jetpack") || unloc.contains("jetpack")
-            || id.contains("copter") || type.contains("copter") || unloc.contains("copter")
-            || id.contains("batpack") || type.contains("batpack") || unloc.contains("batpack")
-            || id.contains("lappack") || type.contains("lappack") || unloc.contains("lappack")
-            || id.contains("energypack") || type.contains("energypack") || unloc.contains("energypack")
-            || id.contains("fluxpack") || type.contains("fluxpack") || unloc.contains("fluxpack")
-            || id.contains("capacitor") || type.contains("capacitor") || unloc.contains("capacitor")
-            || id.contains("battery") || type.contains("battery") || unloc.contains("battery")
-            || id.contains("charger") || type.contains("charger") || unloc.contains("charger")
-            || id.contains("charging") || type.contains("charging") || unloc.contains("charging")
-            || id.contains("sleeping") || type.contains("sleeping") || unloc.contains("sleeping")
-            || id.contains("feedbag") || type.contains("feedbag") || unloc.contains("feedbag")
-            || id.contains("lunch") || type.contains("lunch") || unloc.contains("lunch")
-            || id.contains("trash") || type.contains("trash") || unloc.contains("trash")
-            || id.contains("quiver") || type.contains("quiver") || unloc.contains("quiver")
-            || id.contains("focus") || type.contains("focus") || unloc.contains("focus")
-            || id.contains("wand") || type.contains("wand") || unloc.contains("wand")
-            || id.contains("seedbag") || type.contains("seedbag") || unloc.contains("seedbag")) {
+        if (id.contains("lootbag") || id.contains("loot_bag")
+            || type.contains("lootbag")
+            || type.contains("loot_bag")
+            || id.contains("jetpack")
+            || type.contains("jetpack")
+            || unloc.contains("jetpack")
+            || id.contains("copter")
+            || type.contains("copter")
+            || unloc.contains("copter")
+            || id.contains("batpack")
+            || type.contains("batpack")
+            || unloc.contains("batpack")
+            || id.contains("lappack")
+            || type.contains("lappack")
+            || unloc.contains("lappack")
+            || id.contains("energypack")
+            || type.contains("energypack")
+            || unloc.contains("energypack")
+            || id.contains("fluxpack")
+            || type.contains("fluxpack")
+            || unloc.contains("fluxpack")
+            || id.contains("capacitor")
+            || type.contains("capacitor")
+            || unloc.contains("capacitor")
+            || id.contains("battery")
+            || type.contains("battery")
+            || unloc.contains("battery")
+            || id.contains("charger")
+            || type.contains("charger")
+            || unloc.contains("charger")
+            || id.contains("charging")
+            || type.contains("charging")
+            || unloc.contains("charging")
+            || id.contains("sleeping")
+            || type.contains("sleeping")
+            || unloc.contains("sleeping")
+            || id.contains("feedbag")
+            || type.contains("feedbag")
+            || unloc.contains("feedbag")
+            || id.contains("lunch")
+            || type.contains("lunch")
+            || unloc.contains("lunch")
+            || id.contains("trash")
+            || type.contains("trash")
+            || unloc.contains("trash")
+            || id.contains("quiver")
+            || type.contains("quiver")
+            || unloc.contains("quiver")
+            || id.contains("focus")
+            || type.contains("focus")
+            || unloc.contains("focus")
+            || id.contains("wand")
+            || type.contains("wand")
+            || unloc.contains("wand")
+            || id.contains("seedbag")
+            || type.contains("seedbag")
+            || unloc.contains("seedbag")) {
             return false;
         }
 
@@ -79,14 +117,22 @@ public final class InventoryProtection {
         int dot = type.lastIndexOf('.');
         if (dot >= 0) type = type.substring(dot + 1);
         if (type.contains("jetpack") || type.contains("copter")
-            || type.contains("batpack") || type.contains("lappack")
-            || type.contains("energypack") || type.contains("fluxpack")
-            || type.contains("capacitor") || type.contains("battery")
-            || type.contains("charger") || type.contains("charging")
-            || type.contains("quiver") || type.contains("focus")
-            || type.contains("wand") || type.contains("seedbag")
-            || type.contains("lunch") || type.contains("trash")
-            || type.contains("sleeping") || type.contains("feedbag")) {
+            || type.contains("batpack")
+            || type.contains("lappack")
+            || type.contains("energypack")
+            || type.contains("fluxpack")
+            || type.contains("capacitor")
+            || type.contains("battery")
+            || type.contains("charger")
+            || type.contains("charging")
+            || type.contains("quiver")
+            || type.contains("focus")
+            || type.contains("wand")
+            || type.contains("seedbag")
+            || type.contains("lunch")
+            || type.contains("trash")
+            || type.contains("sleeping")
+            || type.contains("feedbag")) {
             return false;
         }
         return (type.contains("backpack") || type.contains("knapsack")
@@ -111,7 +157,8 @@ public final class InventoryProtection {
                 .contains("ItemHealingAxe");
     }
 
-    public static boolean essentialForPacking(ItemStack stack, InventoryBaseline baseline, int slot, boolean healingAxe) {
+    public static boolean essentialForPacking(ItemStack stack, InventoryBaseline baseline, int slot,
+        boolean healingAxe) {
         if (stack == null) return false;
         if (isBeeFrame(
             stack.getItem()

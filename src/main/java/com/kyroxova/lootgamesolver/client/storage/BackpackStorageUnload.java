@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 import java.util.Locale;
 
 import net.minecraft.client.Minecraft;
@@ -10,6 +9,8 @@ import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
 
 /** Opens each carried backpack and withdraws its contents in verified batches. */
 public final class BackpackStorageUnload {

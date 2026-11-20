@@ -27,7 +27,8 @@ public final class NavigationSteering {
         return null;
     }
 
-    public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking, int cooldown) {
+    public static boolean yieldCameraToBaritone(boolean baritoneActive, boolean interacting, boolean attacking,
+        int cooldown) {
         return baritoneActive && (interacting || attacking || cooldown > 0);
     }
 

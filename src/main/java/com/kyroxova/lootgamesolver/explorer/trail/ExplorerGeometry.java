@@ -1,7 +1,8 @@
 package com.kyroxova.lootgamesolver.explorer.trail;
 
-import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPolicy;
 import java.util.List;
+
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPolicy;
 
 public final class ExplorerGeometry {
 

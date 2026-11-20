@@ -1,5 +1,14 @@
 package com.kyroxova.lootgamesolver.client;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
+import net.minecraftforge.client.event.ClientChatReceivedEvent;
+import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+
 import com.kyroxova.lootgamesolver.client.loot.MinedDropStore;
 import com.kyroxova.lootgamesolver.client.loot.MinedDropTracker;
 import com.kyroxova.lootgamesolver.client.loot.PendingLootStore;
@@ -15,28 +24,9 @@ import com.kyroxova.lootgamesolver.client.storage.TrashCleanup;
 import com.kyroxova.lootgamesolver.client.ui.ClientHudOverlay;
 import com.kyroxova.lootgamesolver.client.ui.StatusText;
 import com.kyroxova.lootgamesolver.client.ui.WorldOverlayRenderer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.settings.GameSettings;
-import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.util.ChatComponentTranslation;
-import net.minecraft.util.IChatComponent;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
-import net.minecraftforge.client.event.ClientChatReceivedEvent;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
-
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
-import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.SolverAction;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
 import com.kyroxova.lootgamesolver.minecraft.LootGamesBridge;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -103,8 +93,8 @@ public final class ClientHooks {
         solvedPuzzles++;
     }
 
-    public static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven, boolean solving,
-        boolean opening, boolean storage) {
+    public static boolean explorerHudActive(boolean navigating, boolean looting, boolean explorationDriven,
+        boolean solving, boolean opening, boolean storage) {
         return navigating || looting || (explorationDriven && (solving || opening || storage));
     }
 
@@ -112,7 +102,8 @@ public final class ClientHooks {
         return !paused && active;
     }
 
-    public static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused, boolean pausedOnPress) {
+    public static boolean resumeOnExploreRelease(boolean wasHeld, boolean holdAction, boolean paused,
+        boolean pausedOnPress) {
         return wasHeld && !holdAction && paused && !pausedOnPress;
     }
 
@@ -281,7 +272,8 @@ public final class ClientHooks {
                 || rewardReturnPending
                 || storageRecovery != null
                 || rewardLooter.active()
-                || (exploration.inDungeonRoom(mc) && rewardLooter.hasUncollectedCluster(mc, exploration.verifiedRoomCenter(mc)));
+                || (exploration.inDungeonRoom(mc)
+                    && rewardLooter.hasUncollectedCluster(mc, exploration.verifiedRoomCenter(mc)));
             if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
             if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc, rewardLooter.expectedView());
             exploration.tick(mc, session.isActive(), roomWork);
@@ -317,8 +309,7 @@ public final class ClientHooks {
             if (exploration != null) exploration.clearLastCheckpoint(mc);
             rewardLooterCooldown = 0;
             mc.thePlayer.addChatMessage(
-                new net.minecraft.util.ChatComponentText(
-                    "\u00a7a[LootGameSolver] Checkpoint cleared."));
+                new net.minecraft.util.ChatComponentText("\u00a7a[LootGameSolver] Checkpoint cleared."));
         }
         if (resumeLootRequested) {
             resumeLootRequested = false;
@@ -434,7 +425,8 @@ public final class ClientHooks {
                     return;
                 }
                 if ("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
-                    && mc.thePlayer != null && mc.thePlayer.inventory.getFirstEmptyStack() < 0
+                    && mc.thePlayer != null
+                    && mc.thePlayer.inventory.getFirstEmptyStack() < 0
                     && mc.currentScreen == null
                     && (exploration == null || !exploration.navigating())) {
                     if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
@@ -442,11 +434,11 @@ public final class ClientHooks {
                     rewardPreCleanupPending = false;
                     rewardLooterCooldown = 100;
                     if (exploration != null) exploration.stop(mc, "Reward collection paused");
-                    mc.thePlayer.addChatMessage(new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
-                            + (rewardLooter.pendingCheckpoint() != null
-                                ? "Use /lgs resumeLoot after making space."
-                                : "Could not save the reward checkpoint.")));
+                    mc.thePlayer.addChatMessage(
+                        new net.minecraft.util.ChatComponentText(
+                            "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
+                                + (rewardLooter.pendingCheckpoint() != null ? "Use /lgs resumeLoot after making space."
+                                    : "Could not save the reward checkpoint.")));
                     return;
                 }
                 if (rewardLooter.completed()) {
@@ -630,8 +622,7 @@ public final class ClientHooks {
         if (checkpoint == null) return false;
         int[] expectedCenter = rewardLooter.rewardCenter();
         if (expectedCenter == null) expectedCenter = rewardCenter;
-        if (expectedCenter != null && !java.util.Arrays.equals(expectedCenter, checkpoint.center))
-            return false;
+        if (expectedCenter != null && !java.util.Arrays.equals(expectedCenter, checkpoint.center)) return false;
         StorageRecoveryController recovery = new StorageRecoveryController();
         if (!recovery.start(mc, checkpoint, inventoryBaseline)) return false;
         storageRecovery = recovery;

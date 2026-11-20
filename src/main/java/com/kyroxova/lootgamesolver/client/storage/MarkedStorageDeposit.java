@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
-import com.kyroxova.lootgamesolver.client.VisibleBlockInteraction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.entity.Entity;
@@ -12,6 +10,9 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
+
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
+import com.kyroxova.lootgamesolver.client.VisibleBlockInteraction;
 
 /** Opens marked, reachable inventories and verifies each deposit before continuing. */
 public final class MarkedStorageDeposit {
@@ -114,7 +115,8 @@ public final class MarkedStorageDeposit {
                 for (Object value : mc.thePlayer.openContainer.inventorySlots) {
                     IInventory slotInventory = ((Slot) value).inventory;
                     if (slotInventory == opened) matching = true;
-                    else if (slotInventory != mc.thePlayer.inventory && (binnieWindowInv == null || slotInventory != binnieWindowInv)) return Result.FAILED;
+                    else if (slotInventory != mc.thePlayer.inventory
+                        && (binnieWindowInv == null || slotInventory != binnieWindowInv)) return Result.FAILED;
                 }
                 if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
                 transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);

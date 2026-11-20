@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.ReturnRoutePolicy;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.dryShore;
 
 import java.util.List;
@@ -10,11 +7,15 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.ReturnRoutePolicy;
 
 public class ExplorerGoalCoordinator {
 
     public boolean checkPendingSearches(Minecraft mc, Explorer explorer) {
-        if (!explorer.returning && !explorer.searching && !explorer.movingToPuzzleCenter && explorer.target != null
+        if (!explorer.returning && !explorer.searching
+            && !explorer.movingToPuzzleCenter
+            && explorer.target != null
             && explorer.reachableBoard(mc)) {
             if (mc.thePlayer.onGround && explorer.trail.target != null) {
                 explorer.recordAccessPoint(
@@ -60,7 +61,8 @@ public class ExplorerGoalCoordinator {
             && explorer.startRoomEntrySearch(mc)) return true;
         if (explorer.planningExistingAccess && explorer.existingAccessPlan != null) {
             boolean complete = explorer.existingAccessPlan.advance(
-                (x, y, z, nx, ny, nz) -> explorer.routePlanner.existingWalkCost(mc.theWorld, explorer, x, y, z, nx, ny, nz),
+                (x, y, z, nx, ny, nz) -> explorer.routePlanner
+                    .existingWalkCost(mc.theWorld, explorer, x, y, z, nx, ny, nz),
                 32,
                 System.nanoTime() + 2_500_000L);
             explorer.status = "Checking existing route: " + explorer.existingAccessPlan.expandedNodes() + " positions";
@@ -101,8 +103,10 @@ public class ExplorerGoalCoordinator {
                         new int[] { (int) Math.floor(mc.thePlayer.posX),
                             (int) Math.floor(mc.thePlayer.boundingBox.minY), (int) Math.floor(mc.thePlayer.posZ) });
                     explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 0);
-                    if (explorer.activeRoomExit.length >= 12) explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 9);
-                    if (explorer.activeRoomExit.length >= 9) explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 6);
+                    if (explorer.activeRoomExit.length >= 12)
+                        explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 9);
+                    if (explorer.activeRoomExit.length >= 9)
+                        explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 6);
                     explorer.appendRoomExitWaypoint(explorer.activeRoomExit, 3);
                     explorer.roomExitCrossing = true;
                     explorer.roomExitJumpRetries = 0;
@@ -160,7 +164,9 @@ public class ExplorerGoalCoordinator {
     }
 
     public void handleEmptyRoute(Minecraft mc, Explorer explorer) {
-        if (explorer.continuationSearch != null && !explorer.returning && !explorer.digging && !explorer.movingToPuzzleCenter) {
+        if (explorer.continuationSearch != null && !explorer.returning
+            && !explorer.digging
+            && !explorer.movingToPuzzleCenter) {
             explorer.extendRoute(mc);
             if (!explorer.route.isEmpty()) return;
             if (explorer.continuationSearch != null) {
@@ -278,7 +284,8 @@ public class ExplorerGoalCoordinator {
                 }
                 return;
             }
-            if (ReturnRoutePolicy.shouldContinueSavedTrailJoin(explorer.rejoiningSavedTrail, explorer.returnTrailRoute)) {
+            if (ReturnRoutePolicy
+                .shouldContinueSavedTrailJoin(explorer.rejoiningSavedTrail, explorer.returnTrailRoute)) {
                 explorer.returnJoinSearch = new GroundPathfinder.Search(
                     explorer.walkingTerrain(mc.theWorld),
                     (int) Math.floor(mc.thePlayer.posX),
@@ -302,7 +309,8 @@ public class ExplorerGoalCoordinator {
             int exitZ = (int) Math.floor(mc.thePlayer.posZ);
             if (!mc.theWorld.canBlockSeeTheSky(exitX, exitY, exitZ)) {
                 explorer.blockedWalkNodes.clear();
-                if (explorer.startSavedReturn(mc, explorer.resumeSearchAfterReturn, 128) || explorer.digTowardSavedExit(mc)) return;
+                if (explorer.startSavedReturn(mc, explorer.resumeSearchAfterReturn, 128)
+                    || explorer.digTowardSavedExit(mc)) return;
                 explorer.retryExitLater(mc);
                 return;
             }
@@ -338,14 +346,16 @@ public class ExplorerGoalCoordinator {
         }
         if (!explorer.entranceSelected
             && (explorer.digging || (!explorer.searching && explorer.target.yCoord < mc.thePlayer.boundingBox.minY - 2
-                && Math.abs(mc.thePlayer.posX - explorer.target.xCoord) + Math.abs(mc.thePlayer.posZ - explorer.target.zCoord) <= 32))
+                && Math.abs(mc.thePlayer.posX - explorer.target.xCoord)
+                    + Math.abs(mc.thePlayer.posZ - explorer.target.zCoord) <= 32))
             && !dryShore(
                 mc.theWorld,
                 (int) Math.floor(mc.thePlayer.posX),
                 (int) Math.floor(mc.thePlayer.boundingBox.minY),
                 (int) Math.floor(mc.thePlayer.posZ))) {
             explorer.digging = false;
-            if (!explorer.findDryEntrance(mc)) explorer.stop(mc, "No verified dry entrance near the water; digging stopped");
+            if (!explorer.findDryEntrance(mc))
+                explorer.stop(mc, "No verified dry entrance near the water; digging stopped");
             return;
         }
         if (!explorer.searching && !explorer.digging) {
@@ -382,7 +392,8 @@ public class ExplorerGoalCoordinator {
                 explorer.plan(mc);
                 if (!explorer.route.isEmpty() || explorer.walkingSearch != null) return;
                 if (LootGameSolverConfig.staircaseEnabled && explorer.target.yCoord < mc.thePlayer.boundingBox.minY - 2
-                    && mc.theWorld.blockExists(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord)) {
+                    && mc.theWorld
+                        .blockExists(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord)) {
                     if (explorer.startRoomEntrySearch(mc)) return;
                     if (!explorer.selectDigEntrance(mc) && !explorer.nextSearchLeg(mc)) {
                         explorer.stop(mc, "No safe dig entrance near the structure");
@@ -397,7 +408,8 @@ public class ExplorerGoalCoordinator {
             return;
         }
         if (explorer.digging && (Math.abs(explorer.target.yCoord + 1 - mc.thePlayer.boundingBox.minY) > 1
-            || Math.abs(mc.thePlayer.posX - explorer.target.xCoord) + Math.abs(mc.thePlayer.posZ - explorer.target.zCoord) > 3)) {
+            || Math.abs(mc.thePlayer.posX - explorer.target.xCoord)
+                + Math.abs(mc.thePlayer.posZ - explorer.target.zCoord) > 3)) {
             if (!explorer.stairStep(mc)) {
                 if (explorer.stairSteps == 0 && ++explorer.approachAttempts <= 3) {
                     explorer.excavationSearch = null;

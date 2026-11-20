@@ -1,10 +1,5 @@
 package com.kyroxova.lootgamesolver.client.loot;
 
-import com.kyroxova.lootgamesolver.client.AimHelper;
-import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
-import com.kyroxova.lootgamesolver.client.ClientHooks;
-import com.kyroxova.lootgamesolver.client.VisibleBlockInteraction;
-import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestView.*;
 
 import java.util.ArrayList;
@@ -16,11 +11,8 @@ import java.util.Random;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.IInventory;
-import net.minecraft.inventory.Slot;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
@@ -28,9 +20,13 @@ import net.minecraft.util.Vec3;
 import net.minecraft.util.WeightedRandomChestContent;
 import net.minecraftforge.common.ChestGenHooks;
 
+import com.kyroxova.lootgamesolver.client.AimHelper;
+import com.kyroxova.lootgamesolver.client.BaritoneInventoryBridge;
+import com.kyroxova.lootgamesolver.client.ClientHooks;
+import com.kyroxova.lootgamesolver.client.VisibleBlockInteraction;
+import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.ExplorerSustain;
 import com.kyroxova.lootgamesolver.explorer.excavation.MiningAimGate;
 
 public final class RewardChestLooter {
@@ -160,7 +156,8 @@ public final class RewardChestLooter {
 
     public PendingLootStore.Checkpoint saveCheckpoint(Minecraft mc) {
         if (mc == null || mc.theWorld == null || checkpointCenter == null) return null;
-        if (!pendingLoot.save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, checkpointCenter, gameType, true))
+        if (!pendingLoot
+            .save(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, checkpointCenter, gameType, true))
             return null;
         return pendingLoot.load();
     }
@@ -471,7 +468,8 @@ public final class RewardChestLooter {
         }
         double hitX = hit.hitVec.xCoord - eye.xCoord, hitY = hit.hitVec.yCoord - eye.yCoord;
         double hitZ = hit.hitVec.zCoord - eye.zCoord;
-        float targetYaw = Math.hypot(hitX, hitZ) < 0.05D ? mc.thePlayer.rotationYaw : AimHelper.calculateYaw(hitX, hitZ);
+        float targetYaw = Math.hypot(hitX, hitZ) < 0.05D ? mc.thePlayer.rotationYaw
+            : AimHelper.calculateYaw(hitX, hitZ);
         float targetPitch = AimHelper.calculatePitch(hitX, hitY, hitZ);
         if (!turnToward(mc, exploration, targetYaw, targetPitch)) {
             chestAim.reset();
@@ -484,15 +482,20 @@ public final class RewardChestLooter {
         net.minecraft.util.MovingObjectPosition crosshair = mc.objectMouseOver;
         boolean matches = mc.renderViewEntity == mc.thePlayer
             && (VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach)
-                || (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2]
+                || (aimed != null && aimed.blockX == pos[0]
+                    && aimed.blockY == pos[1]
+                    && aimed.blockZ == pos[2]
                     && eye.squareDistanceTo(aimed.hitVec) <= reach * reach));
         net.minecraft.util.MovingObjectPosition clickTarget = (crosshair != null && crosshair.blockX == pos[0]
-            && crosshair.blockY == pos[1] && crosshair.blockZ == pos[2])
-            ? crosshair : (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2] ? aimed : hit);
+            && crosshair.blockY == pos[1]
+            && crosshair.blockZ == pos[2]) ? crosshair
+                : (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2] ? aimed
+                    : hit);
         float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw);
         float pitchError = targetPitch - mc.thePlayer.rotationPitch;
         if (!matches || eye.squareDistanceTo(clickTarget.hitVec) > reach * reach
-            || Math.abs(yawError) > 4.5F || Math.abs(pitchError) > 4.5F) {
+            || Math.abs(yawError) > 4.5F
+            || Math.abs(pitchError) > 4.5F) {
             status = "Facing reward chest";
             return;
         }

@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.ClientHooks;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -13,13 +12,15 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.MovingObjectPosition;
 
+import com.kyroxova.lootgamesolver.client.ClientHooks;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 
 public final class StorageCommand extends CommandBase {
 
     private static final String[] SUBCOMMANDS = { "help", "setHome", "setWarp", "setChest", "setStorage", "clearChest",
-        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot", "clearCheckpoint", "caveMode" };
+        "clearChests", "clearWarp", "clearStorage", "enable", "disable", "storageStatus", "resumeLoot",
+        "clearCheckpoint", "caveMode" };
 
     @Override
     public String getCommandName() {

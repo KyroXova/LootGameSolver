@@ -59,7 +59,9 @@ public final class LootGamesTileAccess {
         if (cachedPosConstructor != null) {
             return cachedPosConstructor.newInstance(Integer.valueOf(x), Integer.valueOf(y));
         }
-        return Class.forName(POS).getConstructor(int.class, int.class).newInstance(Integer.valueOf(x), Integer.valueOf(y));
+        return Class.forName(POS)
+            .getConstructor(int.class, int.class)
+            .newInstance(Integer.valueOf(x), Integer.valueOf(y));
     }
 
     public static Field getFieldRecursive(Class<?> clazz, String fieldName) {
@@ -76,13 +78,18 @@ public final class LootGamesTileAccess {
     }
 
     public static Object invoke(Object target, String name, Object... args) throws Exception {
-        Method[] methods = target.getClass().getMethods();
+        Method[] methods = target.getClass()
+            .getMethods();
         for (Method method : methods) {
-            if (method.getName().equals(name) && method.getParameterTypes().length == args.length) {
+            if (method.getName()
+                .equals(name) && method.getParameterTypes().length == args.length) {
                 return method.invoke(target, args);
             }
         }
-        throw new NoSuchMethodException(target.getClass().getName() + "." + name);
+        throw new NoSuchMethodException(
+            target.getClass()
+                .getName() + "."
+                + name);
     }
 
     public static boolean bool(Object target, String name) throws Exception {
@@ -95,7 +102,8 @@ public final class LootGamesTileAccess {
 
     public static boolean isMasterBlock(net.minecraft.block.Block block) {
         if (block == null) return false;
-        String name = block.getClass().getName();
+        String name = block.getClass()
+            .getName();
         return name.endsWith(".PuzzleMasterBlock")
             || name.equals("ru.timeconqueror.lootgames.common.block.PuzzleMasterBlock");
     }
@@ -107,7 +115,9 @@ public final class LootGamesTileAccess {
 
     public static boolean isFloorActivator(net.minecraft.block.Block block) {
         if (block == null) return false;
-        return isFloorActivatorName(block.getClass().getName());
+        return isFloorActivatorName(
+            block.getClass()
+                .getName());
     }
 
     public static boolean isFloorActivatorName(String name) {
@@ -128,38 +138,52 @@ public final class LootGamesTileAccess {
             return null;
         }
         try {
-            Object blockPos = cachedBlockPosOfMethod.invoke(null, Integer.valueOf(x), Integer.valueOf(y), Integer.valueOf(z));
+            Object blockPos = cachedBlockPosOfMethod
+                .invoke(null, Integer.valueOf(x), Integer.valueOf(y), Integer.valueOf(z));
             Object masterPos = cachedGetMasterPosMethod.invoke(null, world, blockPos);
             if (masterPos != null) {
-                return new int[] { number(invoke(masterPos, "getX")), number(invoke(masterPos, "getY")), number(invoke(masterPos, "getZ")) };
+                return new int[] { number(invoke(masterPos, "getX")), number(invoke(masterPos, "getY")),
+                    number(invoke(masterPos, "getZ")) };
             }
         } catch (Exception ignored) {}
         return null;
     }
 
     public static Object extractGameFromTile(World world, TileEntity tile, int x, int y, int z) {
-        if (tile != null && !tile.isInvalid() && tile.getClass().getName().startsWith(LOOTGAMES_PKG)) {
+        if (tile != null && !tile.isInvalid()
+            && tile.getClass()
+                .getName()
+                .startsWith(LOOTGAMES_PKG)) {
             try {
-                Method getGame = tile.getClass().getMethod("getGame");
+                Method getGame = tile.getClass()
+                    .getMethod("getGame");
                 Object game = getGame.invoke(tile);
                 if (game != null) {
-                    String gName = game.getClass().getName();
+                    String gName = game.getClass()
+                        .getName();
                     if (MS_GAME.equals(gName) || SDK_GAME.equals(gName) || GOL_GAME.equals(gName)) return game;
                 }
             } catch (Exception ignored) {}
         }
 
         net.minecraft.block.Block b = world.getBlock(x, y, z);
-        if (b != null && b.getClass().getName().startsWith(LOOTGAMES_PKG)) {
+        if (b != null && b.getClass()
+            .getName()
+            .startsWith(LOOTGAMES_PKG)) {
             int[] masterPos = getMasterPos(world, x, y, z);
             if (masterPos != null) {
                 TileEntity masterTile = world.getTileEntity(masterPos[0], masterPos[1], masterPos[2]);
-                if (masterTile != null && !masterTile.isInvalid() && masterTile.getClass().getName().startsWith(LOOTGAMES_PKG)) {
+                if (masterTile != null && !masterTile.isInvalid()
+                    && masterTile.getClass()
+                        .getName()
+                        .startsWith(LOOTGAMES_PKG)) {
                     try {
-                        Method getGame = masterTile.getClass().getMethod("getGame");
+                        Method getGame = masterTile.getClass()
+                            .getMethod("getGame");
                         Object game = getGame.invoke(masterTile);
                         if (game != null) {
-                            String gName = game.getClass().getName();
+                            String gName = game.getClass()
+                                .getName();
                             if (MS_GAME.equals(gName) || SDK_GAME.equals(gName) || GOL_GAME.equals(gName)) return game;
                         }
                     } catch (Exception ignored) {}
@@ -177,7 +201,9 @@ public final class LootGamesTileAccess {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     net.minecraft.block.Block b = world.getBlock(px + dx, py + dy, pz + dz);
-                    if (b != null && b.getClass().getName().startsWith(LOOTGAMES_PKG)) {
+                    if (b != null && b.getClass()
+                        .getName()
+                        .startsWith(LOOTGAMES_PKG)) {
                         return true;
                     }
                 }
@@ -189,7 +215,8 @@ public final class LootGamesTileAccess {
     @SuppressWarnings("unchecked")
     public static Object findNearbyGame(World world, EntityPlayer player, boolean forceScan) {
         Minecraft mc = Minecraft.getMinecraft();
-        if (mc.objectMouseOver != null && mc.objectMouseOver.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
+        if (mc.objectMouseOver != null
+            && mc.objectMouseOver.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
             int bx = mc.objectMouseOver.blockX;
             int by = mc.objectMouseOver.blockY;
             int bz = mc.objectMouseOver.blockZ;
@@ -198,7 +225,9 @@ public final class LootGamesTileAccess {
             double dz = bz + 0.5D - player.posZ;
             if (Math.abs(dx) <= 32.0D && Math.abs(dz) <= 32.0D && Math.abs(dy) <= 8.0D) {
                 net.minecraft.block.Block hitBlock = world.getBlock(bx, by, bz);
-                if (hitBlock != null && hitBlock.getClass().getName().startsWith(LOOTGAMES_PKG)) {
+                if (hitBlock != null && hitBlock.getClass()
+                    .getName()
+                    .startsWith(LOOTGAMES_PKG)) {
                     TileEntity hitTile = world.getTileEntity(bx, by, bz);
                     Object game = extractGameFromTile(world, hitTile, bx, by, bz);
                     if (game != null) return game;
@@ -217,7 +246,9 @@ public final class LootGamesTileAccess {
             TileEntity tile = tiles.get(i);
             if (tile == null || tile.isInvalid()) continue;
 
-            if (!tile.getClass().getName().startsWith(LOOTGAMES_PKG)) continue;
+            if (!tile.getClass()
+                .getName()
+                .startsWith(LOOTGAMES_PKG)) continue;
 
             double tdx = tile.xCoord + 0.5D - player.posX;
             double tdy = tile.yCoord + 0.5D - player.posY;
@@ -254,7 +285,10 @@ public final class LootGamesTileAccess {
                     boolean isMaster = isMasterBlock(block);
                     if (!isMaster) {
                         TileEntity te = mc.theWorld.getTileEntity(x, y, z);
-                        if (te != null && isMasterTile(te.getClass().getName())) isMaster = true;
+                        if (te != null && isMasterTile(
+                            te.getClass()
+                                .getName()))
+                            isMaster = true;
                     }
                     if (isMaster) {
                         double distance = mc.thePlayer.getDistanceSq(x + 0.5D, y + 0.5D, z + 0.5D);
@@ -271,7 +305,9 @@ public final class LootGamesTileAccess {
             if (!(obj instanceof TileEntity)) continue;
             TileEntity te = (TileEntity) obj;
             if (te.isInvalid()) continue;
-            if (isMasterTile(te.getClass().getName())) {
+            if (isMasterTile(
+                te.getClass()
+                    .getName())) {
                 double distance = mc.thePlayer.getDistanceSq(te.xCoord + 0.5D, te.yCoord + 0.5D, te.zCoord + 0.5D);
                 if (distance <= 256.0D && distance < best) {
                     closest = new int[] { te.xCoord, te.yCoord, te.zCoord };
@@ -305,7 +341,8 @@ public final class LootGamesTileAccess {
     }
 
     public static Object gameAtMaster(Minecraft mc, int[] position) {
-        if (position == null || position.length < 3 || mc.theWorld == null
+        if (position == null || position.length < 3
+            || mc.theWorld == null
             || !mc.theWorld.blockExists(position[0], position[1], position[2])) return null;
         TileEntity tile = mc.theWorld.getTileEntity(position[0], position[1], position[2]);
         return tile == null || tile.isInvalid() ? null

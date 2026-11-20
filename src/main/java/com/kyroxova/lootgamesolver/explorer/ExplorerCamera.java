@@ -1,8 +1,9 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSteering;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
+
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSteering;
 
 public final class ExplorerCamera {
 

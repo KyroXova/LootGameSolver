@@ -7,8 +7,8 @@ public final class VisibleBlockInteraction {
 
     private VisibleBlockInteraction() {}
 
-    public static boolean matches(MovingObjectPosition crosshair, MovingObjectPosition ray, Vec3 eye, int x, int y, int z,
-        double reach) {
+    public static boolean matches(MovingObjectPosition crosshair, MovingObjectPosition ray, Vec3 eye, int x, int y,
+        int z, double reach) {
         if (eye == null || reach <= 0
             || !target(crosshair, x, y, z)
             || !target(ray, x, y, z)

@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer;
 
-import com.kyroxova.lootgamesolver.explorer.structure.ExplorerStructureDiscovery;
-import com.kyroxova.lootgamesolver.explorer.structure.ProgressiveSearch;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 
 import net.minecraft.client.Minecraft;
@@ -10,6 +7,8 @@ import net.minecraft.tileentity.TileEntity;
 
 import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.structure.ExplorerStructureDiscovery;
+import com.kyroxova.lootgamesolver.explorer.structure.ProgressiveSearch;
 
 public class ExplorerSearchCoordinator {
 
@@ -25,7 +24,8 @@ public class ExplorerSearchCoordinator {
         return isExplored(explorer.sessionVisitedChunks, explorer.baritoneNavigation, blockX, blockZ);
     }
 
-    public static boolean isExplored(java.util.Set<Long> visitedChunks, BaritoneNavigationBridge nav, int blockX, int blockZ) {
+    public static boolean isExplored(java.util.Set<Long> visitedChunks, BaritoneNavigationBridge nav, int blockX,
+        int blockZ) {
         int cx = blockX >> 4;
         int cz = blockZ >> 4;
         long key = Explorer.chunkKey(cx, cz);
@@ -54,15 +54,8 @@ public class ExplorerSearchCoordinator {
             currentYaw);
     }
 
-    public float findOutwardYaw(
-        int originX,
-        int originZ,
-        java.util.Set<Long> visitedChunks,
-        BaritoneNavigationBridge nav,
-        int px,
-        int pz,
-        float baseYaw,
-        float currentYaw) {
+    public float findOutwardYaw(int originX, int originZ, java.util.Set<Long> visitedChunks,
+        BaritoneNavigationBridge nav, int px, int pz, float baseYaw, float currentYaw) {
         boolean hasOrigin = originX != Integer.MIN_VALUE;
         double origDx = hasOrigin ? px - originX : 0.0D;
         double origDz = hasOrigin ? pz - originZ : 0.0D;
@@ -174,10 +167,15 @@ public class ExplorerSearchCoordinator {
         explorer.target = null;
         explorer.knownStructure = null;
         if (mc.theWorld == null || mc.thePlayer == null) return;
-        explorer.target = ExplorerStructureDiscovery
-            .find(mc, explorer.savedFinder, explorer.solvedStructures, explorer.blockedStructures, Explorer.worldIdentity(mc));
+        explorer.target = ExplorerStructureDiscovery.find(
+            mc,
+            explorer.savedFinder,
+            explorer.solvedStructures,
+            explorer.blockedStructures,
+            Explorer.worldIdentity(mc));
         if (explorer.target != null) {
-            explorer.knownStructure = new int[] { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
+            explorer.knownStructure = new int[] { explorer.target.xCoord, explorer.target.yCoord,
+                explorer.target.zCoord };
             explorer.waypointLabelY = ExplorerStructureDiscovery.labelHeight(mc, explorer.target);
         }
     }
@@ -279,12 +277,7 @@ public class ExplorerSearchCoordinator {
         }
         float chosenYaw = findOutwardYaw(mc, explorer, baseYaw, mc.thePlayer.rotationYaw);
         explorer.searchYaw = chosenYaw;
-        explorer.search = new ProgressiveSearch(
-            px,
-            pz,
-            explorer.searchYaw,
-            0,
-            128);
+        explorer.search = new ProgressiveSearch(px, pz, explorer.searchYaw, 0, 128);
         int[] first = explorer.search.next();
         if (first != null) {
             BaritoneNavigationBridge.Start started = explorer.baritoneNavigation.startHorizontal(first[0], first[1]);
@@ -296,7 +289,8 @@ public class ExplorerSearchCoordinator {
                 explorer.baritoneCoordinator.searchMove = true;
                 explorer.searching = true;
                 explorer.walking = true;
-                explorer.status = solved ? "Puzzle solved; searching for the next structure" : "Searching for structures";
+                explorer.status = solved ? "Puzzle solved; searching for the next structure"
+                    : "Searching for structures";
                 return;
             }
             if (started != BaritoneNavigationBridge.Start.ABSENT) {
@@ -378,9 +372,8 @@ public class ExplorerSearchCoordinator {
             return;
         }
         if (explorer.target != null && !explorer.target.isInvalid()) {
-            boolean nearEntrance = Math.hypot(
-                mc.thePlayer.posX - explorer.target.xCoord,
-                mc.thePlayer.posZ - explorer.target.zCoord) <= 6D;
+            boolean nearEntrance = Math
+                .hypot(mc.thePlayer.posX - explorer.target.xCoord, mc.thePlayer.posZ - explorer.target.zCoord) <= 6D;
             if (nearEntrance && !explorer.insideDungeonRoom(mc)) {
                 if (explorer.startRoomEntrySearch(mc)) {
                     explorer.status = "Finding a clear structure entrance";

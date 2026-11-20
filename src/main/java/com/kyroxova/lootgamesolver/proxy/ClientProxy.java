@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.proxy;
 
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.kyroxova.lootgamesolver.client.ClientHooks;

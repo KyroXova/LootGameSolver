@@ -1,30 +1,29 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
-import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
-import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.excavation.ExplorerMiningTarget.visibleMiningPoint;
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFoliage;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
-import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.client.DigToolSelector;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
 
 public class ExplorerMiningDriver {
 
     public void releaseMiningInput(Minecraft mc, Explorer explorer) {
         if (mc == null || mc.gameSettings == null || explorer == null) return;
-        explorer.miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        explorer.miningAttack
+            .release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
     }
 
     public void releaseMiningWhileSandFalls(Minecraft mc, Explorer explorer) {
         if (mc == null || mc.gameSettings == null || explorer == null) return;
-        explorer.miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        explorer.miningAttack
+            .release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
         if (mc.playerController != null) mc.playerController.resetBlockRemoving();
         explorer.miningAim.reset();
         explorer.digTicks = 0;
@@ -72,7 +71,8 @@ public class ExplorerMiningDriver {
                 && obstruction.blockY > by
                 && obstruction.blockY <= y + 4
                 && visible instanceof net.minecraft.block.BlockFalling
-                && explorer.excavationTerrain.excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
+                && explorer.excavationTerrain
+                    .excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
             if (aimPoint == null && (fallingObstruction || FoliagePolicy.canClear(
                 plant,
                 w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
@@ -111,7 +111,8 @@ public class ExplorerMiningDriver {
         explorer.toolWaitTicks = 0;
         if (slot < 0) {
             explorer.waitingForTool = true;
-            explorer.miningAttack.release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+            explorer.miningAttack
+                .release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
             mc.playerController.resetBlockRemoving();
             explorer.digTicks = 0;
             explorer.miningAim.reset();
@@ -150,7 +151,8 @@ public class ExplorerMiningDriver {
             && hit.blockY == mineY
             && hit.blockZ == mineZ;
         if (!matches) {
-            hit = com.kyroxova.lootgamesolver.minecraft.LootGamesInteractionHelper.visibleTarget(mc, mineX, mineY, mineZ);
+            hit = com.kyroxova.lootgamesolver.minecraft.LootGamesInteractionHelper
+                .visibleTarget(mc, mineX, mineY, mineZ);
             if (hit != null) matches = true;
         }
         float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);

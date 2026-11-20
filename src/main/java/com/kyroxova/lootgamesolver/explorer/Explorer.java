@@ -1,5 +1,20 @@
 package com.kyroxova.lootgamesolver.explorer;
 
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.*;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.World;
+
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
+import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.client.ui.StatusText;
+import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.explorer.excavation.BlockPlacer;
 import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
 import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPlanner;
@@ -32,21 +47,6 @@ import com.kyroxova.lootgamesolver.explorer.structure.SolvedStructureStore;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTrailCoordinator;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTrailSession;
-import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.*;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.settings.GameSettings;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
-
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
-import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
-import com.kyroxova.lootgamesolver.client.ui.StatusText;
-import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public class Explorer {
 
@@ -579,7 +579,8 @@ public class Explorer {
 
     public void renderCamera(Minecraft mc) {
         if (inventoryMaintenance || mc.thePlayer == null || mc.theWorld == null) return;
-        boolean baritoneActive = baritoneCoordinator.active() || baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
+        boolean baritoneActive = baritoneCoordinator.active()
+            || baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING;
         boolean attacking = mc.gameSettings != null && GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
         if (NavigationSteering.yieldCameraToBaritone(
             baritoneActive,
@@ -1001,7 +1002,8 @@ public class Explorer {
         return excavationPlanner.attemptStairStep(mc, this, destinationY);
     }
 
-    public int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ, int destinationY) {
+    public int foliageSupportY(World w, int x, int foliageY, int z, int playerX, int footY, int playerZ,
+        int destinationY) {
         return excavationPlanner.foliageSupportY(w, this, x, foliageY, z, playerX, footY, playerZ, destinationY);
     }
 

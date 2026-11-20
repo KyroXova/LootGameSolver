@@ -1,10 +1,10 @@
 package com.kyroxova.lootgamesolver.client.puzzle;
 
-import com.kyroxova.lootgamesolver.client.ClientHooks;
-import com.kyroxova.lootgamesolver.client.loot.RewardChestLooter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
+import com.kyroxova.lootgamesolver.client.ClientHooks;
+import com.kyroxova.lootgamesolver.client.loot.RewardChestLooter;
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.explorer.Explorer;
 import com.kyroxova.lootgamesolver.minecraft.DetectedGame;
@@ -121,8 +121,8 @@ public final class AutoPuzzleCoordinator {
         puzzleCompletion.begin();
     }
 
-    public void checkSolvingStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
-        PuzzleCompletionGate puzzleCompletion, PuzzleTileNavigator tileNavigator) {
+    public void checkSolvingStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration,
+        SolverSession session, PuzzleCompletionGate puzzleCompletion, PuzzleTileNavigator tileNavigator) {
         if (state != State.SOLVING || puzzleCompletion.won(mc.theWorld != null)) return;
         Object game = puzzleBridge.nearbyGame(true);
         int level = puzzleBridge.currentMinesweeperLevel(game);
@@ -436,7 +436,8 @@ public final class AutoPuzzleCoordinator {
         }
     }
 
-    public void startPuzzleSolver(Minecraft mc, LootGamesBridge puzzleBridge, SolverSession session, ClientHooks hooks) {
+    public void startPuzzleSolver(Minecraft mc, LootGamesBridge puzzleBridge, SolverSession session,
+        ClientHooks hooks) {
         if (hooks != null && hooks.getExploration() != null
             && hooks.getExploration()
                 .navigating()) {

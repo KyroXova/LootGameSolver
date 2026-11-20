@@ -39,16 +39,23 @@ public final class BinnieCompartmentAdapter {
 
     public static BinnieCompartmentAdapter detect(Container container) {
         if (container == null) return null;
-        if (!CONTAINER_CLASS.equals(container.getClass().getName())) return null;
+        if (!CONTAINER_CLASS.equals(
+            container.getClass()
+                .getName()))
+            return null;
 
         try {
             Field windowField = getField(container.getClass(), "window");
             if (windowField == null) return null;
             windowField.setAccessible(true);
             Object window = windowField.get(container);
-            if (window == null || !WINDOW_CLASS.equals(window.getClass().getName())) return null;
+            if (window == null || !WINDOW_CLASS.equals(
+                window.getClass()
+                    .getName()))
+                return null;
 
-            Method getInvMethod = window.getClass().getMethod("getInventory");
+            Method getInvMethod = window.getClass()
+                .getMethod("getInventory");
             IInventory machineInv = (IInventory) getInvMethod.invoke(window);
 
             Object compInv = null;
@@ -60,11 +67,13 @@ public final class BinnieCompartmentAdapter {
                     Method getMachineMethod = machineClass.getMethod("getMachine", Object.class);
                     Object machine = getMachineMethod.invoke(null, machineInv);
                     if (machine != null) {
-                        Method getInterfaceMethod = machine.getClass().getMethod("getInterface", Class.class);
+                        Method getInterfaceMethod = machine.getClass()
+                            .getMethod("getInterface", Class.class);
                         Class<?> compInvClass = Class.forName(COMP_INV_CLASS);
                         compInv = getInterfaceMethod.invoke(machine, compInvClass);
                         if (compInv != null) {
-                            Method getTabNumber = compInv.getClass().getMethod("getTabNumber");
+                            Method getTabNumber = compInv.getClass()
+                                .getMethod("getTabNumber");
                             count = (Integer) getTabNumber.invoke(compInv);
                         }
                     }
@@ -92,7 +101,8 @@ public final class BinnieCompartmentAdapter {
 
     public IInventory getMachineInventory() {
         try {
-            Method getInvMethod = window.getClass().getMethod("getInventory");
+            Method getInvMethod = window.getClass()
+                .getMethod("getInventory");
             return (IInventory) getInvMethod.invoke(window);
         } catch (Throwable t) {
             return null;
@@ -101,7 +111,8 @@ public final class BinnieCompartmentAdapter {
 
     public IInventory getWindowInventory() {
         try {
-            Method getWinInvMethod = window.getClass().getMethod("getWindowInventory");
+            Method getWinInvMethod = window.getClass()
+                .getMethod("getWindowInventory");
             return (IInventory) getWinInvMethod.invoke(window);
         } catch (Throwable t) {
             return null;
@@ -126,7 +137,8 @@ public final class BinnieCompartmentAdapter {
     public int[] getSlotsForCurrentTab() {
         if (compInventory == null) return null;
         try {
-            Method getSlotsMethod = compInventory.getClass().getMethod("getSlotsForTab", int.class);
+            Method getSlotsMethod = compInventory.getClass()
+                .getMethod("getSlotsForTab", int.class);
             return (int[]) getSlotsMethod.invoke(compInventory, getCurrentTab());
         } catch (Throwable ignored) {
             return null;
@@ -159,15 +171,12 @@ public final class BinnieCompartmentAdapter {
             NBTTagCompound tag = new NBTTagCompound();
             tag.setByte("i", (byte) nextTab);
 
-            Method sendAction = window.getClass().getMethod("sendClientAction", String.class, NBTTagCompound.class);
+            Method sendAction = window.getClass()
+                .getMethod("sendClientAction", String.class, NBTTagCompound.class);
             sendAction.invoke(window, "tab-change", tag);
 
-            Method receiveGuiNBT = window.getClass().getMethod(
-                "receiveGuiNBT",
-                Side.class,
-                EntityPlayer.class,
-                String.class,
-                NBTTagCompound.class);
+            Method receiveGuiNBT = window.getClass()
+                .getMethod("receiveGuiNBT", Side.class, EntityPlayer.class, String.class, NBTTagCompound.class);
             receiveGuiNBT.invoke(window, Side.CLIENT, mc.thePlayer, "tab-change", tag);
 
             Field curTabField = getField(window.getClass(), "currentTab");
@@ -177,7 +186,8 @@ public final class BinnieCompartmentAdapter {
             }
 
             try {
-                Method updateTabs = window.getClass().getMethod("updateTabs");
+                Method updateTabs = window.getClass()
+                    .getMethod("updateTabs");
                 updateTabs.invoke(window);
             } catch (Throwable ignored) {}
 

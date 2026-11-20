@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client.loot;
 
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;

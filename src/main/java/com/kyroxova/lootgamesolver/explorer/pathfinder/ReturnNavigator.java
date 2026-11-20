@@ -1,9 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.solidCheckpoint;
@@ -15,6 +11,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.tileentity.TileEntity;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.excavation.ExcavationPathfinder;
 
 public final class ReturnNavigator {
 

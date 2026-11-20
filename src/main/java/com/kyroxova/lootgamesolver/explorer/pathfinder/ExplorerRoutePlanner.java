@@ -1,9 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerWalkingTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.passable;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
@@ -14,6 +10,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerWalkingTerrain;
 
 public class ExplorerRoutePlanner {
 
@@ -209,7 +207,8 @@ public class ExplorerRoutePlanner {
                 boolean reachedGoal = explorer.walkingSearch.reachedGoal();
                 explorer.route.addAll(explorer.walkingSearch.path());
                 explorer.walkingSearch = null;
-                explorer.walkingSearchNeedsResume = !explorer.movingToPuzzleCenter && !reachedGoal && !explorer.route.isEmpty();
+                explorer.walkingSearchNeedsResume = !explorer.movingToPuzzleCenter && !reachedGoal
+                    && !explorer.route.isEmpty();
                 if (explorer.movingToPuzzleCenter && reachedCenter && explorer.target != null) {
                     explorer.puzzleCenter.appendPuzzleCenterWaypoint(
                         explorer,

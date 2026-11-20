@@ -55,7 +55,9 @@ public final class LootGamesActionTracker {
     }
 
     public int currentMinesweeperLevel(Object game) {
-        if (game == null || !LootGamesTileAccess.MS_GAME.equals(game.getClass().getName())) {
+        if (game == null || !LootGamesTileAccess.MS_GAME.equals(
+            game.getClass()
+                .getName())) {
             return -1;
         }
         try {
@@ -69,14 +71,18 @@ public final class LootGamesActionTracker {
 
     public static boolean minesweeperGenerated(Object game) throws Exception {
         try {
-            return game.getClass().getField("cIsGenerated").getBoolean(game);
+            return game.getClass()
+                .getField("cIsGenerated")
+                .getBoolean(game);
         } catch (NoSuchFieldException absent) {
             return LootGamesTileAccess.bool(game, "isBoardGenerated");
         }
     }
 
     public boolean canOpenMinesweeperBoard(Object game) {
-        if (game == null || !LootGamesTileAccess.MS_GAME.equals(game.getClass().getName())) {
+        if (game == null || !LootGamesTileAccess.MS_GAME.equals(
+            game.getClass()
+                .getName())) {
             return false;
         }
         try {
@@ -97,7 +103,9 @@ public final class LootGamesActionTracker {
                     if (size > 0) return boardBlock(game, new CellPosition(size / 2, size / 2));
                 } catch (Exception ignored) {}
             }
-            if (game != null && LootGamesTileAccess.MS_GAME.equals(game.getClass().getName())) {
+            if (game != null && LootGamesTileAccess.MS_GAME.equals(
+                game.getClass()
+                    .getName())) {
                 Object board = LootGamesTileAccess.invoke(game, "getBoard");
                 int size = LootGamesTileAccess.number(LootGamesTileAccess.invoke(board, "size"));
                 if (size > 0) {
@@ -113,7 +121,9 @@ public final class LootGamesActionTracker {
                 for (int floorY = y; floorY >= y - 5; floorY--) {
                     if (!mc.theWorld.blockExists(x, floorY, z)) break;
                     net.minecraft.block.Block block = mc.theWorld.getBlock(x, floorY, z);
-                    if (block != null && block != Blocks.air && block.getMaterial().isSolid()) {
+                    if (block != null && block != Blocks.air
+                        && block.getMaterial()
+                            .isSolid()) {
                         return new int[] { x, floorY, z };
                     }
                 }
@@ -155,11 +165,8 @@ public final class LootGamesActionTracker {
         if (current.type == MiniGame.MINESWEEPER) {
             if (!current.minesweeper.contains(action.position)) return true;
             MinesweeperCell cell = current.minesweeper.get(action.position);
-            return action.type == SolverAction.Type.REVEAL
-                ? cell.getState() == CellState.REVEALED
-                : action.type == SolverAction.Type.FLAG
-                    ? cell.getState() == CellState.FLAGGED
-                    : false;
+            return action.type == SolverAction.Type.REVEAL ? cell.getState() == CellState.REVEALED
+                : action.type == SolverAction.Type.FLAG ? cell.getState() == CellState.FLAGGED : false;
         }
         if (current.type == MiniGame.SUDOKU && action.type == SolverAction.Type.SET_VALUE) {
             if (current.sudokuPlayerValues != null) {
@@ -254,13 +261,15 @@ public final class LootGamesActionTracker {
     public void submitSudokuCheck(DetectedGame snapshot) {
         if (snapshot == null || snapshot.game == null) return;
         try {
-            Class<?> pkgClass = Class.forName("ru.timeconqueror.lootgames.common.packet.game.sudoku.CPSudokuEndGameCheck");
+            Class<?> pkgClass = Class
+                .forName("ru.timeconqueror.lootgames.common.packet.game.sudoku.CPSudokuEndGameCheck");
             Class<?> posClass = Class.forName(LootGamesTileAccess.POS);
             java.lang.reflect.Constructor<?> posCons = posClass.getConstructor(int.class, int.class);
             java.lang.reflect.Constructor<?> pkgCons = pkgClass.getConstructor(posClass);
             Object packet = pkgCons.newInstance(posCons.newInstance(0, 0));
 
-            for (Method m : snapshot.game.getClass().getMethods()) {
+            for (Method m : snapshot.game.getClass()
+                .getMethods()) {
                 if ("sendFeedbackPacket".equals(m.getName()) && m.getParameterTypes().length == 1) {
                     m.invoke(snapshot.game, packet);
                     break;
@@ -280,12 +289,11 @@ public final class LootGamesActionTracker {
     }
 
     public int[] boardBlock(Object game, CellPosition position) throws Exception {
-        Object result = LootGamesTileAccess.invoke(game, "convertToBlockPos", LootGamesTileAccess.createPos(position.x, position.y));
-        return new int[] {
-            LootGamesTileAccess.number(LootGamesTileAccess.invoke(result, "getX")),
+        Object result = LootGamesTileAccess
+            .invoke(game, "convertToBlockPos", LootGamesTileAccess.createPos(position.x, position.y));
+        return new int[] { LootGamesTileAccess.number(LootGamesTileAccess.invoke(result, "getX")),
             LootGamesTileAccess.number(LootGamesTileAccess.invoke(result, "getY")),
-            LootGamesTileAccess.number(LootGamesTileAccess.invoke(result, "getZ"))
-        };
+            LootGamesTileAccess.number(LootGamesTileAccess.invoke(result, "getZ")) };
     }
 
     public Map<CellPosition, int[]> precomputePositions(Object game, int width, int height) {
@@ -327,7 +335,8 @@ public final class LootGamesActionTracker {
                         sig.append('#');
                     }
                 } else {
-                    int clue = LootGamesTileAccess.number(LootGamesTileAccess.invoke(LootGamesTileAccess.invoke(field, "getType"), "getId"));
+                    int clue = LootGamesTileAccess
+                        .number(LootGamesTileAccess.invoke(LootGamesTileAccess.invoke(field, "getType"), "getId"));
                     board.set(x, y, MinesweeperCell.revealed(clue));
                     sig.append((char) ('0' + clue));
                 }
@@ -346,12 +355,15 @@ public final class LootGamesActionTracker {
 
         for (int y = 0; y < 9; y++) {
             for (int x = 0; x < 9; x++) {
-                int puzzleVal = LootGamesTileAccess.number(LootGamesTileAccess.invoke(rawBoard, "getPuzzleValue", Integer.valueOf(x), Integer.valueOf(y)));
-                int playerVal = LootGamesTileAccess.number(LootGamesTileAccess.invoke(rawBoard, "getPlayerValue", Integer.valueOf(x), Integer.valueOf(y)));
+                int puzzleVal = LootGamesTileAccess.number(
+                    LootGamesTileAccess.invoke(rawBoard, "getPuzzleValue", Integer.valueOf(x), Integer.valueOf(y)));
+                int playerVal = LootGamesTileAccess.number(
+                    LootGamesTileAccess.invoke(rawBoard, "getPlayerValue", Integer.valueOf(x), Integer.valueOf(y)));
                 board.set(y, x, puzzleVal);
                 board.setPlayerValue(y, x, playerVal);
                 playerValues[y][x] = playerVal;
-                sig.append((char) ('0' + puzzleVal)).append((char) ('0' + playerVal));
+                sig.append((char) ('0' + puzzleVal))
+                    .append((char) ('0' + playerVal));
             }
         }
         Map<CellPosition, int[]> posMap = precomputePositions(game, 9, 9);

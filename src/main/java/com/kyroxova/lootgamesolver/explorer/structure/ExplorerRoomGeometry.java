@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.*;
 
 import java.util.ArrayList;

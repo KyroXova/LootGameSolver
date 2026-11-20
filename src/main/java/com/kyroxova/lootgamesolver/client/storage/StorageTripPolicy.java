@@ -42,8 +42,8 @@ public final class StorageTripPolicy {
         return false;
     }
 
-    public static boolean near(int currentDimension, double x, double y, double z, int targetDimension, double tx, double ty,
-        double tz, double radius) {
+    public static boolean near(int currentDimension, double x, double y, double z, int targetDimension, double tx,
+        double ty, double tz, double radius) {
         if (currentDimension != targetDimension || radius < 0
             || !Double.isFinite(radius)
             || !Double.isFinite(x)

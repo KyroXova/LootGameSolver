@@ -1,12 +1,12 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
 
 public final class RoomEntry {
 

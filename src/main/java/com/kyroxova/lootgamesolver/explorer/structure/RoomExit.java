@@ -1,10 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.structure;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.trail.ContactHazards;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.samePosition;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isDungeonWall;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.passable;
@@ -15,6 +10,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.trail.ContactHazards;
 
 public final class RoomExit {
 
@@ -142,8 +140,8 @@ public final class RoomExit {
             if (!world.blockExists(x, by, z)) return false;
             net.minecraft.block.Block block = world.getBlock(x, by, z);
             if (ContactHazards.dangerous(block, world.getBlockMetadata(x, by, z)) || block.getMaterial()
-                .isLiquid()
-                || !passable(world, x, by, z) && !explorer.excavationTerrain.excavatable(world, x, by, z)) return false;
+                .isLiquid() || !passable(world, x, by, z) && !explorer.excavationTerrain.excavatable(world, x, by, z))
+                return false;
         }
         return true;
     }

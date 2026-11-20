@@ -1,9 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
-import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChestPit;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.staircaseDirection;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFoliage;
@@ -14,6 +10,9 @@ import net.minecraft.init.Blocks;
 
 import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
+import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
 
 public class ExplorerRouteNavigator {
 
@@ -66,7 +65,8 @@ public class ExplorerRouteNavigator {
                     public boolean exit(int x, int y, int z) {
                         if (!ExplorerTerrain.solidCheckpoint(exitWorld, x, y, z)) return false;
                         int index = explorer.trail.points.nearestIndex(x, y, z, 0);
-                        if (explorer.trail.points.size() >= 2) return index >= 0 && index < explorer.trail.points.size() - 1;
+                        if (explorer.trail.points.size() >= 2)
+                            return index >= 0 && index < explorer.trail.points.size() - 1;
                         return exitWorld.canBlockSeeTheSky(x, y, z);
                     }
                 }, sx, sy, sz);
@@ -130,7 +130,9 @@ public class ExplorerRouteNavigator {
                 break;
             }
         }
-        if (!explorer.digging && !explorer.roomExitCrossing && !explorer.roomEntryCrossing && explorer.route.size() >= 2) {
+        if (!explorer.digging && !explorer.roomExitCrossing
+            && !explorer.roomEntryCrossing
+            && explorer.route.size() >= 2) {
             int[] first = explorer.route.get(0), second = explorer.route.get(1);
             int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
             int cz = (int) Math.floor(mc.thePlayer.posZ);
@@ -190,7 +192,8 @@ public class ExplorerRouteNavigator {
             else explorer.stop(mc, "Diagonal clearance changed");
             return true;
         }
-        if (!safe(mc.theWorld, next[0], next[1], next[2]) || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
+        if (!safe(mc.theWorld, next[0], next[1], next[2])
+            || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
             if (explorer.returning) {
                 if (next[1] > py && explorer.tryPlaceReturnStep(mc, next)) return true;
                 if (explorer.rerouteSavedReturn(mc, 1)) return true;
@@ -217,10 +220,15 @@ public class ExplorerRouteNavigator {
         double distance = Math.sqrt(dx * dx + dz * dz);
         boolean centering = next.length > 3 && next[3] == 2;
         boolean passed = !centering && py == next[1]
-            && NavigationSteering
-                .passed(mc.thePlayer.posX, mc.thePlayer.posZ, explorer.segmentX, explorer.segmentZ, next[0] + 0.5D, next[2] + 0.5D);
-        if ((!explorer.digging || mc.thePlayer.onGround) && (passed
-            || NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), explorer.route.size() > 1))) {
+            && NavigationSteering.passed(
+                mc.thePlayer.posX,
+                mc.thePlayer.posZ,
+                explorer.segmentX,
+                explorer.segmentZ,
+                next[0] + 0.5D,
+                next[2] + 0.5D);
+        if ((!explorer.digging || mc.thePlayer.onGround) && (passed || NavigationSteering
+            .reached(distance, py, next[1], mc.thePlayer.isInWater(), explorer.route.size() > 1))) {
             explorer.segmentX = next[0] + 0.5D;
             explorer.segmentZ = next[2] + 0.5D;
             if (!explorer.returning && explorer.trail.target != null) explorer.recordAccessPoint(px, py, pz);
@@ -313,12 +321,14 @@ public class ExplorerRouteNavigator {
         }
         if (explorer.cameraPitchDirection != 0 && upcomingPitch == 0
             && mc.thePlayer.onGround
-            && Math.hypot(mc.thePlayer.posX - explorer.pitchLandingX, mc.thePlayer.posZ - explorer.pitchLandingZ) >= 1D) {
+            && Math.hypot(mc.thePlayer.posX - explorer.pitchLandingX, mc.thePlayer.posZ - explorer.pitchLandingZ)
+                >= 1D) {
             explorer.cameraPitchDirection = 0;
         }
         boolean swimming = mc.thePlayer.isInWater() || mc.theWorld.getBlock(next[0], next[1], next[2])
             .getMaterial() == net.minecraft.block.material.Material.water;
-        float desiredPitch = swimming ? 0F : explorer.cameraPitchDirection > 0 ? -10F : explorer.cameraPitchDirection < 0 ? 30F : 0F;
+        float desiredPitch = swimming ? 0F
+            : explorer.cameraPitchDirection > 0 ? -10F : explorer.cameraPitchDirection < 0 ? 30F : 0F;
         Float pathHeading = NavigationSteering.pathLookHeading(explorer.route, mc.thePlayer.posX, mc.thePlayer.posZ);
         if (!centering && pathHeading != null) explorer.look(pathHeading, desiredPitch);
         explorer.status = centering ? "Centering on supported ground"
@@ -333,7 +343,9 @@ public class ExplorerRouteNavigator {
         if (distance >= explorer.lastDistance - 0.005D) explorer.stalled++;
         else explorer.stalled = 0;
         explorer.lastDistance = distance;
-        if (explorer.stalled >= 8 && explorer.stalled <= 24 && mc.thePlayer.onGround && explorer.navigationInput != null) {
+        if (explorer.stalled >= 8 && explorer.stalled <= 24
+            && mc.thePlayer.onGround
+            && explorer.navigationInput != null) {
             explorer.navigationInput.hop = true;
             explorer.navigationInput.forward = 1.0F;
         }
@@ -399,7 +411,8 @@ public class ExplorerRouteNavigator {
                         explorer.status = "Stalled checkpoint avoided; following alternate route";
                         return true;
                     }
-                    if (LootGameSolverConfig.staircaseEnabled && !mc.thePlayer.isInWater() && explorer.selectDigEntrance(mc)) {
+                    if (LootGameSolverConfig.staircaseEnabled && !mc.thePlayer.isInWater()
+                        && explorer.selectDigEntrance(mc)) {
                         explorer.status = "Walking route blocked; checking a safe dig entrance";
                         return true;
                     }

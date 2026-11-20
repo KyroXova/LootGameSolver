@@ -1,11 +1,12 @@
 package com.kyroxova.lootgamesolver.client.loot;
 
-import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
-import com.kyroxova.lootgamesolver.client.puzzle.PuzzleCompletionGate;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
+
+import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
+import com.kyroxova.lootgamesolver.client.puzzle.PuzzleCompletionGate;
 
 public class RewardCenterResetTest {
 

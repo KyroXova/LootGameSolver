@@ -1,15 +1,15 @@
 package com.kyroxova.lootgamesolver.client;
 
-import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
-import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
-import org.lwjgl.input.Keyboard;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
 
+import org.lwjgl.input.Keyboard;
+
+import com.kyroxova.lootgamesolver.client.puzzle.AutoPuzzleCoordinator;
+import com.kyroxova.lootgamesolver.client.storage.InventoryBaseline;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 import com.kyroxova.lootgamesolver.core.ActionPlanner;
 import com.kyroxova.lootgamesolver.core.MiniGame;
@@ -56,8 +56,7 @@ public final class ClientKeyHandler {
             || hooks.storageRecovery != null
             || (hooks.exploration != null && hooks.exploration.navigating());
         boolean runExploreAction = false;
-        boolean acceptsExplore = mc.currentScreen == null
-            || mc.currentScreen instanceof GuiChest
+        boolean acceptsExplore = mc.currentScreen == null || mc.currentScreen instanceof GuiChest
             || mc.currentScreen instanceof GuiInventory;
         if (!acceptsExplore) {
             exploreKeyHeld = false;
@@ -91,7 +90,8 @@ public final class ClientKeyHandler {
                     hooks.session.cancel("Automation cleared");
                     hooks.tileNavigator.stop();
                     hooks.autoPuzzle.reset();
-                    if (hooks.exploration != null && hooks.exploration.navigating()) hooks.exploration.stop(mc, "Automation cleared");
+                    if (hooks.exploration != null && hooks.exploration.navigating())
+                        hooks.exploration.stop(mc, "Automation cleared");
                     hooks.setAutomationPaused(mc, false);
                 } else if (hooks.rewardReturnPending) {
                     if (hooks.preLootPacker.active()) hooks.preLootPacker.cancel(mc);

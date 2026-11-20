@@ -1,8 +1,8 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
 import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 
 /** Finds and centers on a supported, clear three-by-three area before setting a return warp. */

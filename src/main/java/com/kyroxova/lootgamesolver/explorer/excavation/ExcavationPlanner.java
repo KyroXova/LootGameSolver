@@ -1,11 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
-import com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge;
-import com.kyroxova.lootgamesolver.explorer.Explorer;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
-import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.entranceScore;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.samePosition;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
@@ -23,6 +17,9 @@ import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.trail.FoliagePolicy;
 
 public final class ExcavationPlanner {
 

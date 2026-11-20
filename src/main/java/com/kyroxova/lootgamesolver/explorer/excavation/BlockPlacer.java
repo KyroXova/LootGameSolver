@@ -1,8 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.excavation;
 
-import com.kyroxova.lootgamesolver.explorer.ExplorerCamera;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry;
-import com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.samePosition;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 
@@ -12,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 
 import com.kyroxova.lootgamesolver.client.storage.InventoryToolTransfer;
+import com.kyroxova.lootgamesolver.explorer.ExplorerCamera;
 
 public final class BlockPlacer {
 

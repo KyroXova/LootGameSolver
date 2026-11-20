@@ -1,7 +1,5 @@
 package com.kyroxova.lootgamesolver.explorer.trail;
 
-import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
-import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSurfacePolicy;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.*;
 
@@ -12,6 +10,9 @@ import java.util.function.Supplier;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+
+import com.kyroxova.lootgamesolver.explorer.pathfinder.GroundPathfinder;
+import com.kyroxova.lootgamesolver.explorer.pathfinder.NavigationSurfacePolicy;
 
 public final class ExplorerWalkingTerrain implements GroundPathfinder.Terrain {
 
