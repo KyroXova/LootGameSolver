@@ -18,19 +18,14 @@ import net.minecraft.nbt.NBTTagList;
 
 public final class SavedStructureFinder {
 
+    private final File regionDirectory;
     private volatile List<int[]> positions = Collections.emptyList();
     private volatile boolean cancelled;
+    private volatile boolean busy;
 
     public SavedStructureFinder(final File regionDirectory) {
-        Thread worker = new Thread(new Runnable() {
-
-            public void run() {
-                scan(regionDirectory);
-            }
-        }, "LootGames save search");
-        worker.setDaemon(true);
-        worker.setPriority(Thread.MIN_PRIORITY);
-        worker.start();
+        this.regionDirectory = regionDirectory;
+        rescan();
     }
 
     public void cancel() {
@@ -39,6 +34,24 @@ public final class SavedStructureFinder {
 
     public List<int[]> positions() {
         return positions;
+    }
+
+    public void rescan() {
+        if (busy || cancelled || regionDirectory == null) return;
+        busy = true;
+        Thread worker = new Thread(new Runnable() {
+
+            public void run() {
+                try {
+                    scan(regionDirectory);
+                } finally {
+                    busy = false;
+                }
+            }
+        }, "LootGames save search");
+        worker.setDaemon(true);
+        worker.setPriority(Thread.MIN_PRIORITY);
+        worker.start();
     }
 
     private void scan(File directory) {

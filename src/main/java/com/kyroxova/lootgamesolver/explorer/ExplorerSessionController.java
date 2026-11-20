@@ -170,6 +170,7 @@ public class ExplorerSessionController {
             return true;
         }
         if (explorer.ticks % 20 == 0) explorer.excavationTerrain.clearToolCache();
+        if (explorer.ticks % 1200 == 0 && explorer.savedFinder != null) explorer.savedFinder.rescan();
         explorer.updateRoutePreview(mc);
         if (++explorer.ticks % 100 == 0 && !explorer.walking && !roomWorkActive) explorer.scan(mc);
         if (explorer.walking && explorer.searching && !roomWorkActive && explorer.ticks % 40 == 0) {
