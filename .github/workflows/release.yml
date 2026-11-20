@@ -164,13 +164,7 @@ jobs:
 
       - name: Obtain Baritone jar for bundled release
         id: baritone
-        run: |
-          set -euo pipefail
-          git clone --depth 1 --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
-          (cd baritone-src && chmod +x gradlew && ./gradlew reobfJar --parallel --max-workers=4)
-          BARITONE_JAR=baritone-src/build/libs/baritone-1.7.10-1.20.0-1.7.10-dev.jar
-          test -f "$BARITONE_JAR"
-          echo "jar_path=$(realpath "$BARITONE_JAR")" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/build-baritone
 
       - name: Build bundled Baritone mod
         run: ./gradlew bundledBaritoneJar -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}"
@@ -185,6 +179,9 @@ jobs:
           test -s "$NOTES"
           JAR="build/libs/lootgamesolver-${VERSION}.jar"
           test -f "$JAR"
+          SIZE=$(stat -c %s "$JAR")
+          test "$SIZE" -ge 8000000 && test "$SIZE" -le 20000000
+          unzip -l "$JAR" | grep 'baritone/api/BaritoneAPI.class' > /dev/null
           unzip -p "$JAR" META-INF/CHANGELOG.md > build/release_body.md
           cmp "$NOTES" build/release_body.md
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"
@@ -209,3 +206,12 @@ jobs:
           ./gradlew publishCurseforge -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}" --no-configuration-cache
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+
+  sync-description:
+    needs: [check-version, release]
+    if: needs.check-version.outputs.is_prerelease != 'true'
+    uses: ./.github/workflows/sync-curseforge-description.yml
+    with:
+      release_commit: ${{ needs.check-version.outputs.release_commit_sha }}
+    secrets:
+      curseforge_token: ${{ secrets.CURSEFORGE_TOKEN }}

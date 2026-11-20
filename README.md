@@ -1,5 +1,10 @@
 # LootGameSolver
 
+[![CurseForge](https://img.shields.io/badge/CurseForge-Download-f16436?logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/lootgamesolver)
+[![GitHub release](https://img.shields.io/github/v/release/KyroXova/LootGameSolver)](https://github.com/KyroXova/LootGameSolver/releases)
+[![Build and test](https://github.com/KyroXova/LootGameSolver/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/KyroXova/LootGameSolver/actions/workflows/build-and-test.yml)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.7.10-green)](https://www.minecraft.net/)
+
 LootGameSolver is a client-side Minecraft 1.7.10 mod for **GregTech: New Horizons (GTNH)** that helps you play **LootGames**. It supports Minesweeper, Sudoku, and Game of Light with automatic solving and in-world hints.
 
 Choose how you want to play: let the solver interact with a board, follow holograms yourself, or try the experimental explorer to find and complete structures.
@@ -61,8 +66,8 @@ Structure discovery is progressive. The explorer checks loaded LootGames structu
 | --- | --- |
 | **R** | Toggle the Auto-Solver |
 | **H** | Toggle holograms and navigation lines |
-| **G** | Start or stop the explorer |
-| **Hold G** | Clear the last checkpoint and replan |
+| **G** | Start the explorer, or pause and resume active automation |
+| **Hold G** | Clear active automation and the last checkpoint |
 
 Keys can be changed in Minecraft's Controls menu. The HUD shows solver and explorer status, the selected structure, and hold-G progress. Navigation pauses for open menus, manual movement, damage, or flight.
 
@@ -75,7 +80,8 @@ Manage storage destinations, marked targets, checkpoints, and navigation prefere
 | `/lgs help [command]` | Show command list or detailed help for a specific command. |
 | `/lgs setHome` | Select your existing `/home` command as the storage destination. |
 | `/lgs setWarp <name>` | Select `/warp <name>` as the storage destination (`returnLooting` is reserved). |
-| `/lgs setChest` / `/lgs setStorage` | Mark the looked-at inventory block, entity, or Binnie Compartment for storage deposits. |
+| `/lgs setChest` / `/lgs setStorage` | Mark the looked-at inventory block or entity for storage deposits. |
+| `/lgs setStorage <name>` | Alias for selecting a storage warp. |
 | `/lgs clearChest` | Unmark the looked-at storage target. |
 | `/lgs clearChests` | Remove all marked storage targets for the current world. |
 | `/lgs clearWarp` | Clear the home or warp destination while keeping marked targets saved. |
@@ -93,7 +99,7 @@ When depositing into marked storage, LootGameSolver supports multi-page storage 
 ## Installation
 
 1. Install **GTNH for Minecraft 1.7.10** with Forge and LootGames.
-2. Download the latest LootGameSolver JAR and place it in the instance's `mods` folder.
+2. Download the latest LootGameSolver JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/lootgamesolver) or [GitHub Releases](https://github.com/KyroXova/LootGameSolver/releases) and place it in the instance's `mods` folder.
 3. Launch the instance and approach a LootGames board, or use the experimental explorer to search for one.
 
 ## Configuration
@@ -104,5 +110,5 @@ See the [3.1.0 changelog](changelog/changelog_3.0.0_to_3.1.0.md) for the latest 
 
 ## Baritone Integration & Licensing
 
-> **Note:** Baritone is bundled via Jar-in-Jar with this project. Baritone has been backported to Minecraft 1.7.10 under the `GNU Lesser General Public License` as-is and modified only to accommodate LootGameSolver functionality. It is hosted under the fork [KyroXova/baritone](https://github.com/KyroXova/baritone) for maintenance and build compatibility, contributing backport enhancements without unlawful redistribution. All modifications remain open source and compliant with the LGPL.
+The release JAR includes the classes and resources of the Minecraft 1.7.10 [Baritone fork](https://github.com/KyroXova/baritone). A separate Baritone download is not needed for the bundled release. See the fork for its source and license.
 

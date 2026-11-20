@@ -7,8 +7,30 @@ on:
 
 jobs:
   build-and-test:
-    uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
-    secrets: inherit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: |
+            8
+            17
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Set up build workspace
+        run: ./gradlew setupCIWorkspace
+      - name: Build and test LootGameSolver
+        run: ./gradlew build --parallel --max-workers=4
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test/
+          if-no-files-found: ignore
 
   build-bundled:
     runs-on: ubuntu-24.04
@@ -25,6 +47,7 @@ jobs:
             8
             17
             21
+            25
           distribution: 'zulu'
 
       - name: Setup Gradle
@@ -32,21 +55,29 @@ jobs:
 
       - name: Obtain Baritone jar
         id: baritone
-        run: |
-          set -euo pipefail
-          git clone --depth 1 --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
-          (cd baritone-src && chmod +x gradlew && ./gradlew reobfJar --parallel --max-workers=4)
-          BARITONE_JAR=baritone-src/build/libs/baritone-1.7.10-1.20.0-1.7.10-dev.jar
-          test -f "$BARITONE_JAR"
-          echo "jar_path=$(realpath "$BARITONE_JAR")" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/build-baritone
 
       - name: Build bundled LootGameSolver with Baritone
         run: |
           chmod +x gradlew
           ./gradlew bundledBaritoneJar -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}"
 
+      - name: Verify bundled artifact
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^[[:space:]]*modVersion[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+          jar="build/libs/lootgamesolver-${version}.jar"
+          test -f "$jar"
+          size=$(stat -c %s "$jar")
+          test "$size" -ge 8000000 && test "$size" -le 20000000
+          unzip -l "$jar" | grep 'baritone/api/BaritoneAPI.class' > /dev/null
+          echo "path=$jar" >> "$GITHUB_OUTPUT"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: lootgamesolver
-          path: build/libs/lootgamesolver-*.jar
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error

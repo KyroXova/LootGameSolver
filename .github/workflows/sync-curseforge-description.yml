@@ -1,0 +1,29 @@
+name: Synchronize CurseForge description
+
+on:
+  workflow_call:
+    inputs:
+      release_commit:
+        required: true
+        type: string
+    secrets:
+      curseforge_token:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release description
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_commit }}
+      - name: Update CurseForge project description
+        uses: btwonion/mc-readme-sync@011dd459df6af7c1dd202300ffd43d91752315b1 # v1.0.1
+        with:
+          curseforge-api-key: ${{ secrets.curseforge_token }}
+          curseforge-project-id: '1654587'
+          readme-path: Curseforge-desc.md

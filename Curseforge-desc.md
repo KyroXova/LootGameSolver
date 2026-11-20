@@ -1,97 +1,27 @@
 # LootGameSolver
 
-LootGameSolver is a client-side Minecraft 1.7.10 mod for **GregTech: New Horizons (GTNH)** that helps you play **LootGames**. It supports Minesweeper, Sudoku, and Game of Light with automatic solving and in-world hints.
+Solve LootGames puzzles in GregTech: New Horizons with automatic interactions or in-world hints. LootGameSolver is a client-side mod for Minecraft 1.7.10 and Forge, supporting Minesweeper, Sudoku, and Game of Light.
 
-Choose how you want to play: let the solver interact with a board, follow holograms yourself, or try the experimental explorer to find and complete structures.
+## Choose how to play
 
-## Ways to play
+- **Auto-Solver (`R`)** detects the board, chooses moves, and interacts with the puzzle.
+- **Holograms (`H`)** show suggested moves and navigation lines while you play.
+- **Explorer (`G`)** is an experimental mode for finding structures, reaching their puzzles, and collecting rewards. Press `G` to pause or resume active automation; hold it to clear the current automation and checkpoint.
 
-### Auto-Solver
+Minesweeper can use probabilities when no guaranteed safe move is available. Such guesses are not guaranteed to be safe.
 
-Press **R** to toggle the solver. It reads the active board, plans moves, aims and interacts with puzzle tiles, and moves into reach when needed. The solver tracks stage changes and waits for board updates before continuing.
+## Explore and collect
 
-### Holograms
+Explorer searches loaded terrain and can inspect saved region data in single-player worlds. It can navigate toward structures, excavate entrances, solve puzzles, open reward chests, and pack eligible loot into supported backpacks. It also supports configured home or warp storage, marked containers, and Binnie's multi-page Compartments.
 
-Press **H** to toggle in-world hints and navigation lines. Holograms show suggested puzzle actions while you control movement and interactions yourself. The status HUD remains available when holograms are hidden.
+Explorer is experimental. It can change blocks and inventory contents, including discarding mined debris and ores when cleanup is enabled and available. Supervise automation and be ready to take control. Structures outside loaded terrain may require exploration before they can be discovered.
 
-## Supported games
+Use `/lgs help` to see all commands and `/lgs help <command>` for details. For storage, use `/lgs setHome` or `/lgs setWarp <name>`, look at a container and use `/lgs setChest`, then `/lgs enable`. Storage trips require the corresponding server commands and permissions; `/setwarp returnLooting` is used for the return point. Use `/lgs disable` to keep your settings without running trips. `/lgs caveMode on` enables underground travel; cave mode is off by default.
 
-### Minesweeper
+The default keys can be changed in Minecraft's Controls menu. The HUD shows automation status, elapsed time, and the puzzle count.
 
-- Reveal safe cells and flag identified mines, with hints shown over the board.
-- Continue through stages as boards are revealed.
-- Use board-wide mine counts to calculate probabilities. Probability-based moves and their minimum safety threshold are configurable; a guess is never guaranteed safe.
+## Installation
 
-### Sudoku
+Install the JAR into the `mods` folder of a Minecraft 1.7.10 Forge instance with LootGames, such as GTNH. The release JAR includes the [Baritone 1.7.10 fork](https://github.com/KyroXova/baritone); a separate Baritone installation is not required.
 
-- Solve from the original clues while tracking player entries separately.
-- Show numbers for empty or incorrect cells and choose the shorter direction when entering a value.
-- Confirm changes before continuing and submit a completed board.
-
-### Game of Light
-
-- Track and replay the sequence through successive rounds.
-- Display sequence positions as holograms, including multiple steps on the same tile.
-- Wait for accepted interactions before advancing the sequence.
-
-## Experimental explorer: powerful automation
-
-Press **G** to start or stop the explorer. This experimental mode brings structure finding, navigation, puzzle solving, and reward collection together in one automated flow.
-
-The explorer can:
-
-- Find loaded LootGames structures and search saved regions in single-player worlds.
-- Plan walking routes, tunnels, and stairs, including dry approaches around water.
-- Select tools, clear obstructions, and avoid known hazardous plants, traps, and liquids.
-- Open boards, solve games, and resume an unfinished game inside a structure.
-- Collect reward chests and move eligible items into supported backpacks.
-- Automatically deposit collected loot into marked home or warp storage targets (including Binnie's multi-page Compartments) and return to complete unfinished rooms.
-- Use food and the Extra Utilities Healing Axe while exploring.
-- Clean unwanted inventory items when the trash-can command is available, while protecting backpacks, tools, food, and a stack of building material.
-
-Reward collection uses known local loot-table weights when available; on servers, item weights may be unknown. Inventory cleanup can remove ores and excess blocks.
-
-**Early beta:** Explorer automation is experimental and may fail to find a structure, navigate a route, solve a board, or collect every reward. Supervise it and be ready to take control; it can change blocks and inventory contents while active.
-
-Structure discovery is progressive. The explorer checks loaded LootGames structures first and can also inspect saved region data in single-player worlds. When it has no known target, it explores outward in expanding search legs and checks newly loaded terrain. It navigates and digs in the world rather than teleporting.
-
-## Controls
-
-| Default key | Action |
-| --- | --- |
-| **R** | Toggle the Auto-Solver |
-| **H** | Toggle holograms and navigation lines |
-| **G** | Start or stop the explorer |
-| **Hold G** | Clear the last checkpoint and replan |
-
-Keys can be changed in Minecraft's Controls menu. The HUD shows solver and explorer status, the selected structure, and hold-G progress. Navigation pauses for open menus, manual movement, damage, or flight.
-
-## Commands
-
-Manage storage destinations, marked targets, checkpoints, and navigation preferences with `/lootgamesolver` (alias `/lgs`):
-
-| Command | Description |
-| --- | --- |
-| `/lgs help [command]` | Show command list or detailed help for a specific command. |
-| `/lgs setHome` | Select your existing `/home` command as the storage destination. |
-| `/lgs setWarp <name>` | Select `/warp <name>` as the storage destination (`returnLooting` is reserved). |
-| `/lgs setChest` / `/lgs setStorage` | Mark the looked-at inventory block, entity, or Binnie Compartment for storage deposits. |
-| `/lgs clearChest` | Unmark the looked-at storage target. |
-| `/lgs clearChests` | Remove all marked storage targets for the current world. |
-| `/lgs clearWarp` | Clear the home or warp destination while keeping marked targets saved. |
-| `/lgs clearStorage` | Clear destination and all targets, and disable recovery. |
-| `/lgs enable` / `/lgs disable` | Enable or disable automated storage recovery trips. |
-| `/lgs storageStatus` | Display configured destination, target count, and recovery preference. |
-| `/lgs resumeLoot` | Resume saved reward collection when you are back near the dungeon room. |
-| `/lgs clearCheckpoint` | Clear saved loot collection and navigation checkpoints. |
-| `/lgs caveMode [on\|off\|status]` | Allow subterranean pathing or prefer surface travel for long-distance routes. |
-
-### Multi-Page Storage Containers
-
-When depositing into marked storage, LootGameSolver supports multi-page storage containers such as Binnie's Compartments (Wood, Copper, Bronze, Iron, Gold, and Diamond). The depositor cycles through all available tabs, verifies slot acceptance on each page, and deposits eligible loot while strictly protecting carried gear, weapons, tools, and backpacks.
-
-## Configuration
-
-The configuration includes solver interaction delays, Minesweeper probability settings, display options, and experimental exploration settings such as route range and staircase digging.
-
-See the [3.1.0 changelog](https://github.com/KyroXova/LootGameSolver/blob/main/changelog/changelog_3.0.0_to_3.1.0.md) for the latest changes.
+[Source and full command reference](https://github.com/KyroXova/LootGameSolver) · [GitHub releases](https://github.com/KyroXova/LootGameSolver/releases) · [Report an issue](https://github.com/KyroXova/LootGameSolver/issues) · [3.1.0 changelog](https://github.com/KyroXova/LootGameSolver/blob/main/changelog/changelog_3.0.0_to_3.1.0.md)

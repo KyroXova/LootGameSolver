@@ -1,0 +1,24 @@
+name: Build Baritone for LootGameSolver
+description: Build the public 1.7.10-LGS branch for the combined release jar
+outputs:
+  jar_path:
+    description: Absolute path of the production Baritone jar
+    value: ${{ steps.build.outputs.jar_path }}
+runs:
+  using: composite
+  steps:
+    - id: build
+      shell: bash
+      run: |
+        set -euo pipefail
+        git clone --depth 1 --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
+        expected=$(sed -n 's/^[[:space:]]*baritoneRevision[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+        actual=$(git -C baritone-src rev-parse HEAD)
+        if [[ ! "$expected" =~ ^[0-9a-f]{40}$ || "$actual" != "$expected" ]]; then
+          echo "Public 1.7.10-LGS is at $actual; expected $expected. Publish the intended revision or update baritoneRevision." >&2
+          exit 1
+        fi
+        (cd baritone-src && chmod +x gradlew && ./gradlew reobfJar --parallel --max-workers=4)
+        BARITONE_JAR=baritone-src/build/libs/baritone-1.7.10-1.20.0-1.7.10-dev.jar
+        test -f "$BARITONE_JAR"
+        echo "jar_path=$(realpath "$BARITONE_JAR")" >> "$GITHUB_OUTPUT"
