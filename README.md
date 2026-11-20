@@ -112,3 +112,7 @@ See the [3.1.0 changelog](changelog/changelog_3.0.0_to_3.1.0.md) for the latest 
 
 The release JAR includes the classes and resources of the Minecraft 1.7.10 [Baritone fork](https://github.com/KyroXova/baritone). A separate Baritone download is not needed for the bundled release. See the fork for its source and license.
 
+## Building the bundled release
+
+CI clones the fork's public `1.7.10-LGS` branch, checks out the commit named by `baritoneRevision` in `gradle.properties`, builds Baritone, and combines it with LootGameSolver. The pinned commit must be reachable from that branch. Advancing the branch does not change an existing pin; update `baritoneRevision` deliberately when adopting a newer Baritone revision. Building the public repositories does not require a personal GitHub token. Publishing to CurseForge requires the repository's `CURSEFORGE_TOKEN` secret.
+

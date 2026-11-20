@@ -11,11 +11,20 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        git clone --depth 1 --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
         expected=$(sed -n 's/^[[:space:]]*baritoneRevision[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+        if [[ ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "baritoneRevision must be a full Git commit ID." >&2
+          exit 1
+        fi
+        git clone --single-branch --no-checkout --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
+        if ! git -C baritone-src merge-base --is-ancestor "$expected" origin/1.7.10-LGS; then
+          echo "Pinned Baritone revision is not reachable from public 1.7.10-LGS: $expected" >&2
+          exit 1
+        fi
+        git -C baritone-src checkout --detach "$expected"
         actual=$(git -C baritone-src rev-parse HEAD)
-        if [[ ! "$expected" =~ ^[0-9a-f]{40}$ || "$actual" != "$expected" ]]; then
-          echo "Public 1.7.10-LGS is at $actual; expected $expected. Publish the intended revision or update baritoneRevision." >&2
+        if [[ "$actual" != "$expected" ]]; then
+          echo "Could not check out the pinned Baritone revision: $expected" >&2
           exit 1
         fi
         (cd baritone-src && chmod +x gradlew && ./gradlew reobfJar --parallel --max-workers=4)

@@ -214,4 +214,4 @@ jobs:
     with:
       release_commit: ${{ needs.check-version.outputs.release_commit_sha }}
     secrets:
-      curseforge_token: ${{ secrets.CURSEFORGE_TOKEN }}
+      CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}

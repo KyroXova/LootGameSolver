@@ -7,8 +7,14 @@ on:
         required: true
         type: string
     secrets:
-      curseforge_token:
+      CURSEFORGE_TOKEN:
         required: true
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Commit or tag containing the description (defaults to the selected ref)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -20,10 +26,10 @@ jobs:
       - name: Checkout release description
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_commit }}
+          ref: ${{ inputs.release_commit || github.sha }}
       - name: Update CurseForge project description
         uses: btwonion/mc-readme-sync@011dd459df6af7c1dd202300ffd43d91752315b1 # v1.0.1
         with:
-          curseforge-api-key: ${{ secrets.curseforge_token }}
+          curseforge-api-key: ${{ secrets.CURSEFORGE_TOKEN }}
           curseforge-project-id: '1654587'
           readme-path: Curseforge-desc.md
