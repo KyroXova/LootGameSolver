@@ -51,6 +51,37 @@ public final class BaritoneNavigationBridge {
     private Object clickLeft;
     private Object clickRight;
     private Object clickSprint;
+    private Object cachedWorld;
+    private Method isCachedMethod;
+
+    public boolean isCached(int blockX, int blockZ) {
+        try {
+            if (isCachedMethod == null) {
+                Class<?> api = Class.forName("baritone.api.BaritoneAPI");
+                Object provider = api.getMethod("getProvider").invoke(null);
+                if (provider == null) return false;
+                Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
+                Object baritone = providerApi.getMethod("getPrimaryBaritone").invoke(provider);
+                if (baritone == null) return false;
+                Class<?> baritoneApi = Class.forName("baritone.api.IBaritone");
+                Object worldProvider = baritoneApi.getMethod("getWorldProvider").invoke(baritone);
+                if (worldProvider == null) return false;
+                Class<?> worldProviderApi = Class.forName("baritone.api.cache.IWorldProvider");
+                Object currentWorld = worldProviderApi.getMethod("getCurrentWorld").invoke(worldProvider);
+                if (currentWorld == null) return false;
+                Class<?> worldDataApi = Class.forName("baritone.api.cache.IWorldData");
+                cachedWorld = worldDataApi.getMethod("getCachedWorld").invoke(currentWorld);
+                if (cachedWorld == null) return false;
+                Class<?> cachedWorldApi = Class.forName("baritone.api.cache.ICachedWorld");
+                isCachedMethod = cachedWorldApi.getMethod("isCached", int.class, int.class);
+            }
+            return (Boolean) isCachedMethod.invoke(cachedWorld, blockX, blockZ);
+        } catch (Throwable failure) {
+            cachedWorld = null;
+            isCachedMethod = null;
+            return false;
+        }
+    }
 
     public Start start(int x, int y, int z) {
         return start(x, y, z, 0, false);

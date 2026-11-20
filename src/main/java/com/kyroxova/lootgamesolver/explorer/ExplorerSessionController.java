@@ -134,6 +134,9 @@ public class ExplorerSessionController {
             explorer.route.clear();
             explorer.search = null;
             explorer.searching = false;
+            explorer.explorationOriginX = Integer.MIN_VALUE;
+            explorer.explorationOriginZ = Integer.MIN_VALUE;
+            explorer.sessionVisitedChunks.clear();
             if (explorer.world != null && mc.isSingleplayer() && mc.getIntegratedServer() != null) {
                 java.io.File save = new java.io.File(
                     new java.io.File(mc.mcDataDir, "saves"),
@@ -145,6 +148,9 @@ public class ExplorerSessionController {
             }
         }
         if (mc.thePlayer == null || mc.theWorld == null) return true;
+        int pcx = ((int) Math.floor(mc.thePlayer.posX)) >> 4;
+        int pcz = ((int) Math.floor(mc.thePlayer.posZ)) >> 4;
+        explorer.markChunkVisited(pcx, pcz, 2);
         if (explorer.sustain.busy() && explorer.sustain.tick(mc, explorer.walking, false)) {
             explorer.status = "Eating or preparing food";
             return true;

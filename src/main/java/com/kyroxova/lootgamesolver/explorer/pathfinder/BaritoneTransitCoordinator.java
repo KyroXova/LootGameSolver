@@ -378,7 +378,14 @@ public final class BaritoneTransitCoordinator {
                     } else if (started != BaritoneNavigationBridge.Start.BUSY || ++handoffTicks > 40) {
                         searchHandoff = false;
                         explorer.rotateSearch(mc);
-                        searchNext = true;
+                        int[] next = explorer.search == null ? null : explorer.search.next();
+                        if (next != null) {
+                            searchX = next[0];
+                            searchZ = next[1];
+                            searchNext = true;
+                            searchHandoff = true;
+                            handoffTicks = 0;
+                        }
                         explorer.status = "Replanning search";
                     }
                 } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
@@ -416,11 +423,8 @@ public final class BaritoneTransitCoordinator {
                         explorer.status = "Exploring for structures";
                     } else {
                         routeFailures = 0;
+                        explorer.rotateSearch(mc);
                         int[] next = explorer.search == null ? null : explorer.search.next();
-                        if (next == null) {
-                            explorer.rotateSearch(mc);
-                            next = explorer.search == null ? null : explorer.search.next();
-                        }
                         if (next != null) {
                             searchX = next[0];
                             searchZ = next[1];

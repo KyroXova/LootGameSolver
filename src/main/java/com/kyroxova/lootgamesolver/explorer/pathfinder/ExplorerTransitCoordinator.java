@@ -235,13 +235,11 @@ public class ExplorerTransitCoordinator {
         explorer.existingAccessChecked = false;
         explorer.stallRecoveries = 0;
         explorer.blockedWalkNodes.clear();
-        explorer.searchYaw = mc.thePlayer.rotationYaw;
-        explorer.search = new ProgressiveSearch(
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.posZ),
-            explorer.searchYaw,
-            LootGameSolverConfig.explorationSearchLimit,
-            128);
+        if (explorer.explorationOriginX == Integer.MIN_VALUE && mc.thePlayer != null) {
+            explorer.explorationOriginX = (int) Math.floor(mc.thePlayer.posX);
+            explorer.explorationOriginZ = (int) Math.floor(mc.thePlayer.posZ);
+        }
+        explorer.rotateSearch(mc);
         explorer.entranceSelected = false;
         explorer.excavationSearch = null;
         explorer.excavationReplans = 0;

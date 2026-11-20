@@ -13,11 +13,137 @@ import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 public class ExplorerSearchCoordinator {
 
+    public void ensureOrigin(Minecraft mc, Explorer explorer) {
+        if (explorer.explorationOriginX == Integer.MIN_VALUE && mc != null && mc.thePlayer != null) {
+            explorer.explorationOriginX = (int) Math.floor(mc.thePlayer.posX);
+            explorer.explorationOriginZ = (int) Math.floor(mc.thePlayer.posZ);
+        }
+    }
+
+    public static boolean isExplored(Minecraft mc, Explorer explorer, int blockX, int blockZ) {
+        if (explorer == null) return false;
+        return isExplored(explorer.sessionVisitedChunks, explorer.baritoneNavigation, blockX, blockZ);
+    }
+
+    public static boolean isExplored(java.util.Set<Long> visitedChunks, BaritoneNavigationBridge nav, int blockX, int blockZ) {
+        int cx = blockX >> 4;
+        int cz = blockZ >> 4;
+        long key = Explorer.chunkKey(cx, cz);
+        if (visitedChunks != null && visitedChunks.contains(key)) return true;
+        if (nav != null && nav.isCached(blockX, blockZ)) return true;
+        return false;
+    }
+
+    public float findOutwardYaw(Minecraft mc, Explorer explorer, float baseYaw, float currentYaw) {
+        if (mc == null || mc.thePlayer == null || explorer == null) return baseYaw;
+        int px = (int) Math.floor(mc.thePlayer.posX);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        return findOutwardYaw(explorer, px, pz, baseYaw, currentYaw);
+    }
+
+    public float findOutwardYaw(Explorer explorer, int px, int pz, float baseYaw, float currentYaw) {
+        if (explorer == null) return baseYaw;
+        return findOutwardYaw(
+            explorer.explorationOriginX,
+            explorer.explorationOriginZ,
+            explorer.sessionVisitedChunks,
+            explorer.baritoneNavigation,
+            px,
+            pz,
+            baseYaw,
+            currentYaw);
+    }
+
+    public float findOutwardYaw(
+        int originX,
+        int originZ,
+        java.util.Set<Long> visitedChunks,
+        BaritoneNavigationBridge nav,
+        int px,
+        int pz,
+        float baseYaw,
+        float currentYaw) {
+        boolean hasOrigin = originX != Integer.MIN_VALUE;
+        double origDx = hasOrigin ? px - originX : 0.0D;
+        double origDz = hasOrigin ? pz - originZ : 0.0D;
+        double origDist = Math.hypot(origDx, origDz);
+
+        float[] offsets = new float[] { 0.0F, 25.0F, -25.0F, 45.0F, -45.0F, 65.0F, -65.0F, 85.0F, -85.0F };
+
+        float bestYaw = baseYaw;
+        double bestScore = Double.NEGATIVE_INFINITY;
+
+        for (float offset : offsets) {
+            float candidateYaw = normalizeYaw(baseYaw + offset);
+
+            if (hasOrigin && origDist > 24.0D) {
+                double rad = Math.toRadians(candidateYaw);
+                double dirX = -Math.sin(rad);
+                double dirZ = Math.cos(rad);
+                double dot = dirX * (origDx / origDist) + dirZ * (origDz / origDist);
+                if (dot < 0.0D) {
+                    continue;
+                }
+            }
+
+            double rad = Math.toRadians(candidateYaw);
+            double dirX = -Math.sin(rad);
+            double dirZ = Math.cos(rad);
+
+            int t1X = px + (int) Math.round(dirX * 128.0D);
+            int t1Z = pz + (int) Math.round(dirZ * 128.0D);
+            int t2X = px + (int) Math.round(dirX * 256.0D);
+            int t2Z = pz + (int) Math.round(dirZ * 256.0D);
+
+            boolean t1Explored = isExplored(visitedChunks, nav, t1X, t1Z);
+            boolean t2Explored = isExplored(visitedChunks, nav, t2X, t2Z);
+
+            double score = 0.0D;
+            if (!t1Explored) score += 1000.0D;
+            if (!t2Explored) score += 1000.0D;
+            score -= Math.abs(offset) * 2.0D;
+
+            if (Math.abs(normalizeYaw(candidateYaw - currentYaw)) < 15.0F) {
+                score -= 100.0D;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestYaw = candidateYaw;
+                if (!t1Explored && !t2Explored && Math.abs(offset) <= 25.0F) {
+                    break;
+                }
+            }
+        }
+
+        return bestYaw;
+    }
+
+    private static float normalizeYaw(float yaw) {
+        yaw = yaw % 360.0F;
+        if (yaw > 180.0F) yaw -= 360.0F;
+        if (yaw < -180.0F) yaw += 360.0F;
+        return yaw;
+    }
+
     public void rotateSearch(Minecraft mc, Explorer explorer) {
-        explorer.searchYaw = (explorer.searchYaw + 45.0F) % 360.0F;
-        int px = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posX) : 0;
-        int pz = mc != null && mc.thePlayer != null ? (int) Math.floor(mc.thePlayer.posZ) : 0;
-        explorer.search = new ProgressiveSearch(px, pz, explorer.searchYaw, LootGameSolverConfig.explorationSearchLimit, 128);
+        if (mc == null || mc.thePlayer == null) return;
+        ensureOrigin(mc, explorer);
+        int px = (int) Math.floor(mc.thePlayer.posX);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+
+        float baseYaw;
+        double dx = px - explorer.explorationOriginX;
+        double dz = pz - explorer.explorationOriginZ;
+        if (Math.hypot(dx, dz) > 16.0D) {
+            baseYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        } else {
+            baseYaw = explorer.searchYaw != 0.0F ? explorer.searchYaw : mc.thePlayer.rotationYaw;
+        }
+
+        float chosenYaw = findOutwardYaw(mc, explorer, baseYaw, explorer.searchYaw);
+        explorer.searchYaw = chosenYaw;
+        explorer.search = new ProgressiveSearch(px, pz, explorer.searchYaw, 0, 128);
     }
 
     public boolean nextSearchGoal(Minecraft mc, Explorer explorer) {
@@ -140,11 +266,24 @@ public class ExplorerSearchCoordinator {
         explorer.roomEntrySearchNeedsResume = false;
         explorer.walkingSearchNeedsResume = false;
         explorer.rejoiningSavedTrail = false;
+        ensureOrigin(mc, explorer);
+        int px = (int) Math.floor(mc.thePlayer.posX);
+        int pz = (int) Math.floor(mc.thePlayer.posZ);
+        float baseYaw;
+        double dx = px - explorer.explorationOriginX;
+        double dz = pz - explorer.explorationOriginZ;
+        if (Math.hypot(dx, dz) > 16.0D) {
+            baseYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        } else {
+            baseYaw = mc.thePlayer.rotationYaw;
+        }
+        float chosenYaw = findOutwardYaw(mc, explorer, baseYaw, mc.thePlayer.rotationYaw);
+        explorer.searchYaw = chosenYaw;
         explorer.search = new ProgressiveSearch(
-            (int) Math.floor(mc.thePlayer.posX),
-            (int) Math.floor(mc.thePlayer.posZ),
-            mc.thePlayer.rotationYaw,
-            LootGameSolverConfig.explorationSearchLimit,
+            px,
+            pz,
+            explorer.searchYaw,
+            0,
             128);
         int[] first = explorer.search.next();
         if (first != null) {

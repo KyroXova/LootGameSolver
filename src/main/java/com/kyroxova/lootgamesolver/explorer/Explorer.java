@@ -187,6 +187,21 @@ public class Explorer {
     public GroundPathfinder.Search returnJoinSearch;
     public List<int[]> returnTrailRoute;
     public float searchYaw;
+    public int explorationOriginX = Integer.MIN_VALUE;
+    public int explorationOriginZ = Integer.MIN_VALUE;
+    public final java.util.Set<Long> sessionVisitedChunks = new java.util.HashSet<Long>();
+
+    public static long chunkKey(int chunkX, int chunkZ) {
+        return (((long) chunkX) << 32) | (((long) chunkZ) & 0xFFFFFFFFL);
+    }
+
+    public void markChunkVisited(int chunkX, int chunkZ, int radius) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                sessionVisitedChunks.add(chunkKey(chunkX + dx, chunkZ + dz));
+            }
+        }
+    }
 
     public final ExplorerMiningDriver miningDriver = new ExplorerMiningDriver();
     public final ExplorerRoutePlanner routePlanner = new ExplorerRoutePlanner();
