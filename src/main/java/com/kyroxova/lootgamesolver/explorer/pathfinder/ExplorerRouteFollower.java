@@ -45,12 +45,14 @@ public final class ExplorerRouteFollower {
             : route.size() == 1 && !movingToPuzzleCenter ? (float) Math.min(1D, distance * 1.5D) : 1F;
         Block nextBlock = mc.theWorld.getBlock(next[0], next[1], next[2]);
         AxisAlignedBB nextBox = nextBlock.getCollisionBoundingBoxFromPool(mc.theWorld, next[0], next[1], next[2]);
+        double targetSurface = walkSurfaceY(mc.theWorld, next[0], next[1], next[2]);
+        double rise = targetSurface >= 0D ? targetSurface - mc.thePlayer.boundingBox.minY : (double) (next[1] - footY);
+        boolean canStepUp = targetSurface >= 0D && rise > 0D && rise <= 0.55D;
         boolean climbRewardChest = nextBlock instanceof BlockChest && nextBox != null
             && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
             && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1D;
         boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
-        boolean climbSurface = NavigationSurfacePolicy
-            .needsJump(mc.thePlayer.boundingBox.minY, walkSurfaceY(mc.theWorld, next[0], next[1], next[2]));
+        boolean climbSurface = NavigationSurfacePolicy.needsJump(mc.thePlayer.boundingBox.minY, targetSurface);
         boolean chestPitJump = returning && chestPitJumpBoostTicks > 0
             && isRewardChestPit(mc)
             && mc.thePlayer.onGround
@@ -58,9 +60,11 @@ public final class ExplorerRouteFollower {
             && distance < 4D;
         if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
         boolean inWater = mc.thePlayer.isInWater();
-        boolean stepUp = next[1] > footY || climbRewardChest || climbSurface || mc.thePlayer.isCollidedHorizontally;
+        boolean needsJump = !canStepUp && (climbSurface || climbRewardChest
+            || (targetSurface < 0D && next[1] > footY)
+            || (mc.thePlayer.isCollidedHorizontally && (targetSurface < 0D || (rise > 0.55D && rise <= 1.001D))));
         boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
-        input.hop = (stepUp && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally)
+        input.hop = (needsJump && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally)
             && jumpDistance
             && (mc.thePlayer.onGround || inWater))
             || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)

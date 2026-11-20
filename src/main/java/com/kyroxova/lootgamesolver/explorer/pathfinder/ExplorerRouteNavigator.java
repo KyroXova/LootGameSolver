@@ -2,6 +2,7 @@ package com.kyroxova.lootgamesolver.explorer.pathfinder;
 
 import static com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry.isRewardChestPit;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.staircaseDirection;
+import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerGeometry.supportKey;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFoliage;
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 
@@ -346,8 +347,15 @@ public class ExplorerRouteNavigator {
         if (explorer.stalled >= 8 && explorer.stalled <= 24
             && mc.thePlayer.onGround
             && explorer.navigationInput != null) {
-            explorer.navigationInput.hop = true;
+            double targetSurface = ExplorerTerrain.walkSurfaceY(mc.theWorld, next[0], next[1], next[2]);
+            double rise = targetSurface >= 0D ? targetSurface - mc.thePlayer.boundingBox.minY : (double) (next[1] - py);
+            if (targetSurface < 0D || (rise > 0.55D && rise <= 1.001D)) {
+                explorer.navigationInput.hop = true;
+            }
             explorer.navigationInput.forward = 1.0F;
+        }
+        if (explorer.stalled >= 14 && mc.thePlayer.onGround && !explorer.digging) {
+            if (trySidewaysDetour(mc, explorer, px, py, pz, next, dx, dz)) return true;
         }
         if (explorer.stalled > 40) {
             explorer.stalled = 0;
@@ -508,6 +516,52 @@ public class ExplorerRouteNavigator {
                 explorer.navigationInput.hop = true;
             }
             return true;
+        }
+        return false;
+    }
+
+    private boolean trySidewaysDetour(Minecraft mc, Explorer explorer, int px, int py, int pz, int[] next, double dx,
+        double dz) {
+        if (explorer.route.isEmpty()) return false;
+        int stepX = (int) Math.signum(next[0] - px);
+        int stepZ = (int) Math.signum(next[2] - pz);
+        if (stepX == 0 && stepZ == 0) {
+            if (Math.abs(dx) >= Math.abs(dz)) stepX = dx > 0 ? 1 : -1;
+            else stepZ = dz > 0 ? 1 : -1;
+        }
+
+        int[][] sideDirs;
+        if (stepX != 0 && stepZ == 0) {
+            sideDirs = new int[][] { { 0, 1 }, { 0, -1 } };
+        } else if (stepX == 0 && stepZ != 0) {
+            sideDirs = new int[][] { { 1, 0 }, { -1, 0 } };
+        } else {
+            sideDirs = new int[][] { { stepX, 0 }, { 0, stepZ }, { stepX, -stepZ }, { -stepX, stepZ } };
+        }
+
+        for (int dist = 1; dist <= 3; dist++) {
+            for (int[] side : sideDirs) {
+                int sx = px + side[0] * dist;
+                int sz = pz + side[1] * dist;
+                for (int dy = 1; dy >= -1; dy--) {
+                    int sy = py + dy;
+                    if (!ExplorerTerrain.safe(mc.theWorld, sx, sy, sz)) continue;
+                    long key = supportKey(sx, sy, sz);
+                    if (explorer.blockedWalkNodes.contains(key)) continue;
+                    double sideSurface = ExplorerTerrain.walkSurfaceY(mc.theWorld, sx, sy, sz);
+                    if (sideSurface < 0D) continue;
+                    double sideRise = sideSurface - mc.thePlayer.boundingBox.minY;
+                    if (sideRise > 1.001D || sideRise < -1.5D) continue;
+
+                    int[] failed = explorer.route.get(0);
+                    explorer.markBlockedWalkNode(failed[0], failed[1], failed[2]);
+                    explorer.route.add(0, new int[] { sx, sy, sz, 0 });
+                    explorer.stalled = 0;
+                    explorer.lastDistance = Double.MAX_VALUE;
+                    explorer.status = "Detouring sideways around obstruction";
+                    return true;
+                }
+            }
         }
         return false;
     }
