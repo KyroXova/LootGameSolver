@@ -1,0 +1,69 @@
+package com.kyroxova.lootgamesolver.client.loot;
+
+import java.util.List;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.Vec3;
+
+import com.kyroxova.lootgamesolver.explorer.Explorer;
+
+public final class RewardChestView {
+
+    private RewardChestView() {}
+
+    public static net.minecraft.util.MovingObjectPosition visibleChest(Minecraft mc, Vec3 eye, int[] pos) {
+        double[] offsets = { 0.5D, 0.3D, 0.7D };
+        net.minecraft.util.MovingObjectPosition side = null;
+        for (double y : new double[] { 0.875D, 0.8D, 0.5D, 0.2D }) for (double x : offsets) for (double z : offsets) {
+            Vec3 point = Vec3.createVectorHelper(pos[0] + x, pos[1] + y, pos[2] + z);
+            if (eye.squareDistanceTo(point) > 16D) continue;
+            net.minecraft.util.MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(eye, point);
+            if (hit != null && hit.blockX == pos[0] && hit.blockY == pos[1] && hit.blockZ == pos[2]) {
+                if (hit.sideHit == 1) return hit;
+                if (side == null) side = hit;
+            }
+        }
+        return side;
+    }
+
+    public static int[] findAndMove(Minecraft mc, Explorer exploration, int[] chest, int[] center,
+        List<int[]> failedChestViews) {
+        java.util.List<int[]> positions = new java.util.ArrayList<>();
+        for (int floorY = chest[1] - 1; floorY <= chest[1]; floorY++) for (int radius = 1; radius <= 3; radius++)
+            for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                int x = chest[0] + dx, z = chest[2] + dz;
+                if (dx * dx + dz * dz > 9) continue;
+                if (isChest(mc.theWorld, x, floorY, z) || isChest(mc.theWorld, x, floorY + 1, z)) continue;
+                boolean failed = false;
+                for (int[] view : failedChestViews) if (view[0] == x && view[1] == floorY && view[2] == z) {
+                    failed = true;
+                    break;
+                }
+                if (failed
+                    || !com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain
+                        .puzzleCenterStandable(mc.theWorld, x, floorY + 1, z)
+                    || !com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe(mc.theWorld, x, floorY + 1, z))
+                    continue;
+                Vec3 eye = Vec3.createVectorHelper(x + 0.5D, floorY + 1D + mc.thePlayer.getEyeHeight(), z + 0.5D);
+                if (visibleChest(mc, eye, chest) != null) positions.add(new int[] { x, floorY, z });
+            }
+        positions.sort((a, b) -> {
+            int da = Math.abs(a[0] - chest[0]) + Math.abs(a[2] - chest[2]);
+            int db = Math.abs(b[0] - chest[0]) + Math.abs(b[2] - chest[2]);
+            int distance = Double.compare(
+                mc.thePlayer.getDistanceSq(a[0] + 0.5D, a[1] + 1D, a[2] + 0.5D),
+                mc.thePlayer.getDistanceSq(b[0] + 0.5D, b[1] + 1D, b[2] + 0.5D));
+            return distance != 0 ? distance : Integer.compare(da, db);
+        });
+        for (int[] position : positions) if (exploration.moveToRewardView(mc, position)) {
+            return position;
+        }
+        failedChestViews.clear();
+        return null;
+    }
+
+    private static boolean isChest(net.minecraft.world.World world, int x, int y, int z) {
+        return world.getTileEntity(x, y, z) instanceof net.minecraft.tileentity.TileEntityChest;
+    }
+}

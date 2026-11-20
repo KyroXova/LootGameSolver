@@ -1,0 +1,68 @@
+name: Update Baritone pin
+
+on:
+  schedule:
+    - cron: '31 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-baritone-pin
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create a pull request for a new revision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          current=$(sed -n 's/^[[:space:]]*baritoneRevision[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+          latest=$(git ls-remote --exit-code --heads https://github.com/KyroXova/baritone.git refs/heads/1.7.10-LGS | awk '{print $1}')
+          if [[ ! "$current" =~ ^[0-9a-f]{40}$ || ! "$latest" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'Expected exactly one full Baritone revision in gradle.properties and on the public branch.' >&2
+            exit 1
+          fi
+          if [[ "$current" == "$latest" ]]; then
+            echo 'Baritone is already pinned to the latest revision.'
+            exit 0
+          fi
+          branch="automation/baritone-pin-${latest}"
+          existing=$(gh pr list --base main --head "$branch" --state open --json number --jq 'length')
+          if [[ "$existing" != 0 ]]; then
+            echo 'A pull request for this revision already exists.'
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" > /dev/null; then
+            echo "Branch $branch already exists without an open pull request; review it manually." >&2
+            exit 1
+          fi
+          author_name=$(git log -1 --format=%an --author="$GITHUB_REPOSITORY_OWNER" origin/main)
+          author_email=$(git log -1 --format=%ae --author="$GITHUB_REPOSITORY_OWNER" origin/main)
+          if [[ -z "$author_name" || -z "$author_email" ]]; then
+            echo 'Could not resolve the repository owner author from main history.' >&2
+            exit 1
+          fi
+          git config user.name "$author_name"
+          git config user.email "$author_email"
+          git switch -c "$branch"
+          sed -i "s/^baritoneRevision=.*/baritoneRevision=$latest/" gradle.properties
+          test "$(grep -c "^baritoneRevision=$latest$" gradle.properties)" -eq 1
+          git add gradle.properties
+          git commit -m 'Update Baritone revision'
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --base main --head "$branch" --title 'Update Baritone revision' \
+            --body "Updates the Baritone 1.7.10-LGS pin from $current to $latest. Review the CI build before merging."

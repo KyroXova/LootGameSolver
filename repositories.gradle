@@ -1,4 +1,19 @@
 repositories {
+    // Forge hosts these legacy Scala artifacts as JARs without Maven POMs.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Forge legacy Scala"
+                url = "https://maven.minecraftforge.net/"
+                metadataSources { artifact() }
+            }
+        }
+        filter {
+            includeModule "org.scala-lang", "scala-parser-combinators_2.11"
+            includeModule "org.scala-lang", "scala-swing_2.11"
+            includeModule "org.scala-lang", "scala-xml_2.11"
+        }
+    }
     maven {
         name = "GTNH Maven"
         url = "https://nexus.gtnewhorizons.com/repository/public/"
@@ -8,6 +23,19 @@ repositories {
         url = "https://cursemaven.com"
         content {
             includeGroup "curse.maven"
+        }
+    }
+}
+
+// Prevent plugin-added legacy mirrors from blocking resolution when they time out,
+// and route Central requests to GTNH Maven mirror to avoid Maven Central rate limits (HTTP 429).
+repositories.configureEach { repo ->
+    if (repo instanceof MavenArtifactRepository) {
+        def host = repo.url?.host
+        if (host == "gregtech.overminddl1.com" || repo.name == "OvermindDL1 Forge repo mirror") {
+            repo.content { excludeGroupByRegex ".*" }
+        } else if (host == "repo.maven.apache.org" || host == "repo1.maven.org") {
+            repo.url = uri("https://nexus.gtnewhorizons.com/repository/public/")
         }
     }
 }

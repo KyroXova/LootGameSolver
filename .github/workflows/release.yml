@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: [ '*' ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       tag_name:
@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   check-version:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
@@ -45,8 +46,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MANUAL_TAG: ${{ inputs.tag_name }}
-          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
-          REF_NAME: ${{ github.ref_name }}
           MANUAL_PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
@@ -64,18 +63,8 @@ jobs:
             RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
             IS_PRE="${MANUAL_PRERELEASE:-false}"
             MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
-          elif [[ "$IS_TAG" == "true" ]]; then
-            TARGET_TAG="$REF_NAME"
-            RELEASE_TITLE="LootGameSolver $REF_NAME"
-            if [[ "$REF_NAME" == *-snapshot || "$REF_NAME" == *-pre ]]; then
-              IS_PRE="true"
-              MAKE_LATEST="false"
-            else
-              IS_PRE="false"
-              MAKE_LATEST="true"
-            fi
           else
-            # Push to main/master branch
+            # A push to main releases the version declared by this commit.
             TARGET_TAG="${MOD_VERSION:-latest}"
             RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
             if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
@@ -105,17 +94,23 @@ jobs:
           GITHUB_RELEASE_EXISTS="false"
           if RELEASE_RESULT=$(gh api "repos/${{ github.repository }}/releases/tags/$TARGET_TAG" 2>&1); then
             GITHUB_RELEASE_EXISTS="true"
+            SHOULD_RELEASE="false"
+            echo "Release $TARGET_TAG already exists; skipping duplicate publication."
           elif [[ "$RELEASE_RESULT" != *"HTTP 404"* ]]; then
             echo "Could not verify the GitHub release: $RELEASE_RESULT" >&2
             exit 1
           fi
-          echo "should_release=${SHOULD_RELEASE}" >> $GITHUB_OUTPUT
-          echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
-          echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
-          echo "is_prerelease=${IS_PRE}" >> $GITHUB_OUTPUT
-          echo "make_latest=${MAKE_LATEST}" >> $GITHUB_OUTPUT
-          echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> $GITHUB_OUTPUT
-          echo "release_commit_sha=${RELEASE_COMMIT_SHA}" >> $GITHUB_OUTPUT
+          if [[ "$SHOULD_RELEASE" == "true" && "$RELEASE_COMMIT_SHA" != "$(git rev-parse HEAD)" ]]; then
+            echo "The existing tag points to a different commit; refusing to release." >&2
+            exit 1
+          fi
+          echo "should_release=${SHOULD_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "target_tag=${TARGET_TAG}" >> "$GITHUB_OUTPUT"
+          echo "release_title=${RELEASE_TITLE}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=${IS_PRE}" >> "$GITHUB_OUTPUT"
+          echo "make_latest=${MAKE_LATEST}" >> "$GITHUB_OUTPUT"
+          echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> "$GITHUB_OUTPUT"
+          echo "release_commit_sha=${RELEASE_COMMIT_SHA}" >> "$GITHUB_OUTPUT"
 
   release:
     needs: check-version
@@ -162,6 +157,13 @@ jobs:
       - name: Build mod
         run: ./gradlew build --parallel --max-workers=4
 
+      - name: Obtain Baritone jar for bundled release
+        id: baritone
+        uses: ./.github/actions/build-baritone
+
+      - name: Build bundled Baritone mod
+        run: ./gradlew bundledBaritoneJar -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}"
+
       - name: Prepare release changelog notes
         id: release-notes
         shell: bash
@@ -172,6 +174,9 @@ jobs:
           test -s "$NOTES"
           JAR="build/libs/lootgamesolver-${VERSION}.jar"
           test -f "$JAR"
+          SIZE=$(stat -c %s "$JAR")
+          test "$SIZE" -ge 8000000 && test "$SIZE" -le 20000000
+          unzip -l "$JAR" | grep 'baritone/api/BaritoneAPI.class' > /dev/null
           unzip -p "$JAR" META-INF/CHANGELOG.md > build/release_body.md
           cmp "$NOTES" build/release_body.md
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"
@@ -193,6 +198,15 @@ jobs:
         if: needs.check-version.outputs.is_prerelease != 'true'
         run: |
           test -n "$CURSEFORGE_TOKEN" || { echo "Missing CURSEFORGE_TOKEN secret"; exit 1; }
-          ./gradlew publishCurseforge --no-configuration-cache
+          ./gradlew publishCurseforge -PbaritoneJar="${{ steps.baritone.outputs.jar_path }}" --no-configuration-cache
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+
+  sync-description:
+    needs: [check-version, release]
+    if: needs.check-version.outputs.is_prerelease != 'true'
+    uses: ./.github/workflows/sync-curseforge-description.yml
+    with:
+      release_commit: ${{ needs.check-version.outputs.release_commit_sha }}
+    secrets:
+      CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}

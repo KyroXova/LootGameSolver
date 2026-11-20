@@ -4,6 +4,7 @@ import net.minecraftforge.common.MinecraftForge;
 
 import com.kyroxova.lootgamesolver.client.ClientHooks;
 import com.kyroxova.lootgamesolver.client.Keybinds;
+import com.kyroxova.lootgamesolver.client.storage.StorageCommand;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
@@ -18,6 +19,8 @@ public final class ClientProxy extends CommonProxy {
 
     @Override
     public void init(FMLInitializationEvent event) {
+        com.kyroxova.lootgamesolver.client.BaritoneNavigationBridge.disableChatCommands();
+        net.minecraftforge.client.ClientCommandHandler.instance.registerCommand(new StorageCommand());
         ClientHooks hooks = new ClientHooks();
         cpw.mods.fml.common.FMLCommonHandler.instance()
             .bus()

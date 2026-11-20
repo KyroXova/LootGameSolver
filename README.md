@@ -1,5 +1,10 @@
 # LootGameSolver
 
+[![CurseForge](https://img.shields.io/badge/CurseForge-Download-f16436?logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/lootgamesolver)
+[![GitHub release](https://img.shields.io/github/v/release/KyroXova/LootGameSolver)](https://github.com/KyroXova/LootGameSolver/releases)
+[![Build and test](https://github.com/KyroXova/LootGameSolver/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/KyroXova/LootGameSolver/actions/workflows/build-and-test.yml)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.7.10-green)](https://www.minecraft.net/)
+
 LootGameSolver is a client-side Minecraft 1.7.10 mod for **GregTech: New Horizons (GTNH)** that helps you play **LootGames**. It supports Minesweeper, Sudoku, and Game of Light with automatic solving and in-world hints.
 
 Choose how you want to play: let the solver interact with a board, follow holograms yourself, or try the experimental explorer to find and complete structures.
@@ -45,6 +50,7 @@ The explorer can:
 - Select tools, clear obstructions, and avoid known hazardous plants, traps, and liquids.
 - Open boards, solve games, and resume an unfinished game inside a structure.
 - Collect reward chests and move eligible items into supported backpacks.
+- Automatically deposit collected loot into marked home or warp storage targets (including Binnie's multi-page Compartments) and return to complete unfinished rooms.
 - Use food and the Extra Utilities Healing Axe while exploring.
 - Clean unwanted inventory items when the trash-can command is available, while protecting backpacks, tools, food, and a stack of building material.
 
@@ -60,19 +66,48 @@ Structure discovery is progressive. The explorer checks loaded LootGames structu
 | --- | --- |
 | **R** | Toggle the Auto-Solver |
 | **H** | Toggle holograms and navigation lines |
-| **G** | Start or stop the explorer |
-| **Hold G** | Clear the last checkpoint and replan |
+| **G** | Start the explorer, or pause and resume active automation |
+| **Hold G** | Clear active automation and the last checkpoint |
 
 Keys can be changed in Minecraft's Controls menu. The HUD shows solver and explorer status, the selected structure, and hold-G progress. Navigation pauses for open menus, manual movement, damage, or flight.
+
+## Commands
+
+Manage storage destinations, marked targets, checkpoints, and navigation preferences with `/lootgamesolver` (alias `/lgs`):
+
+| Command | Description |
+| --- | --- |
+| `/lgs help [command]` | Show command list or detailed help for a specific command. |
+| `/lgs setHome` | Select your existing `/home` command as the storage destination. |
+| `/lgs setWarp <name>` | Select `/warp <name>` as the storage destination (`returnLooting` is reserved). |
+| `/lgs setChest` / `/lgs setStorage` | Mark the looked-at inventory block or entity for storage deposits. |
+| `/lgs setStorage <name>` | Alias for selecting a storage warp. |
+| `/lgs clearChest` | Unmark the looked-at storage target. |
+| `/lgs clearChests` | Remove all marked storage targets for the current world. |
+| `/lgs clearWarp` | Clear the home or warp destination while keeping marked targets saved. |
+| `/lgs clearStorage` | Clear destination and all targets, and disable recovery. |
+| `/lgs enable` / `/lgs disable` | Enable or disable automated storage recovery trips. |
+| `/lgs storageStatus` | Display configured destination, target count, and recovery preference. |
+| `/lgs resumeLoot` | Resume saved reward collection when you are back near the dungeon room. |
+| `/lgs clearCheckpoint` | Clear saved loot collection and navigation checkpoints. |
+| `/lgs caveMode [on\|off\|status]` | Allow subterranean pathing or prefer surface travel for long-distance routes. |
+
+### Multi-Page Storage Containers
+
+When depositing into marked storage, LootGameSolver supports multi-page storage containers such as Binnie's Compartments (Wood, Copper, Bronze, Iron, Gold, and Diamond). The depositor cycles through all available tabs, verifies slot acceptance on each page, and deposits eligible loot while strictly protecting carried gear, weapons, tools, and backpacks.
 
 ## Installation
 
 1. Install **GTNH for Minecraft 1.7.10** with Forge and LootGames.
-2. Download the latest LootGameSolver JAR and place it in the instance's `mods` folder.
+2. Download the latest LootGameSolver JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/lootgamesolver) or [GitHub Releases](https://github.com/KyroXova/LootGameSolver/releases) and place it in the instance's `mods` folder.
 3. Launch the instance and approach a LootGames board, or use the experimental explorer to search for one.
 
 ## Configuration
 
 The configuration includes solver interaction delays, Minesweeper probability settings, display options, and experimental exploration settings such as route range and staircase digging.
 
-See the [3.0.0 changelog](changelog/changelog_2.1.0_to_3.0.0.md) for the latest changes.
+See the [3.1.0 changelog](changelog/changelog_3.0.0_to_3.1.0.md) for the latest changes.
+
+## Baritone Integration & Licensing
+
+The release JAR includes the classes and resources of the Minecraft 1.7.10 [Baritone fork](https://github.com/KyroXova/baritone). A separate Baritone download is not needed for the bundled release. See the fork for its source and license.

@@ -6,7 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-import com.kyroxova.lootgamesolver.client.SolverSession;
+import com.kyroxova.lootgamesolver.client.puzzle.SolverSession;
 import com.kyroxova.lootgamesolver.core.SolveResult;
 
 public class SudokuSolverTest {

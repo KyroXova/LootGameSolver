@@ -1,0 +1,33 @@
+name: Build Baritone for LootGameSolver
+description: Build the public 1.7.10-LGS branch for the combined release jar
+outputs:
+  jar_path:
+    description: Absolute path of the production Baritone jar
+    value: ${{ steps.build.outputs.jar_path }}
+runs:
+  using: composite
+  steps:
+    - id: build
+      shell: bash
+      run: |
+        set -euo pipefail
+        expected=$(sed -n 's/^[[:space:]]*baritoneRevision[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d ' \r\n')
+        if [[ ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "baritoneRevision must be a full Git commit ID." >&2
+          exit 1
+        fi
+        git clone --single-branch --no-checkout --branch 1.7.10-LGS https://github.com/KyroXova/baritone.git baritone-src
+        if ! git -C baritone-src merge-base --is-ancestor "$expected" origin/1.7.10-LGS; then
+          echo "Pinned Baritone revision is not reachable from public 1.7.10-LGS: $expected" >&2
+          exit 1
+        fi
+        git -C baritone-src checkout --detach "$expected"
+        actual=$(git -C baritone-src rev-parse HEAD)
+        if [[ "$actual" != "$expected" ]]; then
+          echo "Could not check out the pinned Baritone revision: $expected" >&2
+          exit 1
+        fi
+        (cd baritone-src && chmod +x gradlew && ./gradlew reobfJar --parallel --max-workers=4)
+        BARITONE_JAR=baritone-src/build/libs/baritone-1.7.10-1.20.0-1.7.10-dev.jar
+        test -f "$BARITONE_JAR"
+        echo "jar_path=$(realpath "$BARITONE_JAR")" >> "$GITHUB_OUTPUT"
