@@ -57,6 +57,9 @@ jobs:
         id: baritone
         uses: ./.github/actions/build-baritone
 
+      - name: Set up build workspace
+        run: ./gradlew setupCIWorkspace
+
       - name: Build bundled LootGameSolver with Baritone
         run: |
           chmod +x gradlew
