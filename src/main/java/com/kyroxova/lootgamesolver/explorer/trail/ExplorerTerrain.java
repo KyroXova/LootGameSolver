@@ -59,6 +59,8 @@ public final class ExplorerTerrain {
         if (world.getBlock(x, y, z)
             .getMaterial() == net.minecraft.block.material.Material.leaves
             || world.getBlock(x, y + 1, z)
+                .getMaterial() == net.minecraft.block.material.Material.leaves
+            || world.getBlock(x, y - 1, z)
                 .getMaterial() == net.minecraft.block.material.Material.leaves)
             return false;
         for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
@@ -149,8 +151,19 @@ public final class ExplorerTerrain {
             && box.minX < x + 0.5D
             && box.maxX > x + 0.5D
             && box.minZ < z + 0.5D
-            && box.maxZ > z + 0.5D) return box.maxY;
+            && box.maxZ > z + 0.5D) {
+            if (at == net.minecraft.init.Blocks.snow_layer) {
+                net.minecraft.block.Block underSnow = world.getBlock(x, y - 1, z);
+                if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
+                    || underSnow == net.minecraft.init.Blocks.air
+                    || underSnow.getMaterial().isLiquid()) {
+                    return -1D;
+                }
+            }
+            return box.maxY;
+        }
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
+        if (below.getMaterial() == net.minecraft.block.material.Material.leaves) return -1D;
         if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
             || below == net.minecraft.init.Blocks.ice || below == net.minecraft.init.Blocks.packed_ice
             || below == net.minecraft.init.Blocks.snow) return y;
