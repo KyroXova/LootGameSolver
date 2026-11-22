@@ -12,13 +12,18 @@ This hotfix makes Baritone's temporary block handling safe and limits automatic 
 - Removed the automatic behavior that kept moving acceptable building blocks into hotbar slot 9 during normal play.
 - When Baritone needs a placeable block for a scaffold or construction placement, it now uses an empty hotbar slot first. If the hotbar is full, it may temporarily swap only a recognized throwaway building block; tools, equipment, backpacks, and other non-block items are left alone.
 - Restores the displaced stack to its original slot after placement activity ends or Explorer is interrupted. Restoration waits for a safe inventory state and checks that the original slot contents have not changed. If no safe slot is available, Baritone leaves the inventory alone.
+- Deferred inventory swaps now retain their temporary-slot restoration data until the swap actually executes. A queued temporary swap is cancelled if Explorer inventory handling is disabled before it can run.
 - Avoids repeating a swap when a suitable placeable block is already in the hotbar. Temporary blocks are not reserved there after their placement task ends.
 - Restored placement on normal Explorer travel routes so Baritone can place a temporary step or scaffold when a route requires it; no-break puzzle approaches still cannot place blocks.
+- Rejected or busy navigation requests leave Baritone's shared placement, surface-only, and sprint settings unchanged. Accepted requests keep their route-specific settings.
+- Avoids sunken Biomes O' Plenty mud and quicksand surfaces that impair movement, allowing routes to go around them.
+- Removed unconditional pathfinder search-stat and path-length output from the game console; detailed diagnostics remain available through Baritone debug logging.
 
 ### Explorer room-entry cleanup
 
 - When Explorer reaches a puzzle room with eligible mined-block trash and inventory pressure, it now pauses puzzle startup, runs the existing trash-can cleanup, then starts solving. Cleanup also works after the navigation route has stopped at the room.
 - Storage recovery now resumes backpack unloading after a partial deposit frees inventory slots, instead of ending the trip as soon as the remaining storage targets are full or unavailable. It still stops safely when a later pass cannot make more progress.
+- Storage destinations that reject some item types are now excluded only for those rejected item identities. Newly withdrawn item types can retry those destinations, while unchanged batches avoid redundant attempts.
 
 ## Earlier 3.1.0 details omitted from its release notes
 
