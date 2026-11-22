@@ -138,9 +138,14 @@ public final class BaritoneNavigationBridge {
     private static void setInventoryHandling(boolean enabled) {
         try {
             Class<?> api = Class.forName("baritone.api.BaritoneAPI");
-            Object settings = api.getMethod("getSettings").invoke(null);
-            Object allowInventory = settings.getClass().getField("allowInventory").get(settings);
-            allowInventory.getClass().getField("value").set(allowInventory, enabled);
+            Object settings = api.getMethod("getSettings")
+                .invoke(null);
+            Object allowInventory = settings.getClass()
+                .getField("allowInventory")
+                .get(settings);
+            allowInventory.getClass()
+                .getField("value")
+                .set(allowInventory, enabled);
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
