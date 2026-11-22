@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 public final class BaritoneNavigationBridge {
 
     public static void disableChatCommands() {
+        setInventoryHandling(false);
         try {
             Object settings = Class.forName("baritone.api.BaritoneAPI")
                 .getMethod("getSettings")
