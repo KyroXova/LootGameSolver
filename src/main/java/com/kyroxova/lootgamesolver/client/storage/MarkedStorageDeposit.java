@@ -1,5 +1,9 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.entity.Entity;
@@ -7,6 +11,7 @@ import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryLargeChest;
 import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
@@ -28,7 +33,7 @@ public final class MarkedStorageDeposit {
     private final World world;
     private final StorageLootLedger ledger;
     private final InventoryBaseline baseline;
-    private final java.util.Set<String> fullTargets;
+    private final Map<String, List<ItemStack>> rejectedTypesByTarget;
     private final boolean[] attempted;
     private int currentTargetIndex = -1;
     private int wait, oldSlot = -1, moved;
@@ -41,16 +46,17 @@ public final class MarkedStorageDeposit {
     private VerifiedStorageTransfer transfer;
 
     public MarkedStorageDeposit(Minecraft mc, String[] targets, StorageLootLedger ledger, InventoryBaseline baseline) {
-        this(mc, targets, ledger, baseline, new java.util.HashSet<String>());
+        this(mc, targets, ledger, baseline, new java.util.HashMap<String, List<ItemStack>>());
     }
 
     public MarkedStorageDeposit(Minecraft mc, String[] targets, StorageLootLedger ledger, InventoryBaseline baseline,
-        java.util.Set<String> fullTargets) {
+        Map<String, List<ItemStack>> rejectedTypesByTarget) {
         world = mc.theWorld;
         this.targets = targets.clone();
         this.ledger = ledger;
         this.baseline = baseline;
-        this.fullTargets = fullTargets != null ? fullTargets : new java.util.HashSet<String>();
+        this.rejectedTypesByTarget = rejectedTypesByTarget != null ? rejectedTypesByTarget
+            : new java.util.HashMap<String, List<ItemStack>>();
         this.attempted = new boolean[this.targets.length];
     }
 
@@ -81,15 +87,14 @@ public final class MarkedStorageDeposit {
             VerifiedStorageTransfer.Result result = transfer.tick(mc);
             if (result == VerifiedStorageTransfer.Result.WORKING) return Result.WORKING;
             if (result == VerifiedStorageTransfer.Result.FAILED) return Result.FAILED;
+            if (result == VerifiedStorageTransfer.Result.FULL_OR_REJECTED && currentTargetIndex >= 0
+                && currentTargetIndex < targets.length) {
+                rememberRejectedTypes(targets[currentTargetIndex], transfer.rejectedTypes());
+            }
             moved += transfer.moved();
             mc.thePlayer.closeScreen();
             transfer = null;
             inventory = null;
-            if (result == VerifiedStorageTransfer.Result.FULL_OR_REJECTED) {
-                if (currentTargetIndex >= 0 && currentTargetIndex < targets.length) {
-                    fullTargets.add(targets[currentTargetIndex]);
-                }
-            }
             if (result == VerifiedStorageTransfer.Result.DONE) return Result.DONE;
             return Result.WORKING;
         }
@@ -140,7 +145,7 @@ public final class MarkedStorageDeposit {
             IInventory bestCandidate = null;
 
             for (int i = 0; i < targets.length; i++) {
-                if (attempted[i] || fullTargets.contains(targets[i])) continue;
+                if (attempted[i] || rejectedCurrentBatch(targets[i], mc)) continue;
                 StorageTarget target = StorageTarget.parse(targets[i]);
                 if (target == null) continue;
                 IInventory candidate = target.loadedInventory(mc);
@@ -281,6 +286,34 @@ public final class MarkedStorageDeposit {
             return Result.WORKING;
         }
         return Result.FULL_OR_UNAVAILABLE;
+    }
+
+    private void rememberRejectedTypes(String target, List<ItemStack> rejected) {
+        List<ItemStack> excluded = rejectedTypesByTarget.get(target);
+        if (excluded == null) {
+            excluded = new ArrayList<ItemStack>();
+            rejectedTypesByTarget.put(target, excluded);
+        }
+        for (ItemStack stack : rejected) {
+            if (VerifiedStorageTransfer.containsItemType(excluded, stack)) continue;
+            ItemStack type = stack.copy();
+            type.stackSize = 1;
+            excluded.add(type);
+        }
+    }
+
+    private boolean rejectedCurrentBatch(String target, Minecraft mc) {
+        List<ItemStack> excluded = rejectedTypesByTarget.get(target);
+        if (excluded == null || excluded.isEmpty()) return false;
+        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        boolean hasMovableItems = false;
+        for (int index = 9; index < 36; index++) {
+            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(index);
+            if (!VerifiedStorageTransfer.movable(index, stack, reserve, ledger, baseline)) continue;
+            hasMovableItems = true;
+            if (!VerifiedStorageTransfer.containsItemType(excluded, stack)) return false;
+        }
+        return hasMovableItems;
     }
 
     public void cancel(Minecraft mc) {

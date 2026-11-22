@@ -169,30 +169,6 @@ public final class BaritoneNavigationBridge {
             return Start.FAILED;
         }
         try {
-            try {
-                Object settings = api.getMethod("getSettings")
-                    .invoke(null);
-                Object surfaceOnly = settings.getClass()
-                    .getField("surfaceOnly")
-                    .get(settings);
-                surfaceOnly.getClass()
-                    .getField("value")
-                    .set(surfaceOnly, false);
-                Object allowPlace = settings.getClass()
-                    .getField("allowPlace")
-                    .get(settings);
-                allowPlace.getClass()
-                    .getField("value")
-                    .set(allowPlace, !forbidBreaking || kind == 3);
-                try {
-                    Object sprint = settings.getClass()
-                        .getField("sprint")
-                        .get(settings);
-                    sprint.getClass()
-                        .getField("value")
-                        .set(sprint, true);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
             Object provider = api.getMethod("getProvider")
                 .invoke(null);
             Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
@@ -251,6 +227,30 @@ public final class BaritoneNavigationBridge {
                     .getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
             }
+            try {
+                Object settings = api.getMethod("getSettings")
+                    .invoke(null);
+                Object surfaceOnly = settings.getClass()
+                    .getField("surfaceOnly")
+                    .get(settings);
+                surfaceOnly.getClass()
+                    .getField("value")
+                    .set(surfaceOnly, false);
+                Object allowPlace = settings.getClass()
+                    .getField("allowPlace")
+                    .get(settings);
+                allowPlace.getClass()
+                    .getField("value")
+                    .set(allowPlace, !forbidBreaking || kind == 3);
+                try {
+                    Object sprint = settings.getClass()
+                        .getField("sprint")
+                        .get(settings);
+                    sprint.getClass()
+                        .getField("value")
+                        .set(sprint, true);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             if (kind == 4) {
                 Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
                 Object center = posType.getConstructor(int.class, int.class, int.class)

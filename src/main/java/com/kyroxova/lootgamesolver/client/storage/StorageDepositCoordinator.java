@@ -23,7 +23,7 @@ public final class StorageDepositCoordinator {
     private final InventoryBaseline baseline;
     private final StorageLootLedger ledger = new StorageLootLedger();
     private final BackpackStorageUnload bags;
-    private final java.util.Set<String> fullTargets = new java.util.HashSet<String>();
+    private final java.util.Map<String, java.util.List<net.minecraft.item.ItemStack>> rejectedTypesByTarget = new java.util.HashMap<String, java.util.List<net.minecraft.item.ItemStack>>();
     private MarkedStorageDeposit deposit;
     private Phase phase = Phase.DEPOSIT;
     private boolean needsSpace;
@@ -56,7 +56,7 @@ public final class StorageDepositCoordinator {
             phase = Phase.UNLOAD;
             return Result.WORKING;
         }
-        if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline, fullTargets);
+        if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline, rejectedTypesByTarget);
         MarkedStorageDeposit.Result result = deposit.tick(mc);
         if (result == MarkedStorageDeposit.Result.WORKING) return Result.WORKING;
         if (shouldResumeUnloading(result, phase == Phase.FINAL_DEPOSIT, deposit.moved())) {
