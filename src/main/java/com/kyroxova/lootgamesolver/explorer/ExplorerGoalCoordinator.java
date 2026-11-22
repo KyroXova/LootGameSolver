@@ -88,12 +88,29 @@ public class ExplorerGoalCoordinator {
         }
         if (explorer.returnJoinSearch != null) {
             if (!explorer.returnJoinSearch.advance(3_000_000L)) {
-                explorer.status = "Finding a safe link to saved access route";
+                explorer.status = explorer.roomExitDugPathJoin ? "Finding a safe link to dug path"
+                    : "Finding a safe link to saved access route";
                 return true;
             }
             List<int[]> join = explorer.returnJoinSearch.path();
             boolean reachedJoin = explorer.returnJoinSearch.reachedGoal();
             explorer.returnJoinSearch = null;
+            if (explorer.roomExitDugPathJoin) {
+                if (reachedJoin) {
+                    explorer.route.clear();
+                    explorer.route.addAll(join);
+                    explorer.roomExit.appendDugPath(explorer);
+                } else if (!join.isEmpty()) {
+                    explorer.route.clear();
+                    explorer.route.addAll(join);
+                    explorer.status = "Following safe link to dug path";
+                } else {
+                    explorer.roomExitDugPathJoin = false;
+                    if (explorer.startSavedReturn(mc, true, 128) || explorer.digTowardSavedExit(mc)) return true;
+                    explorer.retryExitLater(mc);
+                }
+                return true;
+            }
             if (explorer.roomExitPlanning) {
                 explorer.roomExitPlanning = false;
                 if (reachedJoin) {
@@ -246,6 +263,10 @@ public class ExplorerGoalCoordinator {
             return;
         }
         if (explorer.returning) {
+            if (explorer.roomExitDugPathJoin) {
+                explorer.roomExit.startDugPathReturn(mc, explorer);
+                return;
+            }
             if (explorer.roomExitNeedsResume && explorer.activeRoomExit != null) {
                 explorer.roomExitNeedsResume = false;
                 explorer.returnJoinSearch = new GroundPathfinder.Search(

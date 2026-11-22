@@ -70,19 +70,13 @@ public final class RoomExit {
     public boolean startSearch(Minecraft mc, Explorer explorer) {
         if (mc.thePlayer == null || mc.theWorld == null) return false;
         if (explorer.staircaseDugPath != null && explorer.staircaseDugPath.size() >= 2) {
-            explorer.route.clear();
-            for (int i = explorer.staircaseDugPath.size() - 1; i >= 0; i--) {
-                int[] p = explorer.staircaseDugPath.get(i);
-                explorer.route.add(new int[] { p[0], p[1], p[2], 0 });
-            }
             explorer.returning = true;
             explorer.returnAvailable = false;
             explorer.resumeSearchAfterReturn = true;
             explorer.walking = true;
             explorer.searching = false;
             explorer.digging = false;
-            explorer.status = "Ascending dug path to surface";
-            return true;
+            return startDugPathReturn(mc, explorer);
         }
         int x = (int) Math.floor(mc.thePlayer.posX);
         int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
@@ -100,6 +94,48 @@ public final class RoomExit {
         needsResume = false;
         crossing = false;
         return startNextSearch(mc, explorer);
+    }
+
+    public boolean startDugPathReturn(Minecraft mc, Explorer explorer) {
+        if (mc == null || mc.thePlayer == null || mc.theWorld == null || explorer.staircaseDugPath.size() < 2)
+            return false;
+        int[] end = explorer.staircaseDugPath.get(explorer.staircaseDugPath.size() - 1);
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (samePosition(end, new int[] { x, y, z })) {
+            explorer.route.clear();
+            appendDugPath(explorer);
+            explorer.roomExitDugPathJoin = false;
+            explorer.status = "Ascending dug path to surface";
+            return true;
+        }
+        explorer.route.clear();
+        explorer.returnJoinSearch = new GroundPathfinder.Search(
+            explorer.walkingTerrain(mc.theWorld),
+            x,
+            y,
+            z,
+            end[0],
+            end[1],
+            end[2],
+            LootGameSolverConfig.explorationRange);
+        explorer.roomExitDugPathJoin = true;
+        explorer.status = "Finding a safe link to dug path";
+        return true;
+    }
+
+    public void appendDugPath(Explorer explorer) {
+        int last = explorer.staircaseDugPath.size() - 1;
+        if (last < 1) return;
+        int[] end = explorer.staircaseDugPath.get(last);
+        if (explorer.route.isEmpty() || !samePosition(explorer.route.get(explorer.route.size() - 1), end))
+            explorer.route.add(new int[] { end[0], end[1], end[2], 0 });
+        for (int i = last - 1; i >= 0; i--) {
+            int[] p = explorer.staircaseDugPath.get(i);
+            explorer.route.add(new int[] { p[0], p[1], p[2], 0 });
+        }
+        explorer.roomExitDugPathJoin = false;
+        explorer.status = "Ascending dug path to surface";
     }
 
     public boolean startNextSearch(Minecraft mc, Explorer explorer) {

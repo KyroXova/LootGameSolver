@@ -7,6 +7,8 @@ import java.util.Optional;
 
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
+
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
 public final class BaritoneNavigationBridge {
 
@@ -55,6 +57,9 @@ public final class BaritoneNavigationBridge {
     private Object cachedWorld;
     private Method isCachedMethod;
     private boolean inventoryHandlingForGoal;
+    private Object previousSurfaceOnlySetting;
+    private Object previousSurfaceOnlyValue;
+    private boolean surfaceOnlyOverridden;
 
     public boolean isCached(int blockX, int blockZ) {
         try {
@@ -119,7 +124,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startHorizontal(int x, int z) {
-        return start(x, 0, z, 2, false);
+        return start(x, 0, z, 2, false, false, true, !LootGameSolverConfig.caveMode);
     }
 
     public void disablePlacement() {
@@ -150,16 +155,39 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
+    private void restoreSurfaceOnly() {
+        try {
+            if (surfaceOnlyOverridden && previousSurfaceOnlySetting != null) previousSurfaceOnlySetting.getClass()
+                .getField("value")
+                .set(previousSurfaceOnlySetting, previousSurfaceOnlyValue);
+        } catch (ReflectiveOperationException | LinkageError ignored) {} finally {
+            previousSurfaceOnlySetting = null;
+            previousSurfaceOnlyValue = null;
+            surfaceOnlyOverridden = false;
+        }
+    }
+
+    private void discardSurfaceOnlySnapshot() {
+        previousSurfaceOnlySetting = null;
+        previousSurfaceOnlyValue = null;
+        surfaceOnlyOverridden = false;
+    }
+
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
-        return start(x, y, z, kind, forbidBreaking, false, true);
+        return start(x, y, z, kind, forbidBreaking, false, true, false);
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal) {
-        return start(x, y, z, kind, forbidBreaking, preserveActiveGoal, true);
+        return start(x, y, z, kind, forbidBreaking, preserveActiveGoal, true, false);
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal,
         boolean inventoryHandling) {
+        return start(x, y, z, kind, forbidBreaking, preserveActiveGoal, inventoryHandling, false);
+    }
+
+    private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal,
+        boolean inventoryHandling, boolean surfaceOnlyEnabled) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -230,12 +258,17 @@ public final class BaritoneNavigationBridge {
             try {
                 Object settings = api.getMethod("getSettings")
                     .invoke(null);
-                Object surfaceOnly = settings.getClass()
+                Object surfaceOnlySetting = settings.getClass()
                     .getField("surfaceOnly")
                     .get(settings);
-                surfaceOnly.getClass()
-                    .getField("value")
-                    .set(surfaceOnly, false);
+                java.lang.reflect.Field surfaceOnlyValue = surfaceOnlySetting.getClass()
+                    .getField("value");
+                if (!surfaceOnlyOverridden) {
+                    previousSurfaceOnlySetting = surfaceOnlySetting;
+                    previousSurfaceOnlyValue = surfaceOnlyValue.get(surfaceOnlySetting);
+                    surfaceOnlyOverridden = true;
+                }
+                surfaceOnlyValue.set(surfaceOnlySetting, surfaceOnlyEnabled);
                 Object allowPlace = settings.getClass()
                     .getField("allowPlace")
                     .get(settings);
@@ -472,7 +505,8 @@ public final class BaritoneNavigationBridge {
                         .invoke(pathing, (Boolean) null);
                 } catch (ReflectiveOperationException | LinkageError ignored) {}
             }
-        }
+            restoreSurfaceOnly();
+        } else discardSurfaceOnlySnapshot();
         process = null;
         goal = null;
         processApi = null;

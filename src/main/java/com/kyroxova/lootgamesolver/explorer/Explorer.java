@@ -150,6 +150,7 @@ public class Explorer {
     public boolean roomExitPlanning;
     public boolean roomExitNeedsResume;
     public boolean roomExitCrossing;
+    public boolean roomExitDugPathJoin;
     public int roomExitJumpRetries;
 
     public List<int[]> roomEntryCandidates;
@@ -910,6 +911,7 @@ public class Explorer {
         roomExitPlanning = false;
         roomExitNeedsResume = false;
         roomExitCrossing = false;
+        roomExitDugPathJoin = false;
         miningDriver.reset(mc, this);
         blockPlacer.reset(mc);
         chestPitNav.reset();

@@ -244,6 +244,7 @@ public class ExplorerSearchCoordinator {
         explorer.roomExitPlanning = false;
         explorer.roomExitNeedsResume = false;
         explorer.roomExitCrossing = false;
+        explorer.roomExitDugPathJoin = false;
         explorer.exitRecoveryTicks = 0;
         explorer.openExitSearch = null;
         explorer.followingOpenExit = false;
