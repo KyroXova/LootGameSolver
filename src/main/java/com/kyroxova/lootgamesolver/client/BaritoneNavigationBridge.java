@@ -54,6 +54,7 @@ public final class BaritoneNavigationBridge {
     private Object clickSprint;
     private Object cachedWorld;
     private Method isCachedMethod;
+    private boolean inventoryHandlingForGoal;
 
     public boolean isCached(int blockX, int blockZ) {
         try {
@@ -98,7 +99,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startPuzzleTileApproach(int x, int y, int z) {
-        return start(x, y, z, 0, true, false);
+        return start(x, y, z, 0, true, false, false);
     }
 
     public Start startWithPlacementWithoutBreaking(int x, int y, int z) {
@@ -114,7 +115,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startAdjacentWithoutBreaking(int x, int y, int z) {
-        return start(x, y, z, 1, true, false);
+        return start(x, y, z, 1, true, false, false);
     }
 
     public Start startHorizontal(int x, int z) {
@@ -150,10 +151,15 @@ public final class BaritoneNavigationBridge {
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
-        return start(x, y, z, kind, forbidBreaking, false);
+        return start(x, y, z, kind, forbidBreaking, false, true);
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal) {
+        return start(x, y, z, kind, forbidBreaking, preserveActiveGoal, true);
+    }
+
+    private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal,
+        boolean inventoryHandling) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -277,7 +283,8 @@ public final class BaritoneNavigationBridge {
             clickLeft = candidateClick;
             clickRight = candidateRightClick;
             clickSprint = candidateSprint;
-            setInventoryHandling(true);
+            inventoryHandlingForGoal = inventoryHandling;
+            setInventoryHandling(inventoryHandlingForGoal);
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
@@ -293,17 +300,23 @@ public final class BaritoneNavigationBridge {
     }
 
     public void setPaused(boolean paused) {
-        setInventoryHandling(!paused);
-        if (process == null || processApi == null) return;
+        if (paused) setInventoryHandling(false);
+        if (process == null || processApi == null) {
+            setInventoryHandling(false);
+            return;
+        }
+        boolean owns = false;
         try {
             if (processApi.getMethod("getGoal")
                 .invoke(process) == goal) {
+                owns = true;
                 processApi.getMethod("setPaused", boolean.class)
                     .invoke(process, paused);
                 if (paused && inputHandler != null && inputHandlerApi != null) inputHandlerApi.getMethod("clearAllKeys")
                     .invoke(inputHandler);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
+        setInventoryHandling(!paused && owns && inventoryHandlingForGoal);
     }
 
     public boolean isPathing() {
@@ -415,14 +428,14 @@ public final class BaritoneNavigationBridge {
     }
 
     public void stop() {
-        setInventoryHandling(false);
-        boolean owns = true;
+        boolean owns = false;
         if (process != null && processApi != null) {
             try {
                 Object current = processApi.getMethod("getGoal")
                     .invoke(process);
                 owns = (current == null || current == goal);
                 if (owns) {
+                    setInventoryHandling(false);
                     Class.forName("baritone.api.process.IBaritoneProcess")
                         .getMethod("onLostControl")
                         .invoke(process);
