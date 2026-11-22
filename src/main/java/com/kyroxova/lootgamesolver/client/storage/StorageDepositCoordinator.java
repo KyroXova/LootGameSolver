@@ -25,7 +25,7 @@ public final class StorageDepositCoordinator {
     private final BackpackStorageUnload bags;
     private final java.util.Map<String, java.util.List<net.minecraft.item.ItemStack>> rejectedTypesByTarget = new java.util.HashMap<String, java.util.List<net.minecraft.item.ItemStack>>();
     private MarkedStorageDeposit deposit;
-    private Phase phase = Phase.DEPOSIT;
+    private Phase phase = Phase.UNLOAD;
     private boolean needsSpace;
 
     public StorageDepositCoordinator(String[] targets, InventoryBaseline baseline) {
