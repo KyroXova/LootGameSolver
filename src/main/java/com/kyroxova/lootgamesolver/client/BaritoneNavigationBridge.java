@@ -134,6 +134,15 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
+    private static void setInventoryHandling(boolean enabled) {
+        try {
+            Class<?> api = Class.forName("baritone.api.BaritoneAPI");
+            Object settings = api.getMethod("getSettings").invoke(null);
+            Object allowInventory = settings.getClass().getField("allowInventory").get(settings);
+            allowInventory.getClass().getField("value").set(allowInventory, enabled);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
         return start(x, y, z, kind, forbidBreaking, false);
     }
@@ -170,14 +179,6 @@ public final class BaritoneNavigationBridge {
                     sprint.getClass()
                         .getField("value")
                         .set(sprint, true);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-                try {
-                    Object allowInventory = settings.getClass()
-                        .getField("allowInventory")
-                        .get(settings);
-                    allowInventory.getClass()
-                        .getField("value")
-                        .set(allowInventory, true);
                 } catch (ReflectiveOperationException | LinkageError ignored) {}
             } catch (ReflectiveOperationException | LinkageError ignored) {}
             Object provider = api.getMethod("getProvider")
@@ -270,6 +271,7 @@ public final class BaritoneNavigationBridge {
             clickLeft = candidateClick;
             clickRight = candidateRightClick;
             clickSprint = candidateSprint;
+            setInventoryHandling(true);
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
@@ -285,6 +287,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public void setPaused(boolean paused) {
+        setInventoryHandling(!paused);
         if (process == null || processApi == null) return;
         try {
             if (processApi.getMethod("getGoal")
@@ -406,6 +409,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public void stop() {
+        setInventoryHandling(false);
         boolean owns = true;
         if (process != null && processApi != null) {
             try {
