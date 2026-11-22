@@ -59,6 +59,12 @@ public final class StorageDepositCoordinator {
         if (deposit == null) deposit = new MarkedStorageDeposit(mc, targets, ledger, baseline, fullTargets);
         MarkedStorageDeposit.Result result = deposit.tick(mc);
         if (result == MarkedStorageDeposit.Result.WORKING) return Result.WORKING;
+        if (shouldResumeUnloading(result, phase == Phase.FINAL_DEPOSIT, deposit.moved())) {
+            deposit = null;
+            needsSpace = false;
+            phase = Phase.UNLOAD;
+            return Result.WORKING;
+        }
         if (result != MarkedStorageDeposit.Result.DONE || (needsSpace && deposit.moved() == 0)) return fail(mc);
         deposit = null;
         needsSpace = false;
@@ -69,6 +75,10 @@ public final class StorageDepositCoordinator {
         }
         phase = Phase.UNLOAD;
         return Result.WORKING;
+    }
+
+    static boolean shouldResumeUnloading(MarkedStorageDeposit.Result result, boolean finalDeposit, int moved) {
+        return result == MarkedStorageDeposit.Result.FULL_OR_UNAVAILABLE && !finalDeposit && moved > 0;
     }
 
     private Result fail(Minecraft mc) {

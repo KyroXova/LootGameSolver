@@ -18,6 +18,7 @@ This hotfix makes Baritone's temporary block handling safe and limits automatic 
 ### Explorer room-entry cleanup
 
 - When Explorer reaches a puzzle room with eligible mined-block trash and inventory pressure, it now pauses puzzle startup, runs the existing trash-can cleanup, then starts solving. Cleanup also works after the navigation route has stopped at the room.
+- Storage recovery now resumes backpack unloading after a partial deposit frees inventory slots, instead of ending the trip as soon as the remaining storage targets are full or unavailable. It still stops safely when a later pass cannot make more progress.
 
 ## Earlier 3.1.0 details omitted from its release notes
 
