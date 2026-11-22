@@ -67,4 +67,4 @@ All commands accept `/lootgamesolver` or the `/lgs` alias. Use `/lgs help <comma
 
 The release JAR includes the [Baritone 1.7.10 fork](https://github.com/KyroXova/baritone); a separate Baritone installation is not required. Solver timing, probability, display, and explorer settings are configurable.
 
-[Source and documentation](https://github.com/KyroXova/LootGameSolver) · [GitHub releases](https://github.com/KyroXova/LootGameSolver/releases) · [Report an issue](https://github.com/KyroXova/LootGameSolver/issues) · [3.1.0 changelog](https://github.com/KyroXova/LootGameSolver/blob/main/changelog/changelog_3.0.0_to_3.1.0.md)
+[Source and documentation](https://github.com/KyroXova/LootGameSolver) · [GitHub releases](https://github.com/KyroXova/LootGameSolver/releases) · [Report an issue](https://github.com/KyroXova/LootGameSolver/issues) · [3.1.1 changelog](https://github.com/KyroXova/LootGameSolver/blob/main/changelog/changelog_3.1.0_to_3.1.1.md)

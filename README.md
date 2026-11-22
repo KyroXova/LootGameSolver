@@ -106,7 +106,7 @@ When depositing into marked storage, LootGameSolver supports multi-page storage 
 
 The configuration includes solver interaction delays, Minesweeper probability settings, display options, and experimental exploration settings such as route range and staircase digging.
 
-See the [3.1.0 changelog](changelog/changelog_3.0.0_to_3.1.0.md) for the latest changes.
+See the [3.1.1 changelog](changelog/changelog_3.1.0_to_3.1.1.md) for the latest changes.
 
 ## Baritone Integration & Licensing
 
