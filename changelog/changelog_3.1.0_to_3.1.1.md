@@ -13,6 +13,11 @@ This hotfix makes Baritone's temporary block handling safe and limits automatic 
 - When Baritone needs a placeable block for a scaffold or construction placement, it now uses an empty hotbar slot first. If the hotbar is full, it may temporarily swap only a recognized throwaway building block; tools, equipment, backpacks, and other non-block items are left alone.
 - Restores the displaced stack to its original slot after placement activity ends or Explorer is interrupted. Restoration waits for a safe inventory state and checks that the original slot contents have not changed. If no safe slot is available, Baritone leaves the inventory alone.
 - Avoids repeating a swap when a suitable placeable block is already in the hotbar. Temporary blocks are not reserved there after their placement task ends.
+- Restored placement on normal Explorer travel routes so Baritone can place a temporary step or scaffold when a route requires it; no-break puzzle approaches still cannot place blocks.
+
+### Explorer room-entry cleanup
+
+- When Explorer reaches a puzzle room with eligible mined-block trash and inventory pressure, it now pauses puzzle startup, runs the existing trash-can cleanup, then starts solving. Cleanup also works after the navigation route has stopped at the room.
 
 ## Earlier 3.1.0 details omitted from its release notes
 

@@ -177,7 +177,7 @@ public final class BaritoneNavigationBridge {
                     .get(settings);
                 allowPlace.getClass()
                     .getField("value")
-                    .set(allowPlace, kind == 3);
+                    .set(allowPlace, !forbidBreaking || kind == 3);
                 try {
                     Object sprint = settings.getClass()
                         .getField("sprint")
