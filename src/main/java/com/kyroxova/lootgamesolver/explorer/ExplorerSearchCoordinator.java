@@ -140,6 +140,7 @@ public class ExplorerSearchCoordinator {
     }
 
     public boolean nextSearchGoal(Minecraft mc, Explorer explorer) {
+        if (searchWasLeftBehind(mc, explorer)) rotateSearch(mc, explorer);
         if (explorer.search == null) rotateSearch(mc, explorer);
         int[] next = explorer.search.next();
         if (next == null) {
@@ -181,6 +182,7 @@ public class ExplorerSearchCoordinator {
     }
 
     public boolean nextSearchLeg(Minecraft mc, Explorer explorer) {
+        if (searchWasLeftBehind(mc, explorer)) rotateSearch(mc, explorer);
         for (int attempt = 0; attempt < 16; attempt++) {
             if (explorer.search == null) rotateSearch(mc, explorer);
             int[] goal = explorer.search.next();
@@ -216,6 +218,12 @@ public class ExplorerSearchCoordinator {
         explorer.walking = true;
         explorer.status = "Waiting for loaded terrain";
         return true;
+    }
+
+    private boolean searchWasLeftBehind(Minecraft mc, Explorer explorer) {
+        if (mc == null || mc.thePlayer == null || explorer.search == null) return false;
+        return explorer.search
+            .isFarFrom((int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.posZ), 512D);
     }
 
     public void continueProgressiveSearch(Minecraft mc, Explorer explorer, boolean solved) {

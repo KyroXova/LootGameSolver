@@ -341,6 +341,12 @@ public final class BaritoneTransitCoordinator {
                 searchMove = false;
                 explorer.walking = false;
             } else {
+                if (Math.hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D) > 512D) {
+                    explorer.baritoneNavigation.stop();
+                    reset();
+                    explorer.continueProgressiveSearch(mc, false);
+                    return true;
+                }
                 double aimDx = (searchX + 0.5D) - mc.thePlayer.posX;
                 double aimDz = (searchZ + 0.5D) - mc.thePlayer.posZ;
                 float aimYaw = (float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F;

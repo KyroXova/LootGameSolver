@@ -103,6 +103,13 @@ public class ExplorerRouteNavigator {
     }
 
     public boolean advanceRoute(Minecraft mc, Explorer explorer) {
+        if (explorer.searching && !explorer.route.isEmpty()) {
+            int[] first = explorer.route.get(0);
+            if (Math.hypot(mc.thePlayer.posX - first[0] - 0.5D, mc.thePlayer.posZ - first[2] - 0.5D) > 128D) {
+                explorer.continueProgressiveSearch(mc, false);
+                return true;
+            }
+        }
         if (!explorer.digging && !explorer.returning
             && !explorer.roomExitCrossing
             && !explorer.roomEntryCrossing
@@ -220,6 +227,8 @@ public class ExplorerRouteNavigator {
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
         boolean centering = next.length > 3 && next[3] == 2;
+        net.minecraft.block.Block floor = mc.theWorld.getBlock(px, py - 1, pz);
+        boolean slippery = floor.slipperiness > 0.6F;
         boolean passed = !centering && py == next[1]
             && NavigationSteering.passed(
                 mc.thePlayer.posX,
@@ -227,7 +236,8 @@ public class ExplorerRouteNavigator {
                 explorer.segmentX,
                 explorer.segmentZ,
                 next[0] + 0.5D,
-                next[2] + 0.5D);
+                next[2] + 0.5D,
+                slippery ? 0.65D : 0.30D);
         if ((!explorer.digging || mc.thePlayer.onGround) && (passed || NavigationSteering
             .reached(distance, py, next[1], mc.thePlayer.isInWater(), explorer.route.size() > 1))) {
             explorer.segmentX = next[0] + 0.5D;
@@ -349,7 +359,7 @@ public class ExplorerRouteNavigator {
             && explorer.navigationInput != null) {
             double targetSurface = ExplorerTerrain.walkSurfaceY(mc.theWorld, next[0], next[1], next[2]);
             double rise = targetSurface >= 0D ? targetSurface - mc.thePlayer.boundingBox.minY : (double) (next[1] - py);
-            if (targetSurface < 0D || (rise > 0.55D && rise <= 1.001D)) {
+            if (targetSurface >= 0D && rise > 0.55D && rise <= 1.001D) {
                 explorer.navigationInput.hop = true;
             }
             explorer.navigationInput.forward = 1.0F;
