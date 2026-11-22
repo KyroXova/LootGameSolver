@@ -19,6 +19,7 @@ public final class MinedDropTracker {
 
         final ItemStack item;
         int previous, mined;
+        boolean protectedReward;
 
         Entry(ItemStack stack) {
             item = stack.copy();
@@ -33,12 +34,13 @@ public final class MinedDropTracker {
 
         String item;
         int metadata, total, mined;
+        boolean protectedReward;
     }
 
     public List<SavedEntry> snapshot() {
         List<SavedEntry> saved = new ArrayList<SavedEntry>();
         for (Entry entry : entries) {
-            if (entry.mined <= 0) continue;
+            if (entry.mined <= 0 && !entry.protectedReward) continue;
             String id = (String) Item.itemRegistry.getNameForObject(entry.item.getItem());
             if (id == null) continue;
             SavedEntry value = new SavedEntry();
@@ -46,18 +48,49 @@ public final class MinedDropTracker {
             value.metadata = entry.item.getItemDamage();
             value.total = entry.previous;
             value.mined = entry.mined;
+            value.protectedReward = entry.protectedReward;
             saved.add(value);
         }
         return saved;
     }
 
     public void restore(ItemStack item, int total, int mined) {
-        if (item == null || total <= 0 || mined <= 0 || mined > total || find(item) != null) return;
+        restore(item, total, mined, false);
+    }
+
+    public void restore(ItemStack item, int total, int mined, boolean protectedReward) {
+        if (item == null || total <= 0 || mined < 0 || mined > total) return;
+        Entry existing = find(item);
+        if (existing != null) {
+            existing.protectedReward |= protectedReward;
+            return;
+        }
+        if (mined == 0 && !protectedReward) return;
         Entry entry = new Entry(item);
         entry.previous = total;
         entry.mined = mined;
+        entry.protectedReward = protectedReward;
         entries.add(entry);
         initialized = true;
+    }
+
+    public void protectReward(ItemStack stack) {
+        if (stack == null) return;
+        Entry entry = find(stack);
+        if (entry == null) {
+            entry = new Entry(stack);
+            entry.previous = stack.stackSize;
+            entries.add(entry);
+        }
+        if (!entry.protectedReward) {
+            entry.protectedReward = true;
+            dirty = true;
+        }
+    }
+
+    public boolean isProtectedReward(ItemStack stack) {
+        Entry entry = stack == null ? null : find(stack);
+        return entry != null && entry.protectedReward;
     }
 
     public boolean dirty() {
@@ -79,7 +112,8 @@ public final class MinedDropTracker {
         if (stack == null || stack.hasTagCompound() || stack.hasDisplayName() || InventoryProtection.essential(stack))
             return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-        return stack.getItem() instanceof ItemBlock || TrashPolicy.isOreOrDust(stack, id);
+        return stack.getItem() instanceof ItemBlock
+            || TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage());
     }
 
     public void clear() {
@@ -110,10 +144,9 @@ public final class MinedDropTracker {
         if (slot < 0 || slot >= inventory.length || inventory[slot] == null) return false;
         ItemStack stack = inventory[slot];
         Entry entry = find(stack);
-        if (entry == null) return false;
-        int untracked = Math.max(0, count(inventory, stack) - entry.mined);
-        for (int i = 0; i < slot; i++) if (matches(inventory[i], stack)) untracked -= inventory[i].stackSize;
-        return untracked <= 0 && entry.mined >= stack.stackSize;
+        return entry != null && !entry.protectedReward
+            && entry.mined >= count(inventory, stack)
+            && entry.mined >= stack.stackSize;
     }
 
     public boolean containsTracked(ItemStack[] inventory, int slot) {

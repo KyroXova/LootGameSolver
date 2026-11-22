@@ -37,8 +37,11 @@ public final class MinedDropStore {
             for (MinedDropTracker.SavedEntry entry : data.entries) {
                 if (entry == null || entry.item == null || entry.total > 2304) continue;
                 Object item = Item.itemRegistry.getObject(entry.item);
-                if (item instanceof Item)
-                    tracker.restore(new ItemStack((Item) item, 1, entry.metadata), entry.total, entry.mined);
+                if (item instanceof Item) tracker.restore(
+                    new ItemStack((Item) item, 1, entry.metadata),
+                    entry.total,
+                    entry.mined,
+                    entry.protectedReward);
             }
         } catch (IOException | RuntimeException ignored) {}
     }

@@ -450,8 +450,9 @@ public final class RewardBackpackPacker {
         if (InventoryProtection.essentialForPacking(stack, baseline, slotIndex, healingAxe)) return false;
         if (isReservedBuildingStack(mc, slotIndex, stack)) return false;
         String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-        if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
-            || (minedDrops != null && minedDrops.containsTracked(MinedDropTracker.inventory(mc), slotIndex)))
+        boolean protectedReward = minedDrops != null && minedDrops.isProtectedReward(stack);
+        if (!protectedReward && (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
+            || (minedDrops != null && minedDrops.containsTracked(MinedDropTracker.inventory(mc), slotIndex))))
             return false;
         if (id != null && id.toLowerCase(java.util.Locale.ROOT)
             .contains("torch")) return false;

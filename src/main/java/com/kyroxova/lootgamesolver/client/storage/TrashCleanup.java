@@ -206,8 +206,9 @@ public final class TrashCleanup {
                 || stack.hasDisplayName()) continue;
 
             String id = (String) Item.itemRegistry.getNameForObject(stack.getItem());
-            if (TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
-                || (minedDrops != null && minedDrops.fullyTracked(inventory, i))) {
+            if (minedDrops != null && !minedDrops.isProtectedReward(stack)
+                && TrashPolicy.isBrokenBlockOrTrash(stack, id, stack.getItemDamage())
+                && minedDrops.fullyTracked(inventory, i)) {
                 return i;
             }
         }

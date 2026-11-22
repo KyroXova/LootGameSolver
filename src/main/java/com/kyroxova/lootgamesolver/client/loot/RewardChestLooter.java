@@ -393,6 +393,9 @@ public final class RewardChestLooter {
                     pendingSlot = -1;
                     return;
                 }
+                ItemStack transferredReward = scanned.get(slotKey(index, pendingSlot));
+                if (minedDrops != null && transferredReward != null
+                    && (after == null || after.stackSize < pendingCount)) minedDrops.protectReward(transferredReward);
                 pendingSlot = -1;
                 java.util.Arrays.fill(backpackPacker.backpackTried, false);
                 if (after == null) queueIndex++;
