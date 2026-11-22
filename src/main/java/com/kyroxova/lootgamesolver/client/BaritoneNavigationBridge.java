@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 public final class BaritoneNavigationBridge {
 
     public static void disableChatCommands() {
+        setInventoryHandling(false);
         try {
             Object settings = Class.forName("baritone.api.BaritoneAPI")
                 .getMethod("getSettings")
@@ -53,6 +54,7 @@ public final class BaritoneNavigationBridge {
     private Object clickSprint;
     private Object cachedWorld;
     private Method isCachedMethod;
+    private boolean inventoryHandlingForGoal;
 
     public boolean isCached(int blockX, int blockZ) {
         try {
@@ -97,7 +99,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startPuzzleTileApproach(int x, int y, int z) {
-        return start(x, y, z, 0, true, false);
+        return start(x, y, z, 0, true, false, false);
     }
 
     public Start startWithPlacementWithoutBreaking(int x, int y, int z) {
@@ -113,7 +115,7 @@ public final class BaritoneNavigationBridge {
     }
 
     public Start startAdjacentWithoutBreaking(int x, int y, int z) {
-        return start(x, y, z, 1, true, false);
+        return start(x, y, z, 1, true, false, false);
     }
 
     public Start startHorizontal(int x, int z) {
@@ -134,11 +136,30 @@ public final class BaritoneNavigationBridge {
         } catch (ReflectiveOperationException | LinkageError ignored) {}
     }
 
+    private static void setInventoryHandling(boolean enabled) {
+        try {
+            Class<?> api = Class.forName("baritone.api.BaritoneAPI");
+            Object settings = api.getMethod("getSettings")
+                .invoke(null);
+            Object allowInventory = settings.getClass()
+                .getField("allowInventory")
+                .get(settings);
+            allowInventory.getClass()
+                .getField("value")
+                .set(allowInventory, enabled);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking) {
-        return start(x, y, z, kind, forbidBreaking, false);
+        return start(x, y, z, kind, forbidBreaking, false, true);
     }
 
     private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal) {
+        return start(x, y, z, kind, forbidBreaking, preserveActiveGoal, true);
+    }
+
+    private Start start(int x, int y, int z, int kind, boolean forbidBreaking, boolean preserveActiveGoal,
+        boolean inventoryHandling) {
         Class<?> api;
         try {
             api = Class.forName("baritone.api.BaritoneAPI");
@@ -148,38 +169,6 @@ public final class BaritoneNavigationBridge {
             return Start.FAILED;
         }
         try {
-            try {
-                Object settings = api.getMethod("getSettings")
-                    .invoke(null);
-                Object surfaceOnly = settings.getClass()
-                    .getField("surfaceOnly")
-                    .get(settings);
-                surfaceOnly.getClass()
-                    .getField("value")
-                    .set(surfaceOnly, false);
-                Object allowPlace = settings.getClass()
-                    .getField("allowPlace")
-                    .get(settings);
-                allowPlace.getClass()
-                    .getField("value")
-                    .set(allowPlace, kind == 3);
-                try {
-                    Object sprint = settings.getClass()
-                        .getField("sprint")
-                        .get(settings);
-                    sprint.getClass()
-                        .getField("value")
-                        .set(sprint, true);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-                try {
-                    Object allowInventory = settings.getClass()
-                        .getField("allowInventory")
-                        .get(settings);
-                    allowInventory.getClass()
-                        .getField("value")
-                        .set(allowInventory, true);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
             Object provider = api.getMethod("getProvider")
                 .invoke(null);
             Class<?> providerApi = Class.forName("baritone.api.IBaritoneProvider");
@@ -238,6 +227,30 @@ public final class BaritoneNavigationBridge {
                     .getConstructor(int.class, int.class, int.class)
                     .newInstance(x, y, z);
             }
+            try {
+                Object settings = api.getMethod("getSettings")
+                    .invoke(null);
+                Object surfaceOnly = settings.getClass()
+                    .getField("surfaceOnly")
+                    .get(settings);
+                surfaceOnly.getClass()
+                    .getField("value")
+                    .set(surfaceOnly, false);
+                Object allowPlace = settings.getClass()
+                    .getField("allowPlace")
+                    .get(settings);
+                allowPlace.getClass()
+                    .getField("value")
+                    .set(allowPlace, !forbidBreaking || kind == 3);
+                try {
+                    Object sprint = settings.getClass()
+                        .getField("sprint")
+                        .get(settings);
+                    sprint.getClass()
+                        .getField("value")
+                        .set(sprint, true);
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
             if (kind == 4) {
                 Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
                 Object center = posType.getConstructor(int.class, int.class, int.class)
@@ -270,6 +283,8 @@ public final class BaritoneNavigationBridge {
             clickLeft = candidateClick;
             clickRight = candidateRightClick;
             clickSprint = candidateSprint;
+            inventoryHandlingForGoal = inventoryHandling;
+            setInventoryHandling(inventoryHandlingForGoal);
             return Start.STARTED;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return Start.FAILED;
@@ -285,16 +300,23 @@ public final class BaritoneNavigationBridge {
     }
 
     public void setPaused(boolean paused) {
-        if (process == null || processApi == null) return;
+        if (paused) setInventoryHandling(false);
+        if (process == null || processApi == null) {
+            setInventoryHandling(false);
+            return;
+        }
+        boolean owns = false;
         try {
             if (processApi.getMethod("getGoal")
                 .invoke(process) == goal) {
+                owns = true;
                 processApi.getMethod("setPaused", boolean.class)
                     .invoke(process, paused);
                 if (paused && inputHandler != null && inputHandlerApi != null) inputHandlerApi.getMethod("clearAllKeys")
                     .invoke(inputHandler);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
+        setInventoryHandling(!paused && owns && inventoryHandlingForGoal);
     }
 
     public boolean isPathing() {
@@ -406,13 +428,14 @@ public final class BaritoneNavigationBridge {
     }
 
     public void stop() {
-        boolean owns = true;
+        boolean owns = false;
         if (process != null && processApi != null) {
             try {
                 Object current = processApi.getMethod("getGoal")
                     .invoke(process);
                 owns = (current == null || current == goal);
                 if (owns) {
+                    setInventoryHandling(false);
                     Class.forName("baritone.api.process.IBaritoneProcess")
                         .getMethod("onLostControl")
                         .invoke(process);

@@ -720,6 +720,20 @@ public class Explorer {
             && (baritoneCoordinator.active() ? !baritoneCoordinator.breaking : route.size() >= 2);
     }
 
+    public boolean puzzleArrivalCleanupSafe(Minecraft mc) {
+        return puzzleArrivalPending && inDungeonRoom(mc)
+            && !digging
+            && !returnDigging
+            && !movingToPuzzleCenter
+            && !sustain.busy()
+            && !toolTransfer.active()
+            && !blockPlacer.selectingBlock()
+            && mc.thePlayer != null
+            && mc.thePlayer.onGround
+            && mc.thePlayer.hurtTime == 0
+            && !mc.thePlayer.capabilities.isFlying;
+    }
+
     public boolean inventoryCleanupDelayPassed() {
         return inventoryMiningCooldownTicks == 0;
     }

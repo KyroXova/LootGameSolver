@@ -342,7 +342,7 @@ public final class ClientHooks {
                 }
         }
         if (inventoryMaintenanceStage != 0) {
-            if (exploration == null || !exploration.navigating()
+            if (exploration == null || (!exploration.navigating() && !exploration.puzzleArrivalPending)
                 || session.isActive()
                 || rewardReturnPending
                 || !LootGameSolverConfig.enabled
@@ -470,9 +470,10 @@ public final class ClientHooks {
         }
         if (!session.isActive() && inventoryMaintenanceCooldown == 0
             && exploration != null
-            && exploration.navigating()
+            && (exploration.navigating() || exploration.puzzleArrivalPending)
             && (trashCleanup.inventoryPressure(mc) || trashCleanup.shouldClean(mc))
-            && exploration.inventoryCleanupSafe(mc)
+            && (exploration.navigating() ? exploration.inventoryCleanupSafe(mc)
+                : exploration.puzzleArrivalCleanupSafe(mc))
             && mc.currentScreen == null
             && mc.thePlayer.inventory.getItemStack() == null) {
             ensureInventoryBaseline(mc);

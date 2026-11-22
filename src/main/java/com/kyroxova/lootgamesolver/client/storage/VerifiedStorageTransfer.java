@@ -1,5 +1,8 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.inventory.Container;
@@ -24,6 +27,7 @@ public final class VerifiedStorageTransfer {
     private final int window;
     private final BinnieCompartmentAdapter binnie;
     private final boolean[] rejected = new boolean[36];
+    private final List<ItemStack> rejectedTypes = new ArrayList<ItemStack>();
     private ItemStack pending;
     private VerifiedContainerClick click;
     private int beforePlayer, beforeDestination, pendingPlayerSlot = -1, moved;
@@ -34,6 +38,12 @@ public final class VerifiedStorageTransfer {
 
     public BinnieCompartmentAdapter binnieAdapter() {
         return binnie;
+    }
+
+    public List<ItemStack> rejectedTypes() {
+        List<ItemStack> result = new ArrayList<ItemStack>();
+        for (ItemStack stack : rejectedTypes) result.add(stack.copy());
+        return result;
     }
 
     public VerifiedStorageTransfer(Container container, IInventory destination, StorageLootLedger ledger,
@@ -80,7 +90,10 @@ public final class VerifiedStorageTransfer {
             ItemStack stack = slot.getStack();
             if (slot.inventory != mc.thePlayer.inventory || !movable(index, stack, reserve, ledger, baseline)) continue;
             remaining = true;
-            if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) continue;
+            if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) {
+                addRejectedType(stack);
+                continue;
+            }
             pending = stack.copy();
             beforePlayer = count(mc.thePlayer.inventory, pending);
             beforeDestination = count(destination, pending);
@@ -96,6 +109,7 @@ public final class VerifiedStorageTransfer {
             if (binnie != null && binnie.canSwitchToNextTab()) {
                 if (binnie.switchToNextTab(mc)) {
                     java.util.Arrays.fill(rejected, false);
+                    rejectedTypes.clear();
                     return Result.WORKING;
                 }
             }
@@ -132,6 +146,20 @@ public final class VerifiedStorageTransfer {
             if (current == null || (current.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(current, stack)
                 && current.stackSize < Math.min(current.getMaxStackSize(), slot.getSlotStackLimit()))) return true;
         }
+        return false;
+    }
+
+    private void addRejectedType(ItemStack stack) {
+        if (containsItemType(rejectedTypes, stack)) return;
+        ItemStack type = stack.copy();
+        type.stackSize = 1;
+        rejectedTypes.add(type);
+    }
+
+    static boolean containsItemType(List<ItemStack> types, ItemStack stack) {
+        if (stack == null) return false;
+        for (ItemStack type : types)
+            if (type.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(type, stack)) return true;
         return false;
     }
 

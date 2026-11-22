@@ -24,4 +24,5 @@ public class StorageLootLedgerTest {
         ledger.deposited(stack, 1);
         assertTrue(ledger.empty());
     }
+
 }
