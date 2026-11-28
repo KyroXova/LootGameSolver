@@ -28,7 +28,9 @@ public final class BaritoneBlockBridge {
             Class.forName("baritone.api.utils.IBlockInteraction")
                 .getMethod("stopBreaking")
                 .invoke(interaction());
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Could not stop Baritone block breaking", ignored);
+        }
     }
 
     private static Object interaction() throws ReflectiveOperationException {

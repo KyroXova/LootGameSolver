@@ -36,47 +36,8 @@ public final class ExplorerRoomGeometry {
                 int alongMin = xSide ? bounds[2] + 1 : bounds[0] + 1;
                 int alongMax = xSide ? bounds[3] - 1 : bounds[1] - 1;
                 for (int along = alongMin; along <= alongMax; along++) {
-                    int[] opening = RoomOpeningGeometry.positions(side[0], xSide, along, side[1], side[2], floorY);
-                    int inX = opening[0], inZ = opening[2], outX = opening[3], outZ = opening[5];
-                    int wallX = opening[6], wallZ = opening[8];
-                    if (!passable(mc.theWorld, wallX, floorY, wallZ) || !passable(mc.theWorld, wallX, floorY + 1, wallZ)
-                        || !(solidCheckpoint(mc.theWorld, outX, floorY, outZ)
-                            || clearable.test(mc.theWorld, outX, floorY, outZ)))
-                        continue;
-                    boolean levelInside = safe(mc.theWorld, inX, floorY, inZ);
-                    boolean lowerInside = !levelInside && safe(mc.theWorld, inX, floorY - 1, inZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 1, wallZ)
-                            .isReplaceable(mc.theWorld, wallX, floorY - 1, wallZ)
-                        && mc.theWorld.getBlock(wallX, floorY - 2, wallZ)
-                            .isNormalCube();
-                    int approachX = inX - side[1], approachZ = inZ - side[2];
-                    boolean twoBelow = !levelInside && !lowerInside
-                        && safe(mc.theWorld, inX, floorY - 2, inZ)
-                        && safe(mc.theWorld, approachX, floorY - 2, approachZ)
-                        && passable(mc.theWorld, inX, floorY, inZ)
-                        && passable(mc.theWorld, inX, floorY + 1, inZ)
-                        && mc.theWorld.getBlock(inX, floorY - 2, inZ)
-                            .isReplaceable(mc.theWorld, inX, floorY - 2, inZ);
-                    if (!levelInside && !lowerInside && !twoBelow) continue;
-                    boolean sideWallA = isDungeonWall(
-                        mc.theWorld,
-                        xSide ? wallX : along - 1,
-                        floorY,
-                        xSide ? along - 1 : wallZ)
-                        || isDungeonWall(mc.theWorld, xSide ? wallX : along - 1, floorY + 1, xSide ? along - 1 : wallZ);
-                    boolean sideWallB = isDungeonWall(
-                        mc.theWorld,
-                        xSide ? wallX : along + 1,
-                        floorY,
-                        xSide ? along + 1 : wallZ)
-                        || isDungeonWall(mc.theWorld, xSide ? wallX : along + 1, floorY + 1, xSide ? along + 1 : wallZ);
-                    if (!sideWallA && !sideWallB) continue;
-                    if (twoBelow) found.add(
-                        new int[] { approachX, floorY - 2, approachZ, outX, floorY, outZ, wallX, floorY, wallZ, inX,
-                            floorY - 1, inZ });
-                    else if (lowerInside)
-                        found.add(new int[] { inX, floorY - 1, inZ, outX, floorY, outZ, wallX, floorY, wallZ, 1 });
-                    else found.add(opening);
+                    int[] candidate = buildExitCandidate(mc.theWorld, side, xSide, along, floorY, clearable);
+                    if (candidate != null) found.add(candidate);
                 }
             }
         }
@@ -86,6 +47,42 @@ public final class ExplorerRoomGeometry {
                 Math.hypot(first[0] + 0.5D - px, first[2] + 0.5D - pz),
                 Math.hypot(second[0] + 0.5D - px, second[2] + 0.5D - pz)));
         return found;
+    }
+
+    private static int[] buildExitCandidate(World world, int[] side, boolean xSide, int along, int floorY,
+        ClearableColumn clearable) {
+        int[] opening = RoomOpeningGeometry.positions(side[0], xSide, along, side[1], side[2], floorY);
+        int inX = opening[0], inZ = opening[2], outX = opening[3], outZ = opening[5];
+        int wallX = opening[6], wallZ = opening[8];
+        if (!passable(world, wallX, floorY, wallZ) || !passable(world, wallX, floorY + 1, wallZ)
+            || !(solidCheckpoint(world, outX, floorY, outZ) || clearable.test(world, outX, floorY, outZ))) return null;
+        if (!hasSideWallFrame(world, xSide, wallX, wallZ, along, floorY)) return null;
+
+        boolean levelInside = safe(world, inX, floorY, inZ);
+        if (levelInside) return opening;
+        boolean lowerInside = safe(world, inX, floorY - 1, inZ) && world.getBlock(wallX, floorY - 1, wallZ)
+            .isReplaceable(world, wallX, floorY - 1, wallZ)
+            && world.getBlock(wallX, floorY - 2, wallZ)
+                .isNormalCube();
+        if (lowerInside) return new int[] { inX, floorY - 1, inZ, outX, floorY, outZ, wallX, floorY, wallZ, 1 };
+        int approachX = inX - side[1], approachZ = inZ - side[2];
+        boolean twoBelow = safe(world, inX, floorY - 2, inZ) && safe(world, approachX, floorY - 2, approachZ)
+            && passable(world, inX, floorY, inZ)
+            && passable(world, inX, floorY + 1, inZ)
+            && world.getBlock(inX, floorY - 2, inZ)
+                .isReplaceable(world, inX, floorY - 2, inZ);
+        return twoBelow
+            ? new int[] { approachX, floorY - 2, approachZ, outX, floorY, outZ, wallX, floorY, wallZ, inX, floorY - 1,
+                inZ }
+            : null;
+    }
+
+    private static boolean hasSideWallFrame(World world, boolean xSide, int wallX, int wallZ, int along, int floorY) {
+        int aX = xSide ? wallX : along - 1, aZ = xSide ? along - 1 : wallZ;
+        int bX = xSide ? wallX : along + 1, bZ = xSide ? along + 1 : wallZ;
+        return isDungeonWall(world, aX, floorY, aZ) || isDungeonWall(world, aX, floorY + 1, aZ)
+            || isDungeonWall(world, bX, floorY, bZ)
+            || isDungeonWall(world, bX, floorY + 1, bZ);
     }
 
     public int[] dungeonRoomBounds(World world, int x, int y, int z, int ticks) {

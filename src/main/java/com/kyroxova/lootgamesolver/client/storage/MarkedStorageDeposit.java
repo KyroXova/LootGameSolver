@@ -67,225 +67,231 @@ public final class MarkedStorageDeposit {
             || mc.thePlayer.inventory.getItemStack() != null
             || mc.thePlayer.hurtTime > 0) return Result.FAILED;
         if (approach != null) {
-            if (mc.currentScreen != null || ++approachTicks > 400
-                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
-                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
-                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
-                || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindRight))
-                return Result.FAILED;
-            if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) return Result.WORKING;
-            boolean reached = navigation.completed();
-            navigation.stop();
-            approach = null;
-            if (reached && ++approachRetries <= 2) {
-                if (currentTargetIndex >= 0 && currentTargetIndex < attempted.length) {
-                    attempted[currentTargetIndex] = false;
-                }
-            }
+            Result approachResult = tickApproach(mc);
+            if (approachResult != null) return approachResult;
         }
-        if (transfer != null) {
-            VerifiedStorageTransfer.Result result = transfer.tick(mc);
-            if (result == VerifiedStorageTransfer.Result.WORKING) return Result.WORKING;
-            if (result == VerifiedStorageTransfer.Result.FAILED) return Result.FAILED;
-            if (result == VerifiedStorageTransfer.Result.FULL_OR_REJECTED && currentTargetIndex >= 0
-                && currentTargetIndex < targets.length) {
-                rememberRejectedTypes(targets[currentTargetIndex], transfer.rejectedTypes());
-            }
-            moved += transfer.moved();
-            mc.thePlayer.closeScreen();
-            transfer = null;
-            inventory = null;
-            if (result == VerifiedStorageTransfer.Result.DONE) return Result.DONE;
-            return Result.WORKING;
-        }
+        if (transfer != null) return tickTransfer(mc);
         if (opening != null) {
-            if (mc.currentScreen instanceof GuiContainer) {
-                IInventory opened = inventory;
-                if (mc.thePlayer.openContainer instanceof ContainerChest) {
-                    IInventory chest = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
-                    if (chest instanceof InventoryLargeChest
-                        && ((InventoryLargeChest) chest).isPartOfLargeChest(inventory)) opened = chest;
-                    else if (vanillaChestView(mc, opening, inventory, chest)) opened = chest;
-                }
-                IInventory binnieWindowInv = null;
-                BinnieCompartmentAdapter binnie = BinnieCompartmentAdapter.detect(mc.thePlayer.openContainer);
-                if (binnie != null) {
-                    IInventory machineInv = binnie.getMachineInventory();
-                    if (machineInv != null && (machineInv == inventory || opening.loadedInventory(mc) == machineInv)) {
-                        opened = machineInv;
-                    }
-                    binnieWindowInv = binnie.getWindowInventory();
-                }
-                boolean matching = false;
-                for (Object value : mc.thePlayer.openContainer.inventorySlots) {
-                    IInventory slotInventory = ((Slot) value).inventory;
-                    if (slotInventory == opened) matching = true;
-                    else if (slotInventory != mc.thePlayer.inventory
-                        && (binnieWindowInv == null || slotInventory != binnieWindowInv)) return Result.FAILED;
-                }
-                if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
-                transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);
-                opening = null;
-                restoreSlot(mc);
-                return Result.WORKING;
-            }
-            if (mc.currentScreen != null) return Result.FAILED;
-            if (++wait < 40) return Result.WORKING;
-            opening = null;
-            inventory = null;
-            restoreSlot(mc);
+            Result openingResult = tickOpening(mc);
+            if (openingResult != null) return openingResult;
         }
         if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer)
             return Result.FAILED;
+        return selectAndOpenNextTarget(mc);
+    }
+
+    private Result tickApproach(Minecraft mc) {
+        if (mc.currentScreen != null || ++approachTicks > 400
+            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
+            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
+            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
+            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindRight)) return Result.FAILED;
+        if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) return Result.WORKING;
+        boolean reached = navigation.completed();
+        navigation.stop();
+        approach = null;
+        if (reached && ++approachRetries <= 2 && currentTargetIndex >= 0 && currentTargetIndex < attempted.length) {
+            attempted[currentTargetIndex] = false;
+        }
+        return null;
+    }
+
+    private Result tickTransfer(Minecraft mc) {
+        VerifiedStorageTransfer.Result result = transfer.tick(mc);
+        if (result == VerifiedStorageTransfer.Result.WORKING) return Result.WORKING;
+        if (result == VerifiedStorageTransfer.Result.FAILED) return Result.FAILED;
+        if (result == VerifiedStorageTransfer.Result.FULL_OR_REJECTED && currentTargetIndex >= 0
+            && currentTargetIndex < targets.length) {
+            rememberRejectedTypes(targets[currentTargetIndex], transfer.rejectedTypes());
+        }
+        moved += transfer.moved();
+        mc.thePlayer.closeScreen();
+        transfer = null;
+        inventory = null;
+        return result == VerifiedStorageTransfer.Result.DONE ? Result.DONE : Result.WORKING;
+    }
+
+    private Result tickOpening(Minecraft mc) {
+        if (mc.currentScreen instanceof GuiContainer) return attachTransferToOpenContainer(mc);
+        if (mc.currentScreen != null) return Result.FAILED;
+        if (++wait < 40) return Result.WORKING;
+        opening = null;
+        inventory = null;
+        restoreSlot(mc);
+        return null;
+    }
+
+    private Result attachTransferToOpenContainer(Minecraft mc) {
+        IInventory opened = inventory;
+        if (mc.thePlayer.openContainer instanceof ContainerChest) {
+            IInventory chest = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
+            if (chest instanceof InventoryLargeChest && ((InventoryLargeChest) chest).isPartOfLargeChest(inventory))
+                opened = chest;
+            else if (vanillaChestView(mc, opening, inventory, chest)) opened = chest;
+        }
+        IInventory binnieWindowInv = null;
+        BinnieCompartmentAdapter binnie = BinnieCompartmentAdapter.detect(mc.thePlayer.openContainer);
+        if (binnie != null) {
+            IInventory machineInv = binnie.getMachineInventory();
+            if (machineInv != null && (machineInv == inventory || opening.loadedInventory(mc) == machineInv))
+                opened = machineInv;
+            binnieWindowInv = binnie.getWindowInventory();
+        }
+        boolean matching = false;
+        for (Object value : mc.thePlayer.openContainer.inventorySlots) {
+            IInventory slotInventory = ((Slot) value).inventory;
+            if (slotInventory == opened) matching = true;
+            else if (slotInventory != mc.thePlayer.inventory
+                && (binnieWindowInv == null || slotInventory != binnieWindowInv)) return Result.FAILED;
+        }
+        if (!matching || opening.loadedInventory(mc) != inventory) return Result.FAILED;
+        transfer = new VerifiedStorageTransfer(mc.thePlayer.openContainer, opened, ledger, baseline);
+        opening = null;
+        restoreSlot(mc);
+        return Result.WORKING;
+    }
+
+    private Result selectAndOpenNextTarget(Minecraft mc) {
         while (true) {
-            int bestIndex = -1;
-            double bestDistSq = Double.MAX_VALUE;
-            StorageTarget bestTarget = null;
-            double[] bestPos = null;
-            IInventory bestCandidate = null;
-
-            for (int i = 0; i < targets.length; i++) {
-                if (attempted[i] || rejectedCurrentBatch(targets[i], mc)) continue;
-                StorageTarget target = StorageTarget.parse(targets[i]);
-                if (target == null) continue;
-                IInventory candidate = target.loadedInventory(mc);
-                double[] pos = target.loadedPosition(mc);
-                if (candidate == null || pos == null) continue;
-                double distSq = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    bestIndex = i;
-                    bestTarget = target;
-                    bestPos = pos;
-                    bestCandidate = candidate;
-                }
-            }
-
+            int bestIndex = findClosestTargetIndex(mc);
             if (bestIndex < 0) break;
             attempted[bestIndex] = true;
             currentTargetIndex = bestIndex;
-
-            StorageTarget target = bestTarget;
-            IInventory candidate = bestCandidate;
-            double[] pos = bestPos;
-            double distance = bestDistSq;
+            StorageTarget target = StorageTarget.parse(targets[bestIndex]);
+            IInventory candidate = target == null ? null : target.loadedInventory(mc);
+            double[] pos = target == null ? null : target.loadedPosition(mc);
+            if (candidate == null || pos == null) continue;
+            double distance = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
             if (distance > 6.25D) {
-                if (distance > 64D) continue;
-                if (approach(target, pos)) return Result.WORKING;
+                if (distance <= 64D && approach(target, pos)) return Result.WORKING;
                 continue;
             }
-            int empty = -1;
-            for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-                empty = i;
-                break;
-            }
-            // Forge calls onItemUseFirst before a chest receives the click. Only
-            // ordinary vanilla items are safe if there is no empty hotbar slot.
-            if (empty < 0 && target.entity == null
-                && !mc.thePlayer.isSneaking()
-                && (world.getBlock(target.x, target.y, target.z) instanceof net.minecraft.block.BlockChest
-                    || "cpw.mods.ironchest.BlockIronChest".equals(
-                        world.getBlock(target.x, target.y, target.z)
-                            .getClass()
-                            .getName()))) {
-                for (int i = 0; i < 9; i++) {
-                    net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                    if (stack != null && (stack.getItem()
-                        .getClass() == net.minecraft.item.Item.class
-                        || stack.getItem()
-                            .getClass() == net.minecraft.item.ItemBlock.class)) {
-                        empty = i;
-                        break;
-                    }
-                }
-            }
+            int empty = findInteractionHotbarSlot(mc, target);
             if (empty < 0) continue;
-            Vec3 eye = Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ);
-            Vec3 destination = Vec3.createVectorHelper(pos[0], pos[1], pos[2]);
-            MovingObjectPosition hit = world.rayTraceBlocks(eye, destination);
-            if (target.entity == null
-                && (hit == null || hit.blockX != target.x || hit.blockY != target.y || hit.blockZ != target.z)) {
-                if (approach(target, pos)) return Result.WORKING;
-                continue;
-            }
-            if (target.entity != null
-                && (!(candidate instanceof Entity) || !mc.thePlayer.canEntityBeSeen((Entity) candidate))) {
-                if (approach(target, pos)) return Result.WORKING;
-                continue;
-            }
-            int targetIndex = bestIndex;
-            if (aimIndex != targetIndex) {
-                aimIndex = targetIndex;
-                aimTicks = 0;
-            }
-            Vec3 aimPoint = target.entity == null ? hit.hitVec
-                : Vec3
-                    .createVectorHelper(pos[0], ((Entity) candidate).posY + ((Entity) candidate).height * 0.5D, pos[2]);
-            double ax = aimPoint.xCoord - eye.xCoord, ay = aimPoint.yCoord - eye.yCoord,
-                az = aimPoint.zCoord - eye.zCoord;
-            float yaw = (float) Math.toDegrees(Math.atan2(az, ax)) - 90F;
-            float pitch = (float) -Math.toDegrees(Math.atan2(ay, Math.hypot(ax, az)));
-            float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
-            float pitchError = pitch - mc.thePlayer.rotationPitch;
-            if (Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
-                float yawStep = Math.max(-6F, Math.min(6F, yawError));
-                float pitchStep = Math.max(-6F, Math.min(6F, pitchError));
-                mc.thePlayer.setAngles(yawStep / 0.15F, -pitchStep / 0.15F);
-            }
-            double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
-            MovingObjectPosition crosshair = mc.objectMouseOver;
-            Vec3 look = mc.thePlayer.getLook(1F);
-            MovingObjectPosition ray = world
-                .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
-            boolean visible = mc.renderViewEntity == mc.thePlayer && (target.entity == null
-                ? VisibleBlockInteraction.matches(crosshair, ray, eye, target.x, target.y, target.z, reach)
-                : crosshair != null && crosshair.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
-                    && crosshair.entityHit == candidate
-                    && crosshair.hitVec != null
-                    && eye.squareDistanceTo(crosshair.hitVec) <= reach * reach);
-            if (!visible || Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
-                if (++aimTicks <= 20) {
-                    attempted[bestIndex] = false;
-                    return Result.WORKING;
-                }
-                aimIndex = -1;
-                if (!visible && approach(target, pos)) return Result.WORKING;
-                continue;
-            }
-            aimIndex = -1;
-            oldSlot = mc.thePlayer.inventory.currentItem;
-            mc.thePlayer.inventory.currentItem = empty;
-            mc.playerController.updateController();
-            boolean sent;
-            if (target.entity == null) {
-                sent = mc.playerController.onPlayerRightClick(
-                    mc.thePlayer,
-                    mc.theWorld,
-                    mc.thePlayer.getHeldItem(),
-                    target.x,
-                    target.y,
-                    target.z,
-                    crosshair.sideHit,
-                    crosshair.hitVec);
-                mc.thePlayer.swingItem();
-            } else {
-                // This method sends the packet even if the client-side interaction returns false.
-                mc.playerController.interactWithEntitySendPacket(mc.thePlayer, (Entity) candidate);
-                sent = true;
-            }
-            if (!sent) {
-                restoreSlot(mc);
-                continue;
-            }
-            opening = target;
-            inventory = candidate;
-            wait = 0;
-            return Result.WORKING;
+            Result interact = tryOpenTarget(mc, bestIndex, target, candidate, pos, empty);
+            if (interact != null) return interact;
         }
         return Result.FULL_OR_UNAVAILABLE;
+    }
+
+    private int findClosestTargetIndex(Minecraft mc) {
+        int bestIndex = -1;
+        double bestDistSq = Double.MAX_VALUE;
+        for (int i = 0; i < targets.length; i++) {
+            if (attempted[i] || rejectedCurrentBatch(targets[i], mc)) continue;
+            StorageTarget target = StorageTarget.parse(targets[i]);
+            if (target == null) continue;
+            IInventory candidate = target.loadedInventory(mc);
+            double[] pos = target.loadedPosition(mc);
+            if (candidate == null || pos == null) continue;
+            double distSq = mc.thePlayer.getDistanceSq(pos[0], pos[1], pos[2]);
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    private int findInteractionHotbarSlot(Minecraft mc, StorageTarget target) {
+        for (int i = 0; i < 9; i++) {
+            if (mc.thePlayer.inventory.getStackInSlot(i) == null) return i;
+        }
+        if (target.entity != null || mc.thePlayer.isSneaking()) return -1;
+        net.minecraft.block.Block block = world.getBlock(target.x, target.y, target.z);
+        if (!(block instanceof net.minecraft.block.BlockChest) && !"cpw.mods.ironchest.BlockIronChest".equals(
+            block.getClass()
+                .getName()))
+            return -1;
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack != null && (stack.getItem()
+                .getClass() == net.minecraft.item.Item.class
+                || stack.getItem()
+                    .getClass() == net.minecraft.item.ItemBlock.class))
+                return i;
+        }
+        return -1;
+    }
+
+    private Result tryOpenTarget(Minecraft mc, int bestIndex, StorageTarget target, IInventory candidate, double[] pos,
+        int empty) {
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        MovingObjectPosition hit = world.rayTraceBlocks(eye, Vec3.createVectorHelper(pos[0], pos[1], pos[2]));
+        boolean blockBlocked = target.entity == null
+            && (hit == null || hit.blockX != target.x || hit.blockY != target.y || hit.blockZ != target.z);
+        boolean entityBlocked = target.entity != null
+            && (!(candidate instanceof Entity) || !mc.thePlayer.canEntityBeSeen((Entity) candidate));
+        if (blockBlocked || entityBlocked) return approach(target, pos) ? Result.WORKING : null;
+
+        if (aimIndex != bestIndex) {
+            aimIndex = bestIndex;
+            aimTicks = 0;
+        }
+        Vec3 aimPoint = target.entity == null ? hit.hitVec
+            : Vec3.createVectorHelper(pos[0], ((Entity) candidate).posY + ((Entity) candidate).height * 0.5D, pos[2]);
+        double ax = aimPoint.xCoord - eye.xCoord, ay = aimPoint.yCoord - eye.yCoord, az = aimPoint.zCoord - eye.zCoord;
+        float yaw = (float) Math.toDegrees(Math.atan2(az, ax)) - 90F;
+        float pitch = (float) -Math.toDegrees(Math.atan2(ay, Math.hypot(ax, az)));
+        float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+        float pitchError = pitch - mc.thePlayer.rotationPitch;
+        if (Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
+            mc.thePlayer.setAngles(
+                Math.max(-6F, Math.min(6F, yawError)) / 0.15F,
+                -Math.max(-6F, Math.min(6F, pitchError)) / 0.15F);
+        }
+        double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+        MovingObjectPosition crosshair = mc.objectMouseOver;
+        Vec3 look = mc.thePlayer.getLook(1F);
+        MovingObjectPosition ray = world
+            .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
+        boolean visible = mc.renderViewEntity == mc.thePlayer && (target.entity == null
+            ? VisibleBlockInteraction.matches(crosshair, ray, eye, target.x, target.y, target.z, reach)
+            : crosshair != null && crosshair.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
+                && crosshair.entityHit == candidate
+                && crosshair.hitVec != null
+                && eye.squareDistanceTo(crosshair.hitVec) <= reach * reach);
+        if (!visible || Math.abs(yawError) > 2F || Math.abs(pitchError) > 2F) {
+            if (++aimTicks <= 20) {
+                attempted[bestIndex] = false;
+                return Result.WORKING;
+            }
+            aimIndex = -1;
+            return !visible && approach(target, pos) ? Result.WORKING : null;
+        }
+        aimIndex = -1;
+        oldSlot = mc.thePlayer.inventory.currentItem;
+        mc.thePlayer.inventory.currentItem = empty;
+        mc.playerController.updateController();
+        boolean sent = sendTargetInteraction(mc, target, candidate, crosshair);
+        if (!sent) {
+            restoreSlot(mc);
+            return null;
+        }
+        opening = target;
+        inventory = candidate;
+        wait = 0;
+        return Result.WORKING;
+    }
+
+    private boolean sendTargetInteraction(Minecraft mc, StorageTarget target, IInventory candidate,
+        MovingObjectPosition crosshair) {
+        if (target.entity == null) {
+            boolean sent = mc.playerController.onPlayerRightClick(
+                mc.thePlayer,
+                mc.theWorld,
+                mc.thePlayer.getHeldItem(),
+                target.x,
+                target.y,
+                target.z,
+                crosshair.sideHit,
+                crosshair.hitVec);
+            mc.thePlayer.swingItem();
+            return sent;
+        }
+        mc.playerController.interactWithEntitySendPacket(mc.thePlayer, (Entity) candidate);
+        return true;
     }
 
     private void rememberRejectedTypes(String target, List<ItemStack> rejected) {

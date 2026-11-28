@@ -117,20 +117,22 @@ public final class BaritoneTransitCoordinator {
 
     private static int[] findSurfaceGoal(Minecraft mc, int skip) {
         int px = (int) Math.floor(mc.thePlayer.posX), pz = (int) Math.floor(mc.thePlayer.posZ);
-        for (int radius = 0; radius <= 16; radius += 2) {
-            for (int dx = -radius; dx <= radius; dx += 2) for (int dz = -radius; dz <= radius; dz += 2) {
-                if (radius != 0 && Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                int x = px + dx, z = pz + dz;
-                if (!mc.theWorld.blockExists(x, 64, z)) continue;
-                int y = mc.theWorld.getHeightValue(x, z);
-                if (y <= 0 || y >= 254
-                    || !mc.theWorld.canBlockSeeTheSky(x, y, z)
-                    || !ExplorerTerrain.solidCheckpoint(mc.theWorld, x, y, z)) continue;
-                if (skip-- > 0) continue;
-                return new int[] { x, y, z };
+        int[] found = null;
+        for (int radius = 2; radius <= 16 && found == null; radius += 2) {
+            for (int dx = -radius; dx <= radius && found == null; dx += 2) {
+                for (int dz = -radius; dz <= radius && found == null; dz += 2) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    int x = px + dx, z = pz + dz;
+                    if (!mc.theWorld.blockExists(x, 64, z)) continue;
+                    int y = mc.theWorld.getHeightValue(x, z);
+                    if (y <= 0 || y >= 254
+                        || !mc.theWorld.canBlockSeeTheSky(x, y, z)
+                        || !ExplorerTerrain.solidCheckpoint(mc.theWorld, x, y, z)) continue;
+                    if (skip-- <= 0) found = new int[] { x, y, z };
+                }
             }
         }
-        return null;
+        return found;
     }
 
     public void rememberReturnPoint(Minecraft mc) {
@@ -146,6 +148,17 @@ public final class BaritoneTransitCoordinator {
 
     public boolean tick(Minecraft mc, Explorer explorer) {
         breaking = active() && explorer.baritoneNavigation.isBreaking();
+        updateBaritoneOverlayAndSprint(mc, explorer);
+        if (shoreMove) return tickShoreMove(mc, explorer);
+        if (surfaceMove) return tickSurfaceMove(mc, explorer);
+        if (returnWaiting || returnMove || resumeSearch) return tickReturnMove(mc, explorer);
+        if (searchMove) return tickSearchMove(mc, explorer);
+        if (structureMove) return tickStructureMove(mc, explorer);
+        if (centerMove) return tickCenterMove(mc, explorer);
+        return false;
+    }
+
+    private void updateBaritoneOverlayAndSprint(Minecraft mc, Explorer explorer) {
         if (active() && explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) {
             explorer.baritoneNavigation.renderOverlay(LootGameSolverConfig.showOverlay);
             if (mc.thePlayer != null) {
@@ -178,383 +191,395 @@ public final class BaritoneTransitCoordinator {
                     .setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
             }
         }
-        if (shoreMove) {
-            if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld || shoreGoal == null) {
-                explorer.baritoneNavigation.stop();
-                shoreMove = false;
-                explorer.walking = false;
-                return true;
-            }
-            int x = (int) Math.floor(mc.thePlayer.posX);
-            int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-            int z = (int) Math.floor(mc.thePlayer.posZ);
-            boolean near = nearShoreGoal(x, y, z, shoreGoal);
-            if (near && mc.thePlayer.onGround
-                && !mc.thePlayer.isInWater()
-                && ExplorerTerrain.dryShore(mc.theWorld, x, y, z)
-                && ExplorerTerrain.safe(mc.theWorld, x, y, z)) {
-                explorer.baritoneNavigation.stop();
-                shoreMove = false;
-                shoreGoal = null;
-                if (explorer.excavationPlanner.beginDiggingAtCurrentPosition(mc, explorer)) {
-                    explorer.walking = true;
-                    explorer.searching = false;
-                    return false;
-                }
-                explorer.stop(mc, "Unable to start excavation from the dry entrance");
-                return true;
-            }
-            if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) return true;
-            if (near && !mc.thePlayer.onGround && ++shoreArrivalWait <= 20) return true;
+    }
+
+    private boolean tickShoreMove(Minecraft mc, Explorer explorer) {
+        if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld || shoreGoal == null) {
+            explorer.baritoneNavigation.stop();
+            shoreMove = false;
+            explorer.walking = false;
+            return true;
+        }
+        int x = (int) Math.floor(mc.thePlayer.posX);
+        int y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        boolean near = nearShoreGoal(x, y, z, shoreGoal);
+        if (near && mc.thePlayer.onGround
+            && !mc.thePlayer.isInWater()
+            && ExplorerTerrain.dryShore(mc.theWorld, x, y, z)
+            && ExplorerTerrain.safe(mc.theWorld, x, y, z)) {
             explorer.baritoneNavigation.stop();
             shoreMove = false;
             shoreGoal = null;
-            if (!explorer.findDryEntrance(mc)) {
-                explorer.stop(mc, "No safe route to a dry entrance");
-                return true;
-            }
-            return shoreMove;
-        }
-        if (surfaceMove) {
-            if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld) {
-                explorer.baritoneNavigation.stop();
-                reset();
-                explorer.walking = false;
+            if (explorer.excavationPlanner.beginDiggingAtCurrentPosition(mc, explorer)) {
+                explorer.walking = true;
+                explorer.searching = false;
                 return false;
             }
-            int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-            int z = (int) Math.floor(mc.thePlayer.posZ);
-            if (!explorer.insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
-                explorer.baritoneNavigation.stop();
-                surfaceMove = false;
-                resumeSearch = true;
-                returnWorld = mc.theWorld;
-                returnSolved = surfaceSolved;
-                returnWait = 0;
-                explorer.status = "On the surface; preparing the next search";
-                return true;
-            }
-            if (surfaceWaiting) {
-                BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
-                    .start(surfaceGoal[0], surfaceGoal[1], surfaceGoal[2]);
-                if (started == BaritoneNavigationBridge.Start.STARTED) surfaceWaiting = false;
-                else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40) {
-                    surfaceWait = 0;
-                    surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
-                    if (surfaceGoal == null) {
-                        routeFailures = 0;
-                        surfaceGoal = findSurfaceGoal(mc, 0);
-                    }
-                    if (surfaceGoal == null) {
-                        surfaceMove = false;
-                        explorer.stop(mc, "No safe surface destination found");
-                    } else explorer.status = "Replanning the surface route";
-                }
-            } else {
-                double dx = mc.thePlayer.posX - surfaceLastX;
-                double dy = mc.thePlayer.posY - surfaceLastY;
-                double dz = mc.thePlayer.posZ - surfaceLastZ;
-                if (dx * dx + dy * dy + dz * dz >= 0.25D) {
-                    surfaceLastX = mc.thePlayer.posX;
-                    surfaceLastY = mc.thePlayer.posY;
-                    surfaceLastZ = mc.thePlayer.posZ;
-                    surfaceStallTicks = 0;
-                } else
-                    surfaceStallTicks = surfaceIdleTicks(surfaceStallTicks, explorer.baritoneNavigation.isBreaking());
-                if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING
-                    && surfaceStallTicks < 160) return true;
-                explorer.baritoneNavigation.stop();
-                surfaceStallTicks = 0;
-                surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
-                if (surfaceGoal == null || routeFailures >= 3) {
-                    surfaceMove = false;
-                    if (explorer.insideDungeonRoom(mc) && explorer.startRoomExitSearch(mc)) return true;
-                    if (explorer.startSavedReturn(mc, true, 128)) return true;
-                    if (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingToSurface(mc)) return true;
-                    explorer.stop(mc, "No safe surface route found");
-                } else {
-                    surfaceWaiting = true;
-                    surfaceWait = 0;
-                    explorer.status = "Replanning the surface route";
-                }
+            explorer.stop(mc, "Unable to start excavation from the dry entrance");
+            return true;
+        }
+        if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING) return true;
+        if (near && !mc.thePlayer.onGround && ++shoreArrivalWait <= 20) return true;
+        explorer.baritoneNavigation.stop();
+        shoreMove = false;
+        shoreGoal = null;
+        if (!explorer.findDryEntrance(mc)) {
+            explorer.stop(mc, "No safe route to a dry entrance");
+            return true;
+        }
+        return shoreMove;
+    }
+
+    private boolean tickSurfaceMove(Minecraft mc, Explorer explorer) {
+        if (mc.thePlayer == null || mc.theWorld == null || explorer.world != mc.theWorld) {
+            explorer.baritoneNavigation.stop();
+            reset();
+            explorer.walking = false;
+            return false;
+        }
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        if (!explorer.insideDungeonRoom(mc) && mc.theWorld.canBlockSeeTheSky(x, y, z)) {
+            explorer.baritoneNavigation.stop();
+            surfaceMove = false;
+            resumeSearch = true;
+            returnWorld = mc.theWorld;
+            returnSolved = surfaceSolved;
+            returnWait = 0;
+            explorer.status = "On the surface; preparing the next search";
+            return true;
+        }
+        if (surfaceWaiting) {
+            BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
+                .start(surfaceGoal[0], surfaceGoal[1], surfaceGoal[2]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) surfaceWaiting = false;
+            else if (started != BaritoneNavigationBridge.Start.BUSY || ++surfaceWait > 40)
+                replanSurfaceGoal(mc, explorer);
+            return true;
+        }
+        double dx = mc.thePlayer.posX - surfaceLastX;
+        double dy = mc.thePlayer.posY - surfaceLastY;
+        double dz = mc.thePlayer.posZ - surfaceLastZ;
+        if (dx * dx + dy * dy + dz * dz >= 0.25D) {
+            surfaceLastX = mc.thePlayer.posX;
+            surfaceLastY = mc.thePlayer.posY;
+            surfaceLastZ = mc.thePlayer.posZ;
+            surfaceStallTicks = 0;
+        } else surfaceStallTicks = surfaceIdleTicks(surfaceStallTicks, explorer.baritoneNavigation.isMining());
+        if (explorer.baritoneNavigation.state() == BaritoneNavigationBridge.State.RUNNING && surfaceStallTicks < 160)
+            return true;
+        explorer.baritoneNavigation.stop();
+        surfaceStallTicks = 0;
+        surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
+        if (surfaceGoal == null || routeFailures >= 3) {
+            surfaceMove = false;
+            if ((explorer.insideDungeonRoom(mc) && explorer.startRoomExitSearch(mc))
+                || explorer.startSavedReturn(mc, true, 128)
+                || (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingToSurface(mc))) return true;
+            explorer.stop(mc, "No safe surface route found");
+        } else {
+            surfaceWaiting = true;
+            surfaceWait = 0;
+            explorer.status = "Replanning the surface route";
+        }
+        return true;
+    }
+
+    private void replanSurfaceGoal(Minecraft mc, Explorer explorer) {
+        surfaceWait = 0;
+        surfaceGoal = findSurfaceGoal(mc, ++routeFailures);
+        if (surfaceGoal == null) {
+            routeFailures = 0;
+            surfaceGoal = findSurfaceGoal(mc, 0);
+        }
+        if (surfaceGoal == null) {
+            surfaceMove = false;
+            explorer.stop(mc, "No safe surface destination found");
+        } else explorer.status = "Replanning the surface route";
+    }
+
+    private boolean tickReturnMove(Minecraft mc, Explorer explorer) {
+        if (mc.thePlayer == null || mc.theWorld == null || returnWorld != mc.theWorld) {
+            explorer.baritoneNavigation.stop();
+            reset();
+            explorer.walking = false;
+            explorer.returning = false;
+            return false;
+        }
+        if (resumeSearch) {
+            if (++returnWait >= 3) {
+                resumeSearch = false;
+                returnPoint = null;
+                returnWorld = null;
+                explorer.continueProgressiveSearch(mc, returnSolved);
             }
             return true;
         }
-        if (returnWaiting || returnMove || resumeSearch) {
-            if (mc.thePlayer == null || mc.theWorld == null || returnWorld != mc.theWorld) {
-                explorer.baritoneNavigation.stop();
-                reset();
-                explorer.walking = false;
-                explorer.returning = false;
-            } else if (resumeSearch) {
-                if (++returnWait >= 3) {
-                    resumeSearch = false;
-                    returnPoint = null;
-                    returnWorld = null;
-                    explorer.continueProgressiveSearch(mc, returnSolved);
-                }
-                return true;
-            } else if (returnWaiting) {
-                BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
-                    .start(returnPoint[0], returnPoint[1], returnPoint[2]);
-                if (started == BaritoneNavigationBridge.Start.STARTED) {
-                    returnWaiting = false;
-                    returnMove = true;
-                } else if (started != BaritoneNavigationBridge.Start.BUSY || ++returnWait > 40) {
-                    returnWaiting = false;
-                    resumeSearch = true;
-                    returnWait = 0;
-                    explorer.status = "Continuing exploration";
-                }
-                return true;
-            } else {
-                double distToExit = returnPoint == null ? 0D
-                    : Math.hypot(mc.thePlayer.posX - returnPoint[0] - 0.5D, mc.thePlayer.posZ - returnPoint[2] - 0.5D);
-                boolean onSurface = mc.theWorld.canBlockSeeTheSky(
-                    (int) Math.floor(mc.thePlayer.posX),
-                    (int) Math.floor(mc.thePlayer.boundingBox.minY),
-                    (int) Math.floor(mc.thePlayer.posZ));
-                boolean arrived = onSurface
-                    || (mc.thePlayer.onGround && distToExit <= 2.5D
-                        && Math.abs(mc.thePlayer.boundingBox.minY - returnPoint[1]) <= 2)
-                    || (explorer.baritoneNavigation.completed() && distToExit <= 4.0D);
-                if (arrived) {
-                    explorer.baritoneNavigation.stop();
-                    returnMove = false;
-                    resumeSearch = true;
-                    returnWait = 0;
-                    explorer.walking = false;
-                    explorer.returning = false;
-                    explorer.entrySurfacePoint = null;
-                } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    returnMove = false;
-                    resumeSearch = true;
-                    returnWait = 0;
-                    explorer.status = "Continuing exploration";
-                }
-                return true;
+        if (returnWaiting) {
+            BaritoneNavigationBridge.Start started = explorer.baritoneNavigation
+                .start(returnPoint[0], returnPoint[1], returnPoint[2]);
+            if (started == BaritoneNavigationBridge.Start.STARTED) {
+                returnWaiting = false;
+                returnMove = true;
+            } else if (started != BaritoneNavigationBridge.Start.BUSY || ++returnWait > 40) {
+                returnWaiting = false;
+                resumeSearch = true;
+                returnWait = 0;
+                explorer.status = "Continuing exploration";
             }
+            return true;
         }
-        if (searchMove) {
-            if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+        double distToExit = returnPoint == null ? 0D
+            : Math.hypot(mc.thePlayer.posX - returnPoint[0] - 0.5D, mc.thePlayer.posZ - returnPoint[2] - 0.5D);
+        boolean onSurface = mc.theWorld.canBlockSeeTheSky(
+            (int) Math.floor(mc.thePlayer.posX),
+            (int) Math.floor(mc.thePlayer.boundingBox.minY),
+            (int) Math.floor(mc.thePlayer.posZ));
+        boolean arrived = onSurface
+            || (mc.thePlayer.onGround && distToExit <= 2.5D
+                && Math.abs(mc.thePlayer.boundingBox.minY - returnPoint[1]) <= 2)
+            || (explorer.baritoneNavigation.completed() && distToExit <= 4.0D);
+        if (arrived) {
+            explorer.baritoneNavigation.stop();
+            returnMove = false;
+            resumeSearch = true;
+            returnWait = 0;
+            explorer.walking = false;
+            explorer.returning = false;
+            explorer.entrySurfacePoint = null;
+        } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+            returnMove = false;
+            resumeSearch = true;
+            returnWait = 0;
+            explorer.status = "Continuing exploration";
+        }
+        return true;
+    }
+
+    private boolean tickSearchMove(Minecraft mc, Explorer explorer) {
+        if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+            explorer.baritoneNavigation.stop();
+            searchMove = false;
+            explorer.walking = false;
+            return false;
+        }
+        if (Math.hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D) > 512D) {
+            explorer.baritoneNavigation.stop();
+            reset();
+            explorer.continueProgressiveSearch(mc, false);
+            return true;
+        }
+        double aimDx = (searchX + 0.5D) - mc.thePlayer.posX;
+        double aimDz = (searchZ + 0.5D) - mc.thePlayer.posZ;
+        explorer.look((float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F, 0F);
+        if (!searchHandoff && ++searchTicks % 10 == 0) {
+            explorer.scan(mc);
+            if (explorer.target != null) {
                 explorer.baritoneNavigation.stop();
                 searchMove = false;
-                explorer.walking = false;
-            } else {
-                double aimDx = (searchX + 0.5D) - mc.thePlayer.posX;
-                double aimDz = (searchZ + 0.5D) - mc.thePlayer.posZ;
-                float aimYaw = (float) (Math.atan2(aimDz, aimDx) * 180D / Math.PI) - 90F;
-                explorer.look(aimYaw, 0F);
-                if (!searchHandoff && ++searchTicks % 10 == 0) {
-                    explorer.scan(mc);
-                    if (explorer.target != null) {
-                        explorer.baritoneNavigation.stop();
-                        searchMove = false;
-                        searchHandoff = false;
-                        rememberReturnPoint(mc);
-                        explorer.routeToStructure(mc);
-                        return true;
-                    }
-                }
-                if (searchHandoff) {
-                    BaritoneNavigationBridge.Start started = searchNext
-                        ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
-                        : explorer.baritoneNavigation.startStructureApproach(
-                            explorer.target.xCoord,
-                            explorer.target.yCoord,
-                            explorer.target.zCoord);
-                    if (started == BaritoneNavigationBridge.Start.STARTED) {
-                        searchHandoff = false;
-                        if (searchNext) {
-                            searchNext = false;
-                            explorer.status = "Exploring for structures";
-                        } else {
-                            searchMove = false;
-                            rememberReturnPoint(mc);
-                            structureMove = true;
-                            explorer.searching = false;
-                            explorer.status = "Walking to LootGame";
-                        }
-                    } else if (started != BaritoneNavigationBridge.Start.BUSY || ++handoffTicks > 40) {
-                        searchHandoff = false;
-                        explorer.rotateSearch(mc);
-                        int[] next = explorer.search == null ? null : explorer.search.next();
-                        if (next != null) {
-                            searchX = next[0];
-                            searchZ = next[1];
-                            searchNext = true;
-                            searchHandoff = true;
-                            handoffTicks = 0;
-                        }
-                        explorer.status = "Replanning search";
-                    }
-                } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    double distToGoal = Math
-                        .hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D);
-                    boolean arrived = (explorer.baritoneNavigation.completed() && distToGoal <= 4.0D)
-                        || distToGoal <= 2.5D;
-                    explorer.baritoneNavigation.stop();
-                    if (arrived) {
-                        explorer.scan(mc);
-                        if (explorer.target != null) {
-                            searchMove = false;
-                            searchHandoff = false;
-                            rememberReturnPoint(mc);
-                            explorer.routeToStructure(mc);
-                        } else {
-                            int[] next = explorer.search == null ? null : explorer.search.next();
-                            if (next == null) {
-                                explorer.rotateSearch(mc);
-                                next = explorer.search == null ? null : explorer.search.next();
-                            }
-                            if (next != null) {
-                                searchX = next[0];
-                                searchZ = next[1];
-                                searchNext = true;
-                                searchHandoff = true;
-                                handoffTicks = 0;
-                                routeFailures = 0;
-                            }
-                        }
-                    } else if (distToGoal > 4.0D && ++routeFailures <= 12) {
-                        searchNext = true;
-                        searchHandoff = true;
-                        handoffTicks = 0;
-                        explorer.status = "Exploring for structures";
-                    } else {
-                        routeFailures = 0;
-                        explorer.rotateSearch(mc);
-                        int[] next = explorer.search == null ? null : explorer.search.next();
-                        if (next != null) {
-                            searchX = next[0];
-                            searchZ = next[1];
-                            searchNext = true;
-                            searchHandoff = true;
-                            handoffTicks = 0;
-                        }
-                    }
-                }
+                searchHandoff = false;
+                rememberReturnPoint(mc);
+                explorer.routeToStructure(mc);
                 return true;
             }
         }
-        if (structureMove) {
-            if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
-                explorer.baritoneNavigation.stop();
+        if (searchHandoff) advanceSearchHandoff(mc, explorer);
+        else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING)
+            advanceStoppedSearchMove(mc, explorer);
+        return true;
+    }
+
+    private void advanceSearchHandoff(Minecraft mc, Explorer explorer) {
+        BaritoneNavigationBridge.Start started = searchNext
+            ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
+            : explorer.baritoneNavigation
+                .startStructureApproach(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+        if (started == BaritoneNavigationBridge.Start.STARTED) {
+            searchHandoff = false;
+            if (searchNext) {
+                searchNext = false;
+                explorer.status = "Exploring for structures";
+            } else {
+                searchMove = false;
+                rememberReturnPoint(mc);
+                structureMove = true;
+                explorer.searching = false;
+                explorer.status = "Walking to LootGame";
+            }
+        } else if (started != BaritoneNavigationBridge.Start.BUSY || ++handoffTicks > 40) {
+            searchHandoff = false;
+            explorer.rotateSearch(mc);
+            queueNextSearchLeg(explorer);
+            explorer.status = "Replanning search";
+        }
+    }
+
+    private void advanceStoppedSearchMove(Minecraft mc, Explorer explorer) {
+        double distToGoal = Math.hypot(mc.thePlayer.posX - searchX - 0.5D, mc.thePlayer.posZ - searchZ - 0.5D);
+        boolean arrived = (explorer.baritoneNavigation.completed() && distToGoal <= 4.0D) || distToGoal <= 2.5D;
+        explorer.baritoneNavigation.stop();
+        if (arrived) {
+            explorer.scan(mc);
+            if (explorer.target != null) {
+                searchMove = false;
+                searchHandoff = false;
+                rememberReturnPoint(mc);
+                explorer.routeToStructure(mc);
+                return;
+            }
+            int[] next = explorer.search == null ? null : explorer.search.next();
+            if (next == null) {
+                explorer.rotateSearch(mc);
+                next = explorer.search == null ? null : explorer.search.next();
+            }
+            if (next != null) {
+                searchX = next[0];
+                searchZ = next[1];
+                searchNext = true;
+                searchHandoff = true;
+                handoffTicks = 0;
+                routeFailures = 0;
+            }
+        } else if (distToGoal > 4.0D && ++routeFailures <= 12) {
+            searchNext = true;
+            searchHandoff = true;
+            handoffTicks = 0;
+            explorer.status = "Exploring for structures";
+        } else {
+            routeFailures = 0;
+            explorer.rotateSearch(mc);
+            queueNextSearchLeg(explorer);
+        }
+    }
+
+    private void queueNextSearchLeg(Explorer explorer) {
+        int[] next = explorer.search == null ? null : explorer.search.next();
+        if (next == null) return;
+        searchX = next[0];
+        searchZ = next[1];
+        searchNext = true;
+        searchHandoff = true;
+        handoffTicks = 0;
+    }
+
+    private boolean tickStructureMove(Minecraft mc, Explorer explorer) {
+        if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+            explorer.baritoneNavigation.stop();
+            structureMove = false;
+            preRouting = false;
+            explorer.walking = false;
+            return false;
+        }
+        if (explorer.target != null && explorer.reachableBoard(mc)) {
+            int[] arrivedAt = { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
+            explorer.baritoneNavigation.stop();
+            structureMove = false;
+            preRouting = false;
+            explorer.stop(mc, "Arrived at LootGame; opening puzzle");
+            explorer.knownStructure = arrivedAt;
+            explorer.puzzleArrivalPending = true;
+        } else if (preRouting && explorer.target != null) {
+            advanceStructurePreRouting(mc, explorer);
+        } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+            explorer.baritoneNavigation.stop();
+            structureMove = false;
+            preRouting = false;
+            if (explorer.target != null && ++routeFailures <= 3) {
+                explorer.routeToStructure(mc);
+            } else {
+                routeFailures = 0;
+                if (explorer.target != null && LootGameSolverConfig.staircaseEnabled
+                    && explorer.selectDigEntrance(mc)) {
+                    explorer.walking = true;
+                    explorer.searching = false;
+                } else {
+                    explorer.target = null;
+                    explorer.rotateSearch(mc);
+                    searchMove = true;
+                    searchNext = true;
+                    searchHandoff = true;
+                    handoffTicks = 0;
+                    explorer.status = "Exploring for structures";
+                }
+            }
+        }
+        return true;
+    }
+
+    private void advanceStructurePreRouting(Minecraft mc, Explorer explorer) {
+        double hDist = Math.hypot(
+            mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+            mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+        if (hDist <= 6.0D || explorer.baritoneNavigation.completed()) {
+            preRouting = false;
+            explorer.baritoneNavigation.stop();
+            if (mc.thePlayer.isInWater() && explorer.findDryEntrance(mc)) {
                 structureMove = false;
-                preRouting = false;
-                explorer.walking = false;
-            } else {
-                if (explorer.target != null && explorer.reachableBoard(mc)) {
-                    int[] arrivedAt = { explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord };
-                    explorer.baritoneNavigation.stop();
-                    structureMove = false;
-                    preRouting = false;
-                    explorer.stop(mc, "Arrived at LootGame; opening puzzle");
-                    explorer.knownStructure = arrivedAt;
-                    explorer.puzzleArrivalPending = true;
-                } else if (preRouting && explorer.target != null) {
-                    double hDist = Math.hypot(
-                        mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
-                        mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
-                    if (hDist <= 6.0D || explorer.baritoneNavigation.completed()) {
-                        preRouting = false;
-                        explorer.baritoneNavigation.stop();
-                        if (mc.thePlayer.isInWater() && explorer.findDryEntrance(mc)) {
-                            structureMove = false;
-                            explorer.walking = true;
-                            explorer.searching = false;
-                            return true;
-                        }
-                        BaritoneNavigationBridge.Start start = explorer.baritoneNavigation.startStructureApproach(
-                            explorer.target.xCoord,
-                            explorer.target.yCoord,
-                            explorer.target.zCoord);
-                        if (start == BaritoneNavigationBridge.Start.STARTED) {
-                            explorer.status = "Walking to LootGame";
-                        } else if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
-                            structureMove = false;
-                            explorer.walking = true;
-                            explorer.searching = false;
-                        } else {
-                            structureMove = false;
-                            explorer.routeToStructure(mc);
-                        }
-                    } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                        explorer.baritoneNavigation.startHorizontal(explorer.target.xCoord, explorer.target.zCoord);
-                    }
-                } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    explorer.baritoneNavigation.stop();
-                    structureMove = false;
-                    preRouting = false;
-                    if (explorer.target != null && ++routeFailures <= 3) {
-                        explorer.routeToStructure(mc);
-                    } else {
-                        routeFailures = 0;
-                        if (explorer.target != null && LootGameSolverConfig.staircaseEnabled
-                            && explorer.selectDigEntrance(mc)) {
-                            explorer.walking = true;
-                            explorer.searching = false;
-                        } else {
-                            explorer.target = null;
-                            explorer.rotateSearch(mc);
-                            searchMove = true;
-                            searchNext = true;
-                            searchHandoff = true;
-                            handoffTicks = 0;
-                            explorer.status = "Exploring for structures";
-                        }
-                    }
-                }
-                return true;
+                explorer.walking = true;
+                explorer.searching = false;
+                return;
             }
+            BaritoneNavigationBridge.Start start = explorer.baritoneNavigation
+                .startStructureApproach(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
+            if (start == BaritoneNavigationBridge.Start.STARTED) {
+                explorer.status = "Walking to LootGame";
+            } else if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+                structureMove = false;
+                explorer.walking = true;
+                explorer.searching = false;
+            } else {
+                structureMove = false;
+                explorer.routeToStructure(mc);
+            }
+        } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+            explorer.baritoneNavigation.startHorizontal(explorer.target.xCoord, explorer.target.zCoord);
         }
-        if (centerMove) {
-            if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
-                explorer.baritoneNavigation.stop();
+    }
+
+    private boolean tickCenterMove(Minecraft mc, Explorer explorer) {
+        if (explorer.world != mc.theWorld || mc.thePlayer == null || mc.theWorld == null) {
+            explorer.baritoneNavigation.stop();
+            centerMove = false;
+            explorer.walking = false;
+            return false;
+        }
+        if (explorer.movingToRewardView) {
+            double dx = mc.thePlayer.posX - rewardViewX;
+            double dz = mc.thePlayer.posZ - rewardViewZ;
+            if (rewardApproachProgress(dx, dz)) {
+                rewardViewX = mc.thePlayer.posX;
+                rewardViewZ = mc.thePlayer.posZ;
+                rewardViewStalled = 0;
+            } else if (++rewardViewStalled >= 160) {
+                rewardViewStalled = 0;
                 centerMove = false;
-                explorer.walking = false;
-            } else {
-                if (explorer.movingToRewardView) {
-                    double dx = mc.thePlayer.posX - rewardViewX;
-                    double dz = mc.thePlayer.posZ - rewardViewZ;
-                    if (rewardApproachProgress(dx, dz)) {
-                        rewardViewX = mc.thePlayer.posX;
-                        rewardViewZ = mc.thePlayer.posZ;
-                        rewardViewStalled = 0;
-                    } else if (++rewardViewStalled >= 160) {
-                        rewardViewStalled = 0;
-                        centerMove = false;
-                        explorer.stop(mc, "Reward chest approach stalled; trying another position");
-                        return true;
-                    }
-                } else rewardViewStalled = 0;
-                if (explorer.target == null) {
-                    centerMove = false;
-                    explorer.stop(mc, "Board center target lost");
-                    return true;
-                }
-                double distToCenter = Math.hypot(
-                    mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
-                    mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
-                boolean arrived = explorer.target != null
-                    && ((distToCenter <= (explorer.movingToRewardView ? 0.75D : 1.5D)
-                        && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - explorer.target.yCoord - 1) <= 2)
-                        || (explorer.baritoneNavigation.completed()
-                            && distToCenter <= (explorer.movingToRewardView ? 1.0D : 2.2D)));
-                if (arrived) {
-                    explorer.baritoneNavigation.stop();
-                    centerMove = false;
-                    explorer.stop(mc, "At LootGames board center");
-                    explorer.puzzleCenter.puzzleCenterArrivalPending = true;
-                } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
-                    explorer.baritoneNavigation.stop();
-                    centerMove = false;
-                    explorer.stop(mc, "Baritone could not reach the board center");
-                }
+                explorer.stop(mc, "Reward chest approach stalled; trying another position");
                 return true;
             }
+        } else rewardViewStalled = 0;
+        if (explorer.target == null) {
+            centerMove = false;
+            explorer.stop(mc, "Board center target lost");
+            return true;
         }
-        return false;
+        double distToCenter = Math.hypot(
+            mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+            mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+        boolean arrived = (distToCenter <= (explorer.movingToRewardView ? 0.75D : 1.5D)
+            && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - explorer.target.yCoord - 1) <= 2)
+            || (explorer.baritoneNavigation.completed() && distToCenter <= (explorer.movingToRewardView ? 1.0D : 2.2D));
+        if (arrived) {
+            explorer.baritoneNavigation.stop();
+            centerMove = false;
+            explorer.stop(mc, "At LootGames board center");
+            explorer.puzzleCenter.puzzleCenterArrivalPending = true;
+        } else if (explorer.baritoneNavigation.state() != BaritoneNavigationBridge.State.RUNNING) {
+            explorer.baritoneNavigation.stop();
+            centerMove = false;
+            explorer.stop(mc, "Baritone could not reach the board center");
+        }
+        return true;
     }
 
     public static boolean rewardApproachProgress(double dx, double dz) {

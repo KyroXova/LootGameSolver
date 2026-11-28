@@ -97,11 +97,15 @@ public final class SavedStructureFinder {
                             }
                         }
                     } catch (IOException ignored) {
-                        // Skip chunks that fail to load and continue searching.
+                        com.kyroxova.lootgamesolver.LootGameSolver.LOG
+                            .debug("Skipping unreadable chunk during structure scan", ignored);
                     }
                 }
                 positions = Collections.unmodifiableList(new ArrayList<int[]>(found));
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+                com.kyroxova.lootgamesolver.LootGameSolver.LOG
+                    .debug("Could not scan region files for saved structures", ignored);
+            }
         }
     }
 }

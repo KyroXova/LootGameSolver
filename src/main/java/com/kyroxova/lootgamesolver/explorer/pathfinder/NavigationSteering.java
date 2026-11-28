@@ -137,12 +137,17 @@ public final class NavigationSteering {
     }
 
     public static boolean passed(double px, double pz, double ax, double az, double bx, double bz) {
+        return passed(px, pz, ax, az, bx, bz, 0.30D);
+    }
+
+    public static boolean passed(double px, double pz, double ax, double az, double bx, double bz,
+        double crossTrackLimit) {
         double dx = bx - ax, dz = bz - az;
         double length = Math.sqrt(dx * dx + dz * dz);
         if (length < 0.01D) return false;
         double along = (px - bx) * dx + (pz - bz) * dz;
         double cross = Math.abs((px - bx) * dz - (pz - bz) * dx) / length;
-        return along >= 0 && cross < 0.30D;
+        return along >= 0 && cross < crossTrackLimit;
     }
 
     public static float turn(float current, float desired, float maximum) {

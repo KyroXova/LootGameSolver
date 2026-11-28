@@ -9,6 +9,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemSword;
 import net.minecraft.item.ItemTool;
 
+import com.kyroxova.lootgamesolver.LootGameSolver;
+
 public final class InventoryProtection {
 
     private InventoryProtection() {}
@@ -18,7 +20,9 @@ public final class InventoryProtection {
         String unlocalized = "";
         try {
             unlocalized = stack.getUnlocalizedName();
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            LootGameSolver.LOG.debug("Could not read item unlocalized name", ignored);
+        }
         return bagIdentity(
             String.valueOf(Item.itemRegistry.getNameForObject(stack.getItem())),
             stack.getItem()
@@ -31,6 +35,12 @@ public final class InventoryProtection {
         return bagIdentity(registryName, className, "");
     }
 
+    private static final String[] EXCLUDED_BAG_TERMS = { "jetpack", "copter", "batpack", "lappack", "energypack",
+        "fluxpack", "capacitor", "battery", "charger", "charging", "sleeping", "feedbag", "lunch", "trash", "quiver",
+        "focus", "wand", "seedbag" };
+    private static final String[] BAG_ID_OR_TYPE_TERMS = { "backpack", "bag", "pouch" };
+    private static final String[] BAG_ID_ONLY_TERMS = { "knapsack", "satchel" };
+
     public static boolean bagIdentity(String registryName, String className, String unlocalizedName) {
         String id = registryName == null ? "" : registryName.toLowerCase(Locale.ROOT);
         String type = className == null ? "" : className.toLowerCase(Locale.ROOT);
@@ -40,74 +50,25 @@ public final class InventoryProtection {
         int dot = Math.max(type.lastIndexOf('.'), type.lastIndexOf('$'));
         if (dot >= 0) type = type.substring(dot + 1);
 
-        if (id.contains("lootbag") || id.contains("loot_bag")
-            || type.contains("lootbag")
-            || type.contains("loot_bag")
-            || id.contains("jetpack")
-            || type.contains("jetpack")
-            || unloc.contains("jetpack")
-            || id.contains("copter")
-            || type.contains("copter")
-            || unloc.contains("copter")
-            || id.contains("batpack")
-            || type.contains("batpack")
-            || unloc.contains("batpack")
-            || id.contains("lappack")
-            || type.contains("lappack")
-            || unloc.contains("lappack")
-            || id.contains("energypack")
-            || type.contains("energypack")
-            || unloc.contains("energypack")
-            || id.contains("fluxpack")
-            || type.contains("fluxpack")
-            || unloc.contains("fluxpack")
-            || id.contains("capacitor")
-            || type.contains("capacitor")
-            || unloc.contains("capacitor")
-            || id.contains("battery")
-            || type.contains("battery")
-            || unloc.contains("battery")
-            || id.contains("charger")
-            || type.contains("charger")
-            || unloc.contains("charger")
-            || id.contains("charging")
-            || type.contains("charging")
-            || unloc.contains("charging")
-            || id.contains("sleeping")
-            || type.contains("sleeping")
-            || unloc.contains("sleeping")
-            || id.contains("feedbag")
-            || type.contains("feedbag")
-            || unloc.contains("feedbag")
-            || id.contains("lunch")
-            || type.contains("lunch")
-            || unloc.contains("lunch")
-            || id.contains("trash")
-            || type.contains("trash")
-            || unloc.contains("trash")
-            || id.contains("quiver")
-            || type.contains("quiver")
-            || unloc.contains("quiver")
-            || id.contains("focus")
-            || type.contains("focus")
-            || unloc.contains("focus")
-            || id.contains("wand")
-            || type.contains("wand")
-            || unloc.contains("wand")
-            || id.contains("seedbag")
-            || type.contains("seedbag")
-            || unloc.contains("seedbag")) {
-            return false;
+        if (containsAny(id, "lootbag", "loot_bag") || containsAny(type, "lootbag", "loot_bag")) return false;
+        for (String excluded : EXCLUDED_BAG_TERMS) {
+            if (id.contains(excluded) || type.contains(excluded) || unloc.contains(excluded)) return false;
         }
-
-        return id.contains("backpack") || type.contains("backpack")
-            || id.contains("knapsack")
-            || id.contains("satchel")
-            || id.contains("bag")
-            || type.contains("bag")
-            || id.contains("pouch")
-            || type.contains("pouch");
+        for (String term : BAG_ID_OR_TYPE_TERMS) {
+            if (id.contains(term) || type.contains(term)) return true;
+        }
+        return containsAny(id, BAG_ID_ONLY_TERMS);
     }
+
+    private static boolean containsAny(String value, String... terms) {
+        for (String term : terms) {
+            if (value.contains(term)) return true;
+        }
+        return false;
+    }
+
+    private static final String[] BAG_CONTAINER_TERMS = { "backpack", "knapsack", "satchel", "bag", "pouch", "holding",
+        "iteminventory" };
 
     public static boolean backpackContainer(String name) {
         if (name == null) return false;
@@ -116,31 +77,8 @@ public final class InventoryProtection {
             return true;
         int dot = type.lastIndexOf('.');
         if (dot >= 0) type = type.substring(dot + 1);
-        if (type.contains("jetpack") || type.contains("copter")
-            || type.contains("batpack")
-            || type.contains("lappack")
-            || type.contains("energypack")
-            || type.contains("fluxpack")
-            || type.contains("capacitor")
-            || type.contains("battery")
-            || type.contains("charger")
-            || type.contains("charging")
-            || type.contains("quiver")
-            || type.contains("focus")
-            || type.contains("wand")
-            || type.contains("seedbag")
-            || type.contains("lunch")
-            || type.contains("trash")
-            || type.contains("sleeping")
-            || type.contains("feedbag")) {
-            return false;
-        }
-        return (type.contains("backpack") || type.contains("knapsack")
-            || type.contains("satchel")
-            || type.contains("bag")
-            || type.contains("pouch")
-            || type.contains("holding")
-            || type.contains("iteminventory"));
+        if (containsAny(type, EXCLUDED_BAG_TERMS)) return false;
+        return containsAny(type, BAG_CONTAINER_TERMS);
     }
 
     public static boolean essential(ItemStack stack) {

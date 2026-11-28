@@ -38,7 +38,9 @@ public final class StorageTripPolicy {
                 java.util.UUID.fromString(fields[2]);
                 return true;
             }
-        } catch (IllegalArgumentException ignored) {}
+        } catch (IllegalArgumentException ignored) {
+            com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Invalid storage target string: {}", target, ignored);
+        }
         return false;
     }
 

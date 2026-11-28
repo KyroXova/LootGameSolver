@@ -4,16 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: 'Tag matching modVersion, or leave empty to use modVersion'
-        required: false
-        default: ''
-      prerelease:
-        description: 'Mark as prerelease'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -45,41 +35,20 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MANUAL_TAG: ${{ inputs.tag_name }}
-          MANUAL_PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
           MOD_VERSION=$(grep -E '^[[:space:]]*modVersion[[:space:]]*=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
           echo "Current modVersion: '$MOD_VERSION'"
 
           SHOULD_RELEASE="true"
-          TARGET_TAG=""
-          RELEASE_TITLE=""
-          IS_PRE="false"
-          MAKE_LATEST="true"
-
-          if [[ -n "$MANUAL_TAG" ]]; then
-            TARGET_TAG="$MANUAL_TAG"
-            RELEASE_TITLE="LootGameSolver $MANUAL_TAG"
-            IS_PRE="${MANUAL_PRERELEASE:-false}"
-            MAKE_LATEST=$([[ "$IS_PRE" == "true" ]] && echo "false" || echo "true")
-          else
-            # A push to main releases the version declared by this commit.
-            TARGET_TAG="${MOD_VERSION:-latest}"
-            RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
-            if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
-              IS_PRE="true"
-              MAKE_LATEST="false"
-            else
-              IS_PRE="false"
-              MAKE_LATEST="true"
-            fi
-
-          fi
-
-          if [[ "$MANUAL_PRERELEASE" == "true" ]]; then
+          TARGET_TAG="${MOD_VERSION:-latest}"
+          RELEASE_TITLE="LootGameSolver ${MOD_VERSION:-Latest Build}"
+          if [[ "$TARGET_TAG" == *-snapshot || "$TARGET_TAG" == *-pre ]]; then
             IS_PRE="true"
             MAKE_LATEST="false"
+          else
+            IS_PRE="false"
+            MAKE_LATEST="true"
           fi
 
           if [[ "${TARGET_TAG#v}" != "$MOD_VERSION" ]]; then
@@ -146,7 +115,7 @@ jobs:
           distribution: 'zulu'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -183,7 +152,7 @@ jobs:
           echo "CHANGELOG_FILE=$GITHUB_WORKSPACE/$NOTES" >> "$GITHUB_ENV"
       - name: Publish GitHub Release
         if: needs.check-version.outputs.github_release_exists != 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ needs.check-version.outputs.target_tag }}

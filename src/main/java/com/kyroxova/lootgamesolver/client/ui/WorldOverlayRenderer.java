@@ -176,75 +176,13 @@ public final class WorldOverlayRenderer {
             GL11.glDepthMask(false);
             GL11.glLineWidth(1.5F);
 
-            SolverAction firstAction = actions.get(0);
-            int[] firstBlock = session.getBlockPos(firstAction.position);
-            if (!solving && firstBlock != null) {
-                double fdx = firstBlock[0] + 0.5D - mc.thePlayer.posX;
-                double fdy = firstBlock[1] + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
-                double fdz = firstBlock[2] + 0.5D - mc.thePlayer.posZ;
-                if (fdx * fdx + fdy * fdy + fdz * fdz > 7.84D) {
-                    GL11.glLineWidth(2.5F);
-                    Tessellator t = Tessellator.instance;
-                    t.startDrawing(GL11.GL_LINES);
-                    t.setColorRGBA_F(0.2F, 0.9F, 1.0F, 0.85F);
-                    t.addVertex(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ);
-                    t.addVertex(firstBlock[0] + 0.5D, firstBlock[1] + 0.15D, firstBlock[2] + 0.5D);
-                    t.draw();
-                }
-            }
+            if (!solving) renderFirstActionTracer(mc, actions.get(0));
 
-            int maxRender = actions.size();
             Map<CellPosition, String> lightLabels = current.type == MiniGame.GAME_OF_LIGHT
                 ? sequenceLabels(actions, current.gol == null ? 0 : current.gol.getCurrentSymbol())
                 : null;
-            for (int i = 0; i < maxRender; i++) {
-                SolverAction action = actions.get(i);
-                if (lightLabels != null && !lightLabels.containsKey(action.position)) continue;
-                int[] block = session.getBlockPos(action.position);
-                if (block == null) continue;
-
-                double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
-                double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
-                double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
-                if (dx > 32.0D || dz > 32.0D || dy > 16.0D) continue;
-
-                double minX = block[0] + 0.02D, minY = block[1] + 0.02D, minZ = block[2] + 0.02D;
-                double maxX = minX + 0.96D, maxY = minY + 0.96D, maxZ = minZ + 0.96D;
-                AxisAlignedBB box = AxisAlignedBB.getBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
-
-                if (current.type == MiniGame.MINESWEEPER) {
-                    if (action.type == SolverAction.Type.FLAG) {
-                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
-                        drawFlag(RED_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
-                    } else if (action.type == SolverAction.Type.REVEAL) {
-                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
-                        drawFlag(SAFE_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
-                    }
-                } else if (current.type == MiniGame.SUDOKU) {
-                    if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
-                    drawFloatingText(
-                        String.valueOf(action.value),
-                        minX + 0.5D,
-                        minY + 1.25D,
-                        minZ + 0.5D,
-                        0x55FFFF,
-                        mc);
-                } else if (current.type == MiniGame.GAME_OF_LIGHT) {
-                    if (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId())) {
-                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
-                        drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
-                    } else {
-                        if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
-                        drawFloatingText(
-                            lightLabels.get(action.position),
-                            minX + 0.5D,
-                            minY + 1.25D,
-                            minZ + 0.5D,
-                            0x00FFFF,
-                            mc);
-                    }
-                    lightLabels.remove(action.position);
-                }
+            for (int i = 0; i < actions.size(); i++) {
+                renderActionHighlight(mc, current, actions.get(i), lightLabels);
             }
         } finally {
             GL11.glDepthMask(true);
@@ -255,6 +193,67 @@ public final class WorldOverlayRenderer {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
+    }
+
+    private void renderFirstActionTracer(Minecraft mc, SolverAction firstAction) {
+        int[] firstBlock = session.getBlockPos(firstAction.position);
+        if (firstBlock == null) return;
+        double fdx = firstBlock[0] + 0.5D - mc.thePlayer.posX;
+        double fdy = firstBlock[1] + 0.5D - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
+        double fdz = firstBlock[2] + 0.5D - mc.thePlayer.posZ;
+        if (fdx * fdx + fdy * fdy + fdz * fdz <= 7.84D) return;
+        GL11.glLineWidth(2.5F);
+        Tessellator t = Tessellator.instance;
+        t.startDrawing(GL11.GL_LINES);
+        t.setColorRGBA_F(0.2F, 0.9F, 1.0F, 0.85F);
+        t.addVertex(mc.thePlayer.posX, mc.thePlayer.boundingBox.minY + 0.15D, mc.thePlayer.posZ);
+        t.addVertex(firstBlock[0] + 0.5D, firstBlock[1] + 0.15D, firstBlock[2] + 0.5D);
+        t.draw();
+    }
+
+    private void renderActionHighlight(Minecraft mc, DetectedGame current, SolverAction action,
+        Map<CellPosition, String> lightLabels) {
+        if (lightLabels != null && !lightLabels.containsKey(action.position)) return;
+        int[] block = session.getBlockPos(action.position);
+        if (block == null) return;
+        double dx = Math.abs(block[0] + 0.5D - mc.thePlayer.posX);
+        double dy = Math.abs(block[1] + 0.5D - mc.thePlayer.posY);
+        double dz = Math.abs(block[2] + 0.5D - mc.thePlayer.posZ);
+        if (dx > 32.0D || dz > 32.0D || dy > 16.0D) return;
+
+        double minX = block[0] + 0.02D, minY = block[1] + 0.02D, minZ = block[2] + 0.02D;
+        AxisAlignedBB box = AxisAlignedBB.getBoundingBox(minX, minY, minZ, minX + 0.96D, minY + 0.96D, minZ + 0.96D);
+        if (current.type == MiniGame.MINESWEEPER) {
+            renderMinesweeperHighlight(mc, action, box, minX, minY, minZ);
+        } else if (current.type == MiniGame.SUDOKU) {
+            if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 0.7F, 1.0F);
+            drawFloatingText(String.valueOf(action.value), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x55FFFF, mc);
+        } else if (current.type == MiniGame.GAME_OF_LIGHT) {
+            renderGameOfLightHighlight(mc, current, action, lightLabels, box, minX, minY, minZ);
+        }
+    }
+
+    private void renderMinesweeperHighlight(Minecraft mc, SolverAction action, AxisAlignedBB box, double minX,
+        double minY, double minZ) {
+        if (action.type == SolverAction.Type.FLAG) {
+            if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.2F, 0.2F);
+            drawFlag(RED_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
+        } else if (action.type == SolverAction.Type.REVEAL) {
+            if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.2F, 1.0F, 0.2F);
+            drawFlag(SAFE_FLAG, minX + 0.5D, minY + 1.1D, minZ + 0.5D, mc);
+        }
+    }
+
+    private void renderGameOfLightHighlight(Minecraft mc, DetectedGame current, SolverAction action,
+        Map<CellPosition, String> lightLabels, AxisAlignedBB box, double minX, double minY, double minZ) {
+        if (current.gol != null && GameOfLightBoard.STAGE_WAITING_START.equals(current.gol.getStageId())) {
+            if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 1.0F, 0.8F, 0.0F);
+            drawFloatingText("START", minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0xFFFF44, mc);
+        } else {
+            if (LootGameSolverConfig.renderStyle == 0) drawWireframe(box, 0.0F, 0.9F, 0.9F);
+            drawFloatingText(lightLabels.get(action.position), minX + 0.5D, minY + 1.25D, minZ + 0.5D, 0x00FFFF, mc);
+        }
+        lightLabels.remove(action.position);
     }
 
     private static void renderStorageTargets() {
@@ -301,7 +300,10 @@ public final class WorldOverlayRenderer {
                         }
                     }
                     if (box != null) drawWireframe(box.expand(0.01D, 0.01D, 0.01D), 0.2F, 1F, 0.2F);
-                } catch (IllegalArgumentException ignored) {}
+                } catch (IllegalArgumentException ignored) {
+                    com.kyroxova.lootgamesolver.LootGameSolver.LOG
+                        .debug("Skipping invalid storage overlay target", ignored);
+                }
             }
         } finally {
             GL11.glPopMatrix();

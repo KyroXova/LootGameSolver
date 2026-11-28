@@ -42,4 +42,8 @@ public final class ProgressiveSearch {
         if (limit > 0 && dist > limit) return null;
         return new int[] { (int) Math.round(x + dirX * dist), (int) Math.round(z + dirZ * dist) };
     }
+
+    public boolean isFarFrom(int blockX, int blockZ, double distance) {
+        return Math.hypot(blockX - x, blockZ - z) > distance;
+    }
 }

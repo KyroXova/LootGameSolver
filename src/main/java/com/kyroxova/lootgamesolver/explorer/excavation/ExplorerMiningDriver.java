@@ -51,72 +51,16 @@ public class ExplorerMiningDriver {
 
     public boolean minePlannedBlock(Minecraft mc, Explorer explorer, int nx, int by, int nz, int destinationY) {
         World w = mc.theWorld;
-        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int z = (int) Math.floor(mc.thePlayer.posZ);
         net.minecraft.block.Block b = w.getBlock(nx, by, nz);
-        int mineX = nx, mineY = by, mineZ = nz;
+        int[] target = resolveObstructingTarget(mc, explorer, w, nx, by, nz, b);
+        int mineX = target[0], mineY = target[1], mineZ = target[2];
+        if (mineX != nx || mineY != by || mineZ != nz) b = w.getBlock(mineX, mineY, mineZ);
         net.minecraft.util.Vec3 aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
-        net.minecraft.util.MovingObjectPosition obstruction = w.rayTraceBlocks(
-            net.minecraft.util.Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ),
-            net.minecraft.util.Vec3.createVectorHelper(nx + 0.5D, by + 0.5D, nz + 0.5D));
-        if (obstruction != null
-            && obstruction.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
-            net.minecraft.block.Block visible = w.getBlock(obstruction.blockX, obstruction.blockY, obstruction.blockZ);
-            boolean plant = isFoliage(visible);
-            boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling && obstruction.blockX == nx
-                && obstruction.blockZ == nz
-                && obstruction.blockY > by
-                && obstruction.blockY <= y + 4
-                && visible instanceof net.minecraft.block.BlockFalling
-                && explorer.excavationTerrain
-                    .excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
-            if (aimPoint == null && (fallingObstruction || FoliagePolicy.canClear(
-                plant,
-                w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
-                visible.getBlockHardness(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ),
-                obstruction.blockX,
-                obstruction.blockY,
-                obstruction.blockZ,
-                x,
-                y,
-                z,
-                nx,
-                nz,
-                false))) {
-                mineX = obstruction.blockX;
-                mineY = obstruction.blockY;
-                mineZ = obstruction.blockZ;
-                b = visible;
-                aimPoint = visibleMiningPoint(mc, mineX, mineY, mineZ);
-            }
-        }
         int slot = DigToolSelector.equip(mc, b, w.getBlockMetadata(mineX, mineY, mineZ));
-        if (slot >= 9) {
-            if (explorer.toolTransfer.start(mc, slot)) {
-                explorer.status = "Opening inventory to prepare tool";
-                return true;
-            }
-            if (++explorer.toolWaitTicks > 40) {
-                explorer.stop(
-                    mc,
-                    "\u00A7eAuto-dig paused: inventory swap could not finish. Close other inventories and clear the cursor.");
-                return true;
-            }
-            explorer.status = "Preparing digging tool...";
-            return true;
-        }
+        if (slot >= 9) return startMiningToolTransfer(mc, explorer, slot);
         explorer.toolWaitTicks = 0;
         if (slot < 0) {
-            explorer.waitingForTool = true;
-            explorer.miningAttack
-                .release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
-            mc.playerController.resetBlockRemoving();
-            explorer.digTicks = 0;
-            explorer.miningAim.reset();
-            explorer.status = "Mining paused: no usable tool for " + b.getLocalizedName();
+            pauseForMissingMiningTool(mc, explorer, b);
             return true;
         }
         explorer.waitingForTool = false;
@@ -137,6 +81,75 @@ public class ExplorerMiningDriver {
             explorer.status = "Finding visible block face";
             return false;
         }
+        return aimAndAttackMiningTarget(mc, explorer, w, b, mineX, mineY, mineZ, aimPoint);
+    }
+
+    private int[] resolveObstructingTarget(Minecraft mc, Explorer explorer, World w, int nx, int by, int nz,
+        net.minecraft.block.Block b) {
+        if (visibleMiningPoint(mc, nx, by, nz) != null) return new int[] { nx, by, nz };
+        int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int z = (int) Math.floor(mc.thePlayer.posZ);
+        net.minecraft.util.MovingObjectPosition obstruction = w.rayTraceBlocks(
+            net.minecraft.util.Vec3.createVectorHelper(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ),
+            net.minecraft.util.Vec3.createVectorHelper(nx + 0.5D, by + 0.5D, nz + 0.5D));
+        if (obstruction == null
+            || obstruction.typeOfHit != net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK)
+            return new int[] { nx, by, nz };
+        net.minecraft.block.Block visible = w.getBlock(obstruction.blockX, obstruction.blockY, obstruction.blockZ);
+        boolean fallingObstruction = b instanceof net.minecraft.block.BlockFalling && obstruction.blockX == nx
+            && obstruction.blockZ == nz
+            && obstruction.blockY > by
+            && obstruction.blockY <= y + 4
+            && visible instanceof net.minecraft.block.BlockFalling
+            && explorer.excavationTerrain.excavatable(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ);
+        boolean clearableFoliage = FoliagePolicy.canClear(
+            isFoliage(visible),
+            w.getTileEntity(obstruction.blockX, obstruction.blockY, obstruction.blockZ) != null,
+            visible.getBlockHardness(w, obstruction.blockX, obstruction.blockY, obstruction.blockZ),
+            obstruction.blockX,
+            obstruction.blockY,
+            obstruction.blockZ,
+            x,
+            y,
+            z,
+            nx,
+            nz,
+            false);
+        return (fallingObstruction || clearableFoliage)
+            ? new int[] { obstruction.blockX, obstruction.blockY, obstruction.blockZ }
+            : new int[] { nx, by, nz };
+    }
+
+    private static boolean startMiningToolTransfer(Minecraft mc, Explorer explorer, int slot) {
+        if (explorer.toolTransfer.start(mc, slot)) {
+            explorer.status = "Opening inventory to prepare tool";
+            return true;
+        }
+        if (++explorer.toolWaitTicks > 40) {
+            explorer.stop(
+                mc,
+                "\u00A7eAuto-dig paused: inventory swap could not finish. Close other inventories and clear the cursor.");
+            return true;
+        }
+        explorer.status = "Preparing digging tool...";
+        return true;
+    }
+
+    private static void pauseForMissingMiningTool(Minecraft mc, Explorer explorer, net.minecraft.block.Block b) {
+        explorer.waitingForTool = true;
+        explorer.miningAttack
+            .release(mc.gameSettings.keyBindAttack, GameSettings.isKeyDown(mc.gameSettings.keyBindAttack));
+        mc.playerController.resetBlockRemoving();
+        explorer.digTicks = 0;
+        explorer.miningAim.reset();
+        explorer.status = "Mining paused: no usable tool for " + b.getLocalizedName();
+    }
+
+    private boolean aimAndAttackMiningTarget(Minecraft mc, Explorer explorer, World w, net.minecraft.block.Block b,
+        int mineX, int mineY, int mineZ, net.minecraft.util.Vec3 aimPoint) {
         double aimX = aimPoint.xCoord - mc.thePlayer.posX;
         double aimY = aimPoint.yCoord - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
         double aimZ = aimPoint.zCoord - mc.thePlayer.posZ;

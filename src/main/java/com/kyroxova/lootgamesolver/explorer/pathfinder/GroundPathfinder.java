@@ -128,39 +128,53 @@ public final class GroundPathfinder {
                     done = true;
                     break;
                 }
-                for (int[] direction : DIRECTIONS) for (int dy = -1; dy <= 1; dy++) {
+                expandNode(node);
+            }
+            done = done || open.isEmpty() || visited.size() >= 8192;
+            return done;
+        }
+
+        private void expandNode(Node node) {
+            for (int[] direction : DIRECTIONS) {
+                for (int dy = -1; dy <= 1; dy++) {
                     int nx = node.x + direction[0], ny = node.y + dy, nz = node.z + direction[1];
                     boolean diagonal = direction[0] != 0 && direction[1] != 0;
-                    if (diagonal && (dy != 0 || !stand(terrain, standable, nx, node.y, node.z)
-                        || !stand(terrain, standable, node.x, node.y, nz))) continue;
-                    if (Math.abs(nx - x) > radius || Math.abs(nz - z) > radius || Math.abs(ny - y) > 12) continue;
+                    if (!canStepTo(node, nx, ny, nz, dy, diagonal)) continue;
                     long position = key(nx, ny, nz);
-                    Boolean canStand = standable.get(position);
-                    if (canStand == null) {
-                        canStand = terrain.stand(nx, ny, nz);
-                        standable.put(position, canStand);
-                    }
-                    if (!canStand || !terrain.canTransition(node.x, node.y, node.z, nx, ny, nz)) continue;
-                    if (dy > 0 && !clear(terrain, clearable, node.x, node.y + 2, node.z)) continue;
-                    if (dy < 0 && !clear(terrain, clearable, nx, node.y + 1, nz)) continue;
-                    if (diagonal && (!clear(terrain, clearable, nx, node.y + 1, node.z)
-                        || !clear(terrain, clearable, node.x, node.y + 1, nz))) continue;
-                    int stepCost = (diagonal ? 14 : 10) + 10 * Math.abs(dy)
-                        + 10 * Math.max(0, terrainCost(terrain, terrainCosts, nx, ny, nz))
-                        + Math.max(0, terrain.transitionCost(node.x, node.y, node.z, nx, ny, nz));
-                    if (node.parent != null
-                        && (nx - node.x != node.x - node.parent.x || nz - node.z != node.z - node.parent.z))
-                        stepCost += 6;
-                    int nextCost = node.cost + stepCost;
+                    if (visited.contains(position)) continue;
+                    int nextCost = node.cost + computeStepCost(node, nx, ny, nz, dy, diagonal);
                     Integer priorCost = bestCosts.get(position);
                     if (priorCost != null && priorCost.intValue() <= nextCost) continue;
-                    if (visited.contains(position)) continue;
                     bestCosts.put(position, nextCost);
                     open.add(new Node(nx, ny, nz, nextCost, gx, gy, gz, node));
                 }
             }
-            done = done || open.isEmpty() || visited.size() >= 8192;
-            return done;
+        }
+
+        private boolean canStepTo(Node node, int nx, int ny, int nz, int dy, boolean diagonal) {
+            if (diagonal && (dy != 0 || !stand(terrain, standable, nx, node.y, node.z)
+                || !stand(terrain, standable, node.x, node.y, nz))) return false;
+            if (Math.abs(nx - x) > radius || Math.abs(nz - z) > radius || Math.abs(ny - y) > 12) return false;
+            long position = key(nx, ny, nz);
+            Boolean canStand = standable.get(position);
+            if (canStand == null) {
+                canStand = terrain.stand(nx, ny, nz);
+                standable.put(position, canStand);
+            }
+            if (!canStand || !terrain.canTransition(node.x, node.y, node.z, nx, ny, nz)) return false;
+            if (dy > 0 && !clear(terrain, clearable, node.x, node.y + 2, node.z)) return false;
+            if (dy < 0 && !clear(terrain, clearable, nx, node.y + 1, nz)) return false;
+            return !diagonal || (clear(terrain, clearable, nx, node.y + 1, node.z)
+                && clear(terrain, clearable, node.x, node.y + 1, nz));
+        }
+
+        private int computeStepCost(Node node, int nx, int ny, int nz, int dy, boolean diagonal) {
+            int stepCost = (diagonal ? 14 : 10) + 10 * Math.abs(dy)
+                + 10 * Math.max(0, terrainCost(terrain, terrainCosts, nx, ny, nz))
+                + Math.max(0, terrain.transitionCost(node.x, node.y, node.z, nx, ny, nz));
+            if (node.parent != null && (nx - node.x != node.x - node.parent.x || nz - node.z != node.z - node.parent.z))
+                stepCost += 6;
+            return stepCost;
         }
 
         public List<int[]> path() {

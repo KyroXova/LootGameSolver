@@ -65,57 +65,80 @@ public final class VerifiedStorageTransfer {
             || destination == mc.thePlayer.inventory) return Result.FAILED;
         if (binnie != null && binnie.isSyncing()) return Result.WORKING;
         if (pending != null) {
-            VerifiedContainerClick.Result reply = click.tick();
-            if (reply == VerifiedContainerClick.Result.WAITING) return Result.WORKING;
-            if (reply == VerifiedContainerClick.Result.FAILED) return Result.FAILED;
-            click = null;
-            int afterPlayer = count(mc.thePlayer.inventory, pending);
-            int afterDestination = count(destination, pending);
-            if (!StorageTransferPolicy.confirmed(beforePlayer, afterPlayer, beforeDestination, afterDestination)) {
-                if (afterPlayer != beforePlayer || afterDestination != beforeDestination) return Result.FAILED;
-                rejected[pendingPlayerSlot] = true;
-            } else {
-                int amount = beforePlayer - afterPlayer;
-                moved += amount;
-                ledger.deposited(pending, amount);
-            }
-            pending = null;
-            pendingPlayerSlot = -1;
+            Result pendingResult = handlePendingClick(mc);
+            if (pendingResult != null) return pendingResult;
         }
-        boolean remaining = false;
-        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
-        for (Object value : container.inventorySlots) {
-            Slot slot = (Slot) value;
-            int index = slot.getSlotIndex();
-            ItemStack stack = slot.getStack();
-            if (slot.inventory != mc.thePlayer.inventory || !movable(index, stack, reserve, ledger, baseline)) continue;
-            remaining = true;
-            if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) {
-                addRejectedType(stack);
-                continue;
-            }
-            pending = stack.copy();
+        Slot selected = findNextTransferSlot(mc);
+        if (selected != null) {
+            pending = selected.getStack()
+                .copy();
             beforePlayer = count(mc.thePlayer.inventory, pending);
             beforeDestination = count(destination, pending);
-            pendingPlayerSlot = index;
-            click = VerifiedContainerClick.start(mc, slot.slotNumber, true);
+            pendingPlayerSlot = selected.getSlotIndex();
+            click = VerifiedContainerClick.start(mc, selected.slotNumber, true);
             if (click == null) {
                 pending = null;
                 return Result.FAILED;
             }
             return Result.WORKING;
         }
-        if (remaining) {
-            if (binnie != null && binnie.canSwitchToNextTab()) {
-                if (binnie.switchToNextTab(mc)) {
-                    java.util.Arrays.fill(rejected, false);
-                    rejectedTypes.clear();
-                    return Result.WORKING;
-                }
+        if (hasAnyMovableRemaining(mc)) {
+            if (binnie != null && binnie.canSwitchToNextTab() && binnie.switchToNextTab(mc)) {
+                java.util.Arrays.fill(rejected, false);
+                rejectedTypes.clear();
+                return Result.WORKING;
             }
             return Result.FULL_OR_REJECTED;
         }
         return Result.DONE;
+    }
+
+    private Result handlePendingClick(Minecraft mc) {
+        VerifiedContainerClick.Result reply = click.tick();
+        if (reply == VerifiedContainerClick.Result.WAITING) return Result.WORKING;
+        if (reply == VerifiedContainerClick.Result.FAILED) return Result.FAILED;
+        click = null;
+        int afterPlayer = count(mc.thePlayer.inventory, pending);
+        int afterDestination = count(destination, pending);
+        if (!StorageTransferPolicy.confirmed(beforePlayer, afterPlayer, beforeDestination, afterDestination)) {
+            if (afterPlayer != beforePlayer || afterDestination != beforeDestination) return Result.FAILED;
+            rejected[pendingPlayerSlot] = true;
+        } else {
+            int amount = beforePlayer - afterPlayer;
+            moved += amount;
+            ledger.deposited(pending, amount);
+        }
+        pending = null;
+        pendingPlayerSlot = -1;
+        return null;
+    }
+
+    private Slot findNextTransferSlot(Minecraft mc) {
+        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        Slot selected = null;
+        for (Object value : container.inventorySlots) {
+            if (selected != null) break;
+            Slot slot = (Slot) value;
+            int index = slot.getSlotIndex();
+            ItemStack stack = slot.getStack();
+            if (slot.inventory != mc.thePlayer.inventory || !movable(index, stack, reserve, ledger, baseline)) continue;
+            if (rejected[index] || !slot.canTakeStack(mc.thePlayer) || !accepts(stack)) {
+                addRejectedType(stack);
+                continue;
+            }
+            selected = slot;
+        }
+        return selected;
+    }
+
+    private boolean hasAnyMovableRemaining(Minecraft mc) {
+        int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        for (Object value : container.inventorySlots) {
+            Slot slot = (Slot) value;
+            if (slot.inventory == mc.thePlayer.inventory
+                && movable(slot.getSlotIndex(), slot.getStack(), reserve, ledger, baseline)) return true;
+        }
+        return false;
     }
 
     public void cancel() {

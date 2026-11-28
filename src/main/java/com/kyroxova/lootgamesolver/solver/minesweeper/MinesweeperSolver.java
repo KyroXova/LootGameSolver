@@ -389,7 +389,7 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
     }
 
     private ReductionResult reduceConstraints(List<Constraint> initial) {
-        Map<CellPosition, Boolean> knownAssignments = new LinkedHashMap<CellPosition, Boolean>(); // true = mine, false
+        Map<CellPosition, Boolean> knownAssignments = new LinkedHashMap<CellPosition, Boolean>();
         List<Constraint> current = new ArrayList<Constraint>();
         for (Constraint c : initial) {
             current.add(new Constraint(new LinkedHashSet<CellPosition>(c.variables), c.mines));
@@ -398,56 +398,14 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
         boolean changed = true;
         while (changed) {
             changed = false;
+            current = applyKnownAssignments(current, knownAssignments);
+            if (current == null) return contradictionResult();
 
-            // Apply known assignments to each constraint.
-            if (!knownAssignments.isEmpty()) {
-                List<Constraint> updated = new ArrayList<Constraint>();
-                for (Constraint c : current) {
-                    Set<CellPosition> vars = new LinkedHashSet<CellPosition>(c.variables);
-                    int mines = c.mines;
-                    for (Map.Entry<CellPosition, Boolean> entry : knownAssignments.entrySet()) {
-                        if (vars.remove(entry.getKey())) {
-                            if (entry.getValue()) {
-                                mines--;
-                            }
-                        }
-                    }
-                    if (mines < 0 || mines > vars.size()) {
-                        return new ReductionResult(
-                            Collections.<SolverAction>emptyList(),
-                            Collections.<Constraint>emptyList(),
-                            true);
-                    }
-                    if (!vars.isEmpty()) {
-                        updated.add(new Constraint(vars, mines));
-                    }
-                }
-                current = updated;
-            }
-
-            // Apply direct deductions.
             List<Constraint> nextConstraints = new ArrayList<Constraint>();
             for (Constraint c : current) {
-                if (c.mines < 0 || c.mines > c.variables.size()) {
-                    return new ReductionResult(
-                        Collections.<SolverAction>emptyList(),
-                        Collections.<Constraint>emptyList(),
-                        true);
-                }
-                if (c.mines == 0) {
-                    for (CellPosition p : c.variables) {
-                        if (!knownAssignments.containsKey(p)) {
-                            knownAssignments.put(p, Boolean.FALSE);
-                            changed = true;
-                        }
-                    }
-                } else if (c.mines == c.variables.size()) {
-                    for (CellPosition p : c.variables) {
-                        if (!knownAssignments.containsKey(p)) {
-                            knownAssignments.put(p, Boolean.TRUE);
-                            changed = true;
-                        }
-                    }
+                if (c.mines < 0 || c.mines > c.variables.size()) return contradictionResult();
+                if (c.mines == 0 || c.mines == c.variables.size()) {
+                    changed |= assignAll(c.variables, c.mines != 0, knownAssignments);
                 } else {
                     nextConstraints.add(c);
                 }
@@ -455,69 +413,86 @@ public final class MinesweeperSolver implements MiniGameSolver<MinesweeperBoard>
             current = nextConstraints;
             if (changed) continue;
 
-            // Derive constraints from strict subsets.
-            int n = current.size();
             List<Constraint> addedSubsets = new ArrayList<Constraint>();
-            for (int i = 0; i < n; i++) {
-                Constraint c1 = current.get(i);
-                for (int j = 0; j < n; j++) {
-                    if (i == j) continue;
-                    Constraint c2 = current.get(j);
-                    if (c2.variables.size() > c1.variables.size() && c2.variables.containsAll(c1.variables)) {
-                        Set<CellPosition> diffVars = new LinkedHashSet<CellPosition>(c2.variables);
-                        diffVars.removeAll(c1.variables);
-                        int diffMines = c2.mines - c1.mines;
-                        if (diffMines < 0 || diffMines > diffVars.size()) {
-                            return new ReductionResult(
-                                Collections.<SolverAction>emptyList(),
-                                Collections.<Constraint>emptyList(),
-                                true);
-                        }
-                        if (diffMines == 0) {
-                            for (CellPosition p : diffVars) {
-                                if (!knownAssignments.containsKey(p)) {
-                                    knownAssignments.put(p, Boolean.FALSE);
-                                    changed = true;
-                                }
-                            }
-                        } else if (diffMines == diffVars.size()) {
-                            for (CellPosition p : diffVars) {
-                                if (!knownAssignments.containsKey(p)) {
-                                    knownAssignments.put(p, Boolean.TRUE);
-                                    changed = true;
-                                }
-                            }
-                        } else {
-                            Constraint subsetConstraint = new Constraint(diffVars, diffMines);
-                            if (!containsEquivalentConstraint(current, subsetConstraint)
-                                && !containsEquivalentConstraint(addedSubsets, subsetConstraint)) {
-                                addedSubsets.add(subsetConstraint);
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-            }
+            Boolean subsetChanged = deriveSubsetConstraints(current, knownAssignments, addedSubsets);
+            if (subsetChanged == null) return contradictionResult();
+            changed = subsetChanged.booleanValue();
+            if (!changed && addedSubsets.isEmpty()) break;
             current.addAll(addedSubsets);
         }
 
         List<SolverAction> actions = new ArrayList<SolverAction>();
         for (Map.Entry<CellPosition, Boolean> entry : knownAssignments.entrySet()) {
-            if (entry.getValue()) {
-                actions.add(new SolverAction(SolverAction.Type.FLAG, entry.getKey()));
-            } else {
-                actions.add(new SolverAction(SolverAction.Type.REVEAL, entry.getKey()));
-            }
+            actions.add(
+                new SolverAction(entry.getValue() ? SolverAction.Type.FLAG : SolverAction.Type.REVEAL, entry.getKey()));
         }
-
         List<Constraint> distinctRemaining = new ArrayList<Constraint>();
         for (Constraint c : current) {
-            if (!containsEquivalentConstraint(distinctRemaining, c)) {
-                distinctRemaining.add(c);
+            if (!containsEquivalentConstraint(distinctRemaining, c)) distinctRemaining.add(c);
+        }
+        return new ReductionResult(actions, distinctRemaining, false);
+    }
+
+    private static ReductionResult contradictionResult() {
+        return new ReductionResult(Collections.<SolverAction>emptyList(), Collections.<Constraint>emptyList(), true);
+    }
+
+    private static List<Constraint> applyKnownAssignments(List<Constraint> current,
+        Map<CellPosition, Boolean> knownAssignments) {
+        if (knownAssignments.isEmpty()) return current;
+        List<Constraint> updated = new ArrayList<Constraint>();
+        for (Constraint c : current) {
+            Set<CellPosition> vars = new LinkedHashSet<CellPosition>(c.variables);
+            int mines = c.mines;
+            for (Map.Entry<CellPosition, Boolean> entry : knownAssignments.entrySet()) {
+                if (vars.remove(entry.getKey()) && entry.getValue()) mines--;
+            }
+            if (mines < 0 || mines > vars.size()) return null;
+            if (!vars.isEmpty()) updated.add(new Constraint(vars, mines));
+        }
+        return updated;
+    }
+
+    private static boolean assignAll(Set<CellPosition> vars, boolean isMine,
+        Map<CellPosition, Boolean> knownAssignments) {
+        boolean changed = false;
+        Boolean value = Boolean.valueOf(isMine);
+        for (CellPosition p : vars) {
+            if (!knownAssignments.containsKey(p)) {
+                knownAssignments.put(p, value);
+                changed = true;
             }
         }
+        return changed;
+    }
 
-        return new ReductionResult(actions, distinctRemaining, false);
+    private Boolean deriveSubsetConstraints(List<Constraint> current, Map<CellPosition, Boolean> knownAssignments,
+        List<Constraint> addedSubsets) {
+        boolean changed = false;
+        int n = current.size();
+        for (int i = 0; i < n; i++) {
+            Constraint c1 = current.get(i);
+            for (int j = 0; j < n; j++) {
+                if (i == j) continue;
+                Constraint c2 = current.get(j);
+                if (c2.variables.size() <= c1.variables.size() || !c2.variables.containsAll(c1.variables)) continue;
+                Set<CellPosition> diffVars = new LinkedHashSet<CellPosition>(c2.variables);
+                diffVars.removeAll(c1.variables);
+                int diffMines = c2.mines - c1.mines;
+                if (diffMines < 0 || diffMines > diffVars.size()) return null;
+                if (diffMines == 0 || diffMines == diffVars.size()) {
+                    changed |= assignAll(diffVars, diffMines != 0, knownAssignments);
+                } else {
+                    Constraint subsetConstraint = new Constraint(diffVars, diffMines);
+                    if (!containsEquivalentConstraint(current, subsetConstraint)
+                        && !containsEquivalentConstraint(addedSubsets, subsetConstraint)) {
+                        addedSubsets.add(subsetConstraint);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return Boolean.valueOf(changed);
     }
 
     private boolean containsEquivalentConstraint(List<Constraint> list, Constraint target) {

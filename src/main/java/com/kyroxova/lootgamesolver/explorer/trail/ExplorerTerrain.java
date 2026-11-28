@@ -56,53 +56,15 @@ public final class ExplorerTerrain {
     }
 
     public static boolean safe(World world, int x, int y, int z) {
-        if (world.getBlock(x, y, z)
-            .getMaterial() == net.minecraft.block.material.Material.leaves
-            || world.getBlock(x, y + 1, z)
-                .getMaterial() == net.minecraft.block.material.Material.leaves
-            || world.getBlock(x, y - 1, z)
-                .getMaterial() == net.minecraft.block.material.Material.leaves)
+        if (hasLeavesInColumn(world, x, y, z) || !noNearbyOil(world, x, y, z) || !noNearbyHazards(world, x, y, z))
             return false;
-        for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
-                net.minecraft.block.Block nearby = world.getBlock(x + dx, y + dy, z + dz);
-                if (OilAvoidance.isOilBlock(nearby)) return false;
-            }
-        }
-        for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
-            for (int dy = -1; dy <= 2; dy++) {
-                if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
-                net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
-                if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))) return false;
-                if (isQuicksand(world, x + dx, y + dy, z + dz)) return false;
-                if (block.getMaterial() == net.minecraft.block.material.Material.lava || block == Blocks.fire
-                    || block == Blocks.cactus
-                    || block == Blocks.web
-                    || block == Blocks.portal) return false;
-            }
-        }
         boolean liquidAtFeet = world.getBlock(x, y, z)
             .getMaterial()
             .isLiquid();
         boolean liquidBelow = world.getBlock(x, y - 1, z)
             .getMaterial()
             .isLiquid();
-        if (liquidAtFeet || liquidBelow) {
-            boolean waterAtFeet = world.getBlock(x, y, z)
-                .getMaterial() == net.minecraft.block.material.Material.water;
-            boolean waterBelow = world.getBlock(x, y - 1, z)
-                .getMaterial() == net.minecraft.block.material.Material.water;
-            if (waterAtFeet && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) {
-                return true;
-            }
-            if (!liquidAtFeet && (waterBelow || world.getBlock(x, y - 1, z) == Blocks.waterlily)
-                && passable(world, x, y, z)
-                && passable(world, x, y + 1, z)) {
-                return true;
-            }
-            return false;
-        }
+        if (liquidAtFeet || liquidBelow) return safeInWater(world, x, y, z, liquidAtFeet);
         double surfaceY = walkSurfaceY(world, x, y, z);
         if (surfaceY < y) return false;
         return world
@@ -110,6 +72,55 @@ public final class ExplorerTerrain {
                 net.minecraft.util.AxisAlignedBB
                     .getBoundingBox(x + 0.19D, surfaceY + 0.01D, z + 0.19D, x + 0.81D, surfaceY + 1.81D, z + 0.81D))
             .isEmpty();
+    }
+
+    private static boolean hasLeavesInColumn(World world, int x, int y, int z) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (world.getBlock(x, y + dy, z)
+                .getMaterial() == net.minecraft.block.material.Material.leaves) return true;
+        }
+        return false;
+    }
+
+    private static boolean noNearbyOil(World world, int x, int y, int z) {
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    if (!world.blockExists(x + dx, y + dy, z + dz)
+                        || OilAvoidance.isOilBlock(world.getBlock(x + dx, y + dy, z + dz))) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean noNearbyHazards(World world, int x, int y, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dy = -1; dy <= 2; dy++) {
+                    if (!world.blockExists(x + dx, y + dy, z + dz)) return false;
+                    net.minecraft.block.Block block = world.getBlock(x + dx, y + dy, z + dz);
+                    if (ContactHazards.dangerous(block, world.getBlockMetadata(x + dx, y + dy, z + dz))
+                        || isQuicksand(world, x + dx, y + dy, z + dz)) return false;
+                    if (block.getMaterial() == net.minecraft.block.material.Material.lava || block == Blocks.fire
+                        || block == Blocks.cactus
+                        || block == Blocks.web
+                        || block == Blocks.portal) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean safeInWater(World world, int x, int y, int z, boolean liquidAtFeet) {
+        boolean waterAtFeet = world.getBlock(x, y, z)
+            .getMaterial() == net.minecraft.block.material.Material.water;
+        boolean waterBelow = world.getBlock(x, y - 1, z)
+            .getMaterial() == net.minecraft.block.material.Material.water;
+        if (waterAtFeet && passable(world, x, y + 1, z) && passable(world, x, y + 2, z)) return true;
+        return !liquidAtFeet && (waterBelow || world.getBlock(x, y - 1, z) == Blocks.waterlily)
+            && passable(world, x, y, z)
+            && passable(world, x, y + 1, z);
     }
 
     public static boolean isQuicksand(World world, int x, int y, int z) {
@@ -144,50 +155,38 @@ public final class ExplorerTerrain {
     public static double walkSurfaceY(World world, int x, int y, int z) {
         net.minecraft.block.Block at = world.getBlock(x, y, z);
         if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
-        if (at == net.minecraft.init.Blocks.snow_layer) {
-            net.minecraft.block.Block underSnow = world.getBlock(x, y - 1, z);
-            if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
-                || underSnow == net.minecraft.init.Blocks.air
-                || underSnow.getMaterial()
-                    .isLiquid()) {
-                return -1D;
-            }
-            int meta = world.getBlockMetadata(x, y, z) & 7;
-            return y + (meta + 1) * 0.125D;
-        }
+        if (at == net.minecraft.init.Blocks.snow_layer) return snowLayerSurfaceY(world, x, y, z);
         net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
-        if (box != null && box.maxY >= y + 0.05D
-            && box.maxY < y + 1D
-            && box.minX < x + 0.5D
-            && box.maxX > x + 0.5D
-            && box.minZ < z + 0.5D
-            && box.maxZ > z + 0.5D) {
-            return box.maxY;
-        }
+        if (box != null && box.maxY < y + 1D && boxCoversCenter(box, x, z, y + 0.05D)) return box.maxY;
+
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
         if (below.getMaterial() == net.minecraft.block.material.Material.leaves) return -1D;
-        if (below == net.minecraft.init.Blocks.snow_layer) {
-            net.minecraft.block.Block underSnow = world.getBlock(x, y - 2, z);
-            if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
-                || underSnow == net.minecraft.init.Blocks.air
-                || underSnow.getMaterial()
-                    .isLiquid()) {
-                return -1D;
-            }
-            int meta = world.getBlockMetadata(x, y - 1, z) & 7;
-            return (y - 1) + (meta + 1) * 0.125D;
-        }
+        if (below == net.minecraft.init.Blocks.snow_layer) return snowLayerSurfaceY(world, x, y - 1, z);
         if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
             || below == net.minecraft.init.Blocks.ice
             || below == net.minecraft.init.Blocks.packed_ice
             || below == net.minecraft.init.Blocks.snow) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
-        if (belowBox != null && belowBox.maxY >= y
-            && belowBox.minX < x + 0.5D
-            && belowBox.maxX > x + 0.5D
-            && belowBox.minZ < z + 0.5D
-            && belowBox.maxZ > z + 0.5D) return y;
+        if (belowBox != null && boxCoversCenter(belowBox, x, z, y)) return y;
         return -1D;
+    }
+
+    private static double snowLayerSurfaceY(World world, int x, int snowY, int z) {
+        net.minecraft.block.Block underSnow = world.getBlock(x, snowY - 1, z);
+        if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
+            || underSnow == net.minecraft.init.Blocks.air
+            || underSnow.getMaterial()
+                .isLiquid())
+            return -1D;
+        int meta = world.getBlockMetadata(x, snowY, z) & 7;
+        return snowY + (meta + 1) * 0.125D;
+    }
+
+    private static boolean boxCoversCenter(net.minecraft.util.AxisAlignedBB box, int x, int z, double minMaxY) {
+        return box.maxY >= minMaxY && box.minX < x + 0.5D
+            && box.maxX > x + 0.5D
+            && box.minZ < z + 0.5D
+            && box.maxZ > z + 0.5D;
     }
 
     public static boolean isDungeonWall(World world, int x, int y, int z) {

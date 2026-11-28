@@ -64,20 +64,12 @@ public final class ExcavationTerrain {
         if (!w.blockExists(nx, ny - 1, nz) || !w.getBlock(nx, ny - 1, nz)
             .isNormalCube()) return -1;
         boolean overhead = ny > y && !passable(w, x, y + 2, z);
-        if (overhead && w.getBlock(x, y + 2, z) instanceof net.minecraft.block.BlockFalling) return -1;
-        if (overhead && !excavatable(w, x, y + 2, z)) return -1;
-        int cost = 1 + Math.abs(ny - y), firstBreak = Integer.MAX_VALUE, lastBreak = Integer.MIN_VALUE;
-        if (overhead) {
-            cost += 2;
-            for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) for (int by = y + 1; by <= y + 3; by++) {
-                net.minecraft.block.Block block = w.getBlock(x + ox, by, z + oz);
-                if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial()
-                    .isLiquid() || ox == 0 && oz == 0 && block instanceof net.minecraft.block.BlockFalling) return -1;
-            }
-        }
+        if (overhead && !overheadClear(w, x, y, z)) return -1;
         int clearanceTop = Math.max(y, ny) + 1;
-        if (!w.blockExists(nx, clearanceTop + 1, nz)) return -1;
-        if (clearanceTop > y + 4) return -1;
+        if (!w.blockExists(nx, clearanceTop + 1, nz) || clearanceTop > y + 4) return -1;
+
+        int cost = 1 + Math.abs(ny - y) + (overhead ? 2 : 0);
+        int firstBreak = Integer.MAX_VALUE, lastBreak = Integer.MIN_VALUE;
         for (int by = ny; by <= clearanceTop; by++) {
             if (passable(w, nx, by, nz)) continue;
             if (!excavatable(w, nx, by, nz)) return -1;
@@ -87,16 +79,41 @@ public final class ExcavationTerrain {
             cost += Math.max(1, (int) Math.ceil(block.getBlockHardness(w, nx, by, nz) / 2F));
             if (block.getMaterial() == net.minecraft.block.material.Material.wood) cost += 4;
         }
-        for (int ox = -1; ox <= 1; ox++)
-            for (int oz = -1; oz <= 1; oz++) for (int by = ny - 1; by <= Math.max(y, ny) + 2; by++) {
-                if (!w.blockExists(nx + ox, by, nz + oz)) return -1;
-                net.minecraft.block.Block block = w.getBlock(nx + ox, by, nz + oz);
-                if (ContactHazards.dangerous(block, w.getBlockMetadata(nx + ox, by, nz + oz))) return -1;
-                if ((block.getMaterial()
-                    .isLiquid() && by >= firstBreak - 1
-                    && by <= lastBreak + 1) || block == Blocks.fire || block == Blocks.cactus || block == Blocks.portal)
-                    return -1;
+        return surroundingHazardsClear(w, nx, ny, Math.max(y, ny) + 2, nz, firstBreak, lastBreak) ? cost : -1;
+    }
+
+    private boolean overheadClear(World w, int x, int y, int z) {
+        if (w.getBlock(x, y + 2, z) instanceof net.minecraft.block.BlockFalling || !excavatable(w, x, y + 2, z))
+            return false;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                for (int by = y + 1; by <= y + 3; by++) {
+                    net.minecraft.block.Block block = w.getBlock(x + ox, by, z + oz);
+                    if (!w.blockExists(x + ox, by, z + oz) || block.getMaterial()
+                        .isLiquid() || (ox == 0 && oz == 0 && block instanceof net.minecraft.block.BlockFalling))
+                        return false;
+                }
             }
-        return cost;
+        }
+        return true;
+    }
+
+    private static boolean surroundingHazardsClear(World w, int nx, int ny, int topY, int nz, int firstBreak,
+        int lastBreak) {
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                for (int by = ny - 1; by <= topY; by++) {
+                    if (!w.blockExists(nx + ox, by, nz + oz)) return false;
+                    net.minecraft.block.Block block = w.getBlock(nx + ox, by, nz + oz);
+                    if (ContactHazards.dangerous(block, w.getBlockMetadata(nx + ox, by, nz + oz))) return false;
+                    if ((block.getMaterial()
+                        .isLiquid() && by >= firstBreak - 1
+                        && by <= lastBreak + 1) || block == Blocks.fire
+                        || block == Blocks.cactus
+                        || block == Blocks.portal) return false;
+                }
+            }
+        }
+        return true;
     }
 }

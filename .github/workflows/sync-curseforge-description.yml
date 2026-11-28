@@ -10,11 +10,6 @@ on:
       CURSEFORGE_TOKEN:
         required: true
   workflow_dispatch:
-    inputs:
-      release_commit:
-        description: Commit or tag containing the description (defaults to the selected ref)
-        required: false
-        type: string
 
 permissions:
   contents: read

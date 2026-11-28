@@ -150,6 +150,7 @@ public class Explorer {
     public boolean roomExitPlanning;
     public boolean roomExitNeedsResume;
     public boolean roomExitCrossing;
+    public boolean roomExitDugPathJoin;
     public int roomExitJumpRetries;
 
     public List<int[]> roomEntryCandidates;
@@ -366,7 +367,9 @@ public class Explorer {
             int dim = mc.theWorld.provider.dimensionId;
             int[] center = position != null ? position : knownStructure;
             if (center != null) solvedStructures.mark(world, dim, center, center);
-        } catch (java.io.IOException ignored) {}
+        } catch (java.io.IOException ignored) {
+            com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Could not persist solved structure marker", ignored);
+        }
     }
 
     public void finishPuzzle(Minecraft mc, boolean solved) {
@@ -793,7 +796,7 @@ public class Explorer {
 
     public void updateRoutePreview(Minecraft mc) {
         int[] head = route.isEmpty() ? null : route.get(0);
-        if (head != previewHead || route.size() != previewSize) {
+        if (!java.util.Objects.equals(head, previewHead) || route.size() != previewSize) {
             previewHead = head;
             previewSize = route.size();
             navigationPreview.clear();
@@ -910,6 +913,7 @@ public class Explorer {
         roomExitPlanning = false;
         roomExitNeedsResume = false;
         roomExitCrossing = false;
+        roomExitDugPathJoin = false;
         miningDriver.reset(mc, this);
         blockPlacer.reset(mc);
         chestPitNav.reset();

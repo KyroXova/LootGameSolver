@@ -6,6 +6,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.play.client.C0EPacketClickWindow;
 import net.minecraft.network.play.server.S32PacketConfirmTransaction;
 
+import com.kyroxova.lootgamesolver.LootGameSolver;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -85,7 +87,9 @@ public final class ContainerClickConfirmation extends ChannelDuplexHandler {
     public void close() {
         try {
             if (pipeline != null && pipeline.context(this) != null) pipeline.remove(this);
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {
+            LootGameSolver.LOG.debug("Could not remove container click observer from pipeline", ignored);
+        }
         pipeline = null;
     }
 }

@@ -79,25 +79,10 @@ public final class StorageRecoveryController {
     }
 
     public Result tick(Minecraft mc) {
-        if (cancelled) return Result.FAILED;
-        if (failureReason != null) return Result.FAILED;
+        if (cancelled || failureReason != null) return Result.FAILED;
         if (positioning) {
-            if (mc == null || mc.theWorld == null
-                || mc.thePlayer == null
-                || !checkpoint.world.equals(Explorer.worldIdentity(mc))
-                || checkpoint.dimension != mc.theWorld.provider.dimensionId) {
-                positioner.stop();
-                return Result.FAILED;
-            }
-            ReturnWarpPositioner.Result result = positioner.tick(mc);
-            if (result == ReturnWarpPositioner.Result.FAILED) {
-                positioner.stop();
-                failureReason = "Could not reach a clear 3x3 area for the return warp.";
-                return Result.FAILED;
-            }
-            if (result == ReturnWarpPositioner.Result.WORKING) return Result.WORKING;
-            positioning = false;
-            if (!trip.start(mc, true)) return Result.FAILED;
+            Result posResult = tickPositioning(mc);
+            if (posResult != null) return posResult;
         }
         trip.tick(mc);
         StorageTripState.Phase phase = trip.phase();
@@ -108,34 +93,54 @@ public final class StorageRecoveryController {
         }
         if (phase == StorageTripState.Phase.READY_TO_RESUME)
             return returnWithoutDeposit ? Result.RETURNED_UNSTORED : Result.RETURNED;
-        if (phase != StorageTripState.Phase.DEPOSITING) return Result.WORKING;
-        if (mc == null || mc.theWorld == null || mc.thePlayer == null) return Result.WORKING;
-        if (!dropOffChecked && mc.currentScreen != null) return Result.WORKING;
+        if (phase != StorageTripState.Phase.DEPOSITING || mc == null || mc.theWorld == null || mc.thePlayer == null)
+            return Result.WORKING;
+        if (tickBogoDropOff(mc)) return Result.WORKING;
+        return tickDeposit(mc);
+    }
+
+    private Result tickPositioning(Minecraft mc) {
+        if (mc == null || mc.theWorld == null
+            || mc.thePlayer == null
+            || !checkpoint.world.equals(Explorer.worldIdentity(mc))
+            || checkpoint.dimension != mc.theWorld.provider.dimensionId) {
+            positioner.stop();
+            return Result.FAILED;
+        }
+        ReturnWarpPositioner.Result result = positioner.tick(mc);
+        if (result == ReturnWarpPositioner.Result.FAILED) {
+            positioner.stop();
+            failureReason = "Could not reach a clear 3x3 area for the return warp.";
+            return Result.FAILED;
+        }
+        if (result == ReturnWarpPositioner.Result.WORKING) return Result.WORKING;
+        positioning = false;
+        return trip.start(mc, true) ? null : Result.FAILED;
+    }
+
+    private boolean tickBogoDropOff(Minecraft mc) {
         if (!dropOffChecked) {
+            if (mc.currentScreen != null) return true;
             dropOffChecked = true;
-            if (BogoDropOffBridge.available()) {
-                if (BogoDropOffBridge.safeToRequest(mc)) {
-                    bogo = new BogoDropOffBridge.Session();
-                    if (!bogo.start()) {
-                        bogo = null;
-                    }
-                }
+            if (BogoDropOffBridge.available() && BogoDropOffBridge.safeToRequest(mc)) {
+                bogo = new BogoDropOffBridge.Session();
+                if (!bogo.start()) bogo = null;
             }
         }
-        if (bogo != null) {
-            int response = bogo.response();
-            if (response < 0 || ++dropOffWait > 600) {
-                bogo.close();
-                bogo = null;
-            } else if (response == 0) {
-                return Result.WORKING;
-            } else if (++dropOffSettle < 5) {
-                return Result.WORKING;
-            } else {
-                bogo.close();
-                bogo = null;
-            }
+        if (bogo == null) return false;
+        int response = bogo.response();
+        if (response < 0 || ++dropOffWait > 600) {
+            bogo.close();
+            bogo = null;
+            return false;
         }
+        if (response == 0 || ++dropOffSettle < 5) return true;
+        bogo.close();
+        bogo = null;
+        return false;
+    }
+
+    private Result tickDeposit(Minecraft mc) {
         if (deposit == null) deposit = new StorageDepositCoordinator(LootGameSolverConfig.storageTargets, baseline);
         StorageDepositCoordinator.Result result = deposit.tick(mc);
         if (result == StorageDepositCoordinator.Result.FAILED) {

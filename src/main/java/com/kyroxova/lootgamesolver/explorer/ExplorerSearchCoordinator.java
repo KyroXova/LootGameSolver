@@ -140,6 +140,7 @@ public class ExplorerSearchCoordinator {
     }
 
     public boolean nextSearchGoal(Minecraft mc, Explorer explorer) {
+        if (searchWasLeftBehind(mc, explorer)) rotateSearch(mc, explorer);
         if (explorer.search == null) rotateSearch(mc, explorer);
         int[] next = explorer.search.next();
         if (next == null) {
@@ -181,6 +182,7 @@ public class ExplorerSearchCoordinator {
     }
 
     public boolean nextSearchLeg(Minecraft mc, Explorer explorer) {
+        if (searchWasLeftBehind(mc, explorer)) rotateSearch(mc, explorer);
         for (int attempt = 0; attempt < 16; attempt++) {
             if (explorer.search == null) rotateSearch(mc, explorer);
             int[] goal = explorer.search.next();
@@ -202,20 +204,28 @@ public class ExplorerSearchCoordinator {
             explorer.target.yCoord = y;
             explorer.target.zCoord = z + (int) Math.round(dz / length * step);
             if (!mc.theWorld.blockExists(explorer.target.xCoord, y, explorer.target.zCoord)) continue;
-            explorer.plan(mc);
-            explorer.searching = true;
-            explorer.digging = false;
-            explorer.walking = true;
-            explorer.stalled = 0;
-            explorer.lastDistance = Double.MAX_VALUE;
-            explorer.status = explorer.route.isEmpty() && explorer.walkingSearch == null ? "Checking safe direction"
-                : "Exploring outward";
-            return true;
+            if (mc.theWorld.blockExists(explorer.target.xCoord, y, explorer.target.zCoord)) {
+                explorer.plan(mc);
+                explorer.searching = true;
+                explorer.digging = false;
+                explorer.walking = true;
+                explorer.stalled = 0;
+                explorer.lastDistance = Double.MAX_VALUE;
+                explorer.status = explorer.route.isEmpty() && explorer.walkingSearch == null ? "Checking safe direction"
+                    : "Exploring outward";
+                return true;
+            }
         }
         explorer.searching = true;
         explorer.walking = true;
         explorer.status = "Waiting for loaded terrain";
         return true;
+    }
+
+    private boolean searchWasLeftBehind(Minecraft mc, Explorer explorer) {
+        if (mc == null || mc.thePlayer == null || explorer.search == null) return false;
+        return explorer.search
+            .isFarFrom((int) Math.floor(mc.thePlayer.posX), (int) Math.floor(mc.thePlayer.posZ), 512D);
     }
 
     public void continueProgressiveSearch(Minecraft mc, Explorer explorer, boolean solved) {
@@ -236,6 +246,7 @@ public class ExplorerSearchCoordinator {
         explorer.roomExitPlanning = false;
         explorer.roomExitNeedsResume = false;
         explorer.roomExitCrossing = false;
+        explorer.roomExitDugPathJoin = false;
         explorer.exitRecoveryTicks = 0;
         explorer.openExitSearch = null;
         explorer.followingOpenExit = false;
@@ -339,77 +350,19 @@ public class ExplorerSearchCoordinator {
         explorer.continuationSearch = null;
         explorer.extendedFrom = null;
         if (explorer.returning) {
-            if (explorer.startChestPitReturn(mc, true)) return;
-            if (explorer.startSavedReturn(mc, true, 128)) return;
-            if (explorer.startRoomExitSearch(mc)) return;
-            retryExitLater(mc, explorer);
+            retryReturningRoute(mc, explorer);
             return;
         }
         if (explorer.movingToPuzzleCenter) {
-            if (++explorer.approachAttempts <= 3) {
-                explorer.reachPuzzleCenter(mc);
-            } else {
-                explorer.approachAttempts = 0;
-                int[] room = explorer.knownStructure == null ? null : explorer.knownStructure.clone();
-                explorer.stop(mc, "Puzzle approach failed; room work held");
-                explorer.knownStructure = room;
-            }
+            retryPuzzleApproach(mc, explorer);
             return;
         }
-        if (explorer.digging) {
-            explorer.excavationRoute.clear();
-            explorer.excavationSearch = null;
-            explorer.miningAim.reset();
-            if (LootGameSolverConfig.staircaseEnabled && explorer.stairStep(mc)) {
-                explorer.status = "Replanning tunnel from current position";
-                return;
-            }
-            explorer.digging = false;
-            explorer.entranceSelected = false;
-        }
+        if (explorer.digging && retryDiggingRoute(mc, explorer)) return;
         if (explorer.searching && nextSearchLeg(mc, explorer)) {
             explorer.status = "Trying another exploration direction";
             return;
         }
-        if (explorer.target != null && !explorer.target.isInvalid()) {
-            boolean nearEntrance = Math
-                .hypot(mc.thePlayer.posX - explorer.target.xCoord, mc.thePlayer.posZ - explorer.target.zCoord) <= 6D;
-            if (nearEntrance && !explorer.insideDungeonRoom(mc)) {
-                if (explorer.startRoomEntrySearch(mc)) {
-                    explorer.status = "Finding a clear structure entrance";
-                    return;
-                }
-                if (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingAtCurrentPosition(mc)) return;
-            }
-            if (explorer.beginExistingAccessSearch(mc)) {
-                explorer.status = "Checking a different existing path";
-                return;
-            }
-            explorer.plan(mc);
-            if (!explorer.route.isEmpty() || explorer.walkingSearch != null) {
-                explorer.status = "Following a newly checked route";
-                return;
-            }
-            if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
-                explorer.status = "Checking another safe approach";
-                return;
-            }
-        }
-        if (explorer.target == null || explorer.target.isInvalid()) {
-            scan(mc, explorer);
-            if (explorer.target != null) {
-                explorer.beginAccessTrail(mc);
-                if (explorer.reuseSavedAccessPath(mc) || explorer.beginExistingAccessSearch(mc)) {
-                    explorer.status = "Resuming access to the nearest structure";
-                    return;
-                }
-                explorer.plan(mc);
-                if (!explorer.route.isEmpty() || explorer.walkingSearch != null) {
-                    explorer.status = "Following route to the nearest structure";
-                    return;
-                }
-            }
-        }
+        if (retryStructureTargetRoute(mc, explorer)) return;
         if (nextSearchLeg(mc, explorer)) {
             explorer.status = "Trying another exploration direction";
             return;
@@ -418,6 +371,77 @@ public class ExplorerSearchCoordinator {
         explorer.routeRetryTicks = 8;
         explorer.walking = true;
         explorer.status = "Waiting for a safe route, then retrying";
+    }
+
+    private void retryReturningRoute(Minecraft mc, Explorer explorer) {
+        if (explorer.startChestPitReturn(mc, true) || explorer.startSavedReturn(mc, true, 128)
+            || explorer.startRoomExitSearch(mc)) return;
+        retryExitLater(mc, explorer);
+    }
+
+    private static void retryPuzzleApproach(Minecraft mc, Explorer explorer) {
+        if (++explorer.approachAttempts <= 3) {
+            explorer.reachPuzzleCenter(mc);
+            return;
+        }
+        explorer.approachAttempts = 0;
+        int[] room = explorer.knownStructure == null ? null : explorer.knownStructure.clone();
+        explorer.stop(mc, "Puzzle approach failed; room work held");
+        explorer.knownStructure = room;
+    }
+
+    private static boolean retryDiggingRoute(Minecraft mc, Explorer explorer) {
+        explorer.excavationRoute.clear();
+        explorer.excavationSearch = null;
+        explorer.miningAim.reset();
+        if (LootGameSolverConfig.staircaseEnabled && explorer.stairStep(mc)) {
+            explorer.status = "Replanning tunnel from current position";
+            return true;
+        }
+        explorer.digging = false;
+        explorer.entranceSelected = false;
+        return false;
+    }
+
+    private boolean retryStructureTargetRoute(Minecraft mc, Explorer explorer) {
+        if (explorer.target == null || explorer.target.isInvalid()) {
+            scan(mc, explorer);
+            if (explorer.target == null) return false;
+            explorer.beginAccessTrail(mc);
+            if (explorer.reuseSavedAccessPath(mc) || explorer.beginExistingAccessSearch(mc)) {
+                explorer.status = "Resuming access to the nearest structure";
+                return true;
+            }
+            explorer.plan(mc);
+            if (!explorer.route.isEmpty() || explorer.walkingSearch != null) {
+                explorer.status = "Following route to the nearest structure";
+                return true;
+            }
+            return false;
+        }
+        boolean nearEntrance = Math
+            .hypot(mc.thePlayer.posX - explorer.target.xCoord, mc.thePlayer.posZ - explorer.target.zCoord) <= 6D;
+        if (nearEntrance && !explorer.insideDungeonRoom(mc)) {
+            if (explorer.startRoomEntrySearch(mc)) {
+                explorer.status = "Finding a clear structure entrance";
+                return true;
+            }
+            if (LootGameSolverConfig.staircaseEnabled && explorer.beginDiggingAtCurrentPosition(mc)) return true;
+        }
+        if (explorer.beginExistingAccessSearch(mc)) {
+            explorer.status = "Checking a different existing path";
+            return true;
+        }
+        explorer.plan(mc);
+        if (!explorer.route.isEmpty() || explorer.walkingSearch != null) {
+            explorer.status = "Following a newly checked route";
+            return true;
+        }
+        if (LootGameSolverConfig.staircaseEnabled && explorer.selectDigEntrance(mc)) {
+            explorer.status = "Checking another safe approach";
+            return true;
+        }
+        return false;
     }
 
     public void queueRouteRetry(Minecraft mc, Explorer explorer, String message) {

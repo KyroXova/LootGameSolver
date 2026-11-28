@@ -146,14 +146,16 @@ public class ExplorerRoutePlanner {
                 || dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], y, z) || !safe(mc.theWorld, x, y, step[2])))
                 continue;
             if (explorer.route.size() + i < 3) return false;
-            explorer.route.clear();
-            explorer.route.addAll(continuation.subList(i, continuation.size()));
-            explorer.segmentX = mc.thePlayer.posX;
-            explorer.segmentZ = mc.thePlayer.posZ;
-            explorer.stalled = 0;
-            explorer.lastDistance = Double.MAX_VALUE;
-            explorer.status = "Taking shorter route";
-            return true;
+            if (explorer.route.size() + i >= 3) {
+                explorer.route.clear();
+                explorer.route.addAll(continuation.subList(i, continuation.size()));
+                explorer.segmentX = mc.thePlayer.posX;
+                explorer.segmentZ = mc.thePlayer.posZ;
+                explorer.stalled = 0;
+                explorer.lastDistance = Double.MAX_VALUE;
+                explorer.status = "Taking shorter route";
+                return true;
+            }
         }
         return false;
     }

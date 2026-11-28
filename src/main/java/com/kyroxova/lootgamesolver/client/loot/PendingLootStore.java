@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 import com.google.gson.Gson;
+import com.kyroxova.lootgamesolver.LootGameSolver;
 import com.kyroxova.lootgamesolver.core.MiniGame;
 
 public final class PendingLootStore {
@@ -66,7 +67,9 @@ public final class PendingLootStore {
                             .getBytes(StandardCharsets.UTF_8));
                     try {
                         Files.deleteIfExists(pending.toPath());
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                        LootGameSolver.LOG.debug("Could not delete pending loot file {}", pending, ignored);
+                    }
                 }
             }
             return true;

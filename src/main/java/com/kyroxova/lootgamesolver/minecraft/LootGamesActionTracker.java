@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.minecraft;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,8 +60,8 @@ public final class LootGamesActionTracker {
             return -1;
         }
         try {
-            Field level = LootGamesTileAccess.getFieldRecursive(game.getClass(), "currentLevel");
-            return level == null ? -1 : level.getInt(game);
+            Object level = LootGamesTileAccess.getFieldValue(game, "currentLevel");
+            return level instanceof Number ? ((Number) level).intValue() : -1;
         } catch (Exception e) {
             LootGameSolver.LOG.debug("Could not read the Minesweeper stage", e);
             return -1;
@@ -101,7 +100,9 @@ public final class LootGamesActionTracker {
                 try {
                     int size = LootGamesTileAccess.number(LootGamesTileAccess.invoke(game, "getCurrentBoardSize"));
                     if (size > 0) return boardBlock(game, new CellPosition(size / 2, size / 2));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    LootGameSolver.LOG.debug("Could not read current board size", ignored);
+                }
             }
             if (game != null && LootGamesTileAccess.MS_GAME.equals(
                 game.getClass()
@@ -149,8 +150,8 @@ public final class LootGamesActionTracker {
             golActionPending = true;
             if (snapshot.gol != null && GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(snapshot.gol.getStageId())) {
                 try {
-                    Field sequence = LootGamesTileAccess.getFieldRecursive(golPendingStage.getClass(), "sequence");
-                    if (sequence != null && ((List<?>) sequence.get(golPendingStage)).isEmpty()) {
+                    Object sequence = LootGamesTileAccess.getFieldValue(golPendingStage, "sequence");
+                    if (sequence instanceof List<?> && ((List<?>) sequence).isEmpty()) {
                         golSubmitted = golPendingSymbol + 1;
                         clearGameOfLightAction();
                     }
@@ -177,7 +178,7 @@ public final class LootGamesActionTracker {
         if (current.type == MiniGame.GAME_OF_LIGHT) {
             if (current.gol == null) return false;
             Object liveStage = readGameStage(current.game);
-            if (liveStage != null && golPendingStage != null && liveStage != golPendingStage) {
+            if (liveStage != null && golPendingStage != null && !java.util.Objects.equals(liveStage, golPendingStage)) {
                 clearGameOfLightAction();
                 return true;
             }
@@ -195,7 +196,7 @@ public final class LootGamesActionTracker {
 
             Object appearance = readMarkAppearance(current.game);
             String stateName = readMarkStateName(appearance);
-            boolean appearanceChanged = appearance != golPendingAppearance
+            boolean appearanceChanged = !java.util.Objects.equals(appearance, golPendingAppearance)
                 || !java.util.Objects.equals(stateName, golPendingAppearanceState);
             if (appearanceChanged && "ACCEPTED".equalsIgnoreCase(stateName)) {
                 golSubmitted = Math.max(golSubmitted + 1, golPendingSymbol + 1);
@@ -226,8 +227,7 @@ public final class LootGamesActionTracker {
     public static Object readMarkAppearance(Object game) {
         if (game == null) return null;
         try {
-            Field field = LootGamesTileAccess.getFieldRecursive(game.getClass(), "specialMarkAppearance");
-            return field != null ? field.get(game) : null;
+            return LootGamesTileAccess.getFieldValue(game, "specialMarkAppearance");
         } catch (Exception e) {
             return null;
         }
@@ -263,10 +263,9 @@ public final class LootGamesActionTracker {
         try {
             Class<?> pkgClass = Class
                 .forName("ru.timeconqueror.lootgames.common.packet.game.sudoku.CPSudokuEndGameCheck");
-            Class<?> posClass = Class.forName(LootGamesTileAccess.POS);
-            java.lang.reflect.Constructor<?> posCons = posClass.getConstructor(int.class, int.class);
-            java.lang.reflect.Constructor<?> pkgCons = pkgClass.getConstructor(posClass);
-            Object packet = pkgCons.newInstance(posCons.newInstance(0, 0));
+            Object pos = LootGamesTileAccess.createPos(0, 0);
+            java.lang.reflect.Constructor<?> pkgCons = pkgClass.getConstructor(pos.getClass());
+            Object packet = pkgCons.newInstance(pos);
 
             for (Method m : snapshot.game.getClass()
                 .getMethods()) {
@@ -304,7 +303,9 @@ public final class LootGamesActionTracker {
                 try {
                     int[] block = boardBlock(game, pos);
                     map.put(pos, block);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    LootGameSolver.LOG.debug("Could not precompute board block for {}", pos, ignored);
+                }
             }
         }
         return map;
@@ -381,7 +382,8 @@ public final class LootGamesActionTracker {
             return null;
         }
 
-        if (golGame != game || (golStage != stage && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
+        if (!java.util.Objects.equals(golGame, game) || (!java.util.Objects.equals(golStage, stage)
+            && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
             golSequence.clear();
             golSubmitted = 0;
             golActionPending = false;
@@ -395,66 +397,22 @@ public final class LootGamesActionTracker {
         }
         golGame = game;
         golStage = stage;
-        int boardSize = 3;
-        try {
-            boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(game, "getSize"));
-        } catch (Exception e1) {
-            try {
-                boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(game, "getBoardSize"));
-            } catch (Exception e2) {
-                try {
-                    boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(stage, "getSize"));
-                } catch (Exception e3) {
-                    try {
-                        Field f = LootGamesTileAccess.getFieldRecursive(game.getClass(), "size");
-                        if (f != null) boardSize = f.getInt(game);
-                    } catch (Exception ignored) {}
-                }
-            }
-        }
-        if (boardSize <= 0) boardSize = 3;
-
+        int boardSize = readGameOfLightBoardSize(game, stage);
         List<CellPosition> sequence = new ArrayList<CellPosition>();
-        int currentSymbol = 0;
-        if (GameOfLightBoard.STAGE_SHOW_SEQUENCE.equals(stageId)
-            || GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
-            try {
-                Field seqField = LootGamesTileAccess.getFieldRecursive(stage.getClass(), "sequence");
-                if (seqField != null) {
-                    List<?> list = (List<?>) seqField.get(stage);
-                    if (list != null) {
-                        for (Object sym : list) {
-                            Object pos2i = LootGamesTileAccess.invoke(sym, "getPos");
-                            int px = LootGamesTileAccess.number(LootGamesTileAccess.invoke(pos2i, "getX"));
-                            int py = LootGamesTileAccess.number(LootGamesTileAccess.invoke(pos2i, "getY"));
-                            sequence.add(new CellPosition(px, py));
-                        }
-                    }
-                }
-                if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
-                    Field curField = LootGamesTileAccess.getFieldRecursive(stage.getClass(), "currentSymbol");
-                    if (curField != null) {
-                        currentSymbol = curField.getInt(stage);
-                    }
-                }
-            } catch (Exception e) {
-                LootGameSolver.LOG.debug("Error reading Game of Light sequence data", e);
-            }
-        }
+        int currentSymbol = readGameOfLightSequence(stage, stageId, sequence);
         if (GameOfLightBoard.STAGE_SHOW_SEQUENCE.equals(stageId)) {
             golSequence.clear();
             golSequence.addAll(sequence);
             golSubmitted = 0;
-        } else if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && sequence.isEmpty()) {
-            sequence = new ArrayList<CellPosition>(golSequence);
-            currentSymbol = golSubmitted;
-        }
-        if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+        } else if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+            if (sequence.isEmpty()) {
+                sequence = new ArrayList<CellPosition>(golSequence);
+                currentSymbol = golSubmitted;
+            }
             currentSymbol = Math.max(currentSymbol, golSubmitted);
-        }
-        if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId) && currentSymbol > 0
-            && currentSymbol <= sequence.size()) {
-            sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
+            if (currentSymbol > 0 && currentSymbol <= sequence.size()) {
+                sequence = new ArrayList<CellPosition>(sequence.subList(currentSymbol, sequence.size()));
+            }
         }
         GameOfLightBoard board = new GameOfLightBoard(
             stageId,
@@ -472,5 +430,50 @@ public final class LootGamesActionTracker {
             + sequence.toString();
         Map<CellPosition, int[]> posMap = precomputePositions(game, boardSize, boardSize);
         return DetectedGame.gameOfLight(game, board, signature, posMap);
+    }
+
+    private static int readGameOfLightBoardSize(Object game, Object stage) {
+        int boardSize = 3;
+        try {
+            boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(game, "getSize"));
+        } catch (Exception e1) {
+            try {
+                boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(game, "getBoardSize"));
+            } catch (Exception e2) {
+                try {
+                    boardSize = LootGamesTileAccess.number(LootGamesTileAccess.invoke(stage, "getSize"));
+                } catch (Exception e3) {
+                    Object f = LootGamesTileAccess.getFieldValue(game, "size");
+                    if (f instanceof Number) boardSize = ((Number) f).intValue();
+                }
+            }
+        }
+        return boardSize <= 0 ? 3 : boardSize;
+    }
+
+    private static int readGameOfLightSequence(Object stage, String stageId, List<CellPosition> sequence) {
+        int currentSymbol = 0;
+        if (!GameOfLightBoard.STAGE_SHOW_SEQUENCE.equals(stageId)
+            && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+            return currentSymbol;
+        }
+        try {
+            Object rawSeq = LootGamesTileAccess.getFieldValue(stage, "sequence");
+            if (rawSeq instanceof List<?>) {
+                for (Object sym : (List<?>) rawSeq) {
+                    Object pos2i = LootGamesTileAccess.invoke(sym, "getPos");
+                    int px = LootGamesTileAccess.number(LootGamesTileAccess.invoke(pos2i, "getX"));
+                    int py = LootGamesTileAccess.number(LootGamesTileAccess.invoke(pos2i, "getY"));
+                    sequence.add(new CellPosition(px, py));
+                }
+            }
+            if (GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId)) {
+                Object cur = LootGamesTileAccess.getFieldValue(stage, "currentSymbol");
+                if (cur instanceof Number) currentSymbol = ((Number) cur).intValue();
+            }
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Error reading Game of Light sequence data", e);
+        }
+        return currentSymbol;
     }
 }

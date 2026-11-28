@@ -163,141 +163,171 @@ public final class ClientHooks {
             travelModeRefreshRequested = false;
             exploration.refreshTravelMode(Minecraft.getMinecraft());
         }
-
         Minecraft mc = Minecraft.getMinecraft();
         keyHandler.checkKeyToggles(mc, this);
         if (automationPaused && mc.theWorld != null && mc.thePlayer != null) return;
         if (mc.theWorld == null || mc.thePlayer == null) automationPaused = false;
         if (storageRecovery != null) {
-            if (exploration != null) exploration.setAutomationStatus(storageRecovery.status());
-            StorageRecoveryController.Result result = storageRecovery.tick(mc);
-            if (result == StorageRecoveryController.Result.WORKING) return;
-            PendingLootStore.Checkpoint checkpoint = storageRecovery.checkpoint();
-            String storageFailure = storageRecovery.failureReason();
-            storageRecovery = null;
-            puzzleWorld = mc.theWorld;
-            if (result == StorageRecoveryController.Result.RETURNED && mc.theWorld != null && mc.thePlayer != null) {
-                rewardCenter = checkpoint.center.clone();
-                rewardLooter.start(mc, rewardCenter, checkpoint.game);
-                rewardPreCleanupPending = false;
-                rewardReturnPending = true;
-                explorationDriven = exploration != null;
-                mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7a[LootGameSolver] Storage trip complete; resuming saved rewards."));
-            } else if (result == StorageRecoveryController.Result.RETURNED_UNSTORED) {
-                rewardReturnPending = false;
-                rewardPreCleanupPending = false;
-                if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] Returned to rewards, but storage was unavailable or full. Empty bags or storage, then use /lgs resumeLoot."));
-            } else {
-                rewardReturnPending = false;
-                rewardPreCleanupPending = false;
-                if (storageFailure != null && mc.thePlayer != null) mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText("\u00a7e[LootGameSolver] " + storageFailure));
-                if (mc.thePlayer != null) mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] Storage recovery stopped. Your unfinished rewards remain saved; check storage and use /lgs resumeLoot when back nearby."));
-                if (mc.thePlayer != null && mc.thePlayer.inventory.getItemStack() != null) mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] An item is on your cursor. Place it in an inventory slot before closing the screen."));
-            }
+            tickStorageRecovery(mc);
             return;
         }
         if (checkpointClearDoneTicks > 0) checkpointClearDoneTicks--;
-        if (puzzleWorld != mc.theWorld) {
-            if (minedDropStore != null && minedDrops.dirty()) minedDropStore.save(minedDrops);
-            minedDropStore = null;
-            minedDrops.clear();
-            trashCleanup.setMinedDrops(minedDrops);
-            rewardLooter.setMinedDrops(minedDrops);
-            preLootPacker.setMinedDrops(minedDrops);
-            if (exploration != null) exploration.setInventoryMaintenance(false);
-            inventoryMaintenanceStage = 0;
-            inventoryMaintenanceCooldown = 0;
-            storageResumeChecked = false;
-            storageResumeWait = 0;
-            wasInsideRoom = false;
-            trashCleanup.reset();
-            if (preLootPacker.active()) preLootPacker.cancel(mc);
-            rewardLooter.cancel(mc);
-            rewardReturnPending = false;
+        if (puzzleWorld != mc.theWorld) resetOnWorldChange(mc);
+        if (tryResumeInterruptedStorage(mc)) return;
+
+        tickCooldownsAndExploration(mc);
+        tickMinedDropTracking(mc);
+        if (mc.thePlayer == null || mc.theWorld == null) return;
+
+        handleUserRequests(mc);
+        if (tickInventoryMaintenance(mc)) return;
+        if (rewardReturnPending) {
+            tickRewardCollection(mc);
+            return;
+        }
+        if (tryStartInventoryMaintenance(mc)) return;
+        if (mc.currentScreen != null) {
+            pauseForOpenScreen();
+            return;
+        }
+        if (tickRoomDiscovery(mc)) return;
+        tickPuzzleAndWatchdog(mc);
+        updateMovementAndActiveTicks(mc);
+    }
+
+    private void tickStorageRecovery(Minecraft mc) {
+        if (exploration != null) exploration.setAutomationStatus(storageRecovery.status());
+        StorageRecoveryController.Result result = storageRecovery.tick(mc);
+        if (result == StorageRecoveryController.Result.WORKING) return;
+        PendingLootStore.Checkpoint checkpoint = storageRecovery.checkpoint();
+        String storageFailure = storageRecovery.failureReason();
+        storageRecovery = null;
+        puzzleWorld = mc.theWorld;
+        if (result == StorageRecoveryController.Result.RETURNED && mc.theWorld != null && mc.thePlayer != null) {
+            rewardCenter = checkpoint.center.clone();
+            rewardLooter.start(mc, rewardCenter, checkpoint.game);
             rewardPreCleanupPending = false;
-            explorationDriven = false;
-            inventoryBaseline = null;
-            trashCleanup.setBaseline(null);
-            rewardLooter.setBaseline(null);
-            preLootPacker.setBaseline(null);
-            rewardPrePackingAttempted = false;
-            rewardCenter = null;
-            puzzleWorld = mc.theWorld;
-            if (!autoPuzzle.isIdle()) {
-                session.cancel("World changed during puzzle automation");
-                releaseMovementKeys(mc);
-                puzzleCompletion.clear();
-                autoPuzzle.reset();
-            }
+            rewardReturnPending = true;
+            explorationDriven = exploration != null;
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7a[LootGameSolver] Storage trip complete; resuming saved rewards."));
+            return;
         }
-        if (!storageResumeChecked && mc.thePlayer != null
-            && mc.theWorld != null
-            && mc.currentScreen == null
-            && !session.isActive()
-            && !rewardReturnPending
-            && ++storageResumeWait >= 60) {
-            storageResumeChecked = true;
-            PendingLootStore.Checkpoint saved = rewardLooter.pendingCheckpoint();
-            if (saved != null) {
-                StorageRecoveryController recovery = new StorageRecoveryController();
-                ensureInventoryBaseline(mc);
-                if (recovery.resumeAtStorage(mc, saved, inventoryBaseline)) {
-                    storageRecovery = recovery;
-                    explorationDriven = true;
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7a[LootGameSolver] Resuming the interrupted storage trip."));
-                    return;
-                }
-            }
+        rewardReturnPending = false;
+        rewardPreCleanupPending = false;
+        if (mc.thePlayer == null) return;
+        if (result == StorageRecoveryController.Result.RETURNED_UNSTORED) {
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7e[LootGameSolver] Returned to rewards, but storage was unavailable or full. Empty bags or storage, then use /lgs resumeLoot."));
+            return;
         }
+        if (storageFailure != null) mc.thePlayer
+            .addChatMessage(new net.minecraft.util.ChatComponentText("\u00a7e[LootGameSolver] " + storageFailure));
+        mc.thePlayer.addChatMessage(
+            new net.minecraft.util.ChatComponentText(
+                "\u00a7e[LootGameSolver] Storage recovery stopped. Your unfinished rewards remain saved; check storage and use /lgs resumeLoot when back nearby."));
+        if (mc.thePlayer.inventory.getItemStack() != null) mc.thePlayer.addChatMessage(
+            new net.minecraft.util.ChatComponentText(
+                "\u00a7e[LootGameSolver] An item is on your cursor. Place it in an inventory slot before closing the screen."));
+    }
+
+    private void resetOnWorldChange(Minecraft mc) {
+        if (minedDropStore != null && minedDrops.dirty()) minedDropStore.save(minedDrops);
+        minedDropStore = null;
+        minedDrops.clear();
+        trashCleanup.setMinedDrops(minedDrops);
+        rewardLooter.setMinedDrops(minedDrops);
+        preLootPacker.setMinedDrops(minedDrops);
+        if (exploration != null) exploration.setInventoryMaintenance(false);
+        inventoryMaintenanceStage = 0;
+        inventoryMaintenanceCooldown = 0;
+        storageResumeChecked = false;
+        storageResumeWait = 0;
+        wasInsideRoom = false;
+        trashCleanup.reset();
+        if (preLootPacker.active()) preLootPacker.cancel(mc);
+        rewardLooter.cancel(mc);
+        rewardReturnPending = false;
+        rewardPreCleanupPending = false;
+        explorationDriven = false;
+        inventoryBaseline = null;
+        trashCleanup.setBaseline(null);
+        rewardLooter.setBaseline(null);
+        preLootPacker.setBaseline(null);
+        rewardPrePackingAttempted = false;
+        rewardCenter = null;
+        puzzleWorld = mc.theWorld;
+        if (!autoPuzzle.isIdle()) {
+            session.cancel("World changed during puzzle automation");
+            releaseMovementKeys(mc);
+            puzzleCompletion.clear();
+            autoPuzzle.reset();
+        }
+    }
+
+    private boolean tryResumeInterruptedStorage(Minecraft mc) {
+        if (storageResumeChecked || mc.thePlayer == null
+            || mc.theWorld == null
+            || mc.currentScreen != null
+            || session.isActive()
+            || rewardReturnPending
+            || ++storageResumeWait < 60) return false;
+        storageResumeChecked = true;
+        PendingLootStore.Checkpoint saved = rewardLooter.pendingCheckpoint();
+        if (saved == null) return false;
+        StorageRecoveryController recovery = new StorageRecoveryController();
+        ensureInventoryBaseline(mc);
+        if (!recovery.resumeAtStorage(mc, saved, inventoryBaseline)) return false;
+        storageRecovery = recovery;
+        explorationDriven = true;
+        mc.thePlayer.addChatMessage(
+            new net.minecraft.util.ChatComponentText("\u00a7a[LootGameSolver] Resuming the interrupted storage trip."));
+        return true;
+    }
+
+    private void tickCooldownsAndExploration(Minecraft mc) {
         trashCleanup.advanceCooldown();
         if (inventoryMaintenanceCooldown > 0) inventoryMaintenanceCooldown--;
         if (rewardLooterCooldown > 0) rewardLooterCooldown--;
-        if (exploration != null && mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
-            boolean inside = exploration.inDungeonRoom(mc);
-            wasInsideRoom = inside;
+        if (exploration == null) return;
+        if (mc.thePlayer != null && mc.theWorld != null && mc.thePlayer.ticksExisted % 20 == 0) {
+            wasInsideRoom = exploration.inDungeonRoom(mc);
         }
-        if (exploration != null) {
-            boolean roomWork = autoPuzzle.isActive() || session.isActive()
-                || rewardReturnPending
-                || storageRecovery != null
-                || rewardLooter.active()
-                || (exploration.inDungeonRoom(mc)
-                    && rewardLooter.hasUncollectedCluster(mc, exploration.verifiedRoomCenter(mc)));
-            if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
-            if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc, rewardLooter.expectedView());
-            exploration.tick(mc, session.isActive(), roomWork);
-        }
-        if (mc.thePlayer != null && mc.theWorld != null) {
-            if (minedDropStore == null && mc.thePlayer.ticksExisted >= 40 && hasInventoryContents(mc)) {
-                minedDropStore = new MinedDropStore(
-                    new java.io.File(mc.mcDataDir, "config/lootgamesolver"),
-                    Explorer.worldIdentity(mc),
-                    mc.thePlayer.getUniqueID()
-                        .toString());
-                minedDropStore.load(minedDrops);
-                minedDrops.observe(MinedDropTracker.inventory(mc), false, MinedDropTracker::eligible);
-            }
-            boolean mining = exploration != null && exploration.observingMinedDrops()
-                && !session.isActive()
-                && !rewardReturnPending
-                && mc.currentScreen == null;
-            if (minedDropStore != null) {
-                minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
-                if (minedDrops.dirty() && mc.thePlayer.ticksExisted % 20 == 0) minedDropStore.save(minedDrops);
-            }
-        }
+        boolean roomWork = autoPuzzle.isActive() || session.isActive()
+            || rewardReturnPending
+            || storageRecovery != null
+            || rewardLooter.active()
+            || (exploration.inDungeonRoom(mc)
+                && rewardLooter.hasUncollectedCluster(mc, exploration.verifiedRoomCenter(mc)));
+        if (roomWork) exploration.suspendStructureSearchForRoomWork(mc);
+        if (rewardReturnPending) exploration.suspendUnrelatedRouteForRewards(mc, rewardLooter.expectedView());
+        exploration.tick(mc, session.isActive(), roomWork);
+    }
+
+    private void tickMinedDropTracking(Minecraft mc) {
         if (mc.thePlayer == null || mc.theWorld == null) return;
+        if (minedDropStore == null && mc.thePlayer.ticksExisted >= 40 && hasInventoryContents(mc)) {
+            minedDropStore = new MinedDropStore(
+                new java.io.File(mc.mcDataDir, "config/lootgamesolver"),
+                Explorer.worldIdentity(mc),
+                mc.thePlayer.getUniqueID()
+                    .toString());
+            minedDropStore.load(minedDrops);
+            minedDrops.observe(MinedDropTracker.inventory(mc), false, MinedDropTracker::eligible);
+        }
+        boolean mining = exploration != null && exploration.observingMinedDrops()
+            && !session.isActive()
+            && !rewardReturnPending
+            && mc.currentScreen == null;
+        if (minedDropStore != null) {
+            minedDrops.observe(MinedDropTracker.inventory(mc), mining, MinedDropTracker::eligible);
+            if (minedDrops.dirty() && mc.thePlayer.ticksExisted % 20 == 0) minedDropStore.save(minedDrops);
+        }
+    }
+
+    private void handleUserRequests(Minecraft mc) {
         if (clearCheckpointRequested) {
             clearCheckpointRequested = false;
             rewardLooter.clearCheckpoint();
@@ -313,281 +343,295 @@ public final class ClientHooks {
         }
         if (resumeLootRequested) {
             resumeLootRequested = false;
-            PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
-            if (checkpoint == null || !checkpoint.world.equals(Explorer.worldIdentity(mc))
-                || checkpoint.dimension != mc.theWorld.provider.dimensionId
-                || mc.thePlayer.getDistanceSq(
-                    checkpoint.center[0] + 0.5D,
-                    checkpoint.center[1] + 0.5D,
-                    checkpoint.center[2] + 0.5D) > 256D) {
-                mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00a7e[LootGameSolver] No pending loot nearby in this world and dimension."));
-            } else if (session.isActive() || rewardReturnPending
-                || mc.currentScreen != null
-                || (exploration != null && exploration.navigating())) {
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7e[LootGameSolver] Stop other automation and close screens before resuming loot."));
-                } else {
-                    rewardCenter = checkpoint.center.clone();
-                    ensureInventoryBaseline(mc);
-                    rewardLooter.start(mc, rewardCenter, checkpoint.game);
-                    explorationDriven = exploration != null;
-                    rewardPreCleanupPending = false;
-                    rewardReturnPending = true;
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7a[LootGameSolver] Resuming the saved reward collection."));
-                }
+            handleResumeLootRequest(mc);
         }
-        if (inventoryMaintenanceStage != 0) {
-            if (exploration == null || (!exploration.navigating() && !exploration.puzzleArrivalPending)
-                || session.isActive()
-                || rewardReturnPending
-                || !LootGameSolverConfig.enabled
-                || !LootGameSolverConfig.explorationEnabled) {
-                if (exploration != null) {
-                    exploration.setInventoryMaintenance(false);
-                    exploration.setAutomationStatus(null);
-                }
-                if (rewardLooter.active()) rewardLooter.cancel(mc);
-                inventoryMaintenanceStage = 0;
-                inventoryMaintenanceCooldown = 200;
-                return;
-            }
-            if (++inventoryMaintenanceWait < 4 || !exploration.inventoryMaintenanceReady(mc)) return;
-            if (inventoryMaintenanceStage == 1) {
-                if (!trashCleanup.active() && mc.currentScreen != null) return;
-                if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
-                    if (trashCleanup.tick(mc, true)) {
-                        exploration.setAutomationStatus(trashCleanup.status());
-                        return;
-                    }
-                }
+    }
+
+    private void handleResumeLootRequest(Minecraft mc) {
+        PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
+        if (checkpoint == null || !checkpoint.world.equals(Explorer.worldIdentity(mc))
+            || checkpoint.dimension != mc.theWorld.provider.dimensionId
+            || mc.thePlayer
+                .getDistanceSq(checkpoint.center[0] + 0.5D, checkpoint.center[1] + 0.5D, checkpoint.center[2] + 0.5D)
+                > 256D) {
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7e[LootGameSolver] No pending loot nearby in this world and dimension."));
+            return;
+        }
+        if (session.isActive() || rewardReturnPending
+            || mc.currentScreen != null
+            || (exploration != null && exploration.navigating())) {
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7e[LootGameSolver] Stop other automation and close screens before resuming loot."));
+            return;
+        }
+        rewardCenter = checkpoint.center.clone();
+        ensureInventoryBaseline(mc);
+        rewardLooter.start(mc, rewardCenter, checkpoint.game);
+        explorationDriven = exploration != null;
+        rewardPreCleanupPending = false;
+        rewardReturnPending = true;
+        mc.thePlayer.addChatMessage(
+            new net.minecraft.util.ChatComponentText("\u00a7a[LootGameSolver] Resuming the saved reward collection."));
+    }
+
+    private boolean tickInventoryMaintenance(Minecraft mc) {
+        if (inventoryMaintenanceStage == 0) return false;
+        if (exploration == null || (!exploration.navigating() && !exploration.puzzleArrivalPending)
+            || session.isActive()
+            || rewardReturnPending
+            || !LootGameSolverConfig.enabled
+            || !LootGameSolverConfig.explorationEnabled) {
+            if (exploration != null) {
                 exploration.setInventoryMaintenance(false);
                 exploration.setAutomationStatus(null);
-                inventoryMaintenanceStage = 0;
-                inventoryMaintenanceCooldown = 100;
             }
+            if (rewardLooter.active()) rewardLooter.cancel(mc);
+            inventoryMaintenanceStage = 0;
+            inventoryMaintenanceCooldown = 200;
+            return true;
+        }
+        if (++inventoryMaintenanceWait < 4 || !exploration.inventoryMaintenanceReady(mc)) return true;
+        if (inventoryMaintenanceStage == 1) {
+            if (!trashCleanup.active() && mc.currentScreen != null) return true;
+            if ((trashCleanup.active() || trashCleanup.shouldClean(mc)) && trashCleanup.tick(mc, true)) {
+                exploration.setAutomationStatus(trashCleanup.status());
+                return true;
+            }
+            exploration.setInventoryMaintenance(false);
+            exploration.setAutomationStatus(null);
+            inventoryMaintenanceStage = 0;
+            inventoryMaintenanceCooldown = 100;
+        }
+        return true;
+    }
+
+    private void tickRewardCollection(Minecraft mc) {
+        if (rewardCenter != null
+            && rewardCollectionTooFar(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ, rewardCenter)) {
+            boolean saved = rewardLooter.saveCheckpoint(mc) != null;
+            if (preLootPacker.active()) preLootPacker.cancel(mc);
+            rewardLooter.cancel(mc);
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            rewardLooterCooldown = 100;
+            if (exploration != null && exploration.navigating()) exploration.stop(mc, "Reward collection paused");
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00A7e[LootGameSolver] Reward collection paused: too far from the room."
+                        + (saved ? " Return nearby and use /lgs resumeLoot."
+                            : " Could not save the reward checkpoint.")));
             return;
         }
-        if (rewardReturnPending) {
-            if (rewardCenter != null
-                && rewardCollectionTooFar(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ, rewardCenter)) {
-                boolean saved = rewardLooter.saveCheckpoint(mc) != null;
-                if (preLootPacker.active()) preLootPacker.cancel(mc);
-                rewardLooter.cancel(mc);
-                rewardReturnPending = false;
-                rewardPreCleanupPending = false;
-                rewardLooterCooldown = 100;
-                if (exploration != null && exploration.navigating()) exploration.stop(mc, "Reward collection paused");
-                mc.thePlayer.addChatMessage(
-                    new net.minecraft.util.ChatComponentText(
-                        "\u00A7e[LootGameSolver] Reward collection paused: too far from the room."
-                            + (saved ? " Return nearby and use /lgs resumeLoot."
-                                : " Could not save the reward checkpoint.")));
-                return;
+        if (rewardPreCleanupPending && tickRewardPreCleanup(mc)) return;
+        rewardLooter.tick(mc, exploration);
+        if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
+        if (!rewardLooter.active()) handleRewardLooterFinished(mc);
+    }
+
+    private boolean tickRewardPreCleanup(Minecraft mc) {
+        if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return true;
+        if (!rewardPrePackingAttempted) {
+            trashCleanup.clearCooldown();
+            if ((trashCleanup.active() || trashCleanup.shouldClean(mc)) && trashCleanup.tick(mc, true)) {
+                if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
+                return true;
             }
-            if (rewardPreCleanupPending) {
-                if (exploration != null && !exploration.inventoryCleanupDelayPassed()) return;
-                if (!rewardPrePackingAttempted) {
-                    trashCleanup.clearCooldown();
-                    if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
-                        if (trashCleanup.tick(mc, true)) {
-                            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
-                            return;
-                        }
-                    }
-                    rewardPrePackingAttempted = true;
-                    preLootPacker.setBaseline(inventoryBaseline);
-                    if (preLootPacker.startInventoryPacking(mc)) {
-                        if (exploration != null) exploration.setAutomationStatus("Packing inventory before looting");
-                        return;
-                    }
-                }
-                if (preLootPacker.active()) {
-                    preLootPacker.tick(mc, null);
-                    if (exploration != null) exploration.setAutomationStatus(preLootPacker.status());
-                    if (preLootPacker.active()) return;
-                }
-                rewardPreCleanupPending = false;
-                rewardPrePackingAttempted = false;
+            rewardPrePackingAttempted = true;
+            preLootPacker.setBaseline(inventoryBaseline);
+            if (preLootPacker.startInventoryPacking(mc)) {
+                if (exploration != null) exploration.setAutomationStatus("Packing inventory before looting");
+                return true;
             }
-            rewardLooter.tick(mc, exploration);
+        }
+        if (preLootPacker.active()) {
+            preLootPacker.tick(mc, null);
+            if (exploration != null) exploration.setAutomationStatus(preLootPacker.status());
+            if (preLootPacker.active()) return true;
+        }
+        rewardPreCleanupPending = false;
+        rewardPrePackingAttempted = false;
+        return false;
+    }
+
+    private void handleRewardLooterFinished(Minecraft mc) {
+        if ("Reward chest unreachable; collection paused".equals(rewardLooter.status())) {
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            rewardLooterCooldown = 100;
             if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
-            if (!rewardLooter.active()) {
-                if ("Reward chest unreachable; collection paused".equals(rewardLooter.status())) {
-                    rewardReturnPending = false;
-                    rewardPreCleanupPending = false;
-                    rewardLooterCooldown = 100;
-                    if (exploration != null) exploration.setAutomationStatus(rewardLooter.status());
-                    return;
-                }
-                if ("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
-                    && mc.thePlayer != null
-                    && mc.thePlayer.inventory.getFirstEmptyStack() < 0
-                    && mc.currentScreen == null
-                    && (exploration == null || !exploration.navigating())) {
-                    if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
-                    rewardReturnPending = false;
-                    rewardPreCleanupPending = false;
-                    rewardLooterCooldown = 100;
-                    if (exploration != null) exploration.stop(mc, "Reward collection paused");
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
-                                + (rewardLooter.pendingCheckpoint() != null ? "Use /lgs resumeLoot after making space."
-                                    : "Could not save the reward checkpoint.")));
-                    return;
-                }
-                if (rewardLooter.completed()) {
-                    if (trashCleanup.active() || trashCleanup.shouldClean(mc)) {
-                        if (trashCleanup.tick(mc, true)) {
-                            if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
-                            return;
-                        }
-                    }
-                    rewardReturnPending = false;
-                    rewardPreCleanupPending = false;
-                    if (explorationDriven && exploration != null) {
-                        if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
-                        exploration.finishPuzzle(mc, true);
-                    }
-                } else if (!"Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
-                    && !"No available backpack; items kept".equals(rewardLooter.status())) {
-                        boolean saved = rewardLooter.saveCheckpoint(mc) != null;
-                        rewardReturnPending = false;
-                        rewardPreCleanupPending = false;
-                        rewardLooterCooldown = 100;
-                        mc.thePlayer.addChatMessage(
-                            new net.minecraft.util.ChatComponentText(
-                                "\u00A7e[LootGameSolver] " + rewardLooter.status()
-                                    + (saved ? " Rewards saved; use /lgs resumeLoot nearby." : "")));
-                    }
-            }
             return;
         }
-        if (!session.isActive() && inventoryMaintenanceCooldown == 0
-            && exploration != null
-            && (exploration.navigating() || exploration.puzzleArrivalPending)
-            && (trashCleanup.inventoryPressure(mc) || trashCleanup.shouldClean(mc))
-            && (exploration.navigating() ? exploration.inventoryCleanupSafe(mc)
-                : exploration.puzzleArrivalCleanupSafe(mc))
+        if ("Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+            && mc.thePlayer != null
+            && mc.thePlayer.inventory.getFirstEmptyStack() < 0
             && mc.currentScreen == null
-            && mc.thePlayer.inventory.getItemStack() == null) {
-            ensureInventoryBaseline(mc);
-            inventoryMaintenanceStage = 1;
-            inventoryMaintenanceWait = 0;
-            exploration.setInventoryMaintenance(true);
-            exploration.setAutomationStatus("Preparing inventory cleanup");
+            && (exploration == null || !exploration.navigating())) {
+            if (startStorageRecovery(mc, rewardLooter.pendingCheckpoint())) return;
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            rewardLooterCooldown = 100;
+            if (exploration != null) exploration.stop(mc, "Reward collection paused");
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7e[LootGameSolver] Reward collection paused: storage is unavailable. "
+                        + (rewardLooter.pendingCheckpoint() != null ? "Use /lgs resumeLoot after making space."
+                            : "Could not save the reward checkpoint.")));
             return;
         }
-        if (mc.currentScreen != null) {
-            tileNavigator.pause(true);
-            if (session.inventoryTransferActive()) session.tick();
-            else session.pauseForScreen();
-            return;
-        }
-        if (exploration != null
-            && (exploration.navigating()
-                || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED))
-            && (autoPuzzle.isIdle() || autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
-            && !session.isActive()
-            && rewardLooterCooldown == 0
-            && mc.thePlayer.ticksExisted % 20 == 0
-            && (exploration.inDungeonRoom(mc)
-                || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED
-                    && autoPuzzle.getRewardCenter() != null))) {
-            int[] anchor = exploration.verifiedRoomCenter(mc);
-            if (anchor == null && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
-                anchor = autoPuzzle.getRewardCenter();
-            int[] cluster = nearbyRewardCenter(mc, anchor);
-            if (cluster != null && rewardLooter.hasUncollectedCluster(mc, cluster)) {
-                autoPuzzle.reset();
-                exploration.prepareRewardCollection(mc, cluster);
-                rewardCenter = cluster;
-                explorationDriven = true;
-                ensureInventoryBaseline(mc);
-                rewardLooter.start(mc, cluster, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
-                rewardPreCleanupPending = true;
-                rewardPrePackingAttempted = false;
-                rewardReturnPending = true;
-                exploration.setAutomationStatus("Collecting reward chests");
+        if (rewardLooter.completed()) {
+            if ((trashCleanup.active() || trashCleanup.shouldClean(mc)) && trashCleanup.tick(mc, true)) {
+                if (exploration != null) exploration.setAutomationStatus(trashCleanup.status());
                 return;
             }
-            if (!exploration.navigating()) return;
-            int[] center = puzzleBridge.nearbyFloorActivator();
-            if (center == null) {
-                center = puzzleBridge.nearbyMasterBlock(exploration.verifiedRoomCenter(mc));
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            if (explorationDriven && exploration != null) {
+                if (rewardCenter != null) exploration.markStructureSolved(mc, rewardCenter);
+                exploration.finishPuzzle(mc, true);
             }
-            if (center == null) {
-                Object game = puzzleBridge.nearbyGame(true);
-                if (game != null) center = puzzleBridge.gameCenter(game);
-            }
-            if (center != null) exploration.interruptSearchForRoomPuzzle(mc, center);
+            return;
         }
+        if (!"Inventory and backpacks full; rewards remain in chest".equals(rewardLooter.status())
+            && !"No available backpack; items kept".equals(rewardLooter.status())) {
+            boolean saved = rewardLooter.saveCheckpoint(mc) != null;
+            rewardReturnPending = false;
+            rewardPreCleanupPending = false;
+            rewardLooterCooldown = 100;
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00A7e[LootGameSolver] " + rewardLooter.status()
+                        + (saved ? " Rewards saved; use /lgs resumeLoot nearby." : "")));
+        }
+    }
+
+    private boolean tryStartInventoryMaintenance(Minecraft mc) {
+        if (session.isActive() || inventoryMaintenanceCooldown != 0
+            || exploration == null
+            || (!exploration.navigating() && !exploration.puzzleArrivalPending)
+            || (!trashCleanup.inventoryPressure(mc) && !trashCleanup.shouldClean(mc))
+            || !(exploration.navigating() ? exploration.inventoryCleanupSafe(mc)
+                : exploration.puzzleArrivalCleanupSafe(mc))
+            || mc.currentScreen != null
+            || mc.thePlayer.inventory.getItemStack() != null) return false;
+        ensureInventoryBaseline(mc);
+        inventoryMaintenanceStage = 1;
+        inventoryMaintenanceWait = 0;
+        exploration.setInventoryMaintenance(true);
+        exploration.setAutomationStatus("Preparing inventory cleanup");
+        return true;
+    }
+
+    private void pauseForOpenScreen() {
+        tileNavigator.pause(true);
+        if (session.inventoryTransferActive()) session.tick();
+        else session.pauseForScreen();
+    }
+
+    private boolean tickRoomDiscovery(Minecraft mc) {
+        if (exploration == null
+            || (!exploration.navigating()
+                && !(explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED))
+            || (!autoPuzzle.isIdle() && autoPuzzle.getState() != AutoPuzzleCoordinator.State.FAILED)
+            || session.isActive()
+            || rewardLooterCooldown != 0
+            || mc.thePlayer.ticksExisted % 20 != 0) return false;
+        boolean insideOrFailed = exploration.inDungeonRoom(mc)
+            || (explorationDriven && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED
+                && autoPuzzle.getRewardCenter() != null);
+        if (!insideOrFailed) return false;
+
+        int[] anchor = exploration.verifiedRoomCenter(mc);
+        if (anchor == null && autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
+            anchor = autoPuzzle.getRewardCenter();
+        int[] cluster = nearbyRewardCenter(mc, anchor);
+        if (cluster != null && rewardLooter.hasUncollectedCluster(mc, cluster)) {
+            beginRoomRewardCollection(mc, cluster);
+            return true;
+        }
+        if (!exploration.navigating()) return true;
+        int[] center = findNearbyPuzzleCenter(mc, exploration.verifiedRoomCenter(mc));
+        if (center != null) exploration.interruptSearchForRoomPuzzle(mc, center);
+        return false;
+    }
+
+    private void beginRoomRewardCollection(Minecraft mc, int[] cluster) {
+        autoPuzzle.reset();
+        exploration.prepareRewardCollection(mc, cluster);
+        rewardCenter = cluster;
+        explorationDriven = true;
+        ensureInventoryBaseline(mc);
+        rewardLooter.start(mc, cluster, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
+        rewardPreCleanupPending = true;
+        rewardPrePackingAttempted = false;
+        rewardReturnPending = true;
+        exploration.setAutomationStatus("Collecting reward chests");
+    }
+
+    private int[] findNearbyPuzzleCenter(Minecraft mc, int[] room) {
+        int[] center = puzzleBridge.nearbyFloorActivator();
+        if (center == null) center = puzzleBridge.nearbyMasterBlock(room);
+        if (center == null) {
+            Object game = puzzleBridge.nearbyGame(true);
+            if (game != null) center = puzzleBridge.gameCenter(game);
+        }
+        return center;
+    }
+
+    private void tickPuzzleAndWatchdog(Minecraft mc) {
         if (exploration != null && exploration.consumePuzzleArrival() && autoPuzzle.isIdle()) {
             explorationDriven = true;
             autoPuzzle.startFromExploration(exploration.puzzlePosition(), mc.theWorld, puzzleCompletion);
         }
-
         autoPuzzle.checkSolvingStage(mc, puzzleBridge, exploration, session, puzzleCompletion, tileNavigator);
-
-        // Poll dormant board detection less often; poll every tick while solving.
         detectCounter++;
-        if (session.isActive() || detectCounter % 20 == 0) {
-            session.tick(!tileNavigator.moving());
-        }
-
+        if (session.isActive() || detectCounter % 20 == 0) session.tick(!tileNavigator.moving());
         autoPuzzle.tick(mc, puzzleBridge, exploration, session, puzzleCompletion, rewardLooter, this);
 
-        if (exploration != null) {
-            boolean watchingRoom = !session.isActive() && !rewardReturnPending
-                && (exploration.navigating() || (explorationDriven && !autoPuzzle.isIdle()));
-            int[] room = watchingRoom ? exploration.verifiedRoomCenter(mc) : null;
-            RoomOpenWatchdog.Action recovery = roomOpenWatchdog.tick(room, watchingRoom);
-            if (room != null && (recovery == RoomOpenWatchdog.Action.RETRY || autoPuzzle.isIdle()))
-                exploration.setAutomationStatus(roomOpenWatchdog.status());
-            if (recovery != RoomOpenWatchdog.Action.WAIT) {
-                int[] rewards = nearbyRewardCenter(mc, room);
-                if (rewards != null) {
-                    roomOpenWatchdog.reset();
-                    autoPuzzle.reset();
-                    exploration.prepareRewardCollection(mc, rewards);
-                    rewardCenter = rewards;
-                    explorationDriven = true;
-                    ensureInventoryBaseline(mc);
-                    rewardLooter.start(mc, rewards, com.kyroxova.lootgamesolver.core.MiniGame.UNKNOWN);
-                    rewardPreCleanupPending = true;
-                    rewardPrePackingAttempted = false;
-                    rewardReturnPending = true;
-                } else if (recovery == RoomOpenWatchdog.Action.SKIP) {
-                    roomOpenWatchdog.reset();
-                    autoPuzzle.reset();
-                    session.cancel("Skipping unopenable room");
-                    releaseMovementKeys(mc);
-                    exploration.skipUnopenableRoom(mc, room);
-                    mc.thePlayer.addChatMessage(
-                        new net.minecraft.util.ChatComponentText(
-                            "\u00a7e[LootGameSolver] Could not open this room after three retries; moving on."));
-                } else {
-                    int[] master = puzzleBridge.nearbyMasterBlock(room);
-                    int[] floor = puzzleBridge.nearbyFloorActivator();
-                    Object game = puzzleBridge.nearbyGame(true);
-                    int[] center = master != null ? master
-                        : (floor != null ? floor : (game == null ? room : puzzleBridge.gameCenter(game)));
-                    exploration.stop(mc, "Retrying room puzzle");
-                    explorationDriven = true;
-                    autoPuzzle.startManual(center != null ? center : room, floor, mc.theWorld, puzzleCompletion);
-                }
-            }
-        }
+        if (exploration == null) return;
+        boolean watchingRoom = !session.isActive() && !rewardReturnPending
+            && (exploration.navigating() || (explorationDriven && !autoPuzzle.isIdle()));
+        int[] room = watchingRoom ? exploration.verifiedRoomCenter(mc) : null;
+        RoomOpenWatchdog.Action recovery = roomOpenWatchdog.tick(room, watchingRoom);
+        if (room != null && (recovery == RoomOpenWatchdog.Action.RETRY || autoPuzzle.isIdle()))
+            exploration.setAutomationStatus(roomOpenWatchdog.status());
+        if (recovery == RoomOpenWatchdog.Action.WAIT) return;
+        handleRoomOpenRecovery(mc, room, recovery);
+    }
 
+    private void handleRoomOpenRecovery(Minecraft mc, int[] room, RoomOpenWatchdog.Action recovery) {
+        int[] rewards = nearbyRewardCenter(mc, room);
+        if (rewards != null) {
+            roomOpenWatchdog.reset();
+            beginRoomRewardCollection(mc, rewards);
+            return;
+        }
+        if (recovery == RoomOpenWatchdog.Action.SKIP) {
+            roomOpenWatchdog.reset();
+            autoPuzzle.reset();
+            session.cancel("Skipping unopenable room");
+            releaseMovementKeys(mc);
+            exploration.skipUnopenableRoom(mc, room);
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText(
+                    "\u00a7e[LootGameSolver] Could not open this room after three retries; moving on."));
+            return;
+        }
+        int[] master = puzzleBridge.nearbyMasterBlock(room);
+        int[] floor = puzzleBridge.nearbyFloorActivator();
+        Object game = puzzleBridge.nearbyGame(true);
+        int[] center = master != null ? master
+            : (floor != null ? floor : (game == null ? room : puzzleBridge.gameCenter(game)));
+        exploration.stop(mc, "Retrying room puzzle");
+        explorationDriven = true;
+        autoPuzzle.startManual(center != null ? center : room, floor, mc.theWorld, puzzleCompletion);
+    }
+
+    private void updateMovementAndActiveTicks(Minecraft mc) {
         if (session.isActive()) {
-            if (exploration != null && exploration.navigating()) {
-                exploration.stop(mc, "Solving puzzle in progress");
-            }
+            if (exploration != null && exploration.navigating()) exploration.stop(mc, "Solving puzzle in progress");
             tileNavigator.pause(false);
             handleAutoMovement(mc);
         } else tileNavigator.stop();
