@@ -60,32 +60,39 @@ public final class ExplorerRouteFollower {
 
     private boolean shouldHop(Minecraft mc, int[] next, int footY, float turn, double distance, double dx, double dz,
         boolean returning, boolean inWater) {
+        double targetSurface = walkSurfaceY(mc.theWorld, next[0], next[1], next[2]);
+        boolean needsJump = needsStepOrSurfaceJump(mc, next, footY, targetSurface);
+        boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
+        boolean standardJump = needsJump && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally)
+            && jumpDistance
+            && (mc.thePlayer.onGround || inWater);
+        return standardJump || shouldPerformPitOrEscapeJump(mc, turn, distance, dx, dz, returning) || inWater;
+    }
+
+    private static boolean needsStepOrSurfaceJump(Minecraft mc, int[] next, int footY, double targetSurface) {
         Block nextBlock = mc.theWorld.getBlock(next[0], next[1], next[2]);
         AxisAlignedBB nextBox = nextBlock.getCollisionBoundingBoxFromPool(mc.theWorld, next[0], next[1], next[2]);
-        double targetSurface = walkSurfaceY(mc.theWorld, next[0], next[1], next[2]);
         double rise = targetSurface >= 0D ? targetSurface - mc.thePlayer.boundingBox.minY : (double) (next[1] - footY);
-        boolean canStepUp = targetSurface >= 0D && rise > 0D && rise <= 0.55D;
+        if (targetSurface >= 0D && rise > 0D && rise <= 0.55D) return false;
         boolean climbRewardChest = nextBlock instanceof BlockChest && nextBox != null
             && nextBox.maxY - mc.thePlayer.boundingBox.minY > 0.45D
             && nextBox.maxY - mc.thePlayer.boundingBox.minY <= 1D;
-        boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
         boolean climbSurface = NavigationSurfacePolicy.needsJump(mc.thePlayer.boundingBox.minY, targetSurface);
+        return climbSurface || climbRewardChest
+            || (targetSurface < 0D && next[1] > footY)
+            || (mc.thePlayer.isCollidedHorizontally && (targetSurface < 0D || (rise > 0.55D && rise <= 1.001D)));
+    }
+
+    private boolean shouldPerformPitOrEscapeJump(Minecraft mc, float turn, double distance, double dx, double dz,
+        boolean returning) {
         boolean chestPitJump = returning && chestPitJumpBoostTicks > 0
             && isRewardChestPit(mc)
             && mc.thePlayer.onGround
             && Math.abs(turn) < 45F
             && distance < 4D;
         if (chestPitJumpBoostTicks > 0) chestPitJumpBoostTicks--;
-        boolean needsJump = !canStepUp && (climbSurface || climbRewardChest
-            || (targetSurface < 0D && next[1] > footY)
-            || (mc.thePlayer.isCollidedHorizontally && (targetSurface < 0D || (rise > 0.55D && rise <= 1.001D))));
-        boolean jumpDistance = distance <= 1.65D || (mc.thePlayer.isCollidedHorizontally && distance <= 2.2D);
-        return (needsJump && (Math.abs(turn) < 45F || mc.thePlayer.isCollidedHorizontally)
-            && jumpDistance
-            && (mc.thePlayer.onGround || inWater))
-            || (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround)
-            || chestPitJump
-            || inWater;
+        boolean escapeRewardPit = returning && rewardChestAhead(mc, dx, dz);
+        return (escapeRewardPit && Math.abs(turn) < 35F && distance < 2.5D && mc.thePlayer.onGround) || chestPitJump;
     }
 
     private static void applySprintAndWaterControls(Minecraft mc, NavigationInput input, float turn, boolean centering,

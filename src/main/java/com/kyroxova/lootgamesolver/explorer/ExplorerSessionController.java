@@ -175,6 +175,28 @@ public class ExplorerSessionController {
             explorer.stop(mc, "Could not place a safe return step; add cobblestone or dirt");
             return true;
         }
+        handleMaintenanceAndScan(mc, explorer, roomWorkActive);
+        if (!explorer.walking) return true;
+        if (solverActive) {
+            pauseForManualOrSolver(mc, explorer, "Puzzle in progress");
+            return true;
+        }
+        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) {
+            explorer.stop(mc, "Exploration disabled");
+            return true;
+        }
+        if (handleWaterAndControlPause(mc, explorer)) return true;
+        boolean shouldEatWhileMoving = !explorer.route.isEmpty() && !explorer.digging
+            && !explorer.returnDigging
+            && !explorer.blockPlacer.selectingBlock();
+        if (explorer.sustain.tick(mc, true, shouldEatWhileMoving)) {
+            explorer.status = "Eating or preparing food";
+            return true;
+        }
+        return false;
+    }
+
+    private static void handleMaintenanceAndScan(Minecraft mc, Explorer explorer, boolean roomWorkActive) {
         if (explorer.ticks % 20 == 0) explorer.excavationTerrain.clearToolCache();
         if (explorer.ticks % 1200 == 0 && explorer.savedFinder != null) explorer.savedFinder.rescan();
         explorer.updateRoutePreview(mc);
@@ -187,18 +209,11 @@ public class ExplorerSessionController {
                 explorer.route.clear();
             } else explorer.target = previous;
         }
-        if (!explorer.walking) return true;
-        if (solverActive) {
-            pauseForManualOrSolver(mc, explorer, "Puzzle in progress");
-            return true;
-        }
-        if (!LootGameSolverConfig.enabled || !LootGameSolverConfig.explorationEnabled) {
-            explorer.stop(mc, "Exploration disabled");
-            return true;
-        }
+    }
+
+    private static boolean handleWaterAndControlPause(Minecraft mc, Explorer explorer) {
         if (mc.thePlayer.isInWater() && mc.thePlayer.getAir() < 150) {
-            if (explorer.swimToNearestShore(mc)) return true;
-            explorer.stop(mc, "Low Air");
+            if (!explorer.swimToNearestShore(mc)) explorer.stop(mc, "Low Air");
             return true;
         }
         boolean manual = hasManualMovement(mc);
@@ -206,15 +221,6 @@ public class ExplorerSessionController {
             pauseForManualOrSolver(mc, explorer, pausedControlStatus(mc, manual));
             mc.playerController.resetBlockRemoving();
             explorer.miningAim.reset();
-            return true;
-        }
-        if (explorer.sustain.tick(
-            mc,
-            true,
-            !explorer.route.isEmpty() && !explorer.digging
-                && !explorer.returnDigging
-                && !explorer.blockPlacer.selectingBlock())) {
-            explorer.status = "Eating or preparing food";
             return true;
         }
         return false;
