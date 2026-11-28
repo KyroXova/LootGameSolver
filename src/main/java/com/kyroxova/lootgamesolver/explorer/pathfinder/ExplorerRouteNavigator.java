@@ -124,35 +124,16 @@ public class ExplorerRouteNavigator {
         int px = (int) Math.floor(mc.thePlayer.posX);
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
-        if (explorer.returning && explorer.roomExitCrossing
-            && mc.thePlayer.onGround
-            && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1
-            && explorer.clearRoomExitObstruction(mc, next, px, py, pz)) return true;
-        if (!explorer.returning && explorer.trail.target != null && mc.thePlayer.onGround) {
-            explorer.recordAccessPoint(px, py, pz);
-        }
-        if (clearDiggingFoliage(mc, explorer, next, px, py, pz)) return true;
-        if (!validateRouteStepSafety(mc, explorer, next, px, py, pz)) return true;
+        if (tryHandlePreStepChecks(mc, explorer, next, px, py, pz)) return true;
 
         double dx = next[0] + 0.5D - mc.thePlayer.posX;
         double dz = next[2] + 0.5D - mc.thePlayer.posZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
         boolean centering = next.length > 3 && next[3] == 2;
         if (tryAdvancePassedWaypoint(mc, explorer, next, px, py, pz, distance, centering)) {
-            if (explorer.route.isEmpty()) {
-                if (mc.thePlayer.onGround && !explorer.digging) {
-                    mc.thePlayer.motionX *= 0.3D;
-                    mc.thePlayer.motionZ *= 0.3D;
-                }
-                return true;
-            }
-            next = explorer.route.get(0);
+            next = reloadCurrentWaypoint(mc, explorer, py);
+            if (next == null) return true;
             centering = next.length > 3 && next[3] == 2;
-            if (!safe(mc.theWorld, next[0], next[1], next[2])
-                || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
-                handleUnsafeReturnOrStop(mc, explorer, next, py, "Next route segment is no longer safe");
-                return true;
-            }
             dx = next[0] + 0.5D - mc.thePlayer.posX;
             dz = next[2] + 0.5D - mc.thePlayer.posZ;
             distance = Math.sqrt(dx * dx + dz * dz);
@@ -190,49 +171,82 @@ public class ExplorerRouteNavigator {
         return true;
     }
 
+    private static boolean tryHandlePreStepChecks(Minecraft mc, Explorer explorer, int[] next, int px, int py, int pz) {
+        if (explorer.returning && explorer.roomExitCrossing
+            && mc.thePlayer.onGround
+            && Math.abs(next[0] - px) + Math.abs(next[2] - pz) <= 1
+            && explorer.clearRoomExitObstruction(mc, next, px, py, pz)) return true;
+        if (!explorer.returning && explorer.trail.target != null && mc.thePlayer.onGround) {
+            explorer.recordAccessPoint(px, py, pz);
+        }
+        if (clearDiggingFoliage(mc, explorer, next, px, py, pz)) return true;
+        return !validateRouteStepSafety(mc, explorer, next, px, py, pz);
+    }
+
+    private static int[] reloadCurrentWaypoint(Minecraft mc, Explorer explorer, int py) {
+        if (explorer.route.isEmpty()) {
+            if (mc.thePlayer.onGround && !explorer.digging) {
+                mc.thePlayer.motionX *= 0.3D;
+                mc.thePlayer.motionZ *= 0.3D;
+            }
+            return null;
+        }
+        int[] next = explorer.route.get(0);
+        if (!safe(mc.theWorld, next[0], next[1], next[2])
+            || Math.abs(py - next[1]) > (mc.thePlayer.isInWater() ? 2 : 1)) {
+            handleUnsafeReturnOrStop(mc, explorer, next, py, "Next route segment is no longer safe");
+            return null;
+        }
+        return next;
+    }
+
     private static void trimUpcomingRouteShortcuts(Minecraft mc, Explorer explorer) {
         int cx = (int) Math.floor(mc.thePlayer.posX), cy = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int cz = (int) Math.floor(mc.thePlayer.posZ);
-        if (!explorer.digging && !explorer.returning
-            && !explorer.roomExitCrossing
-            && !explorer.roomEntryCrossing
-            && explorer.route.size() >= 3
-            && mc.thePlayer.onGround) {
-            int trimTo = -1;
-            for (int i = Math.min(explorer.route.size() - 1, 8); i >= 2 && trimTo < 0; i--) {
-                int[] step = explorer.route.get(i);
-                int dx = Math.abs(step[0] - cx), dz = Math.abs(step[2] - cz);
-                if ((step.length > 3 && step[3] != 0) || step[1] != cy
-                    || dx > 1
-                    || dz > 1
-                    || dx + dz == 0
-                    || !safe(mc.theWorld, step[0], cy, step[2])
-                    || (dx == 1 && dz == 1
-                        && (!safe(mc.theWorld, step[0], cy, cz) || !safe(mc.theWorld, cx, cy, step[2]))))
-                    continue;
-                boolean special = false;
-                for (int j = 0; j < i; j++) {
-                    if (explorer.route.get(j).length > 3 && explorer.route.get(j)[3] != 0) special = true;
-                }
-                if (!special) trimTo = i;
+        trimLongRouteShortcut(mc, explorer, cx, cy, cz);
+        trimDiagonalCornerShortcut(mc, explorer, cx, cy, cz);
+    }
+
+    private static void trimLongRouteShortcut(Minecraft mc, Explorer explorer, int cx, int cy, int cz) {
+        if (explorer.digging || explorer.returning
+            || explorer.roomExitCrossing
+            || explorer.roomEntryCrossing
+            || explorer.route.size() < 3
+            || !mc.thePlayer.onGround) return;
+        int trimTo = -1;
+        for (int i = Math.min(explorer.route.size() - 1, 8); i >= 2 && trimTo < 0; i--) {
+            int[] step = explorer.route.get(i);
+            int dx = Math.abs(step[0] - cx), dz = Math.abs(step[2] - cz);
+            if ((step.length > 3 && step[3] != 0) || step[1] != cy
+                || dx > 1
+                || dz > 1
+                || dx + dz == 0
+                || !safe(mc.theWorld, step[0], cy, step[2])
+                || (dx == 1 && dz == 1 && (!safe(mc.theWorld, step[0], cy, cz) || !safe(mc.theWorld, cx, cy, step[2]))))
+                continue;
+            boolean special = false;
+            for (int j = 0; j < i; j++) {
+                if (explorer.route.get(j).length > 3 && explorer.route.get(j)[3] != 0) special = true;
             }
-            if (trimTo >= 2) explorer.route.subList(0, trimTo)
-                .clear();
+            if (!special) trimTo = i;
         }
-        if (!explorer.digging && !explorer.roomExitCrossing
-            && !explorer.roomEntryCrossing
-            && explorer.route.size() >= 2) {
-            int[] first = explorer.route.get(0), second = explorer.route.get(1);
-            if ((first.length < 4 || first[3] == 0) && (second.length < 4 || second[3] == 0)
-                && first[1] == cy
-                && second[1] == cy
-                && Math.abs(second[0] - cx) == 1
-                && Math.abs(second[2] - cz) == 1
-                && safe(mc.theWorld, second[0], cy, cz)
-                && safe(mc.theWorld, cx, cy, second[2])
-                && safe(mc.theWorld, second[0], cy, second[2])) {
-                explorer.route.remove(0);
-            }
+        if (trimTo >= 2) explorer.route.subList(0, trimTo)
+            .clear();
+    }
+
+    private static void trimDiagonalCornerShortcut(Minecraft mc, Explorer explorer, int cx, int cy, int cz) {
+        if (explorer.digging || explorer.roomExitCrossing || explorer.roomEntryCrossing || explorer.route.size() < 2)
+            return;
+        int[] first = explorer.route.get(0), second = explorer.route.get(1);
+        if ((first.length < 4 || first[3] == 0) && (second.length < 4 || second[3] == 0)
+            && first[1] == cy
+            && second[1] == cy
+            && Math.abs(second[0] - cx) == 1
+            && Math.abs(second[2] - cz) == 1
+            && safe(mc.theWorld, second[0], cy, cz)
+            && safe(mc.theWorld, cx, cy, second[2])
+            && safe(mc.theWorld, second[0], cy, second[2])) {
+            explorer.route.remove(0);
         }
     }
 

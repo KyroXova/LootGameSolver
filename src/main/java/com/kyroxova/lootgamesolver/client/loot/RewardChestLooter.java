@@ -203,28 +203,7 @@ public final class RewardChestLooter {
             return;
         }
         if (++ticks < 30) return;
-        if (chests.isEmpty() && index == 0) {
-            int[] cluster = ClientHooks.nearbyRewardCenter(mc, center);
-            if (cluster != null) center = cluster;
-        }
-        if (discoverChests(mc)) chestDiscoveryQuietTicks = 0;
-        else if (chestDiscoveryQuietTicks < 60) chestDiscoveryQuietTicks++;
-        if (chests.isEmpty()) {
-            status = "Waiting for reward chests";
-            return;
-        }
-        if (packing) {
-            backpackPacker.tick(mc, exploration, this);
-            return;
-        }
-        while (!collecting && index < chests.size()
-            && lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
-            index++;
-        if (!collecting && index >= chests.size()) {
-            handleAllChestsDone(mc);
-            return;
-        }
-        if (collecting && tickCollectingQueue(mc)) return;
+        if (!prepareChestDiscoveryAndQueue(mc, exploration)) return;
         if (waiting > 0) {
             waiting--;
             return;
@@ -240,6 +219,31 @@ public final class RewardChestLooter {
             return;
         }
         tickApproachAndOpenChest(mc, exploration, pos);
+    }
+
+    private boolean prepareChestDiscoveryAndQueue(Minecraft mc, Explorer exploration) {
+        if (chests.isEmpty() && index == 0) {
+            int[] cluster = ClientHooks.nearbyRewardCenter(mc, center);
+            if (cluster != null) center = cluster;
+        }
+        if (discoverChests(mc)) chestDiscoveryQuietTicks = 0;
+        else if (chestDiscoveryQuietTicks < 60) chestDiscoveryQuietTicks++;
+        if (chests.isEmpty()) {
+            status = "Waiting for reward chests";
+            return false;
+        }
+        if (packing) {
+            backpackPacker.tick(mc, exploration, this);
+            return false;
+        }
+        while (!collecting && index < chests.size()
+            && lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
+            index++;
+        if (!collecting && index >= chests.size()) {
+            handleAllChestsDone(mc);
+            return false;
+        }
+        return !(collecting && tickCollectingQueue(mc));
     }
 
     private void updateChestViewNavigation(Minecraft mc, Explorer exploration) {
