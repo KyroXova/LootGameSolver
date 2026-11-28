@@ -1,0 +1,22 @@
+---
+duplication:
+  exclude_paths:
+    - "build/**"
+    - ".gradle/**"
+    - "gradle/wrapper/**"
+    - "run/**"
+    - "jars/**"
+    - "eclipse/**"
+    - "out/**"
+    - "bin/**"
+
+exclude_paths:
+  - "build/**"
+  - "**/build/**"
+  - ".gradle/**"
+  - "gradle/wrapper/**"
+  - "run/**"
+  - "jars/**"
+  - "eclipse/**"
+  - "out/**"
+  - "bin/**"

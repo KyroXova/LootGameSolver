@@ -2,6 +2,7 @@ import java.util.zip.ZipFile
 
 plugins {
     id("com.gtnewhorizons.gtnhconvention")
+    id("jacoco")
 }
 
 version = providers.gradleProperty("modVersion").get()
@@ -21,6 +22,16 @@ val verifyReleaseContent by tasks.registering {
         check(notes.isNotBlank() && notes.lineSequence().first().contains(currentVersion)) {
             "Release changelog must exist, contain release notes, and name the current version"
         }
+    }
+}
+tasks.named<Test>("test") {
+    finalizedBy(tasks.named("jacocoTestReport"))
+}
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.named("test"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
     }
 }
 tasks.named("check") { dependsOn(verifyReleaseContent) }
