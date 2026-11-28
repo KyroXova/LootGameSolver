@@ -327,8 +327,7 @@ public final class RewardBackpackPacker {
     private void selectNextBackpackSlot(Minecraft mc) {
         if (backpackSlot >= 0 && isBackpack(mc.thePlayer.inventory.getStackInSlot(backpackSlot))) return;
         backpackSlot = -1;
-        if (temporaryBag && !backpackTried[bagSource]
-            && isBackpack(mc.thePlayer.inventory.getStackInSlot(bagHotbar))) {
+        if (temporaryBag && !backpackTried[bagSource] && isBackpack(mc.thePlayer.inventory.getStackInSlot(bagHotbar))) {
             backpackSlot = bagHotbar;
             return;
         }
@@ -388,7 +387,10 @@ public final class RewardBackpackPacker {
         for (int i = 0; i < 9 && hotbarFull; i++) {
             if (mc.thePlayer.inventory.getStackInSlot(i) == null) hotbarFull = false;
         }
-        if (hotbarFull && temporaryBag && temporaryBagUsed && bagHotbar >= 0 && !restoringBag
+        if (hotbarFull && temporaryBag
+            && temporaryBagUsed
+            && bagHotbar >= 0
+            && !restoringBag
             && backpackTransfer.restore(mc, bagSource, bagHotbar, bagDisplaced)) {
             restoringBag = true;
             looter.status = "Making space in hotbar";

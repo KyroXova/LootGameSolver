@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.minecraft;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -383,9 +382,8 @@ public final class LootGamesActionTracker {
             return null;
         }
 
-        if (!java.util.Objects.equals(golGame, game)
-            || (!java.util.Objects.equals(golStage, stage)
-                && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
+        if (!java.util.Objects.equals(golGame, game) || (!java.util.Objects.equals(golStage, stage)
+            && !GameOfLightBoard.STAGE_WAITING_FOR_SEQUENCE.equals(stageId))) {
             golSequence.clear();
             golSubmitted = 0;
             golActionPending = false;

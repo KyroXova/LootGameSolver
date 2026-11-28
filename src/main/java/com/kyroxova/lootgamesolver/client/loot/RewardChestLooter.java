@@ -513,7 +513,8 @@ public final class RewardChestLooter {
         for (int i = index + 1; i < chests.size(); i++) {
             net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
             if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach
-                && !lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i))) {
+                && !lootedChests
+                    .contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i))) {
                 java.util.Collections.swap(chests, index, i);
                 status = "Opening a visible reward chest";
                 return true;
@@ -535,9 +536,8 @@ public final class RewardChestLooter {
                     && aimed.blockZ == pos[2]
                     && eye.squareDistanceTo(aimed.hitVec) <= reach * reach));
         if (!matches) return null;
-        if (crosshair != null && crosshair.blockX == pos[0]
-            && crosshair.blockY == pos[1]
-            && crosshair.blockZ == pos[2]) return crosshair;
+        if (crosshair != null && crosshair.blockX == pos[0] && crosshair.blockY == pos[1] && crosshair.blockZ == pos[2])
+            return crosshair;
         if (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2]) return aimed;
         return fallback;
     }

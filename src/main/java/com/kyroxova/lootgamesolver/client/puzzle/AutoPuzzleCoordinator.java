@@ -170,8 +170,7 @@ public final class AutoPuzzleCoordinator {
         else if (state == State.REVEALING) tickRevealing(mc, puzzleBridge, exploration, session, hooks);
         else if (state == State.REVEALING_NEXT_STAGE)
             tickRevealingNextStage(mc, puzzleBridge, exploration, session, hooks);
-        else if (state == State.SOLVING)
-            tickSolving(mc, exploration, session, puzzleCompletion, rewardLooter, hooks);
+        else if (state == State.SOLVING) tickSolving(mc, exploration, session, puzzleCompletion, rewardLooter, hooks);
     }
 
     private void tickOpening(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
@@ -265,7 +264,8 @@ public final class AutoPuzzleCoordinator {
             exploration.setAutomationStatus("Waiting for LootGames to create the puzzle");
         if (puzzleWaitTicks > 200) {
             state = State.FAILED;
-            if (exploration != null) exploration.setAutomationStatus("Opened puzzle could not be located; explorer held");
+            if (exploration != null)
+                exploration.setAutomationStatus("Opened puzzle could not be located; explorer held");
         }
     }
 
@@ -308,8 +308,7 @@ public final class AutoPuzzleCoordinator {
     }
 
     private void tickPositioningNextStage(Explorer exploration) {
-        if ((exploration != null && exploration.consumePuzzleCenterArrival())
-            || exploration == null
+        if ((exploration != null && exploration.consumePuzzleCenterArrival()) || exploration == null
             || !exploration.navigating()) {
             state = State.REVEALING_NEXT_STAGE;
             puzzleWaitTicks = 0;

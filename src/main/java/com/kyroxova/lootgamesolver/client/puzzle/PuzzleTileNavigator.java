@@ -47,7 +47,8 @@ public final class PuzzleTileNavigator {
             return true;
         }
         double floorY = target[1] + 1;
-        if (Math.abs(mc.thePlayer.posY - floorY) < 1.4D && distXZ < 8.0D && LootGamesBridge.topFaceVisible(mc, target)) {
+        if (Math.abs(mc.thePlayer.posY - floorY) < 1.4D && distXZ < 8.0D
+            && LootGamesBridge.topFaceVisible(mc, target)) {
             moveDirectlyInRoom(mc, dx, dz, distXZ);
             return true;
         }
@@ -147,8 +148,7 @@ public final class PuzzleTileNavigator {
             || !ExplorerTerrain.safe(mc.theWorld, candidate[0], candidate[1], candidate[2])) return false;
         double cx = candidate[0] + 0.5D - target[0] - 0.5D;
         double cz = candidate[2] + 0.5D - target[2] - 0.5D;
-        return Math.hypot(cx, cz) >= 0.8D
-            && withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
+        return Math.hypot(cx, cz) >= 0.8D && withinReach(cx, mc.thePlayer.getEyeHeight() + 0.001D, cz, reach)
             && LootGamesBridge.topFaceVisibleFrom(
                 mc,
                 target,

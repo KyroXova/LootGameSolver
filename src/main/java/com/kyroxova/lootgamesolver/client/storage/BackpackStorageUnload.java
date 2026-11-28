@@ -79,8 +79,8 @@ public final class BackpackStorageUnload {
     private Result tickWithdraw(Minecraft mc) {
         VerifiedBackpackUnload.Result result = withdraw.tick(mc);
         if (result == VerifiedBackpackUnload.Result.WORKING) return Result.WORKING;
-        if (result == VerifiedBackpackUnload.Result.FAILED
-            || result == VerifiedBackpackUnload.Result.NEEDS_ATTENTION) return Result.FAILED;
+        if (result == VerifiedBackpackUnload.Result.FAILED || result == VerifiedBackpackUnload.Result.NEEDS_ATTENTION)
+            return Result.FAILED;
         mc.thePlayer.closeScreen();
         withdraw = null;
         if (result == VerifiedBackpackUnload.Result.EMPTY) finished[source] = true;

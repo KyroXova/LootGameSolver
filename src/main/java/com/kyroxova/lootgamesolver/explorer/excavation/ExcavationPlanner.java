@@ -260,9 +260,8 @@ public final class ExcavationPlanner {
             explorer.rejectedSteps.clear();
         }
         boolean complete = excavationSearch.advance(
-            (a, b, c, nx, ny, nz) -> a == x && b == y
-                && c == z
-                && explorer.blockedWalkNodes.contains(supportKey(nx, ny, nz)) ? -1
+            (a, b, c, nx, ny,
+                nz) -> a == x && b == y && c == z && explorer.blockedWalkNodes.contains(supportKey(nx, ny, nz)) ? -1
                     : explorer.excavationTerrain.excavationCost(mc.theWorld, a, b, c, nx, ny, nz),
             24,
             System.nanoTime() + 3_000_000L);

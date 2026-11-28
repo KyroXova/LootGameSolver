@@ -131,7 +131,14 @@ public final class StatusText {
             return "Moving to Entrance";
         if (text.contains("aiming")) return "Aiming Mining Tool";
         if (containsAny(text, "dig", "stair", "mining")) return "Digging Tunnel";
-        if (startsWithAny(text, "finding", "checking", "planning", "continuation", "next route", "replanning",
+        if (startsWithAny(
+            text,
+            "finding",
+            "checking",
+            "planning",
+            "continuation",
+            "next route",
+            "replanning",
             "rerouted")) return "Planning Route";
         if (containsAny(text, "search", "scan", "terrain")) return "Searching Structures";
         if (startsWithAny(text, "walk", "following", "moving", "aligning", "centering", "exploring"))
@@ -172,7 +179,8 @@ public final class StatusText {
     }
 
     private static String solverActionStatus(String text) {
-        if (containsAny(text, "setting", "number")) return text.contains("navigat") ? "Moving to Number" : "Setting Number";
+        if (containsAny(text, "setting", "number"))
+            return text.contains("navigat") ? "Moving to Number" : "Setting Number";
         if (text.contains("reveal")) return text.contains("navigat") ? "Moving to Reveal" : "Revealing Tile";
         if (text.contains("flag")) return text.contains("navigat") ? "Moving to Flag" : "Flagging Tile";
         if (text.contains("navigating")) return "Moving to Tile";

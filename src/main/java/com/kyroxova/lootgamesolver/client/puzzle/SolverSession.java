@@ -345,7 +345,8 @@ public final class SolverSession {
                     .getClass()
                     .getName()
                     .toLowerCase(java.util.Locale.ROOT)
-                    .contains("backpack")) continue;
+                    .contains("backpack"))
+                continue;
             if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
             if (sudokuTransfer.clearHotbar(mc, i, empty)) {
                 sudokuAutomaticSlot = i;

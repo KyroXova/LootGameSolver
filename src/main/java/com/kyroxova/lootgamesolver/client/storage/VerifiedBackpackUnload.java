@@ -55,8 +55,7 @@ public final class VerifiedBackpackUnload {
 
     private Result tickPickupStage(Minecraft mc) {
         ItemStack cursor = mc.thePlayer.inventory.getItemStack();
-        if (!ItemStack.areItemStacksEqual(cursor, pending)
-            || count(backpack, pending) != beforeBag - pending.stackSize
+        if (!ItemStack.areItemStacksEqual(cursor, pending) || count(backpack, pending) != beforeBag - pending.stackSize
             || count(mc.thePlayer.inventory, pending) != beforePlayer
             || countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
         return placeNext(mc);
@@ -133,10 +132,10 @@ public final class VerifiedBackpackUnload {
             if (slot.inventory != playerInventory || index < 9 || index >= 36 || !slot.isItemValid(stack)) continue;
             ItemStack current = slot.getStack();
             int limit = Math.min(stack.getMaxStackSize(), slot.getSlotStackLimit());
-            if (current == null && limit > 0) return slot;
+            if (current == null && limit >= stack.stackSize) return slot;
             if (current != null && current.isItemEqual(stack)
                 && ItemStack.areItemStackTagsEqual(current, stack)
-                && current.stackSize < limit) return slot;
+                && current.stackSize + stack.stackSize <= limit) return slot;
         }
         return null;
     }

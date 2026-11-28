@@ -164,7 +164,9 @@ public final class StorageCommand extends CommandBase {
                 return true;
             }
             LootGameSolverConfig.setStorageDestination(world, "/warp " + args[1]);
-            reply(sender, "Storage warp selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
+            reply(
+                sender,
+                "Storage warp selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
             return true;
         }
         if ("clearStorage".equalsIgnoreCase(sub)) {
@@ -211,8 +213,8 @@ public final class StorageCommand extends CommandBase {
                 + hit.blockY
                 + ":"
                 + hit.blockZ;
-        } else if (hit.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
-            && hit.entityHit instanceof IInventory) {
+        } else
+            if (hit.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY && hit.entityHit instanceof IInventory) {
                 return "entity:" + mc.theWorld.provider.dimensionId + ":" + hit.entityHit.getUniqueID();
             }
         return null;

@@ -60,9 +60,8 @@ public final class ExplorerRoomGeometry {
 
         boolean levelInside = safe(world, inX, floorY, inZ);
         if (levelInside) return opening;
-        boolean lowerInside = safe(world, inX, floorY - 1, inZ)
-            && world.getBlock(wallX, floorY - 1, wallZ)
-                .isReplaceable(world, wallX, floorY - 1, wallZ)
+        boolean lowerInside = safe(world, inX, floorY - 1, inZ) && world.getBlock(wallX, floorY - 1, wallZ)
+            .isReplaceable(world, wallX, floorY - 1, wallZ)
             && world.getBlock(wallX, floorY - 2, wallZ)
                 .isNormalCube();
         if (lowerInside) return new int[] { inX, floorY - 1, inZ, outX, floorY, outZ, wallX, floorY, wallZ, 1 };

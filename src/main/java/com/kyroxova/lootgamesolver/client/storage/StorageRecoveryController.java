@@ -93,9 +93,8 @@ public final class StorageRecoveryController {
         }
         if (phase == StorageTripState.Phase.READY_TO_RESUME)
             return returnWithoutDeposit ? Result.RETURNED_UNSTORED : Result.RETURNED;
-        if (phase != StorageTripState.Phase.DEPOSITING || mc == null
-            || mc.theWorld == null
-            || mc.thePlayer == null) return Result.WORKING;
+        if (phase != StorageTripState.Phase.DEPOSITING || mc == null || mc.theWorld == null || mc.thePlayer == null)
+            return Result.WORKING;
         if (tickBogoDropOff(mc)) return Result.WORKING;
         return tickDeposit(mc);
     }

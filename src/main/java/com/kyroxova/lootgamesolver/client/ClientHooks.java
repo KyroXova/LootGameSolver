@@ -338,8 +338,8 @@ public final class ClientHooks {
             rewardCenter = null;
             if (exploration != null) exploration.clearLastCheckpoint(mc);
             rewardLooterCooldown = 0;
-            mc.thePlayer
-                .addChatMessage(new net.minecraft.util.ChatComponentText("\u00a7a[LootGameSolver] Checkpoint cleared."));
+            mc.thePlayer.addChatMessage(
+                new net.minecraft.util.ChatComponentText("\u00a7a[LootGameSolver] Checkpoint cleared."));
         }
         if (resumeLootRequested) {
             resumeLootRequested = false;
@@ -351,10 +351,9 @@ public final class ClientHooks {
         PendingLootStore.Checkpoint checkpoint = rewardLooter.pendingCheckpoint();
         if (checkpoint == null || !checkpoint.world.equals(Explorer.worldIdentity(mc))
             || checkpoint.dimension != mc.theWorld.provider.dimensionId
-            || mc.thePlayer.getDistanceSq(
-                checkpoint.center[0] + 0.5D,
-                checkpoint.center[1] + 0.5D,
-                checkpoint.center[2] + 0.5D) > 256D) {
+            || mc.thePlayer
+                .getDistanceSq(checkpoint.center[0] + 0.5D, checkpoint.center[1] + 0.5D, checkpoint.center[2] + 0.5D)
+                > 256D) {
             mc.thePlayer.addChatMessage(
                 new net.minecraft.util.ChatComponentText(
                     "\u00a7e[LootGameSolver] No pending loot nearby in this world and dimension."));

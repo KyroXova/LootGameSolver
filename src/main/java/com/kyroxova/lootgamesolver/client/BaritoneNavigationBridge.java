@@ -467,8 +467,7 @@ public final class BaritoneNavigationBridge {
     public static boolean completedAt(Object process, Class<?> processApi, Object goal, Class<?> goalApi, int x, int y,
         int z) throws ReflectiveOperationException {
         return processApi.getMethod("getGoal")
-            .invoke(process) == null
-            && Objects.equals(
+            .invoke(process) == null && Objects.equals(
                 processApi.getMethod("mostRecentGoal")
                     .invoke(process),
                 goal)
@@ -536,28 +535,28 @@ public final class BaritoneNavigationBridge {
                     inputHandlerApi.getMethod("clearAllKeys")
                         .invoke(inputHandler);
                 } catch (ReflectiveOperationException | LinkageError ignored) {
-                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
-            }
+                    LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+                }
             }
             if (pathing != null && pathingApi != null) {
                 try {
                     pathingApi.getMethod("cancelEverything")
                         .invoke(pathing);
                 } catch (ReflectiveOperationException | LinkageError ignored) {
-                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
-            }
+                    LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+                }
                 try {
                     pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                         .invoke(pathing, false, false, false);
                 } catch (ReflectiveOperationException | LinkageError ignored) {
-                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
-            }
+                    LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+                }
                 try {
                     pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
                         .invoke(pathing, (Boolean) null);
                 } catch (ReflectiveOperationException | LinkageError ignored) {
-                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
-            }
+                    LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+                }
             }
             restoreSurfaceOnly();
         } else discardSurfaceOnlySnapshot();

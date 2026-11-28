@@ -301,7 +301,8 @@ public final class WorldOverlayRenderer {
                     }
                     if (box != null) drawWireframe(box.expand(0.01D, 0.01D, 0.01D), 0.2F, 1F, 0.2F);
                 } catch (IllegalArgumentException ignored) {
-                    com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Skipping invalid storage overlay target", ignored);
+                    com.kyroxova.lootgamesolver.LootGameSolver.LOG
+                        .debug("Skipping invalid storage overlay target", ignored);
                 }
             }
         } finally {

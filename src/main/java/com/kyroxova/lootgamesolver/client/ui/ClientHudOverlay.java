@@ -129,7 +129,13 @@ public final class ClientHudOverlay {
         boolean autoActive = !hooks.automationPaused && hooks.session.isActive();
         String autoColor = hooks.automationPaused ? "\u00A7f" : autoActive ? "\u00A7c" : "\u00A77";
         String holoColor = LootGameSolverConfig.showOverlay ? "\u00A7e" : "\u00A77";
-        String line3 = autoColor + "[" + autoKeyStr + "] Auto \u00A78|\u00A77 " + holoColor + "[" + holoKeyStr + "] Holograms";
+        String line3 = autoColor + "["
+            + autoKeyStr
+            + "] Auto \u00A78|\u00A77 "
+            + holoColor
+            + "["
+            + holoKeyStr
+            + "] Holograms";
         if (hooks.exploration != null && LootGameSolverConfig.explorationEnabled) {
             String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
                 + "] "

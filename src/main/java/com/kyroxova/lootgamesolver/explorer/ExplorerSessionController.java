@@ -81,8 +81,7 @@ public class ExplorerSessionController {
             sustaining = explorer.sustain.tick(mc, explorer.walking, !explorer.baritoneCoordinator.breaking);
         explorer.baritoneNavigation.setPaused(interrupted || sustaining);
         if (interrupted || sustaining) {
-            explorer.status = sustaining ? "Eating or preparing food"
-                : pausedControlStatus(mc, manual);
+            explorer.status = sustaining ? "Eating or preparing food" : pausedControlStatus(mc, manual);
             return true;
         }
         return false;
@@ -153,7 +152,10 @@ public class ExplorerSessionController {
 
     private static boolean checkActiveNavigationGuards(Minecraft mc, Explorer explorer, boolean solverActive,
         boolean roomWorkActive) {
-        explorer.markChunkVisited(((int) Math.floor(mc.thePlayer.posX)) >> 4, ((int) Math.floor(mc.thePlayer.posZ)) >> 4, 2);
+        explorer.markChunkVisited(
+            ((int) Math.floor(mc.thePlayer.posX)) >> 4,
+            ((int) Math.floor(mc.thePlayer.posZ)) >> 4,
+            2);
         if (explorer.sustain.busy() && explorer.sustain.tick(mc, explorer.walking, false)) {
             explorer.status = "Eating or preparing food";
             return true;

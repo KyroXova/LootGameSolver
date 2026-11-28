@@ -144,9 +144,10 @@ public final class MinedDropTracker {
         if (slot < 0 || slot >= inventory.length || inventory[slot] == null) return false;
         ItemStack stack = inventory[slot];
         Entry entry = find(stack);
-        return entry != null && !entry.protectedReward
-            && entry.mined >= count(inventory, stack)
-            && entry.mined >= stack.stackSize;
+        if (entry == null || entry.protectedReward || entry.mined <= 0) return false;
+        int untracked = Math.max(0, count(inventory, stack) - entry.mined);
+        for (int i = 0; i < slot; i++) if (matches(inventory[i], stack)) untracked -= inventory[i].stackSize;
+        return untracked <= 0;
     }
 
     public boolean containsTracked(ItemStack[] inventory, int slot) {

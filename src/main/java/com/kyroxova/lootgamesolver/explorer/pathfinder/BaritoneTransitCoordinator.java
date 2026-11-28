@@ -391,7 +391,8 @@ public final class BaritoneTransitCoordinator {
     }
 
     private void advanceSearchHandoff(Minecraft mc, Explorer explorer) {
-        BaritoneNavigationBridge.Start started = searchNext ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
+        BaritoneNavigationBridge.Start started = searchNext
+            ? explorer.baritoneNavigation.startHorizontal(searchX, searchZ)
             : explorer.baritoneNavigation
                 .startStructureApproach(explorer.target.xCoord, explorer.target.yCoord, explorer.target.zCoord);
         if (started == BaritoneNavigationBridge.Start.STARTED) {
@@ -507,8 +508,9 @@ public final class BaritoneTransitCoordinator {
     }
 
     private void advanceStructurePreRouting(Minecraft mc, Explorer explorer) {
-        double hDist = Math
-            .hypot(mc.thePlayer.posX - explorer.target.xCoord - 0.5D, mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+        double hDist = Math.hypot(
+            mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+            mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
         if (hDist <= 6.0D || explorer.baritoneNavigation.completed()) {
             preRouting = false;
             explorer.baritoneNavigation.stop();
@@ -561,12 +563,12 @@ public final class BaritoneTransitCoordinator {
             explorer.stop(mc, "Board center target lost");
             return true;
         }
-        double distToCenter = Math
-            .hypot(mc.thePlayer.posX - explorer.target.xCoord - 0.5D, mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
+        double distToCenter = Math.hypot(
+            mc.thePlayer.posX - explorer.target.xCoord - 0.5D,
+            mc.thePlayer.posZ - explorer.target.zCoord - 0.5D);
         boolean arrived = (distToCenter <= (explorer.movingToRewardView ? 0.75D : 1.5D)
             && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - explorer.target.yCoord - 1) <= 2)
-            || (explorer.baritoneNavigation.completed()
-                && distToCenter <= (explorer.movingToRewardView ? 1.0D : 2.2D));
+            || (explorer.baritoneNavigation.completed() && distToCenter <= (explorer.movingToRewardView ? 1.0D : 2.2D));
         if (arrived) {
             explorer.baritoneNavigation.stop();
             centerMove = false;

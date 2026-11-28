@@ -7,7 +7,6 @@ import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.isFolia
 import static com.kyroxova.lootgamesolver.explorer.trail.ExplorerTerrain.safe;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.init.Blocks;
 
 import com.kyroxova.lootgamesolver.client.loot.RewardChestGeometry;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
@@ -263,7 +262,8 @@ public class ExplorerRouteNavigator {
         return false;
     }
 
-    private static boolean validateRouteStepSafety(Minecraft mc, Explorer explorer, int[] next, int px, int py, int pz) {
+    private static boolean validateRouteStepSafety(Minecraft mc, Explorer explorer, int[] next, int px, int py,
+        int pz) {
         boolean diagonal = next[0] != px && next[2] != pz && next[1] == py;
         if (diagonal && (!safe(mc.theWorld, next[0], py, pz) || !safe(mc.theWorld, px, py, next[2]))) {
             if (explorer.returning) {
@@ -313,8 +313,9 @@ public class ExplorerRouteNavigator {
                 next[0] + 0.5D,
                 next[2] + 0.5D,
                 floor.slipperiness > 0.6F ? 0.65D : 0.30D);
-        if ((explorer.digging && !mc.thePlayer.onGround) || (!passed && !NavigationSteering
-            .reached(distance, py, next[1], mc.thePlayer.isInWater(), explorer.route.size() > 1))) return false;
+        if ((explorer.digging && !mc.thePlayer.onGround) || (!passed
+            && !NavigationSteering.reached(distance, py, next[1], mc.thePlayer.isInWater(), explorer.route.size() > 1)))
+            return false;
 
         explorer.segmentX = next[0] + 0.5D;
         explorer.segmentZ = next[2] + 0.5D;

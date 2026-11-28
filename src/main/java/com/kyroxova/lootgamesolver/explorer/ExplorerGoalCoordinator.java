@@ -41,8 +41,7 @@ public class ExplorerGoalCoordinator {
         int py = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int pz = (int) Math.floor(mc.thePlayer.posZ);
         if (mc.thePlayer.onGround && explorer.trail.target != null) explorer.recordAccessPoint(px, py, pz);
-        explorer.returnAvailable = explorer.trail.target != null
-            && explorer.trail.target[0] == explorer.target.xCoord
+        explorer.returnAvailable = explorer.trail.target != null && explorer.trail.target[0] == explorer.target.xCoord
             && explorer.trail.target[1] == explorer.target.yCoord
             && explorer.trail.target[2] == explorer.target.zCoord
             && (!explorer.trail.points.reverse(px, py, pz)
@@ -68,8 +67,7 @@ public class ExplorerGoalCoordinator {
 
     private static void advanceExistingAccessPlan(Minecraft mc, Explorer explorer) {
         boolean complete = explorer.existingAccessPlan.advance(
-            (x, y, z, nx, ny, nz) -> explorer.routePlanner
-                .existingWalkCost(mc.theWorld, explorer, x, y, z, nx, ny, nz),
+            (x, y, z, nx, ny, nz) -> explorer.routePlanner.existingWalkCost(mc.theWorld, explorer, x, y, z, nx, ny, nz),
             32,
             System.nanoTime() + 2_500_000L);
         explorer.status = "Checking existing route: " + explorer.existingAccessPlan.expandedNodes() + " positions";
@@ -368,8 +366,7 @@ public class ExplorerGoalCoordinator {
         explorer.roomExitCrossing = false;
         if (explorer.insideDungeonRoom(mc)) {
             explorer.roomExitCandidateIndex++;
-            if (!explorer.startNextRoomExitSearch(mc) && !explorer.digTowardSavedExit(mc))
-                explorer.retryExitLater(mc);
+            if (!explorer.startNextRoomExitSearch(mc) && !explorer.digTowardSavedExit(mc)) explorer.retryExitLater(mc);
             return;
         }
         explorer.roomExitCandidates = null;
@@ -426,8 +423,7 @@ public class ExplorerGoalCoordinator {
 
     private static boolean needsDryShoreRelocation(Minecraft mc, Explorer explorer) {
         if (explorer.entranceSelected) return false;
-        boolean nearLowTarget = !explorer.searching
-            && explorer.target.yCoord < mc.thePlayer.boundingBox.minY - 2
+        boolean nearLowTarget = !explorer.searching && explorer.target.yCoord < mc.thePlayer.boundingBox.minY - 2
             && Math.abs(mc.thePlayer.posX - explorer.target.xCoord)
                 + Math.abs(mc.thePlayer.posZ - explorer.target.zCoord) <= 32;
         if (!explorer.digging && !nearLowTarget) return false;

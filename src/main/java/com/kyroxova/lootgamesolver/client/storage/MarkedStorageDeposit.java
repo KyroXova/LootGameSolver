@@ -85,8 +85,7 @@ public final class MarkedStorageDeposit {
             || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindForward)
             || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindBack)
             || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindLeft)
-            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindRight))
-            return Result.FAILED;
+            || net.minecraft.client.settings.GameSettings.isKeyDown(mc.gameSettings.keyBindRight)) return Result.FAILED;
         if (navigation.state() == BaritoneNavigationBridge.State.RUNNING) return Result.WORKING;
         boolean reached = navigation.completed();
         navigation.stop();
