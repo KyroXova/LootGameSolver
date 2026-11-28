@@ -47,42 +47,54 @@ public final class VerifiedBackpackUnload {
             if (reply == VerifiedContainerClick.Result.FAILED) return Result.FAILED;
             click = null;
         }
-        if (stage == 1) {
-            ItemStack cursor = mc.thePlayer.inventory.getItemStack();
-            if (!ItemStack.areItemStacksEqual(cursor, pending)
-                || count(backpack, pending) != beforeBag - pending.stackSize
-                || count(mc.thePlayer.inventory, pending) != beforePlayer
-                || countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
+        if (stage == 1) return tickPickupStage(mc);
+        if (stage == 2) return tickPlaceStage(mc);
+        if (stage == 3) return tickFullReturnStage(mc);
+        return startNextUnload(mc);
+    }
+
+    private Result tickPickupStage(Minecraft mc) {
+        ItemStack cursor = mc.thePlayer.inventory.getItemStack();
+        if (!ItemStack.areItemStacksEqual(cursor, pending)
+            || count(backpack, pending) != beforeBag - pending.stackSize
+            || count(mc.thePlayer.inventory, pending) != beforePlayer
+            || countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
+        return placeNext(mc);
+    }
+
+    private Result tickPlaceStage(Minecraft mc) {
+        ItemStack cursor = mc.thePlayer.inventory.getItemStack();
+        Slot destination = container.getSlot(destinationSlot);
+        ItemStack placed = destination.getStack();
+        int previousDestinationCount = destinationBefore == null ? 0 : destinationBefore.stackSize;
+        if (placed == null || !sameType(placed, pending)
+            || placed.stackSize != previousDestinationCount + moveAmount
+            || count(mc.thePlayer.inventory, pending) != beforePlayer + movedAmount + moveAmount
+            || countHotbar(mc, pending) != beforeHotbar
+            || (cursor == null ? pending.stackSize != movedAmount + moveAmount
+                : !sameType(cursor, pending) || cursor.stackSize != pending.stackSize - movedAmount - moveAmount))
+            return Result.FAILED;
+        if (cursor != null) {
+            movedAmount += moveAmount;
             return placeNext(mc);
         }
-        if (stage == 2) {
-            ItemStack cursor = mc.thePlayer.inventory.getItemStack();
-            Slot destination = container.getSlot(destinationSlot);
-            ItemStack placed = destination.getStack();
-            int previousDestinationCount = destinationBefore == null ? 0 : destinationBefore.stackSize;
-            if (placed == null || !sameType(placed, pending)
-                || placed.stackSize != previousDestinationCount + moveAmount
-                || count(mc.thePlayer.inventory, pending) != beforePlayer + movedAmount + moveAmount
-                || countHotbar(mc, pending) != beforeHotbar
-                || (cursor == null ? pending.stackSize != movedAmount + moveAmount
-                    : !sameType(cursor, pending) || cursor.stackSize != pending.stackSize - movedAmount - moveAmount))
-                return Result.FAILED;
-            if (cursor != null) {
-                movedAmount += moveAmount;
-                return placeNext(mc);
-            }
-            return completeTransfer(mc, pending.stackSize);
-        }
-        if (stage == 3) {
-            if (mc.thePlayer.inventory.getItemStack() != null || count(backpack, pending) != beforeBag - moveAmount
-                || count(mc.thePlayer.inventory, pending) != beforePlayer + moveAmount
-                || countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
-            ledger.withdrawn(pending, moveAmount);
-            clearPending();
-            return Result.PLAYER_FULL;
-        }
+        return completeTransfer(mc, pending.stackSize);
+    }
+
+    private Result tickFullReturnStage(Minecraft mc) {
+        if (mc.thePlayer.inventory.getItemStack() != null || count(backpack, pending) != beforeBag - moveAmount
+            || count(mc.thePlayer.inventory, pending) != beforePlayer + moveAmount
+            || countHotbar(mc, pending) != beforeHotbar) return Result.FAILED;
+        ledger.withdrawn(pending, moveAmount);
+        clearPending();
+        return Result.PLAYER_FULL;
+    }
+
+    private Result startNextUnload(Minecraft mc) {
         boolean remaining = false;
+        Slot selected = null;
         for (Object value : container.inventorySlots) {
+            if (selected != null) break;
             Slot slot = (Slot) value;
             int index = slot.getSlotIndex();
             ItemStack stack = slot.getStack();
@@ -90,23 +102,24 @@ public final class VerifiedBackpackUnload {
                 continue;
             remaining = true;
             if (InventoryProtection.bag(stack) || !slot.canTakeStack(mc.thePlayer)) continue;
-            Slot destination = destination(container, mc.thePlayer.inventory, stack);
-            if (destination == null) return Result.PLAYER_FULL;
-            pending = stack.copy();
-            beforeBag = count(backpack, pending);
-            beforePlayer = count(mc.thePlayer.inventory, pending);
-            beforeHotbar = countHotbar(mc, pending);
-            movedAmount = 0;
-            sourceSlot = slot.slotNumber;
-            click = VerifiedContainerClick.start(mc, slot.slotNumber, false);
-            if (click == null) {
-                pending = null;
-                return Result.FAILED;
-            }
-            stage = 1;
-            return Result.WORKING;
+            if (destination(container, mc.thePlayer.inventory, stack) == null) return Result.PLAYER_FULL;
+            selected = slot;
         }
-        return remaining ? Result.NEEDS_ATTENTION : Result.EMPTY;
+        if (selected == null) return remaining ? Result.NEEDS_ATTENTION : Result.EMPTY;
+        pending = selected.getStack()
+            .copy();
+        beforeBag = count(backpack, pending);
+        beforePlayer = count(mc.thePlayer.inventory, pending);
+        beforeHotbar = countHotbar(mc, pending);
+        movedAmount = 0;
+        sourceSlot = selected.slotNumber;
+        click = VerifiedContainerClick.start(mc, selected.slotNumber, false);
+        if (click == null) {
+            pending = null;
+            return Result.FAILED;
+        }
+        stage = 1;
+        return Result.WORKING;
     }
 
     public void cancel() {

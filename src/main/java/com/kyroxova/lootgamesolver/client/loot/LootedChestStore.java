@@ -10,6 +10,7 @@ import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.kyroxova.lootgamesolver.LootGameSolver;
 
 public final class LootedChestStore {
 
@@ -23,7 +24,9 @@ public final class LootedChestStore {
             loaded = new Gson().fromJson(
                 new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8),
                 new TypeToken<Set<String>>() {}.getType());
-        } catch (IOException | RuntimeException ignored) {}
+        } catch (IOException | RuntimeException ignored) {
+            LootGameSolver.LOG.debug("Could not load looted chest store from {}", file, ignored);
+        }
         entries = loaded == null ? new HashSet<String>() : loaded;
     }
 
@@ -63,7 +66,9 @@ public final class LootedChestStore {
                             .getBytes(StandardCharsets.UTF_8));
                     try {
                         Files.deleteIfExists(pending.toPath());
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                        LootGameSolver.LOG.debug("Could not delete pending looted chest file {}", pending, ignored);
+                    }
                 }
             }
             return true;

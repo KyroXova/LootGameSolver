@@ -90,22 +90,22 @@ public final class ExcavationPathfinder {
                 finish(best);
                 return true;
             }
-            for (int[] direction : directions) for (int dy = -1; dy <= 1; dy++) {
+            expandNeighbors(terrain, directions, node);
+        }
+        done = open.isEmpty() || visited.size() >= 4096;
+        if (done && horizon && best.parent != null && best.remaining < new Node(x, y, z, 0, gx, gy, gz, null).remaining)
+            finish(best);
+        return done;
+    }
+
+    private void expandNeighbors(Terrain terrain, int[][] directions, Node node) {
+        for (int[] direction : directions) {
+            for (int dy = -1; dy <= 1; dy++) {
                 int nx = node.x + direction[0], ny = node.y + dy, nz = node.z + direction[1];
                 if (Math.abs(nx - x) > 40 || Math.abs(nz - z) > 40 || ny < gy - 2 || ny > y + 4) continue;
-                boolean cutsReturnStair = false;
-                for (Node ancestor = node; ancestor != null; ancestor = ancestor.parent) {
-                    if (ancestor.x == nx && ancestor.z == nz
-                        && ancestor.y - 1 >= ny
-                        && ancestor.y - 1 <= Math.max(node.y, ny) + 1) {
-                        cutsReturnStair = true;
-                        break;
-                    }
-                }
-                // Existing tunnels may revisit an X/Z column at another height.
-                if (horizon && cutsReturnStair) continue;
-                long key = key(nx, ny, nz);
-                if (visited.contains(key)) continue;
+                if (horizon && cutsReturnStair(node, nx, ny, nz)) continue;
+                long nextKey = key(nx, ny, nz);
+                if (visited.contains(nextKey)) continue;
                 int edge = terrain.cost(node.x, node.y, node.z, nx, ny, nz);
                 if (edge < 0) {
                     if (node.parent == null && rejected.size() < 12)
@@ -113,16 +113,21 @@ public final class ExcavationPathfinder {
                     continue;
                 }
                 int cost = node.cost + edge;
-                Integer previous = costs.get(key);
+                Integer previous = costs.get(nextKey);
                 if (previous != null && previous <= cost) continue;
-                costs.put(key, cost);
+                costs.put(nextKey, cost);
                 open.add(new Node(nx, ny, nz, cost, gx, gy, gz, node));
             }
         }
-        done = open.isEmpty() || visited.size() >= 4096;
-        if (done && horizon && best.parent != null && best.remaining < new Node(x, y, z, 0, gx, gy, gz, null).remaining)
-            finish(best);
-        return done;
+    }
+
+    private static boolean cutsReturnStair(Node node, int nx, int ny, int nz) {
+        for (Node ancestor = node; ancestor != null; ancestor = ancestor.parent) {
+            if (ancestor.x == nx && ancestor.z == nz
+                && ancestor.y - 1 >= ny
+                && ancestor.y - 1 <= Math.max(node.y, ny) + 1) return true;
+        }
+        return false;
     }
 
     public int expandedNodes() {

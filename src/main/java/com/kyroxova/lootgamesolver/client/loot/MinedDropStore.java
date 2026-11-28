@@ -12,6 +12,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 import com.google.gson.Gson;
+import com.kyroxova.lootgamesolver.LootGameSolver;
 
 public final class MinedDropStore {
 
@@ -43,7 +44,9 @@ public final class MinedDropStore {
                     entry.mined,
                     entry.protectedReward);
             }
-        } catch (IOException | RuntimeException ignored) {}
+        } catch (IOException | RuntimeException ignored) {
+            LootGameSolver.LOG.debug("Could not load mined drops from {}", file, ignored);
+        }
     }
 
     public boolean save(MinedDropTracker tracker) {
@@ -74,7 +77,9 @@ public final class MinedDropStore {
                             .getBytes(StandardCharsets.UTF_8));
                     try {
                         Files.deleteIfExists(pending.toPath());
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                        LootGameSolver.LOG.debug("Could not delete pending mined drops file {}", pending, ignored);
+                    }
                 }
             }
             tracker.saved();

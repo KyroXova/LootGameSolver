@@ -13,6 +13,7 @@ import java.util.Map;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.kyroxova.lootgamesolver.LootGameSolver;
 
 public final class AccessTrailStore {
 
@@ -35,7 +36,9 @@ public final class AccessTrailStore {
             try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
                 Data loaded = GSON.fromJson(reader, Data.class);
                 if (loaded != null && loaded.trails != null) data = loaded;
-            } catch (IOException | RuntimeException ignored) {}
+            } catch (IOException | RuntimeException ignored) {
+                LootGameSolver.LOG.debug("Could not load access trail store from {}", file, ignored);
+            }
     }
 
     public List<int[]> load(String world, int dimension, int x, int y, int z) {
@@ -69,7 +72,9 @@ public final class AccessTrailStore {
                     bestDistance = distance;
                     best = new int[] { sx, sy, sz };
                 }
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+                LootGameSolver.LOG.debug("Skipping malformed access trail key: {}", name, ignored);
+            }
         }
         return best;
     }
@@ -116,7 +121,9 @@ public final class AccessTrailStore {
                 Files.write(file.toPath(), bytes);
                 try {
                     Files.deleteIfExists(pending.toPath());
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    LootGameSolver.LOG.debug("Could not delete pending access trail file {}", pending, ignored);
+                }
             }
         }
     }

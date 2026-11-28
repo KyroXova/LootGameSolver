@@ -35,77 +35,84 @@ public final class ExplorerSustain {
             stop(mc);
             return false;
         }
+        updateSlotDelays(mc);
+        if (transfer.active()) return tickFoodTransfer(mc);
+        if (eating) return tickEating(mc);
+        if (cooldown > 0) cooldown--;
+        if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
+        if (needsFood(mc) && cooldown == 0) return tryStartEating(mc);
+        if (mineDelayTicks == 0 && manualDelayTicks == 0) return tryEquipHealingAxe(mc);
+        return false;
+    }
+
+    private void updateSlotDelays(Minecraft mc) {
         int currentSlot = mc.thePlayer.inventory.currentItem;
-        if (lastObservedSlot >= 0 && currentSlot != lastObservedSlot) {
-            if (currentSlot != automaticSlot) {
-                manualDelayTicks = 40;
-            }
+        if (lastObservedSlot >= 0 && currentSlot != lastObservedSlot && currentSlot != automaticSlot) {
+            manualDelayTicks = 40;
         }
         lastObservedSlot = currentSlot;
         if (manualDelayTicks > 0) manualDelayTicks--;
         if (mineDelayTicks > 0) mineDelayTicks--;
+    }
 
-        if (transfer.active()) {
-            if (!transfer.tick(mc)) cooldown = 100;
-            else if (!transfer.active()) automaticSlot = mc.thePlayer.inventory.currentItem;
+    private boolean tickFoodTransfer(Minecraft mc) {
+        if (!transfer.tick(mc)) cooldown = 100;
+        else if (!transfer.active()) automaticSlot = mc.thePlayer.inventory.currentItem;
+        return true;
+    }
+
+    private boolean tickEating(Minecraft mc) {
+        if (mc.currentScreen != null || mc.thePlayer.getFoodStats()
+            .getFoodLevel() >= 20 || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
+            releaseUse(mc);
+            eating = false;
+            cooldown = 20;
+            return false;
+        }
+        KeyBinding.setKeyBindState(mc.gameSettings.keyBindUseItem.getKeyCode(), true);
+        return true;
+    }
+
+    private static boolean needsFood(Minecraft mc) {
+        int foodLevel = mc.thePlayer.getFoodStats()
+            .getFoodLevel();
+        return foodLevel <= 14 || (mc.thePlayer.shouldHeal() && foodLevel < 20);
+    }
+
+    private boolean tryStartEating(Minecraft mc) {
+        int food = findFood(mc, 0, 9);
+        if (food < 0) {
+            int inventoryFood = findFood(mc, 9, 36);
+            if (inventoryFood >= 0) {
+                if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
+                if (transfer.start(mc, inventoryFood)) return true;
+            }
+        }
+        if (food >= 0) {
+            select(mc, food);
+            eating = true;
+            eatingTicks = 0;
+            KeyBinding.setKeyBindState(mc.gameSettings.keyBindUseItem.getKeyCode(), true);
+            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
             return true;
         }
-        if (eating) {
-            if (mc.currentScreen != null || mc.thePlayer.getFoodStats()
-                .getFoodLevel() >= 20 || ++eatingTicks > 80 || (eatingTicks > 2 && !mc.thePlayer.isUsingItem())) {
-                releaseUse(mc);
-                eating = false;
-                cooldown = 20;
+        cooldown = 100;
+        return false;
+    }
+
+    private boolean tryEquipHealingAxe(Minecraft mc) {
+        if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem))) return false;
+        for (int i = 0; i < 9; i++) {
+            if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
+                select(mc, i);
                 return false;
             }
-            KeyBinding.setKeyBindState(mc.gameSettings.keyBindUseItem.getKeyCode(), true);
-            return true;
         }
-        if (cooldown > 0) cooldown--;
-        if (mc.currentScreen != null || mc.thePlayer.isUsingItem()) return false;
-        boolean needsFood = mc.thePlayer.getFoodStats()
-            .getFoodLevel() <= 14
-            || (mc.thePlayer.shouldHeal() && mc.thePlayer.getFoodStats()
-                .getFoodLevel() < 20);
-        if (needsFood && cooldown == 0) {
-            int food = findFood(mc, 0, 9);
-            if (food < 0) {
-                int inventoryFood = findFood(mc, 9, 36);
-                if (inventoryFood >= 0) {
-                    if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
-                    if (transfer.start(mc, inventoryFood)) return true;
-                }
-            }
-            if (food >= 0) {
-                select(mc, food);
-                eating = true;
-                eatingTicks = 0;
-                KeyBinding.setKeyBindState(mc.gameSettings.keyBindUseItem.getKeyCode(), true);
-                mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
-                return true;
-            }
-            cooldown = 100;
-        }
-        if (mineDelayTicks == 0 && manualDelayTicks == 0) {
-            boolean holdingAxe = isHealingAxe(
-                mc.thePlayer.inventory.getStackInSlot(mc.thePlayer.inventory.currentItem));
-            if (!holdingAxe) {
-                boolean found = false;
-                for (int i = 0; i < 9; i++) {
-                    ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                    if (isHealingAxe(stack)) {
-                        select(mc, i);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found && cooldown == 0) for (int i = 9; i < 36; i++) {
-                    if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
-                        if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
-                        if (transfer.start(mc, i)) return true;
-                        break;
-                    }
-                }
+        if (cooldown != 0) return false;
+        for (int i = 9; i < 36; i++) {
+            if (isHealingAxe(mc.thePlayer.inventory.getStackInSlot(i))) {
+                if (restoreSlot < 0) restoreSlot = mc.thePlayer.inventory.currentItem;
+                return transfer.start(mc, i);
             }
         }
         return false;
@@ -153,7 +160,9 @@ public final class ExplorerSustain {
                     .contains("healing_axe"))) {
                 return true;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Could not inspect stack unlocalized name", ignored);
+        }
         return false;
     }
 

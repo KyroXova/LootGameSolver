@@ -1,5 +1,7 @@
 package com.kyroxova.lootgamesolver.client.puzzle;
 
+import java.util.Objects;
+
 import com.kyroxova.lootgamesolver.core.MiniGame;
 
 public final class PuzzleSessionIdentity {
@@ -21,7 +23,7 @@ public final class PuzzleSessionIdentity {
             round = nextRound;
             return Change.NONE;
         }
-        if (type != nextType || game != nextGame) {
+        if (type != nextType || !Objects.equals(game, nextGame)) {
             game = nextGame;
             type = nextType;
             round = nextRound;

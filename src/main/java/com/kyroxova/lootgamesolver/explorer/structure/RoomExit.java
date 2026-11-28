@@ -196,7 +196,8 @@ public final class RoomExit {
             net.minecraft.block.Block block = world.getBlock(next[0], by, next[2]);
             if (ContactHazards.dangerous(block, world.getBlockMetadata(next[0], by, next[2]))
                 || !explorer.excavationTerrain.excavatable(world, next[0], by, next[2])) return false;
-            return explorer.minePlannedBlock(mc, next[0], by, next[2], next[1]);
+            if (!passable(world, next[0], by, next[2]))
+                return explorer.minePlannedBlock(mc, next[0], by, next[2], next[1]);
         }
         return false;
     }

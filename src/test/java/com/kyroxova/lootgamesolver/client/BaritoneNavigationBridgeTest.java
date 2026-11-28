@@ -49,11 +49,11 @@ public class BaritoneNavigationBridgeTest {
         process.current = new Goal();
         Pathing pathing = new Pathing();
         BaritoneNavigationBridge bridge = new BaritoneNavigationBridge();
-        setField(bridge, "process", process);
-        setField(bridge, "processApi", Process.class);
-        setField(bridge, "goal", oldGoal);
-        setField(bridge, "pathing", pathing);
-        setField(bridge, "pathingApi", Pathing.class);
+        bridge.process = process;
+        bridge.processApi = Process.class;
+        bridge.goal = oldGoal;
+        bridge.pathing = pathing;
+        bridge.pathingApi = Pathing.class;
         bridge.stop();
         assertFalse(pathing.cancelled);
         assertTrue(process.current != oldGoal);
@@ -65,9 +65,9 @@ public class BaritoneNavigationBridgeTest {
         Process process = new Process();
         process.current = goal;
         BaritoneNavigationBridge bridge = new BaritoneNavigationBridge();
-        setField(bridge, "process", process);
-        setField(bridge, "processApi", Process.class);
-        setField(bridge, "goal", goal);
+        bridge.process = process;
+        bridge.processApi = Process.class;
+        bridge.goal = goal;
         bridge.setPaused(true);
         assertTrue(process.paused);
         bridge.setPaused(false);
@@ -75,13 +75,6 @@ public class BaritoneNavigationBridgeTest {
         process.current = new Goal();
         bridge.setPaused(true);
         assertFalse(process.paused);
-    }
-
-    private static void setField(Object instance, String name, Object value) throws Exception {
-        java.lang.reflect.Field field = instance.getClass()
-            .getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(instance, value);
     }
 
     @Test

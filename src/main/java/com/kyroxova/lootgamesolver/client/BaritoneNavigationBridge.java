@@ -3,10 +3,12 @@ package com.kyroxova.lootgamesolver.client;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import net.minecraft.client.Minecraft;
 
+import com.kyroxova.lootgamesolver.LootGameSolver;
 import com.kyroxova.lootgamesolver.config.LootGameSolverConfig;
 
 /** Owns one custom goal without cancelling a goal subsequently set by another caller. */
@@ -43,12 +45,12 @@ public final class BaritoneNavigationBridge {
         LOST
     }
 
-    private Object process;
-    private Object goal;
-    private Class<?> processApi;
+    Object process;
+    Object goal;
+    Class<?> processApi;
     private Class<?> goalApi;
-    private Object pathing;
-    private Class<?> pathingApi;
+    Object pathing;
+    Class<?> pathingApi;
     private Object inputHandler;
     private Class<?> inputHandlerApi;
     private Object clickLeft;
@@ -138,7 +140,9 @@ public final class BaritoneNavigationBridge {
             allowPlace.getClass()
                 .getField("value")
                 .set(allowPlace, false);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            LootGameSolver.LOG.debug("Could not disable Baritone block placement", ignored);
+        }
     }
 
     private static void setInventoryHandling(boolean enabled) {
@@ -152,7 +156,9 @@ public final class BaritoneNavigationBridge {
             allowInventory.getClass()
                 .getField("value")
                 .set(allowInventory, enabled);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            LootGameSolver.LOG.debug("Could not update Baritone inventory handling", ignored);
+        }
     }
 
     private void restoreSurfaceOnly() {
@@ -160,7 +166,9 @@ public final class BaritoneNavigationBridge {
             if (surfaceOnlyOverridden && previousSurfaceOnlySetting != null) previousSurfaceOnlySetting.getClass()
                 .getField("value")
                 .set(previousSurfaceOnlySetting, previousSurfaceOnlyValue);
-        } catch (ReflectiveOperationException | LinkageError ignored) {} finally {
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            LootGameSolver.LOG.debug("Could not restore Baritone surfaceOnly setting", ignored);
+        } finally {
             previousSurfaceOnlySetting = null;
             previousSurfaceOnlyValue = null;
             surfaceOnlyOverridden = false;
@@ -217,7 +225,9 @@ public final class BaritoneNavigationBridge {
             try {
                 candidateSprint = inputType.getField("SPRINT")
                     .get(null);
-            } catch (ReflectiveOperationException ignored) {}
+            } catch (ReflectiveOperationException ignored) {
+                LootGameSolver.LOG.debug("Baritone SPRINT input unavailable", ignored);
+            }
             Class<?> candidatePathingApi = Class.forName("baritone.api.behavior.IPathingBehavior");
             Object manager = baritoneApi.getMethod("getPathingControlManager")
                 .invoke(baritone);
@@ -227,14 +237,16 @@ public final class BaritoneNavigationBridge {
             Object candidate = baritoneApi.getMethod("getCustomGoalProcess")
                 .invoke(baritone);
             Class<?> baseProcessApi = Class.forName("baritone.api.process.IBaritoneProcess");
-            if (owner.isPresent() && owner.get() != candidate) return Start.BUSY;
+            if (owner.isPresent() && !Objects.equals(owner.get(), candidate)) return Start.BUSY;
             if ((Boolean) baseProcessApi.getMethod("isActive")
                 .invoke(candidate)) {
                 if (preserveActiveGoal) return Start.BUSY;
                 try {
                     candidatePathingApi.getMethod("cancelEverything")
                         .invoke(candidatePathing);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                    LootGameSolver.LOG.debug("Could not cancel active Baritone pathing", ignored);
+                }
             }
             Class<?> customApi = Class.forName("baritone.api.process.ICustomGoalProcess");
             Class<?> goalType = Class.forName("baritone.api.pathing.goals.Goal");
@@ -282,8 +294,12 @@ public final class BaritoneNavigationBridge {
                     sprint.getClass()
                         .getField("value")
                         .set(sprint, true);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                    LootGameSolver.LOG.debug("Could not enable Baritone sprint setting", ignored);
+                }
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not configure Baritone navigation settings", ignored);
+            }
             if (kind == 4) {
                 Class<?> posType = Class.forName("baritone.api.utils.BetterBlockPos");
                 Object center = posType.getConstructor(int.class, int.class, int.class)
@@ -299,12 +315,16 @@ public final class BaritoneNavigationBridge {
             try {
                 candidatePathingApi.getMethod("setNavigationChatOverride", Boolean.class)
                     .invoke(candidatePathing, false);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not set Baritone navigation chat override", ignored);
+            }
             try {
                 candidatePathingApi
                     .getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                     .invoke(candidatePathing, false, false, false);
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not set Baritone navigation render override", ignored);
+            }
             process = candidate;
             goal = next;
             processApi = customApi;
@@ -329,7 +349,9 @@ public final class BaritoneNavigationBridge {
         try {
             pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                 .invoke(pathing, false, visible, false);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            LootGameSolver.LOG.debug("Could not update Baritone render overlay", ignored);
+        }
     }
 
     public void setPaused(boolean paused) {
@@ -340,15 +362,19 @@ public final class BaritoneNavigationBridge {
         }
         boolean owns = false;
         try {
-            if (processApi.getMethod("getGoal")
-                .invoke(process) == goal) {
+            if (Objects.equals(
+                processApi.getMethod("getGoal")
+                    .invoke(process),
+                goal)) {
                 owns = true;
                 processApi.getMethod("setPaused", boolean.class)
                     .invoke(process, paused);
                 if (paused && inputHandler != null && inputHandlerApi != null) inputHandlerApi.getMethod("clearAllKeys")
                     .invoke(inputHandler);
             }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            LootGameSolver.LOG.debug("Could not update Baritone pause state", ignored);
+        }
         setInventoryHandling(!paused && owns && inventoryHandlingForGoal);
     }
 
@@ -371,10 +397,22 @@ public final class BaritoneNavigationBridge {
                 if (executor != null && (Boolean) Class.forName("baritone.api.pathing.path.IPathExecutor")
                     .getMethod("isAimingForInteraction")
                     .invoke(executor)) return true;
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
             Method forced = inputHandlerApi.getMethod("isInputForcedDown", clickLeft.getClass());
             return (Boolean) forced.invoke(inputHandler, clickLeft)
                 || (clickRight != null && (Boolean) forced.invoke(inputHandler, clickRight));
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    public boolean isMining() {
+        if (inputHandler == null || inputHandlerApi == null || clickLeft == null) return false;
+        try {
+            Method forced = inputHandlerApi.getMethod("isInputForcedDown", clickLeft.getClass());
+            return (Boolean) forced.invoke(inputHandler, clickLeft);
         } catch (ReflectiveOperationException | LinkageError ignored) {
             return false;
         }
@@ -430,8 +468,10 @@ public final class BaritoneNavigationBridge {
         int z) throws ReflectiveOperationException {
         return processApi.getMethod("getGoal")
             .invoke(process) == null
-            && processApi.getMethod("mostRecentGoal")
-                .invoke(process) == goal
+            && Objects.equals(
+                processApi.getMethod("mostRecentGoal")
+                    .invoke(process),
+                goal)
             && (Boolean) goalApi.getMethod("isInGoal", int.class, int.class, int.class)
                 .invoke(goal, x, y, z);
     }
@@ -439,8 +479,10 @@ public final class BaritoneNavigationBridge {
     public State state() {
         if (process == null) return State.STOPPED;
         try {
-            return processApi.getMethod("getGoal")
-                .invoke(process) == goal ? State.RUNNING : State.LOST;
+            return Objects.equals(
+                processApi.getMethod("getGoal")
+                    .invoke(process),
+                goal) ? State.RUNNING : State.LOST;
         } catch (ReflectiveOperationException | LinkageError failure) {
             return State.LOST;
         }
@@ -456,7 +498,9 @@ public final class BaritoneNavigationBridge {
                         break;
                     }
                 }
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
         }
     }
 
@@ -473,7 +517,9 @@ public final class BaritoneNavigationBridge {
                         .getMethod("onLostControl")
                         .invoke(process);
                 }
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
         }
         if (owns) {
             if (inputHandler != null && inputHandlerApi != null) {
@@ -489,21 +535,29 @@ public final class BaritoneNavigationBridge {
                     }
                     inputHandlerApi.getMethod("clearAllKeys")
                         .invoke(inputHandler);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
             }
             if (pathing != null && pathingApi != null) {
                 try {
                     pathingApi.getMethod("cancelEverything")
                         .invoke(pathing);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
                 try {
                     pathingApi.getMethod("setNavigationRenderOverride", Boolean.class, Boolean.class, Boolean.class)
                         .invoke(pathing, false, false, false);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
                 try {
                     pathingApi.getMethod("setNavigationChatOverride", Boolean.class)
                         .invoke(pathing, (Boolean) null);
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                LootGameSolver.LOG.debug("Could not query Baritone path executor interaction", ignored);
+            }
             }
             restoreSurfaceOnly();
         } else discardSurfaceOnlySnapshot();

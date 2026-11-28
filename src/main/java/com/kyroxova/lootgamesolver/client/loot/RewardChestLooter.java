@@ -181,55 +181,14 @@ public final class RewardChestLooter {
     public void tick(Minecraft mc, Explorer exploration) {
         if (!active || mc.thePlayer == null || mc.theWorld == null) return;
         if (exploration != null) exploration.suspendUnrelatedRouteForRewards(mc, chestView);
-        if (exploration != null && exploration.navigating() && chestView != null && index < chests.size()) {
-            Vec3 eye = Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ);
-            net.minecraft.util.MovingObjectPosition visible = visibleChest(mc, eye, chests.get(index));
-            double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
-            if ((visible == null || eye.squareDistanceTo(visible.hitVec) > reach * reach) && !collecting) {
-                for (int i = index + 1; i < chests.size(); i++) {
-                    if (lootedChests
-                        .contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i)))
-                        continue;
-                    net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
-                    if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach) {
-                        java.util.Collections.swap(chests, index, i);
-                        visible = other;
-                        break;
-                    }
-                }
-            }
-            if (visible != null && eye.squareDistanceTo(visible.hitVec) <= reach * reach) {
-                exploration.stopRewardView(mc);
-                chestView = null;
-            }
-        }
+        updateChestViewNavigation(mc, exploration);
         if (exploration != null && exploration.navigating()) {
             status = "Moving toward reward chests";
             return;
         }
-        if (chestView != null) {
-            Vec3 eye = Vec3.createVectorHelper(
-                mc.thePlayer.posX,
-                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
-                mc.thePlayer.posZ);
-            boolean arrived = mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D)
-                <= 2.25D;
-            if (arrived) {
-                if (index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null) {
-                    failedChestViews.add(chestView);
-                }
-                chestView = null;
-            } else {
-                failedChestViews.add(chestView);
-                chestView = null;
-            }
-        }
+        checkChestViewArrival(mc);
         if (exploration != null) exploration.consumePuzzleCenterArrival();
-        if (backpackPacker.handleTransfer(mc, this)) return;
-        if (backpackPacker.handleHotbarRestore(mc, this)) return;
+        if (backpackPacker.handleTransfer(mc, this) || backpackPacker.handleHotbarRestore(mc, this)) return;
         if (packingOnly) {
             if (packing) backpackPacker.tick(mc, exploration, this);
             else {
@@ -262,74 +221,10 @@ public final class RewardChestLooter {
             && lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index)))
             index++;
         if (!collecting && index >= chests.size()) {
-            if (chestDiscoveryQuietTicks < 60) {
-                status = "Checking for remaining reward chests";
-                return;
-            }
-            if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
-            opened = false;
-            if (!existingInventoryPackRequested && hasPackableItems(mc)) {
-                existingInventoryPackRequested = true;
-                packing = true;
-                backpackPacker.packOpening = false;
-                backpackPacker.packMoved = false;
-                backpackPacker.backpackSlot = -1;
-                java.util.Arrays.fill(backpackPacker.backpackTried, false);
-                java.util.Arrays.fill(backpackPacker.slotRejectedForCurrentBag, false);
-                status = "Packing leftover inventory items";
-                return;
-            }
-            status = "Reward chests collected";
-            PendingLootStore.Checkpoint checkpoint = pendingLoot.load();
-            if (checkpoint != null && checkpoint.world.equals(Explorer.worldIdentity(mc))
-                && checkpoint.dimension == mc.theWorld.provider.dimensionId
-                && java.util.Arrays.equals(checkpoint.center, checkpointCenter)) pendingLoot.clear();
-            active = false;
+            handleAllChestsDone(mc);
             return;
         }
-        if (collecting) {
-            if (queueIndex >= queue.size()) {
-                if (!opened || !(mc.currentScreen instanceof GuiChest)) {
-                    status = "Rechecking reward chest";
-                    collecting = false;
-                    return;
-                }
-                if (!(mc.thePlayer.openContainer instanceof ContainerChest)) {
-                    status = "Rechecking reward chest";
-                    collecting = false;
-                    return;
-                }
-                IInventory checked = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
-                for (int slot = 0; slot < checked.getSizeInventory(); slot++) {
-                    if (checked.getStackInSlot(slot) != null) {
-                        collecting = false;
-                        status = "Checking remaining items";
-                        return;
-                    }
-                }
-                if (!lootedChests
-                    .mark(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index))) {
-                    status = "Could not save chest progress";
-                    return;
-                }
-                mc.thePlayer.closeScreen();
-                opened = false;
-                collecting = false;
-                index++;
-                openWait = 0;
-                waiting = 2;
-                status = "Chest collected";
-                return;
-            }
-            int nextChest = queue.get(queueIndex).chest;
-            if (opened && index != nextChest && mc.currentScreen instanceof GuiChest) {
-                mc.thePlayer.closeScreen();
-                opened = false;
-                openWait = 0;
-                waiting = 2;
-            }
-            index = nextChest;
-        }
+        if (collecting && tickCollectingQueue(mc)) return;
         if (waiting > 0) {
             waiting--;
             return;
@@ -341,96 +236,211 @@ public final class RewardChestLooter {
             failedViewRounds = 0;
         }
         if (mc.currentScreen instanceof GuiChest && opened && mc.thePlayer.openContainer instanceof ContainerChest) {
-            ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
-            IInventory chest = container.getLowerChestInventory();
-            if (chest.getSizeInventory() != 27
-                || !(mc.theWorld.getTileEntity(pos[0], pos[1], pos[2]) instanceof TileEntityChest)) {
-                mc.thePlayer.closeScreen();
-                opened = false;
-                openWait = 0;
-                waiting = 5;
-                status = "Unexpected chest screen; looting paused";
-                return;
-            }
-            if (!collecting) {
-                discovered.clear();
-                for (int slot = 0; slot < chest.getSizeInventory(); slot++) {
-                    ItemStack stack = chest.getStackInSlot(slot);
-                    if (stack == null) continue;
-                    discovered.add(new RewardLootPolicy.Entry(index, slot, probability(mc, stack, pos)));
-                    scanned.put(slotKey(index, slot), stack.copy());
-                }
-                queue = RewardLootPolicy.ordered(discovered);
-                queueIndex = 0;
-                collecting = true;
-                return;
-            }
-            if (pendingSlot >= 0) {
-                ItemStack after = chest.getStackInSlot(pendingSlot);
-                if (after != null && after.stackSize >= pendingCount) {
-                    boolean inventoryHasSpace = mc.thePlayer.inventory.getFirstEmptyStack() >= 0;
-                    if (!inventoryHasSpace && hasPackableItems(mc)) {
-                        mc.thePlayer.closeScreen();
-                        opened = false;
-                        pendingSlot = -1;
-                        packing = true;
-                        backpackPacker.packOpening = false;
-                        backpackPacker.packMoved = false;
-                        backpackPacker.backpackSlot = -1;
-                        status = "Moving collected rewards into a backpack";
-                        return;
-                    }
-                    if (!inventoryHasSpace) {
-                        mc.thePlayer.closeScreen();
-                        opened = false;
-                        pendingSlot = -1;
-                        active = false;
-                        status = "Inventory and backpacks full; rewards remain in chest";
-                        saveCheckpoint(mc);
-                        return;
-                    }
-                    queueIndex++;
-                    pendingSlot = -1;
-                    return;
-                }
-                ItemStack transferredReward = scanned.get(slotKey(index, pendingSlot));
-                if (minedDrops != null && transferredReward != null
-                    && (after == null || after.stackSize < pendingCount)) minedDrops.protectReward(transferredReward);
-                pendingSlot = -1;
-                java.util.Arrays.fill(backpackPacker.backpackTried, false);
-                if (after == null) queueIndex++;
-                else return;
-            }
-            if (queueIndex >= queue.size() || queue.get(queueIndex).chest != index) {
-                mc.thePlayer.closeScreen();
-                opened = false;
-                openWait = 0;
-                waiting = 4;
-                return;
-            }
-            int best = queue.get(queueIndex).slot;
-            if (best < 0 || best >= chest.getSizeInventory() || chest.getStackInSlot(best) == null) {
-                queueIndex++;
-                return;
-            }
-            ItemStack stack = chest.getStackInSlot(best);
-            ItemStack expected = scanned.get(slotKey(index, best));
-            if (expected == null || !expected.isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(expected, stack)) {
-                status = "Reward chest changed; looting stopped";
-                cancel(mc);
-                return;
-            }
-            int beforeCount = stack.stackSize;
-            if (!BaritoneInventoryBridge.quickMove(mc, best)) {
-                status = "Reward transfer unavailable";
-                return;
-            }
-            pendingSlot = best;
-            pendingCount = beforeCount;
-            waiting = 2;
-            status = "Collecting reward items";
+            tickOpenChestScreen(mc, pos);
             return;
         }
+        tickApproachAndOpenChest(mc, exploration, pos);
+    }
+
+    private void updateChestViewNavigation(Minecraft mc, Explorer exploration) {
+        if (exploration == null || !exploration.navigating() || chestView == null || index >= chests.size()) return;
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        net.minecraft.util.MovingObjectPosition visible = visibleChest(mc, eye, chests.get(index));
+        double reach = Math.min(4D, mc.playerController.getBlockReachDistance());
+        if ((visible == null || eye.squareDistanceTo(visible.hitVec) > reach * reach) && !collecting) {
+            for (int i = index + 1; i < chests.size(); i++) {
+                if (lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i)))
+                    continue;
+                net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
+                if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach) {
+                    java.util.Collections.swap(chests, index, i);
+                    visible = other;
+                    break;
+                }
+            }
+        }
+        if (visible != null && eye.squareDistanceTo(visible.hitVec) <= reach * reach) {
+            exploration.stopRewardView(mc);
+            chestView = null;
+        }
+    }
+
+    private void checkChestViewArrival(Minecraft mc) {
+        if (chestView == null) return;
+        Vec3 eye = Vec3
+            .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
+        boolean arrived = mc.thePlayer.getDistanceSq(chestView[0] + 0.5D, chestView[1] + 1D, chestView[2] + 0.5D)
+            <= 2.25D;
+        if (!arrived || (index < chests.size() && visibleChest(mc, eye, chests.get(index)) == null)) {
+            failedChestViews.add(chestView);
+        }
+        chestView = null;
+    }
+
+    private void handleAllChestsDone(Minecraft mc) {
+        if (chestDiscoveryQuietTicks < 60) {
+            status = "Checking for remaining reward chests";
+            return;
+        }
+        if (opened && mc.currentScreen instanceof GuiChest) mc.thePlayer.closeScreen();
+        opened = false;
+        if (!existingInventoryPackRequested && hasPackableItems(mc)) {
+            existingInventoryPackRequested = true;
+            packing = true;
+            backpackPacker.packOpening = false;
+            backpackPacker.packMoved = false;
+            backpackPacker.backpackSlot = -1;
+            java.util.Arrays.fill(backpackPacker.backpackTried, false);
+            java.util.Arrays.fill(backpackPacker.slotRejectedForCurrentBag, false);
+            status = "Packing leftover inventory items";
+            return;
+        }
+        status = "Reward chests collected";
+        PendingLootStore.Checkpoint checkpoint = pendingLoot.load();
+        if (checkpoint != null && checkpoint.world.equals(Explorer.worldIdentity(mc))
+            && checkpoint.dimension == mc.theWorld.provider.dimensionId
+            && java.util.Arrays.equals(checkpoint.center, checkpointCenter)) pendingLoot.clear();
+        active = false;
+    }
+
+    private boolean tickCollectingQueue(Minecraft mc) {
+        if (queueIndex >= queue.size()) {
+            if (!opened || !(mc.currentScreen instanceof GuiChest)
+                || !(mc.thePlayer.openContainer instanceof ContainerChest)) {
+                status = "Rechecking reward chest";
+                collecting = false;
+                return true;
+            }
+            IInventory checked = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
+            for (int slot = 0; slot < checked.getSizeInventory(); slot++) {
+                if (checked.getStackInSlot(slot) != null) {
+                    collecting = false;
+                    status = "Checking remaining items";
+                    return true;
+                }
+            }
+            if (!lootedChests.mark(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(index))) {
+                status = "Could not save chest progress";
+                return true;
+            }
+            mc.thePlayer.closeScreen();
+            opened = false;
+            collecting = false;
+            index++;
+            openWait = 0;
+            waiting = 2;
+            status = "Chest collected";
+            return true;
+        }
+        int nextChest = queue.get(queueIndex).chest;
+        if (opened && index != nextChest && mc.currentScreen instanceof GuiChest) {
+            mc.thePlayer.closeScreen();
+            opened = false;
+            openWait = 0;
+            waiting = 2;
+        }
+        index = nextChest;
+        return false;
+    }
+
+    private void tickOpenChestScreen(Minecraft mc, int[] pos) {
+        ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
+        IInventory chest = container.getLowerChestInventory();
+        if (chest.getSizeInventory() != 27
+            || !(mc.theWorld.getTileEntity(pos[0], pos[1], pos[2]) instanceof TileEntityChest)) {
+            mc.thePlayer.closeScreen();
+            opened = false;
+            openWait = 0;
+            waiting = 5;
+            status = "Unexpected chest screen; looting paused";
+            return;
+        }
+        if (!collecting) {
+            discovered.clear();
+            for (int slot = 0; slot < chest.getSizeInventory(); slot++) {
+                ItemStack stack = chest.getStackInSlot(slot);
+                if (stack == null) continue;
+                discovered.add(new RewardLootPolicy.Entry(index, slot, probability(mc, stack, pos)));
+                scanned.put(slotKey(index, slot), stack.copy());
+            }
+            queue = RewardLootPolicy.ordered(discovered);
+            queueIndex = 0;
+            collecting = true;
+            return;
+        }
+        if (pendingSlot >= 0 && handlePendingChestTransfer(mc, chest)) return;
+        if (queueIndex >= queue.size() || queue.get(queueIndex).chest != index) {
+            mc.thePlayer.closeScreen();
+            opened = false;
+            openWait = 0;
+            waiting = 4;
+            return;
+        }
+        int best = queue.get(queueIndex).slot;
+        if (best < 0 || best >= chest.getSizeInventory() || chest.getStackInSlot(best) == null) {
+            queueIndex++;
+            return;
+        }
+        ItemStack stack = chest.getStackInSlot(best);
+        ItemStack expected = scanned.get(slotKey(index, best));
+        if (expected == null || !expected.isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(expected, stack)) {
+            status = "Reward chest changed; looting stopped";
+            cancel(mc);
+            return;
+        }
+        int beforeCount = stack.stackSize;
+        if (!BaritoneInventoryBridge.quickMove(mc, best)) {
+            status = "Reward transfer unavailable";
+            return;
+        }
+        pendingSlot = best;
+        pendingCount = beforeCount;
+        waiting = 2;
+        status = "Collecting reward items";
+    }
+
+    private boolean handlePendingChestTransfer(Minecraft mc, IInventory chest) {
+        ItemStack after = chest.getStackInSlot(pendingSlot);
+        if (after != null && after.stackSize >= pendingCount) {
+            boolean inventoryHasSpace = mc.thePlayer.inventory.getFirstEmptyStack() >= 0;
+            if (!inventoryHasSpace && hasPackableItems(mc)) {
+                mc.thePlayer.closeScreen();
+                opened = false;
+                pendingSlot = -1;
+                packing = true;
+                backpackPacker.packOpening = false;
+                backpackPacker.packMoved = false;
+                backpackPacker.backpackSlot = -1;
+                status = "Moving collected rewards into a backpack";
+                return true;
+            }
+            if (!inventoryHasSpace) {
+                mc.thePlayer.closeScreen();
+                opened = false;
+                pendingSlot = -1;
+                active = false;
+                status = "Inventory and backpacks full; rewards remain in chest";
+                saveCheckpoint(mc);
+                return true;
+            }
+            queueIndex++;
+            pendingSlot = -1;
+            return true;
+        }
+        ItemStack transferredReward = scanned.get(slotKey(index, pendingSlot));
+        if (minedDrops != null && transferredReward != null && (after == null || after.stackSize < pendingCount))
+            minedDrops.protectReward(transferredReward);
+        pendingSlot = -1;
+        java.util.Arrays.fill(backpackPacker.backpackTried, false);
+        if (after == null) {
+            queueIndex++;
+            return false;
+        }
+        return true;
+    }
+
+    private void tickApproachAndOpenChest(Minecraft mc, Explorer exploration, int[] pos) {
         if (mc.currentScreen != null) {
             status = "Close the open screen to collect rewards";
             return;
@@ -443,26 +453,12 @@ public final class RewardChestLooter {
             }
             return;
         }
-        double dx = pos[0] + 0.5D - mc.thePlayer.posX, dz = pos[2] + 0.5D - mc.thePlayer.posZ;
-        double dy = pos[1] + 0.5D - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
         double reach = Math.min(4.0D, mc.playerController.getBlockReachDistance());
         Vec3 eye = Vec3
             .createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY + mc.thePlayer.getEyeHeight(), mc.thePlayer.posZ);
         net.minecraft.util.MovingObjectPosition hit = visibleChest(mc, eye, pos);
         if (hit == null || eye.squareDistanceTo(hit.hitVec) > reach * reach) {
-            if (!collecting) {
-                for (int i = index + 1; i < chests.size(); i++) {
-                    net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
-                    if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach
-                        && !lootedChests
-                            .contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i))) {
-                        java.util.Collections.swap(chests, index, i);
-                        status = "Opening a visible reward chest";
-                        return;
-                    }
-                }
-            }
+            if (!collecting && swapToVisibleUnlootedChest(mc, eye, reach)) return;
             if (exploration != null && moveToChestView(mc, exploration, pos, center, failedChestViews))
                 status = "Moving toward reward chests";
             else if (active) status = "Finding a clear view of the reward chest";
@@ -479,24 +475,10 @@ public final class RewardChestLooter {
             status = "Facing reward chest";
             return;
         }
-        Vec3 look = mc.thePlayer.getLook(1.0F);
-        net.minecraft.util.MovingObjectPosition aimed = mc.theWorld
-            .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
-        net.minecraft.util.MovingObjectPosition crosshair = mc.objectMouseOver;
-        boolean matches = mc.renderViewEntity == mc.thePlayer
-            && (VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach)
-                || (aimed != null && aimed.blockX == pos[0]
-                    && aimed.blockY == pos[1]
-                    && aimed.blockZ == pos[2]
-                    && eye.squareDistanceTo(aimed.hitVec) <= reach * reach));
-        net.minecraft.util.MovingObjectPosition clickTarget = (crosshair != null && crosshair.blockX == pos[0]
-            && crosshair.blockY == pos[1]
-            && crosshair.blockZ == pos[2]) ? crosshair
-                : (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2] ? aimed
-                    : hit);
+        net.minecraft.util.MovingObjectPosition clickTarget = resolveChestClickTarget(mc, eye, pos, reach, hit);
         float yawError = net.minecraft.util.MathHelper.wrapAngleTo180_float(targetYaw - mc.thePlayer.rotationYaw);
         float pitchError = targetPitch - mc.thePlayer.rotationPitch;
-        if (!matches || eye.squareDistanceTo(clickTarget.hitVec) > reach * reach
+        if (clickTarget == null || eye.squareDistanceTo(clickTarget.hitVec) > reach * reach
             || Math.abs(yawError) > 4.5F
             || Math.abs(pitchError) > 4.5F) {
             status = "Facing reward chest";
@@ -525,6 +507,39 @@ public final class RewardChestLooter {
         opened = true;
         waiting = 4;
         status = "Opening reward chest";
+    }
+
+    private boolean swapToVisibleUnlootedChest(Minecraft mc, Vec3 eye, double reach) {
+        for (int i = index + 1; i < chests.size(); i++) {
+            net.minecraft.util.MovingObjectPosition other = visibleChest(mc, eye, chests.get(i));
+            if (other != null && eye.squareDistanceTo(other.hitVec) <= reach * reach
+                && !lootedChests.contains(Explorer.worldIdentity(mc), mc.theWorld.provider.dimensionId, chests.get(i))) {
+                java.util.Collections.swap(chests, index, i);
+                status = "Opening a visible reward chest";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static net.minecraft.util.MovingObjectPosition resolveChestClickTarget(Minecraft mc, Vec3 eye, int[] pos,
+        double reach, net.minecraft.util.MovingObjectPosition fallback) {
+        Vec3 look = mc.thePlayer.getLook(1.0F);
+        net.minecraft.util.MovingObjectPosition aimed = mc.theWorld
+            .rayTraceBlocks(eye, eye.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach));
+        net.minecraft.util.MovingObjectPosition crosshair = mc.objectMouseOver;
+        boolean matches = mc.renderViewEntity == mc.thePlayer
+            && (VisibleBlockInteraction.matches(crosshair, aimed, eye, pos[0], pos[1], pos[2], reach)
+                || (aimed != null && aimed.blockX == pos[0]
+                    && aimed.blockY == pos[1]
+                    && aimed.blockZ == pos[2]
+                    && eye.squareDistanceTo(aimed.hitVec) <= reach * reach));
+        if (!matches) return null;
+        if (crosshair != null && crosshair.blockX == pos[0]
+            && crosshair.blockY == pos[1]
+            && crosshair.blockZ == pos[2]) return crosshair;
+        if (aimed != null && aimed.blockX == pos[0] && aimed.blockY == pos[1] && aimed.blockZ == pos[2]) return aimed;
+        return fallback;
     }
 
     private boolean discoverChests(Minecraft mc) {

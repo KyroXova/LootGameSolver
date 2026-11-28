@@ -1,6 +1,5 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import net.minecraft.client.Minecraft;
@@ -9,6 +8,9 @@ import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.nbt.NBTTagCompound;
 
+import com.kyroxova.lootgamesolver.LootGameSolver;
+
+import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
 
 /**
@@ -45,10 +47,7 @@ public final class BinnieCompartmentAdapter {
             return null;
 
         try {
-            Field windowField = getField(container.getClass(), "window");
-            if (windowField == null) return null;
-            windowField.setAccessible(true);
-            Object window = windowField.get(container);
+            Object window = getPrivateField(container, "window");
             if (window == null || !WINDOW_CLASS.equals(
                 window.getClass()
                     .getName()))
@@ -77,20 +76,20 @@ public final class BinnieCompartmentAdapter {
                             count = (Integer) getTabNumber.invoke(compInv);
                         }
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    LootGameSolver.LOG.debug("Could not inspect Binnie compartment tab count", ignored);
+                }
             }
 
             if (count <= 1) {
                 try {
-                    Field panelsField = getField(window.getClass(), "panels");
-                    if (panelsField != null) {
-                        panelsField.setAccessible(true);
-                        java.util.Map<?, ?> panels = (java.util.Map<?, ?>) panelsField.get(window);
-                        if (panels != null && panels.size() > 1) {
-                            count = panels.size();
-                        }
+                    java.util.Map<?, ?> panels = (java.util.Map<?, ?>) getPrivateField(window, "panels");
+                    if (panels != null && panels.size() > 1) {
+                        count = panels.size();
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    LootGameSolver.LOG.debug("Could not inspect Binnie compartment panels", ignored);
+                }
             }
 
             return new BinnieCompartmentAdapter(container, window, compInv, count);
@@ -125,12 +124,11 @@ public final class BinnieCompartmentAdapter {
 
     public int getCurrentTab() {
         try {
-            Field curTabField = getField(window.getClass(), "currentTab");
-            if (curTabField != null) {
-                curTabField.setAccessible(true);
-                return curTabField.getInt(window);
-            }
-        } catch (Throwable ignored) {}
+            Integer tab = (Integer) getPrivateField(window, "currentTab");
+            if (tab != null) return tab.intValue();
+        } catch (Throwable ignored) {
+            LootGameSolver.LOG.debug("Could not read Binnie compartment currentTab", ignored);
+        }
         return 0;
     }
 
@@ -179,17 +177,15 @@ public final class BinnieCompartmentAdapter {
                 .getMethod("receiveGuiNBT", Side.class, EntityPlayer.class, String.class, NBTTagCompound.class);
             receiveGuiNBT.invoke(window, Side.CLIENT, mc.thePlayer, "tab-change", tag);
 
-            Field curTabField = getField(window.getClass(), "currentTab");
-            if (curTabField != null) {
-                curTabField.setAccessible(true);
-                curTabField.setInt(window, nextTab);
-            }
+            setPrivateField(window, "currentTab", Integer.valueOf(nextTab));
 
             try {
                 Method updateTabs = window.getClass()
                     .getMethod("updateTabs");
                 updateTabs.invoke(window);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                LootGameSolver.LOG.debug("Could not invoke Binnie compartment updateTabs", ignored);
+            }
 
             targetTab = nextTab;
             syncWaitTicks = 12;
@@ -216,11 +212,24 @@ public final class BinnieCompartmentAdapter {
         return visitedTabsCount;
     }
 
-    private static Field getField(Class<?> clazz, String name) {
+    @SuppressWarnings("unchecked")
+    private static Object getPrivateField(Object instance, String name) {
+        Class<?> cur = findDeclaringClass(instance.getClass(), name);
+        return cur == null ? null : ReflectionHelper.getPrivateValue((Class<Object>) cur, instance, name);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void setPrivateField(Object instance, String name, Object value) {
+        Class<?> cur = findDeclaringClass(instance.getClass(), name);
+        if (cur != null) ReflectionHelper.setPrivateValue((Class<Object>) cur, instance, value, name);
+    }
+
+    private static Class<?> findDeclaringClass(Class<?> clazz, String name) {
         Class<?> cur = clazz;
         while (cur != null && cur != Object.class) {
             try {
-                return cur.getDeclaredField(name);
+                cur.getDeclaredField(name);
+                return cur;
             } catch (NoSuchFieldException e) {
                 cur = cur.getSuperclass();
             }

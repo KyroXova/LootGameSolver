@@ -25,14 +25,7 @@ public final class ClientHudOverlay {
     private ClientHudOverlay() {}
 
     public static void render(ClientHooks hooks, RenderGameOverlayEvent.Text event) {
-        if (!LootGameSolverConfig.enabled) return;
-        if (!LootGameSolverConfig.showOverlay && !hooks.session.isActive()
-            && !hooks.rewardReturnPending
-            && (hooks.exploration == null || !hooks.exploration.navigating())
-            && !hooks.wasInsideRoom
-            && !hooks.autoPuzzle.isActive()
-            && !hooks.keyHandler.exploreKeyHeld
-            && hooks.checkpointClearDoneTicks == 0) return;
+        if (!shouldRenderHud(hooks)) return;
         DetectedGame cur = hooks.session.getCurrentDetectedGame();
         if (cur == null && (hooks.exploration == null || !LootGameSolverConfig.explorationEnabled)) return;
 
@@ -43,89 +36,26 @@ public final class ClientHudOverlay {
         GL11.glPushMatrix();
         try {
             ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+            String gameTitle = resolveGameTitle(cur);
+            String statusStr = resolveStatusString(hooks);
+            boolean explorerActive = isExplorerHudActive(hooks);
 
-            String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
-            String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
-
-            String gameTitle = cur == null ? "Explorer"
-                : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER ? "Minesweeper"
-                    : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU ? "Sudoku"
-                        : cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT ? "G O L" : "LootGames";
-
-            String statusStr;
-            if (hooks.automationPaused) {
-                statusStr = "Paused";
-            } else if (hooks.session.isActive()) {
-                statusStr = StatusText.solver(hooks.session.getStatus());
-            } else if (hooks.exploration != null) {
-                statusStr = (hooks.exploration.navigating() || hooks.rewardReturnPending
-                    || hooks.autoPuzzle.isActive()
-                    || hooks.autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED)
-                        ? hooks.exploration.navigationStatus()
-                        : "Ready";
-            } else {
-                statusStr = "Ready";
-            }
-
-            boolean autoActive = !hooks.automationPaused && hooks.session.isActive();
-            boolean holoActive = LootGameSolverConfig.showOverlay;
-            boolean explorerActive = hooks.exploration != null && ClientHooks.explorerHudActive(
-                hooks.exploration.navigating(),
-                hooks.rewardReturnPending,
-                hooks.explorationDriven,
-                hooks.session.isActive(),
-                hooks.autoPuzzle.isActive(),
-                hooks.storageRecovery != null);
-
-            String autoColor = hooks.automationPaused ? "\u00A7f" : autoActive ? "\u00A7c" : "\u00A77";
-            String holoColor = holoActive ? "\u00A7e" : "\u00A77";
-
-            long totalSeconds = hooks.totalActiveTicks / 20L;
-            long hours = totalSeconds / 3600L;
-            long minutes = (totalSeconds % 3600L) / 60L;
-            long seconds = totalSeconds % 60L;
-            String timerStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7d" + timerStr
+            String line1 = "\u00A7b\u00A7lLoot Game Solver \u00A77[ \u00A7d" + formatTimer(hooks.totalActiveTicks)
                 + " \u00A77] [ \u00A76"
                 + hooks.solvedPuzzles
                 + " \u00A77]";
-            int dist = hooks.rewardReturnPending ? hooks.rewardLooter.chestDistance(mc)
-                : hooks.exploration != null ? hooks.exploration.checkpointDistance(mc) : 0;
-            String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
-            String line2 = (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
-                + " \u00A78|\u00A7"
-                + (hooks.session.isActive() || explorerActive ? "a" : "e")
-                + " "
-                + statusStr
-                + distBadge;
-            String line3 = autoColor + "["
-                + autoKeyStr
-                + "] Auto \u00A78|\u00A77 "
-                + holoColor
-                + "["
-                + holoKeyStr
-                + "] Holograms";
-            if (hooks.exploration != null && LootGameSolverConfig.explorationEnabled) {
-                String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
-                    + "] "
-                    + hooks.exploration.explorationAction();
-                int held = hooks.checkpointClearDoneTicks > 0 ? 20
-                    : hooks.keyHandler.exploreKeyHeld ? hooks.keyHandler.exploreHoldTicks : 0;
-                line3 += " \u00A78|" + ClientHooks
-                    .explorerKeyLabel(label, !hooks.automationPaused && explorerActive, held, hooks.automationPaused);
-            }
+            String line2 = buildLine2(hooks, mc, gameTitle, statusStr, explorerActive);
+            String line3 = buildLine3(hooks, explorerActive);
+
             int width1 = mc.fontRenderer.getStringWidth(line1);
             int width2 = mc.fontRenderer.getStringWidth(line2);
             int width3 = mc.fontRenderer.getStringWidth(line3);
-            int maxWidth = Math.max(width1, Math.max(width2, width3));
-
-            int panelWidth = Math.max(170, maxWidth + 40);
+            int panelWidth = Math.max(170, Math.max(width1, Math.max(width2, width3)) + 40);
             int panelHeight = 44;
             int x = resolution.getScaledWidth() - panelWidth - 15;
             int y = resolution.getScaledHeight() - panelHeight - 55;
 
             drawNineSlice(TEXTURE_UI_9SLICE, x, y, panelWidth, panelHeight, mc);
-
             mc.fontRenderer.drawStringWithShadow(line1, x + (panelWidth - width1) / 2, y + 7, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line2, x + (panelWidth - width2) / 2, y + 17, 0xFFFFFF);
             mc.fontRenderer.drawStringWithShadow(line3, x + (panelWidth - width3) / 2, y + 27, 0xFFFFFF);
@@ -134,6 +64,82 @@ public final class ClientHudOverlay {
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }
+    }
+
+    private static boolean shouldRenderHud(ClientHooks hooks) {
+        if (!LootGameSolverConfig.enabled) return false;
+        return LootGameSolverConfig.showOverlay || hooks.session.isActive()
+            || hooks.rewardReturnPending
+            || (hooks.exploration != null && hooks.exploration.navigating())
+            || hooks.wasInsideRoom
+            || hooks.autoPuzzle.isActive()
+            || hooks.keyHandler.exploreKeyHeld
+            || hooks.checkpointClearDoneTicks != 0;
+    }
+
+    private static String resolveGameTitle(DetectedGame cur) {
+        if (cur == null) return "Explorer";
+        if (cur.type == com.kyroxova.lootgamesolver.core.MiniGame.MINESWEEPER) return "Minesweeper";
+        if (cur.type == com.kyroxova.lootgamesolver.core.MiniGame.SUDOKU) return "Sudoku";
+        if (cur.type == com.kyroxova.lootgamesolver.core.MiniGame.GAME_OF_LIGHT) return "G O L";
+        return "LootGames";
+    }
+
+    private static String resolveStatusString(ClientHooks hooks) {
+        if (hooks.automationPaused) return "Paused";
+        if (hooks.session.isActive()) return StatusText.solver(hooks.session.getStatus());
+        if (hooks.exploration == null) return "Ready";
+        boolean active = hooks.exploration.navigating() || hooks.rewardReturnPending
+            || hooks.autoPuzzle.isActive()
+            || hooks.autoPuzzle.getState() == AutoPuzzleCoordinator.State.FAILED;
+        return active ? hooks.exploration.navigationStatus() : "Ready";
+    }
+
+    private static boolean isExplorerHudActive(ClientHooks hooks) {
+        return hooks.exploration != null && ClientHooks.explorerHudActive(
+            hooks.exploration.navigating(),
+            hooks.rewardReturnPending,
+            hooks.explorationDriven,
+            hooks.session.isActive(),
+            hooks.autoPuzzle.isActive(),
+            hooks.storageRecovery != null);
+    }
+
+    private static String formatTimer(long totalActiveTicks) {
+        long totalSeconds = totalActiveTicks / 20L;
+        return String.format("%02d:%02d:%02d", totalSeconds / 3600L, (totalSeconds % 3600L) / 60L, totalSeconds % 60L);
+    }
+
+    private static String buildLine2(ClientHooks hooks, Minecraft mc, String gameTitle, String statusStr,
+        boolean explorerActive) {
+        int dist = hooks.rewardReturnPending ? hooks.rewardLooter.chestDistance(mc)
+            : hooks.exploration != null ? hooks.exploration.checkpointDistance(mc) : 0;
+        String distBadge = (explorerActive && dist > 0) ? " \u00A77[ \u00A7f" + dist + "m \u00A77]" : "";
+        return (explorerActive ? "\u00A7a\u00A7l" : "\u00A7f") + gameTitle
+            + " \u00A78|\u00A7"
+            + (hooks.session.isActive() || explorerActive ? "a" : "e")
+            + " "
+            + statusStr
+            + distBadge;
+    }
+
+    private static String buildLine3(ClientHooks hooks, boolean explorerActive) {
+        String autoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleAutoSolve.getKeyCode());
+        String holoKeyStr = GameSettings.getKeyDisplayString(Keybinds.toggleOverlay.getKeyCode());
+        boolean autoActive = !hooks.automationPaused && hooks.session.isActive();
+        String autoColor = hooks.automationPaused ? "\u00A7f" : autoActive ? "\u00A7c" : "\u00A77";
+        String holoColor = LootGameSolverConfig.showOverlay ? "\u00A7e" : "\u00A77";
+        String line3 = autoColor + "[" + autoKeyStr + "] Auto \u00A78|\u00A77 " + holoColor + "[" + holoKeyStr + "] Holograms";
+        if (hooks.exploration != null && LootGameSolverConfig.explorationEnabled) {
+            String label = " [" + GameSettings.getKeyDisplayString(Keybinds.explore.getKeyCode())
+                + "] "
+                + hooks.exploration.explorationAction();
+            int held = hooks.checkpointClearDoneTicks > 0 ? 20
+                : hooks.keyHandler.exploreKeyHeld ? hooks.keyHandler.exploreHoldTicks : 0;
+            line3 += " \u00A78|" + ClientHooks
+                .explorerKeyLabel(label, !hooks.automationPaused && explorerActive, held, hooks.automationPaused);
+        }
+        return line3;
     }
 
     public static void drawNineSlice(ResourceLocation texture, int x, int y, int width, int height, Minecraft mc) {

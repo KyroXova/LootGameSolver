@@ -190,48 +190,14 @@ public final class SolverSession {
         }
         game = snapshot.type;
         updateSudokuSignature(snapshot);
-
-        if (snapshot.type == MiniGame.SUDOKU && snapshot.sudokuPlayerValues != null) {
-            for (int r = 0; r < 9; r++) {
-                for (int c = 0; c < 9; c++) {
-                    if (snapshot.sudokuPlayerValues[r][c] == optimisticSudokuValues[r][c]) {
-                        optimisticSudokuValues[r][c] = 0;
-                    } else if (optimisticSudokuValues[r][c] != 0) {
-                        snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
-                    }
-                    if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
-                        snapshot.sudoku.setPlayerValue(r, c, snapshot.sudokuPlayerValues[r][c]);
-                    }
-                }
-            }
-        }
+        applyOptimisticSudokuValues(snapshot);
 
         SolveResult result = snapshot.type == MiniGame.MINESWEEPER ? minesweeperSolver.solve(snapshot.minesweeper)
             : snapshot.type == MiniGame.SUDOKU ? sudokuSolver.solve(snapshot.sudoku) : golSolver.solve(snapshot.gol);
-
         List<SolverAction> actions = planner
             .plan(result, mode, LootGameSolverConfig.allowProbabilityMoves, LootGameSolverConfig.probabilityThreshold);
-
         Minecraft mc = Minecraft.getMinecraft();
-        if (snapshot.type != MiniGame.GAME_OF_LIGHT && mc.thePlayer != null && actions.size() > 1) {
-            final double px = mc.thePlayer.posX;
-            final double py = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
-            final double pz = mc.thePlayer.posZ;
-            java.util.Collections.sort(actions, new java.util.Comparator<SolverAction>() {
-
-                @Override
-                public int compare(SolverAction a1, SolverAction a2) {
-                    int[] b1 = getBlockPos(a1.position);
-                    int[] b2 = getBlockPos(a2.position);
-                    if (b1 == null || b2 == null) return 0;
-                    double d1 = (b1[0] + 0.5D - px) * (b1[0] + 0.5D - px) + (b1[1] + 0.5D - py) * (b1[1] + 0.5D - py)
-                        + (b1[2] + 0.5D - pz) * (b1[2] + 0.5D - pz);
-                    double d2 = (b2[0] + 0.5D - px) * (b2[0] + 0.5D - px) + (b2[1] + 0.5D - py) * (b2[1] + 0.5D - py)
-                        + (b2[2] + 0.5D - pz) * (b2[2] + 0.5D - pz);
-                    return Double.compare(d1, d2);
-                }
-            });
-        }
+        sortActionsByDistance(snapshot, actions, mc);
 
         activeActions = actions;
         cachedRenderActions = actions;
@@ -239,113 +205,156 @@ public final class SolverSession {
         queued = actions.size();
 
         if (actions.isEmpty()) {
-            if (snapshot.type == MiniGame.SUDOKU && result.getStatus() == SolveResult.Status.SOLVED) {
-                activeAction = null;
-                status = "All Sudoku numbers confirmed. Waiting for next stage...";
-                return;
-            }
-            if (actions.isEmpty()) {
-                if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
-                    || "under_expanding".equals(snapshot.gol.getStageId()))) {
-                    activeAction = null;
-                    status = "Watching sequence playback...";
-                    return;
-                }
-                if (mode == ActionPlanner.Mode.SINGLE_STEP) {
-                    mode = null;
-                }
-                activeAction = null;
-                if (result.getStatus() == SolveResult.Status.PROBABILISTIC) {
-                    status = !LootGameSolverConfig.allowProbabilityMoves ? "Guess: Disabled"
-                        : "Guess: Below safety threshold";
-                } else {
-                    status = result.getMessage();
-                }
-                return;
-            }
+            handleEmptyActions(snapshot, result);
+            return;
         }
-
-        SolverAction nextAction = actions.get(0);
-        if (activeAction == null || !nextAction.position.equals(activeAction.position)
-            || remainingClicksForActiveAction <= 0) {
-            sudokuValueBeforeClick = -1;
-            activeAction = nextAction;
-            if (activeAction.type == SolverAction.Type.SET_VALUE) {
-                int curVal = (snapshot.sudokuPlayerValues != null)
-                    ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
-                    : 0;
-                remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
-                int[] block = getBlockPos(activeAction.position);
-                if (mc.thePlayer != null && shouldUseReverseSudokuClicks(curVal, activeAction.value)) {
-                    int suitable = -1;
-                    for (int i = 0; i < 9; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-                        suitable = i;
-                        break;
-                    }
-                    if (suitable < 0 && block != null && mc.theWorld != null) {
-                        for (int i = 0; i < 9; i++) {
-                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                            if (stack != null && stack.getItem()
-                                .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) {
-                                suitable = i;
-                                break;
-                            }
-                        }
-                    }
-                    if (suitable < 0) {
-                        int empty = -1;
-                        for (int i = 9; i < 36; i++) if (mc.thePlayer.inventory.getStackInSlot(i) == null) {
-                            empty = i;
-                            break;
-                        }
-                        if (empty >= 0) for (int i = 0; i < 9; i++) {
-                            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-                            if (stack == null || stack.isItemStackDamageable()
-                                || stack.getItem() instanceof net.minecraft.item.ItemTool
-                                || stack.getItem() instanceof net.minecraft.item.ItemSword
-                                || stack.getItem() instanceof net.minecraft.item.ItemArmor
-                                || stack.getItem() instanceof net.minecraft.item.ItemFood
-                                || stack.getItem()
-                                    .getClass()
-                                    .getName()
-                                    .toLowerCase(java.util.Locale.ROOT)
-                                    .contains("backpack"))
-                                continue;
-                            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
-                            if (sudokuTransfer.clearHotbar(mc, i, empty)) {
-                                sudokuAutomaticSlot = i;
-                                activeAction = null;
-                                status = "Preparing an empty hand for Sudoku";
-                                return;
-                            }
-                        }
-                    }
-                    if (suitable >= 0 && suitable != mc.thePlayer.inventory.currentItem) {
-                        if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
-                        sudokuAutomaticSlot = suitable;
-                        mc.thePlayer.inventory.currentItem = suitable;
-                        mc.playerController.updateController();
-                    }
-                }
-                net.minecraft.item.ItemStack held = mc.thePlayer == null ? null : mc.thePlayer.getHeldItem();
-                boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
-                    && held.getItem()
-                        .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
-                sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
-                if (!sudokuReverseClick) remainingClicksForActiveAction = (activeAction.value - curVal + 10) % 10;
-            } else {
-                remainingClicksForActiveAction = 1;
-                sudokuReverseClick = false;
-            }
-        } else {
-            activeAction = nextAction;
-        }
-
+        if (!prepareActiveAction(snapshot, actions.get(0), mc)) return;
         String actionName = activeAction.type == SolverAction.Type.REVEAL ? "Revealing"
             : activeAction.type == SolverAction.Type.FLAG ? "Flagging"
                 : activeAction.type == SolverAction.Type.SET_VALUE ? "Setting " + activeAction.value : "Interacting";
         status = actionName + " (" + actions.size() + " remaining)";
         send(snapshot);
+    }
+
+    private void applyOptimisticSudokuValues(DetectedGame snapshot) {
+        if (snapshot.type != MiniGame.SUDOKU || snapshot.sudokuPlayerValues == null) return;
+        for (int r = 0; r < 9; r++) {
+            for (int c = 0; c < 9; c++) {
+                if (snapshot.sudokuPlayerValues[r][c] == optimisticSudokuValues[r][c]) {
+                    optimisticSudokuValues[r][c] = 0;
+                } else if (optimisticSudokuValues[r][c] != 0) {
+                    snapshot.sudokuPlayerValues[r][c] = optimisticSudokuValues[r][c];
+                }
+                if (snapshot.sudoku != null && snapshot.sudokuPlayerValues[r][c] != 0) {
+                    snapshot.sudoku.setPlayerValue(r, c, snapshot.sudokuPlayerValues[r][c]);
+                }
+            }
+        }
+    }
+
+    private void sortActionsByDistance(DetectedGame snapshot, List<SolverAction> actions, Minecraft mc) {
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT || mc.thePlayer == null || actions.size() <= 1) return;
+        final double px = mc.thePlayer.posX;
+        final double py = mc.thePlayer.posY + mc.thePlayer.getEyeHeight();
+        final double pz = mc.thePlayer.posZ;
+        java.util.Collections.sort(actions, new java.util.Comparator<SolverAction>() {
+
+            @Override
+            public int compare(SolverAction a1, SolverAction a2) {
+                int[] b1 = getBlockPos(a1.position);
+                int[] b2 = getBlockPos(a2.position);
+                if (b1 == null || b2 == null) return 0;
+                double d1 = (b1[0] + 0.5D - px) * (b1[0] + 0.5D - px) + (b1[1] + 0.5D - py) * (b1[1] + 0.5D - py)
+                    + (b1[2] + 0.5D - pz) * (b1[2] + 0.5D - pz);
+                double d2 = (b2[0] + 0.5D - px) * (b2[0] + 0.5D - px) + (b2[1] + 0.5D - py) * (b2[1] + 0.5D - py)
+                    + (b2[2] + 0.5D - pz) * (b2[2] + 0.5D - pz);
+                return Double.compare(d1, d2);
+            }
+        });
+    }
+
+    private void handleEmptyActions(DetectedGame snapshot, SolveResult result) {
+        activeAction = null;
+        if (snapshot.type == MiniGame.SUDOKU && result.getStatus() == SolveResult.Status.SOLVED) {
+            status = "All Sudoku numbers confirmed. Waiting for next stage...";
+            return;
+        }
+        if (snapshot.type == MiniGame.GAME_OF_LIGHT && ("show_sequence".equals(snapshot.gol.getStageId())
+            || "under_expanding".equals(snapshot.gol.getStageId()))) {
+            status = "Watching sequence playback...";
+            return;
+        }
+        if (mode == ActionPlanner.Mode.SINGLE_STEP) mode = null;
+        if (result.getStatus() == SolveResult.Status.PROBABILISTIC) {
+            status = !LootGameSolverConfig.allowProbabilityMoves ? "Guess: Disabled" : "Guess: Below safety threshold";
+        } else {
+            status = result.getMessage();
+        }
+    }
+
+    private boolean prepareActiveAction(DetectedGame snapshot, SolverAction nextAction, Minecraft mc) {
+        if (activeAction != null && nextAction.position.equals(activeAction.position)
+            && remainingClicksForActiveAction > 0) {
+            activeAction = nextAction;
+            return true;
+        }
+        sudokuValueBeforeClick = -1;
+        activeAction = nextAction;
+        if (activeAction.type != SolverAction.Type.SET_VALUE) {
+            remainingClicksForActiveAction = 1;
+            sudokuReverseClick = false;
+            return true;
+        }
+        int curVal = (snapshot.sudokuPlayerValues != null)
+            ? snapshot.sudokuPlayerValues[activeAction.position.y][activeAction.position.x]
+            : 0;
+        remainingClicksForActiveAction = calculateClicksNeeded(curVal, activeAction.value);
+        int[] block = getBlockPos(activeAction.position);
+        if (mc.thePlayer != null && shouldUseReverseSudokuClicks(curVal, activeAction.value)
+            && !prepareReverseSudokuHand(mc, block)) {
+            return false;
+        }
+        net.minecraft.item.ItemStack held = mc.thePlayer == null ? null : mc.thePlayer.getHeldItem();
+        boolean canSneakInteract = held == null || (block != null && mc.theWorld != null
+            && held.getItem()
+                .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer));
+        sudokuReverseClick = shouldUseReverseSudokuClicks(curVal, activeAction.value, canSneakInteract);
+        if (!sudokuReverseClick) remainingClicksForActiveAction = (activeAction.value - curVal + 10) % 10;
+        return true;
+    }
+
+    private boolean prepareReverseSudokuHand(Minecraft mc, int[] block) {
+        int suitable = findSuitableReverseHotbarSlot(mc, block);
+        if (suitable < 0 && tryClearHotbarForSudoku(mc)) return false;
+        if (suitable >= 0 && suitable != mc.thePlayer.inventory.currentItem) {
+            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+            sudokuAutomaticSlot = suitable;
+            mc.thePlayer.inventory.currentItem = suitable;
+            mc.playerController.updateController();
+        }
+        return true;
+    }
+
+    private static int findSuitableReverseHotbarSlot(Minecraft mc, int[] block) {
+        for (int i = 0; i < 9; i++) {
+            if (mc.thePlayer.inventory.getStackInSlot(i) == null) return i;
+        }
+        if (block == null || mc.theWorld == null) return -1;
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack != null && stack.getItem()
+                .doesSneakBypassUse(mc.theWorld, block[0], block[1], block[2], mc.thePlayer)) return i;
+        }
+        return -1;
+    }
+
+    private boolean tryClearHotbarForSudoku(Minecraft mc) {
+        int empty = -1;
+        for (int i = 9; i < 36 && empty < 0; i++) {
+            if (mc.thePlayer.inventory.getStackInSlot(i) == null) empty = i;
+        }
+        if (empty < 0) return false;
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.item.ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
+            if (stack == null || stack.isItemStackDamageable()
+                || stack.getItem() instanceof net.minecraft.item.ItemTool
+                || stack.getItem() instanceof net.minecraft.item.ItemSword
+                || stack.getItem() instanceof net.minecraft.item.ItemArmor
+                || stack.getItem() instanceof net.minecraft.item.ItemFood
+                || stack.getItem()
+                    .getClass()
+                    .getName()
+                    .toLowerCase(java.util.Locale.ROOT)
+                    .contains("backpack")) continue;
+            if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
+            if (sudokuTransfer.clearHotbar(mc, i, empty)) {
+                sudokuAutomaticSlot = i;
+                activeAction = null;
+                status = "Preparing an empty hand for Sudoku";
+                return true;
+            }
+        }
+        return false;
     }
 
     private void send(DetectedGame snapshot) {
@@ -412,11 +421,14 @@ public final class SolverSession {
     private boolean prepareEmptyHand(Minecraft mc) {
         if (mc == null || mc.thePlayer == null || mc.playerController == null) return false;
         if (mc.thePlayer.getHeldItem() == null) return true;
-        for (int slot = 0; slot < 9; slot++) {
-            if (mc.thePlayer.inventory.getStackInSlot(slot) != null) continue;
+        int emptyHotbar = -1;
+        for (int slot = 0; slot < 9 && emptyHotbar < 0; slot++) {
+            if (mc.thePlayer.inventory.getStackInSlot(slot) == null) emptyHotbar = slot;
+        }
+        if (emptyHotbar >= 0) {
             if (sudokuPreviousSlot < 0) sudokuPreviousSlot = mc.thePlayer.inventory.currentItem;
-            sudokuAutomaticSlot = slot;
-            mc.thePlayer.inventory.currentItem = slot;
+            sudokuAutomaticSlot = emptyHotbar;
+            mc.thePlayer.inventory.currentItem = emptyHotbar;
             mc.playerController.updateController();
             return true;
         }

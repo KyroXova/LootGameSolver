@@ -77,39 +77,60 @@ public final class PuzzleCenterNavigator {
         double initDx = mc.thePlayer.posX - (center[0] + 0.5D);
         double initDz = mc.thePlayer.posZ - (center[2] + 0.5D);
         double initDy = (mc.thePlayer.posY + mc.thePlayer.getEyeHeight()) - (center[1] + 0.5D);
-        if (allowDigging
+        boolean arrived = allowDigging
             ? initDx * initDx + initDy * initDy + initDz * initDz <= 14.0D && Math.hypot(initDx, initDz) <= 2.8D
-            : rewardViewArrived(initDx, initDz, mc.thePlayer.boundingBox.minY, center[1])) {
-            explorer.movingToPuzzleCenter = false;
-            explorer.target = explorer.puzzleMasterTarget;
-            explorer.puzzleMasterTarget = null;
-            puzzleCenterArrivalPending = true;
+            : rewardViewArrived(initDx, initDz, mc.thePlayer.boundingBox.minY, center[1]);
+        if (arrived) {
+            markPuzzleCenterArrived(explorer);
             return true;
         }
         if (!explorer.walking && explorer.navigationInput == null) {
-            BaritoneNavigationBridge.Start started = allowDigging
-                ? explorer.baritoneNavigation.startAdjacentWithoutBreaking(center[0], center[1] + 1, center[2])
-                : explorer.baritoneNavigation.startPuzzleTileApproach(center[0], center[1] + 1, center[2]);
-            if (started == BaritoneNavigationBridge.Start.STARTED) {
-                explorer.puzzleMasterTarget = explorer.target;
-                TileEntity point = new TileEntity();
-                point.xCoord = center[0];
-                point.yCoord = center[1];
-                point.zCoord = center[2];
-                explorer.target = point;
-                explorer.baritoneCoordinator.centerMove = true;
-                explorer.movingToPuzzleCenter = true;
-                explorer.movingToRewardView = !allowDigging;
-                puzzleCenterArrivalPending = false;
-                explorer.walking = true;
-                explorer.status = "Moving to board center";
-                return true;
-            }
-            if (started != BaritoneNavigationBridge.Start.ABSENT) {
-                explorer.status = "Baritone navigation unavailable or busy";
-                return false;
-            }
+            Boolean baritoneResult = tryStartBaritoneCenterMove(explorer, center, allowDigging);
+            if (baritoneResult != null) return baritoneResult.booleanValue();
         }
+        startGroundCenterSearch(mc, explorer, center, allowDigging);
+        if (explorer.walkingSearch == null && explorer.route.isEmpty())
+            return handleEmptyCenterRoute(mc, explorer, center, allowDigging);
+        explorer.walking = explorer.walkingSearch != null || !explorer.route.isEmpty();
+        if (!explorer.walking) return handleEmptyCenterRoute(mc, explorer, center, allowDigging);
+        explorer.status = "Moving to board center";
+        return true;
+    }
+
+    private void markPuzzleCenterArrived(Explorer explorer) {
+        explorer.movingToPuzzleCenter = false;
+        explorer.target = explorer.puzzleMasterTarget;
+        explorer.puzzleMasterTarget = null;
+        puzzleCenterArrivalPending = true;
+    }
+
+    private Boolean tryStartBaritoneCenterMove(Explorer explorer, int[] center, boolean allowDigging) {
+        BaritoneNavigationBridge.Start started = allowDigging
+            ? explorer.baritoneNavigation.startAdjacentWithoutBreaking(center[0], center[1] + 1, center[2])
+            : explorer.baritoneNavigation.startPuzzleTileApproach(center[0], center[1] + 1, center[2]);
+        if (started == BaritoneNavigationBridge.Start.STARTED) {
+            explorer.puzzleMasterTarget = explorer.target;
+            TileEntity point = new TileEntity();
+            point.xCoord = center[0];
+            point.yCoord = center[1];
+            point.zCoord = center[2];
+            explorer.target = point;
+            explorer.baritoneCoordinator.centerMove = true;
+            explorer.movingToPuzzleCenter = true;
+            explorer.movingToRewardView = !allowDigging;
+            puzzleCenterArrivalPending = false;
+            explorer.walking = true;
+            explorer.status = "Moving to board center";
+            return Boolean.TRUE;
+        }
+        if (started != BaritoneNavigationBridge.Start.ABSENT) {
+            explorer.status = "Baritone navigation unavailable or busy";
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    private void startGroundCenterSearch(Minecraft mc, Explorer explorer, int[] center, boolean allowDigging) {
         explorer.puzzleMasterTarget = explorer.target;
         TileEntity point = new TileEntity();
         point.xCoord = center[0];
@@ -144,66 +165,28 @@ public final class PuzzleCenterNavigator {
             explorer.walkingSearch = null;
             if (reachedCenter) appendPuzzleCenterWaypoint(explorer, center);
         }
-        if (explorer.walkingSearch == null && explorer.route.isEmpty()) {
-            double distance = Math
-                .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 2.5D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 3) {
-                explorer.movingToPuzzleCenter = false;
-                explorer.target = explorer.puzzleMasterTarget;
-                explorer.puzzleMasterTarget = null;
-                puzzleCenterArrivalPending = true;
-                return true;
-            }
-            if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
-                if (allowDigging && !explorer.inDungeonRoom(mc)
-                    && LootGameSolverConfig.staircaseEnabled
-                    && explorer.selectDigEntrance(mc)) {
-                    explorer.walking = true;
-                    explorer.status = explorer.digging ? "Planning board entry" : "Moving to board entrance";
-                    return true;
-                }
-                if (!allowDigging) {
-                    explorer.target = explorer.puzzleMasterTarget;
-                    explorer.puzzleMasterTarget = null;
-                    explorer.movingToPuzzleCenter = false;
-                } else abandonPuzzleCenterMove(mc, explorer);
-                return false;
-            }
+    }
+
+    private boolean handleEmptyCenterRoute(Minecraft mc, Explorer explorer, int[] center, boolean allowDigging) {
+        double distance = Math.hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
+        if (distance <= 2.5D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 3) {
+            markPuzzleCenterArrived(explorer);
+            return true;
         }
-        explorer.walking = explorer.walkingSearch != null || !explorer.route.isEmpty();
-        if (!explorer.walking) {
-            double distance = Math
-                .hypot(mc.thePlayer.posX - (center[0] + 0.5D), mc.thePlayer.posZ - (center[2] + 0.5D));
-            if (distance <= 2.5D && Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) <= 3) {
-                explorer.movingToPuzzleCenter = false;
-                explorer.target = explorer.puzzleMasterTarget;
-                explorer.puzzleMasterTarget = null;
-                puzzleCenterArrivalPending = true;
-                return true;
-            }
-            if (distance > 2.5D || Math.abs(Math.floor(mc.thePlayer.boundingBox.minY) - center[1] - 1) > 3) {
-                if (allowDigging && !explorer.inDungeonRoom(mc)
-                    && LootGameSolverConfig.staircaseEnabled
-                    && explorer.selectDigEntrance(mc)) {
-                    explorer.walking = true;
-                    explorer.status = explorer.digging ? "Planning an entry to the board center"
-                        : "Moving to a safe board entrance";
-                    return true;
-                }
-                if (!allowDigging) {
-                    explorer.target = explorer.puzzleMasterTarget;
-                    explorer.puzzleMasterTarget = null;
-                    explorer.movingToPuzzleCenter = false;
-                } else abandonPuzzleCenterMove(mc, explorer);
-                return false;
-            }
-            explorer.movingToPuzzleCenter = false;
+        if (allowDigging && !explorer.inDungeonRoom(mc)
+            && LootGameSolverConfig.staircaseEnabled
+            && explorer.selectDigEntrance(mc)) {
+            explorer.walking = true;
+            explorer.status = explorer.digging ? "Planning an entry to the board center"
+                : "Moving to a safe board entrance";
+            return true;
+        }
+        if (!allowDigging) {
             explorer.target = explorer.puzzleMasterTarget;
             explorer.puzzleMasterTarget = null;
-            puzzleCenterArrivalPending = true;
-        }
-        explorer.status = "Moving to board center";
-        return true;
+            explorer.movingToPuzzleCenter = false;
+        } else abandonPuzzleCenterMove(mc, explorer);
+        return false;
     }
 
     public static boolean rewardViewArrived(double dx, double dz, double feetY, int floorY) {

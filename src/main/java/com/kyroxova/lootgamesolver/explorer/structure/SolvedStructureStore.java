@@ -13,6 +13,7 @@ import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.kyroxova.lootgamesolver.LootGameSolver;
 
 public final class SolvedStructureStore {
 
@@ -33,7 +34,9 @@ public final class SolvedStructureStore {
             try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
                 Data loaded = GSON.fromJson(reader, Data.class);
                 if (loaded != null && loaded.worlds != null) data = loaded;
-            } catch (IOException | RuntimeException ignored) {}
+            } catch (IOException | RuntimeException ignored) {
+                LootGameSolver.LOG.debug("Could not load solved structure store from {}", file, ignored);
+            }
     }
 
     public boolean contains(String world, int dimension, int x, int y, int z) {
@@ -48,7 +51,9 @@ public final class SolvedStructureStore {
                 int sx = Integer.parseInt(parts[1]), sy = Integer.parseInt(parts[2]), sz = Integer.parseInt(parts[3]);
                 if (Math.abs((long) sx - x) <= 48 && Math.abs((long) sy - y) <= 36 && Math.abs((long) sz - z) <= 48)
                     return true;
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+                LootGameSolver.LOG.debug("Skipping malformed solved structure entry: {}", position, ignored);
+            }
         }
         return false;
     }
@@ -85,7 +90,9 @@ public final class SolvedStructureStore {
                         .getBytes(StandardCharsets.UTF_8));
                 try {
                     Files.deleteIfExists(pending.toPath());
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    LootGameSolver.LOG.debug("Could not delete pending solved structure file {}", pending, ignored);
+                }
             }
         }
     }

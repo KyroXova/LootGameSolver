@@ -66,7 +66,9 @@ public final class ExplorerStructureDiscovery {
                     nearest = distance;
                     target = tile;
                 }
-            } catch (ReflectiveOperationException ignored) {}
+            } catch (ReflectiveOperationException ignored) {
+                com.kyroxova.lootgamesolver.LootGameSolver.LOG.debug("Could not inspect LootGames tile", ignored);
+            }
         }
         return target;
     }

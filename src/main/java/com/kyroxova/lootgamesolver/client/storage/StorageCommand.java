@@ -60,124 +60,162 @@ public final class StorageCommand extends CommandBase {
             return;
         }
         String world = Explorer.worldIdentity(mc);
-        if ("resumeLoot".equalsIgnoreCase(args.length == 0 ? "" : args[0])) {
-            ClientHooks.requestResumeLoot();
+        String sub = args.length == 0 ? "" : args[0];
+        if (handleSimpleCommand(sender, args, sub, world)) return;
+        if ("setChest".equalsIgnoreCase(sub) || "clearChest".equalsIgnoreCase(sub)
+            || ("setStorage".equalsIgnoreCase(sub) && args.length == 1)) {
+            handleTargetCommand(sender, mc, sub, world);
             return;
         }
-        if ("clearCheckpoint".equalsIgnoreCase(args.length == 0 ? "" : args[0])
-            || "resetCheckpoint".equalsIgnoreCase(args.length == 0 ? "" : args[0])) {
-            ClientHooks.requestClearCheckpoint();
-            return;
-        }
-        if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
-            if (args.length > 1) {
-                String detail = commandHelp(args[1]);
-                reply(sender, detail == null ? "Unknown command. Use /lgs help to see all commands." : detail);
-            } else {
-                reply(sender, "Commands (use /lgs help <command> for details):");
-                for (String command : SUBCOMMANDS) reply(sender, commandHelp(command));
-            }
-        } else if ("caveMode".equalsIgnoreCase(args[0])) {
-            if (args.length == 2 && ("on".equalsIgnoreCase(args[1]) || "off".equalsIgnoreCase(args[1]))) {
-                LootGameSolverConfig.setCaveMode("on".equalsIgnoreCase(args[1]));
-                ClientHooks.requestTravelModeRefresh();
-            } else if (args.length != 1 && !(args.length == 2 && "status".equalsIgnoreCase(args[1]))) {
-                reply(sender, commandHelp("caveMode"));
-                return;
-            }
+        if ("storageStatus".equalsIgnoreCase(sub)) {
             reply(
                 sender,
-                "Cave mode " + (LootGameSolverConfig.caveMode ? "enabled: cave travel allowed."
-                    : "disabled: Explorer travels near the surface."));
-        } else if ("enable".equalsIgnoreCase(args[0]) || "disable".equalsIgnoreCase(args[0])) {
-            boolean enable = "enable".equalsIgnoreCase(args[0]);
+                "Storage: "
+                    + (world.equals(LootGameSolverConfig.storageWorld) ? LootGameSolverConfig.storageDestination
+                        : "not configured for this world")
+                    + "; targets: "
+                    + LootGameSolverConfig.storageTargets.length
+                    + "; preference: "
+                    + (LootGameSolverConfig.storageEnabled ? "enabled" : "disabled")
+                    + ".");
+            return;
+        }
+        reply(sender, getCommandUsage(sender));
+    }
+
+    private boolean handleSimpleCommand(ICommandSender sender, String[] args, String sub, String world) {
+        if ("resumeLoot".equalsIgnoreCase(sub)) {
+            ClientHooks.requestResumeLoot();
+            return true;
+        }
+        if ("clearCheckpoint".equalsIgnoreCase(sub) || "resetCheckpoint".equalsIgnoreCase(sub)) {
+            ClientHooks.requestClearCheckpoint();
+            return true;
+        }
+        if (args.length == 0 || "help".equalsIgnoreCase(sub)) {
+            handleHelpCommand(sender, args);
+            return true;
+        }
+        if ("caveMode".equalsIgnoreCase(sub)) {
+            handleCaveModeCommand(sender, args);
+            return true;
+        }
+        if ("enable".equalsIgnoreCase(sub) || "disable".equalsIgnoreCase(sub)) {
+            boolean enable = "enable".equalsIgnoreCase(sub);
             LootGameSolverConfig.setStorageEnabled(enable);
             reply(
                 sender,
                 "Storage recovery preference " + (enable ? "enabled" : "disabled")
                     + ". Destinations and targets remain saved.");
-        } else if ("clearWarp".equalsIgnoreCase(args[0])) {
+            return true;
+        }
+        return handleDestinationCommand(sender, args, sub, world);
+    }
+
+    private void handleHelpCommand(ICommandSender sender, String[] args) {
+        if (args.length > 1) {
+            String detail = commandHelp(args[1]);
+            reply(sender, detail == null ? "Unknown command. Use /lgs help to see all commands." : detail);
+            return;
+        }
+        reply(sender, "Commands (use /lgs help <command> for details):");
+        for (String command : SUBCOMMANDS) reply(sender, commandHelp(command));
+    }
+
+    private void handleCaveModeCommand(ICommandSender sender, String[] args) {
+        if (args.length == 2 && ("on".equalsIgnoreCase(args[1]) || "off".equalsIgnoreCase(args[1]))) {
+            LootGameSolverConfig.setCaveMode("on".equalsIgnoreCase(args[1]));
+            ClientHooks.requestTravelModeRefresh();
+        } else if (args.length != 1 && !(args.length == 2 && "status".equalsIgnoreCase(args[1]))) {
+            reply(sender, commandHelp("caveMode"));
+            return;
+        }
+        reply(
+            sender,
+            "Cave mode " + (LootGameSolverConfig.caveMode ? "enabled: cave travel allowed."
+                : "disabled: Explorer travels near the surface."));
+    }
+
+    private boolean handleDestinationCommand(ICommandSender sender, String[] args, String sub, String world) {
+        if ("clearWarp".equalsIgnoreCase(sub) || "clearChests".equalsIgnoreCase(sub)) {
             if (!world.equals(LootGameSolverConfig.storageWorld)) {
                 reply(sender, "No storage configuration for this world.");
-                return;
+                return true;
             }
-            LootGameSolverConfig.setStorageDestination(world, "");
-            reply(sender, "Storage destination cleared; marked targets remain saved.");
-        } else if ("clearChests".equalsIgnoreCase(args[0])) {
-            if (!world.equals(LootGameSolverConfig.storageWorld)) {
-                reply(sender, "No storage configuration for this world.");
-                return;
+            if ("clearWarp".equalsIgnoreCase(sub)) {
+                LootGameSolverConfig.setStorageDestination(world, "");
+                reply(sender, "Storage destination cleared; marked targets remain saved.");
+            } else {
+                LootGameSolverConfig.setStorageTargets(new String[0]);
+                reply(sender, "All marked storage targets cleared.");
             }
-            LootGameSolverConfig.setStorageTargets(new String[0]);
-            reply(sender, "All marked storage targets cleared.");
-        } else if ("setHome".equalsIgnoreCase(args[0]) && args.length == 1) {
+            return true;
+        }
+        if ("setHome".equalsIgnoreCase(sub) && args.length == 1) {
             LootGameSolverConfig.setStorageDestination(world, "/home");
             reply(sender, "Home selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
-        } else
-            if (("setWarp".equalsIgnoreCase(args[0]) || "setStorage".equalsIgnoreCase(args[0])) && args.length == 2) {
-                if (!validWarpName(args[1])) {
-                    reply(
-                        sender,
-                        "Warp names may contain letters, numbers, underscores and hyphens; returnLooting is reserved for the return trip.");
-                    return;
-                }
-                LootGameSolverConfig.setStorageDestination(world, "/warp " + args[1]);
+            return true;
+        }
+        if (("setWarp".equalsIgnoreCase(sub) || "setStorage".equalsIgnoreCase(sub)) && args.length == 2) {
+            if (!validWarpName(args[1])) {
                 reply(
                     sender,
-                    "Storage warp selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
-            } else if ("setChest".equalsIgnoreCase(args[0]) || "clearChest".equalsIgnoreCase(args[0])
-                || ("setStorage".equalsIgnoreCase(args[0]) && args.length == 1)) {
-                    if (LootGameSolverConfig.storageWorld.isEmpty())
-                        LootGameSolverConfig.setStorageDestination(world, "");
-                    if (!world.equals(LootGameSolverConfig.storageWorld)) {
-                        reply(sender, "Storage is configured for another world. Clear it before marking targets here.");
-                        return;
-                    }
-                    MovingObjectPosition hit = mc.objectMouseOver;
-                    String target = null;
-                    if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
-                        TileEntity tile = mc.theWorld.getTileEntity(hit.blockX, hit.blockY, hit.blockZ);
-                        if (tile instanceof IInventory) target = "block:" + mc.theWorld.provider.dimensionId
-                            + ":"
-                            + hit.blockX
-                            + ":"
-                            + hit.blockY
-                            + ":"
-                            + hit.blockZ;
-                    } else if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
-                        && hit.entityHit instanceof IInventory) {
-                            target = "entity:" + mc.theWorld.provider.dimensionId + ":" + hit.entityHit.getUniqueID();
-                        }
-                    if (target == null) {
-                        reply(sender, "Look directly at a loaded inventory block or inventory entity.");
-                        return;
-                    }
-                    List<String> targets = new ArrayList<String>(Arrays.asList(LootGameSolverConfig.storageTargets));
-                    if ("clearChest".equalsIgnoreCase(args[0])) {
-                        boolean removed = targets.remove(target);
-                        LootGameSolverConfig.setStorageTargets(targets.toArray(new String[0]));
-                        reply(sender, removed ? "Storage target unmarked." : "That target was not marked.");
-                        return;
-                    }
-                    if (!targets.contains(target)) targets.add(target);
-                    LootGameSolverConfig.setStorageTargets(targets.toArray(new String[0]));
-                    reply(sender, "Storage target marked: " + target + ". Use /lgs enable to allow recovery.");
-                } else if ("clearStorage".equalsIgnoreCase(args[0])) {
-                    LootGameSolverConfig.setStorageDestination("", "");
-                    LootGameSolverConfig.setStorageEnabled(false);
-                    reply(sender, "Storage configuration cleared.");
-                } else if ("storageStatus".equalsIgnoreCase(args[0])) {
-                    reply(
-                        sender,
-                        "Storage: "
-                            + (world.equals(LootGameSolverConfig.storageWorld) ? LootGameSolverConfig.storageDestination
-                                : "not configured for this world")
-                            + "; targets: "
-                            + LootGameSolverConfig.storageTargets.length
-                            + "; preference: "
-                            + (LootGameSolverConfig.storageEnabled ? "enabled" : "disabled")
-                            + ".");
-                } else reply(sender, getCommandUsage(sender));
+                    "Warp names may contain letters, numbers, underscores and hyphens; returnLooting is reserved for the return trip.");
+                return true;
+            }
+            LootGameSolverConfig.setStorageDestination(world, "/warp " + args[1]);
+            reply(sender, "Storage warp selected. Mark storage with /lgs setChest and use /lgs enable to allow recovery.");
+            return true;
+        }
+        if ("clearStorage".equalsIgnoreCase(sub)) {
+            LootGameSolverConfig.setStorageDestination("", "");
+            LootGameSolverConfig.setStorageEnabled(false);
+            reply(sender, "Storage configuration cleared.");
+            return true;
+        }
+        return false;
+    }
+
+    private void handleTargetCommand(ICommandSender sender, Minecraft mc, String sub, String world) {
+        if (LootGameSolverConfig.storageWorld.isEmpty()) LootGameSolverConfig.setStorageDestination(world, "");
+        if (!world.equals(LootGameSolverConfig.storageWorld)) {
+            reply(sender, "Storage is configured for another world. Clear it before marking targets here.");
+            return;
+        }
+        String target = resolveLookedAtTarget(mc);
+        if (target == null) {
+            reply(sender, "Look directly at a loaded inventory block or inventory entity.");
+            return;
+        }
+        List<String> targets = new ArrayList<String>(Arrays.asList(LootGameSolverConfig.storageTargets));
+        if ("clearChest".equalsIgnoreCase(sub)) {
+            boolean removed = targets.remove(target);
+            LootGameSolverConfig.setStorageTargets(targets.toArray(new String[0]));
+            reply(sender, removed ? "Storage target unmarked." : "That target was not marked.");
+            return;
+        }
+        if (!targets.contains(target)) targets.add(target);
+        LootGameSolverConfig.setStorageTargets(targets.toArray(new String[0]));
+        reply(sender, "Storage target marked: " + target + ". Use /lgs enable to allow recovery.");
+    }
+
+    private static String resolveLookedAtTarget(Minecraft mc) {
+        MovingObjectPosition hit = mc.objectMouseOver;
+        if (hit == null) return null;
+        if (hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+            TileEntity tile = mc.theWorld.getTileEntity(hit.blockX, hit.blockY, hit.blockZ);
+            if (tile instanceof IInventory) return "block:" + mc.theWorld.provider.dimensionId
+                + ":"
+                + hit.blockX
+                + ":"
+                + hit.blockY
+                + ":"
+                + hit.blockZ;
+        } else if (hit.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
+            && hit.entityHit instanceof IInventory) {
+                return "entity:" + mc.theWorld.provider.dimensionId + ":" + hit.entityHit.getUniqueID();
+            }
+        return null;
     }
 
     public static boolean validWarpName(String value) {

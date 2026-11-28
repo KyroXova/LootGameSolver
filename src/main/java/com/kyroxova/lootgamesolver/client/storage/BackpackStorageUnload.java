@@ -52,81 +52,96 @@ public final class BackpackStorageUnload {
             || (phase != Phase.WITHDRAW && mc.thePlayer.inventory.getItemStack() != null)
             || mc.thePlayer.hurtTime > 0) return Result.FAILED;
         if (phase == Phase.SWAP || phase == Phase.RESTORE) {
-            if (swap.active()) {
-                if (!swap.tick(mc)) return Result.FAILED;
-                if (swap.active()) return Result.WORKING;
-            }
-            if (phase == Phase.RESTORE) {
-                restoreSelection(mc);
-                phase = Phase.FIND;
-                return afterRestore;
-            }
-            if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbar))) return Result.FAILED;
-            phase = Phase.OPEN;
-            wait = 0;
+            Result swapResult = tickSwapOrRestore(mc);
+            if (swapResult != null) return swapResult;
         }
-        if (phase == Phase.WITHDRAW) {
-            VerifiedBackpackUnload.Result result = withdraw.tick(mc);
-            if (result == VerifiedBackpackUnload.Result.WORKING) return Result.WORKING;
-            if (result == VerifiedBackpackUnload.Result.FAILED
-                || result == VerifiedBackpackUnload.Result.NEEDS_ATTENTION) return Result.FAILED;
+        if (phase == Phase.WITHDRAW) return tickWithdraw(mc);
+        if (phase == Phase.OPEN) return tickOpen(mc);
+        return startNextBackpack(mc);
+    }
+
+    private Result tickSwapOrRestore(Minecraft mc) {
+        if (swap.active()) {
+            if (!swap.tick(mc)) return Result.FAILED;
+            if (swap.active()) return Result.WORKING;
+        }
+        if (phase == Phase.RESTORE) {
+            restoreSelection(mc);
+            phase = Phase.FIND;
+            return afterRestore;
+        }
+        if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbar))) return Result.FAILED;
+        phase = Phase.OPEN;
+        wait = 0;
+        return null;
+    }
+
+    private Result tickWithdraw(Minecraft mc) {
+        VerifiedBackpackUnload.Result result = withdraw.tick(mc);
+        if (result == VerifiedBackpackUnload.Result.WORKING) return Result.WORKING;
+        if (result == VerifiedBackpackUnload.Result.FAILED
+            || result == VerifiedBackpackUnload.Result.NEEDS_ATTENTION) return Result.FAILED;
+        mc.thePlayer.closeScreen();
+        withdraw = null;
+        if (result == VerifiedBackpackUnload.Result.EMPTY) finished[source] = true;
+        return restore(mc, result == VerifiedBackpackUnload.Result.PLAYER_FULL ? Result.NEED_DEPOSIT : Result.WORKING);
+    }
+
+    private Result tickOpen(Minecraft mc) {
+        if (mc.currentScreen instanceof GuiContainer) return openBackpackContainer(mc);
+        if (mc.currentScreen != null || ++wait > 40) return Result.FAILED;
+        if (wait > 1) return Result.WORKING;
+        if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbar))) return Result.FAILED;
+        mc.thePlayer.inventory.currentItem = hotbar;
+        mc.playerController.updateController();
+        return BaritoneInventoryBridge.useHotbarItem(mc, hotbar) ? Result.WORKING : Result.FAILED;
+    }
+
+    private Result openBackpackContainer(Minecraft mc) {
+        if (mc.currentScreen instanceof GuiChest || mc.thePlayer.openContainer instanceof ContainerChest)
+            return Result.FAILED;
+        String name = mc.thePlayer.openContainer.getClass()
+            .getName()
+            .toLowerCase(Locale.ROOT);
+        if (!InventoryProtection.backpackContainer(name)) {
             mc.thePlayer.closeScreen();
-            withdraw = null;
-            if (result == VerifiedBackpackUnload.Result.EMPTY) finished[source] = true;
-            return restore(
-                mc,
-                result == VerifiedBackpackUnload.Result.PLAYER_FULL ? Result.NEED_DEPOSIT : Result.WORKING);
+            finished[source] = true;
+            return restore(mc, Result.WORKING);
         }
-        if (phase == Phase.OPEN) {
-            if (mc.currentScreen instanceof GuiContainer) {
-                if (mc.currentScreen instanceof GuiChest || mc.thePlayer.openContainer instanceof ContainerChest)
-                    return Result.FAILED;
-                String name = mc.thePlayer.openContainer.getClass()
-                    .getName()
-                    .toLowerCase(Locale.ROOT);
-                if (!InventoryProtection.backpackContainer(name)) {
-                    mc.thePlayer.closeScreen();
-                    finished[source] = true;
-                    return restore(mc, Result.WORKING);
-                }
-                IInventory contents = null;
-                int containerSlots = 0;
-                for (Object value : mc.thePlayer.openContainer.inventorySlots) {
-                    IInventory candidate = ((Slot) value).inventory;
-                    if (candidate == mc.thePlayer.inventory) continue;
-                    containerSlots++;
-                    if (contents != null && contents != candidate) {
-                        mc.thePlayer.closeScreen();
-                        finished[source] = true;
-                        return restore(mc, Result.WORKING);
-                    }
-                    contents = candidate;
-                }
-                if (contents == null || containerSlots < 4) {
-                    mc.thePlayer.closeScreen();
-                    finished[source] = true;
-                    return restore(mc, Result.WORKING);
-                }
-                withdraw = new VerifiedBackpackUnload(mc.thePlayer.openContainer, contents, ledger);
-                phase = Phase.WITHDRAW;
-                return Result.WORKING;
-            }
-            if (mc.currentScreen != null || ++wait > 40) return Result.FAILED;
-            if (wait > 1) return Result.WORKING;
-            if (!InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(hotbar))) return Result.FAILED;
-            mc.thePlayer.inventory.currentItem = hotbar;
-            mc.playerController.updateController();
-            if (!BaritoneInventoryBridge.useHotbarItem(mc, hotbar)) return Result.FAILED;
-            return Result.WORKING;
+        IInventory contents = resolveBackpackInventory(mc);
+        if (contents == null) {
+            mc.thePlayer.closeScreen();
+            finished[source] = true;
+            return restore(mc, Result.WORKING);
         }
+        withdraw = new VerifiedBackpackUnload(mc.thePlayer.openContainer, contents, ledger);
+        phase = Phase.WITHDRAW;
+        return Result.WORKING;
+    }
+
+    private IInventory resolveBackpackInventory(Minecraft mc) {
+        IInventory contents = null;
+        int containerSlots = 0;
+        for (Object value : mc.thePlayer.openContainer.inventorySlots) {
+            IInventory candidate = ((Slot) value).inventory;
+            if (candidate == mc.thePlayer.inventory) continue;
+            containerSlots++;
+            if (contents != null && contents != candidate) return null;
+            contents = candidate;
+        }
+        return containerSlots >= 4 ? contents : null;
+    }
+
+    private Result startNextBackpack(Minecraft mc) {
         if (mc.currentScreen != null || mc.thePlayer.openContainer != mc.thePlayer.inventoryContainer)
             return Result.FAILED;
         source = -1;
-        for (int i = 0; i < 36; i++)
+        for (int i = 0; i < 36; i++) {
             if (!finished[i] && InventoryProtection.bag(mc.thePlayer.inventory.getStackInSlot(i))) {
                 source = i;
                 break;
             }
+        }
         if (source < 0) return Result.DONE;
         oldSlot = mc.thePlayer.inventory.currentItem;
         if (source < 9) {

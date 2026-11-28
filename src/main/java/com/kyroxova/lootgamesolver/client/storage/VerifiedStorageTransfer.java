@@ -84,7 +84,9 @@ public final class VerifiedStorageTransfer {
         }
         boolean remaining = false;
         int reserve = TrashCleanup.findBuildingReserveSlot(mc);
+        Slot selected = null;
         for (Object value : container.inventorySlots) {
+            if (selected != null) break;
             Slot slot = (Slot) value;
             int index = slot.getSlotIndex();
             ItemStack stack = slot.getStack();
@@ -94,11 +96,15 @@ public final class VerifiedStorageTransfer {
                 addRejectedType(stack);
                 continue;
             }
-            pending = stack.copy();
+            selected = slot;
+        }
+        if (selected != null) {
+            pending = selected.getStack()
+                .copy();
             beforePlayer = count(mc.thePlayer.inventory, pending);
             beforeDestination = count(destination, pending);
-            pendingPlayerSlot = index;
-            click = VerifiedContainerClick.start(mc, slot.slotNumber, true);
+            pendingPlayerSlot = selected.getSlotIndex();
+            click = VerifiedContainerClick.start(mc, selected.slotNumber, true);
             if (click == null) {
                 pending = null;
                 return Result.FAILED;

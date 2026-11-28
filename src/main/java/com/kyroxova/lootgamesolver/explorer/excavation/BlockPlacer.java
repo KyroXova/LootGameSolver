@@ -84,26 +84,11 @@ public final class BlockPlacer {
         if (returnPlacementSlot >= 0
             && (next == null || activeReturnWaypoint == null || !samePosition(next, activeReturnWaypoint)))
             abandonAttempt(mc);
-        if (!returning || mc.thePlayer == null || !mc.thePlayer.onGround || next == null) {
+        if (!isValidReturnPlacementRequest(mc, next, returning)) {
             abandonAttempt(mc);
             return false;
         }
-        int playerX = (int) Math.floor(mc.thePlayer.posX);
         int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
-        int playerZ = (int) Math.floor(mc.thePlayer.posZ);
-        if (next[1] <= playerY || next[1] > playerY + 2
-            || Math.abs(next[0] - playerX) > 1
-            || Math.abs(next[2] - playerZ) > 1
-            || Math.abs(next[0] - playerX) + Math.abs(next[2] - playerZ) == 0
-            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D) {
-            abandonAttempt(mc);
-            return false;
-        }
-        if (next[0] != playerX && next[2] != playerZ
-            && (!safe(mc.theWorld, next[0], playerY, playerZ) || !safe(mc.theWorld, playerX, playerY, next[2]))) {
-            abandonAttempt(mc);
-            return false;
-        }
         boolean needsIntermediateStep = next[1] == playerY + 2;
         int x = next[0], y = needsIntermediateStep ? playerY : next[1] - 1, z = next[2];
         net.minecraft.block.Block targetBlock = mc.theWorld.getBlock(x, y, z);
@@ -112,16 +97,48 @@ public final class BlockPlacer {
             return false;
         }
         if (activeReturnWaypoint == null) activeReturnWaypoint = next.clone();
+        if (!ensurePlaceableBlockSelected(mc)) return status != null;
+        if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z)) {
+            abandonAttempt(mc);
+            return false;
+        }
+        if (++returnPlacementAimTicks > 100) {
+            returnPlacementAimTicks = 0;
+            restoreReturnPlacementSlot(mc);
+            return false;
+        }
+        if (tryPlaceAgainstAdjacentSupport(mc, x, y, z, next, playerY, needsIntermediateStep)) return true;
+        abandonAttempt(mc);
+        return false;
+    }
+
+    private static boolean isValidReturnPlacementRequest(Minecraft mc, int[] next, boolean returning) {
+        if (!returning || mc.thePlayer == null || !mc.thePlayer.onGround || next == null) return false;
+        int playerX = (int) Math.floor(mc.thePlayer.posX);
+        int playerY = (int) Math.floor(mc.thePlayer.boundingBox.minY);
+        int playerZ = (int) Math.floor(mc.thePlayer.posZ);
+        if (next[1] <= playerY || next[1] > playerY + 2
+            || Math.abs(next[0] - playerX) > 1
+            || Math.abs(next[2] - playerZ) > 1
+            || Math.abs(next[0] - playerX) + Math.abs(next[2] - playerZ) == 0
+            || Math.hypot(mc.thePlayer.posX - (next[0] + 0.5D), mc.thePlayer.posZ - (next[2] + 0.5D)) > 1.8D)
+            return false;
+        return next[0] == playerX || next[2] == playerZ
+            || (safe(mc.theWorld, next[0], playerY, playerZ) && safe(mc.theWorld, playerX, playerY, next[2]));
+    }
+
+    private boolean ensurePlaceableBlockSelected(Minecraft mc) {
         int slot = findPlaceableBlock(mc, true);
         if (slot < 0) {
             int inventorySlot = findPlaceableBlock(mc, false);
             if (inventorySlot >= 9 && toolTransfer.start(mc, inventorySlot)) {
                 if (returnPlacementSlot < 0) returnPlacementSlot = mc.thePlayer.inventory.currentItem;
                 status = "Opening inventory to prepare a return step block";
-                return true;
+                return false;
             }
             status = "Return step needs cobblestone or dirt";
             abandonAttempt(mc);
+            status = null;
             return false;
         }
         if (returnPlacementSlot < 0) returnPlacementSlot = mc.thePlayer.inventory.currentItem;
@@ -130,20 +147,15 @@ public final class BlockPlacer {
             mc.playerController.updateController();
             placementAim.reset();
             status = "Preparing return step";
-            return true;
-        }
-        if (mc.theWorld.getBlock(x, y, z) != Blocks.air && !targetBlock.isReplaceable(mc.theWorld, x, y, z)) {
-            abandonAttempt(mc);
             return false;
         }
-        // Prefer a support block directly below the placement target.
+        return true;
+    }
+
+    private boolean tryPlaceAgainstAdjacentSupport(Minecraft mc, int x, int y, int z, int[] next, int playerY,
+        boolean needsIntermediateStep) {
         int[][] adjacent = { { x, y - 1, z, 1 }, { x - 1, y, z, 5 }, { x + 1, y, z, 4 }, { x, y, z - 1, 3 },
             { x, y, z + 1, 2 } };
-        if (++returnPlacementAimTicks > 100) {
-            returnPlacementAimTicks = 0;
-            restoreReturnPlacementSlot(mc);
-            return false;
-        }
         for (int sideIndex = 0; sideIndex < adjacent.length; sideIndex++) {
             int[] side = adjacent[(sideIndex + (returnPlacementAimTicks - 1) / 20) % adjacent.length];
             net.minecraft.block.Block support = mc.theWorld.getBlock(side[0], side[1], side[2]);
@@ -164,11 +176,8 @@ public final class BlockPlacer {
                 || visible.sideHit != side[3]
                 || eye.squareDistanceTo(visible.hitVec) > 16D) continue;
             net.minecraft.util.Vec3 hit = visible.hitVec;
-            hx = hit.xCoord;
-            hy = hit.yCoord;
-            hz = hit.zCoord;
-            double dx = hx - mc.thePlayer.posX, dz = hz - mc.thePlayer.posZ;
-            double dy = hy - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
+            double dx = hit.xCoord - mc.thePlayer.posX, dz = hit.zCoord - mc.thePlayer.posZ;
+            double dy = hit.yCoord - mc.thePlayer.posY - mc.thePlayer.getEyeHeight();
             float yaw = (float) (Math.atan2(dz, dx) * 180D / Math.PI) - 90F;
             float pitch = (float) (-Math.atan2(dy, Math.hypot(dx, dz)) * 180D / Math.PI);
             camera.look(yaw, pitch);
@@ -209,7 +218,6 @@ public final class BlockPlacer {
                 return true;
             }
         }
-        abandonAttempt(mc);
         return false;
     }
 

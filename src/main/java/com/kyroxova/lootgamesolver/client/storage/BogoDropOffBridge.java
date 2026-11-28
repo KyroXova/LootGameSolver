@@ -1,11 +1,11 @@
 package com.kyroxova.lootgamesolver.client.storage;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.minecraft.client.Minecraft;
 
+import cpw.mods.fml.relauncher.ReflectionHelper;
 import cpw.mods.fml.relauncher.Side;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -36,19 +36,16 @@ public final class BogoDropOffBridge {
         private ChannelPipeline pipeline;
         private final String handlerName = "lootgamesolver:dropoff-observer";
 
+        @SuppressWarnings("unchecked")
         boolean start() {
             try {
                 Class<?> handler = Class.forName("com.cleanroommc.bogosorter.common.network.NetworkHandler");
                 Object wrapper = handler.getField("network")
                     .get(null);
-                Field channelsField = wrapper.getClass()
-                    .getDeclaredField("channels");
-                channelsField.setAccessible(true);
-                Object channel = ((Map<?, ?>) channelsField.get(wrapper)).get(Side.CLIENT);
-                Field codecField = wrapper.getClass()
-                    .getDeclaredField("packetCodec");
-                codecField.setAccessible(true);
-                Object codec = codecField.get(wrapper);
+                Object channel = ((Map<?, ?>) ReflectionHelper
+                    .getPrivateValue((Class<Object>) wrapper.getClass(), wrapper, "channels")).get(Side.CLIENT);
+                Object codec = ReflectionHelper
+                    .getPrivateValue((Class<Object>) wrapper.getClass(), wrapper, "packetCodec");
                 if (!(channel instanceof io.netty.channel.Channel)
                     || !(codec instanceof io.netty.channel.ChannelHandler)) return false;
                 if (!observe(((io.netty.channel.Channel) channel).pipeline(), (io.netty.channel.ChannelHandler) codec))

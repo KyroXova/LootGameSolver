@@ -164,276 +164,287 @@ public final class AutoPuzzleCoordinator {
             reset();
             return;
         }
+        if (state == State.OPENING) tickOpening(mc, puzzleBridge, exploration, session, hooks);
+        else if (state == State.POSITIONING) tickPositioning(mc, puzzleBridge, exploration);
+        else if (state == State.POSITIONING_NEXT_STAGE) tickPositioningNextStage(exploration);
+        else if (state == State.REVEALING) tickRevealing(mc, puzzleBridge, exploration, session, hooks);
+        else if (state == State.REVEALING_NEXT_STAGE)
+            tickRevealingNextStage(mc, puzzleBridge, exploration, session, hooks);
+        else if (state == State.SOLVING)
+            tickSolving(mc, exploration, session, puzzleCompletion, rewardLooter, hooks);
+    }
 
-        if (state == State.OPENING) {
-            puzzleWaitTicks++;
-            if (hooks.isExplorationDriven() && exploration != null
-                && autoPuzzlePosition != null
-                && !exploration.inTargetRoom(mc, autoPuzzlePosition)) {
-                if (exploration.navigating() || exploration.enterTargetRoom(mc, autoPuzzlePosition)) {
-                    exploration.setAutomationStatus("Entering puzzle room");
-                    puzzleWaitTicks = 0;
-                } else if (puzzleWaitTicks > 200) {
-                    state = State.FAILED;
-                    exploration.setAutomationStatus("No safe entrance to puzzle room");
-                }
-                return;
-            }
-            int[] activator = puzzleBridge.nearbyFloorActivator();
-            if (activator != null && exploration != null) {
-                rewardCenter = activator.clone();
-                floorActivatorPosition = activator;
-                floorActivatorClicked = false;
-                if (withinInteractionReach(mc, activator) && puzzleBridge.hasClearView(activator)) {
-                    state = State.REVEALING;
-                    puzzleWaitTicks = 0;
-                    return;
-                }
-                if (exploration.moveToPuzzleCenter(mc, activator)) {
-                    state = State.POSITIONING;
-                    puzzleWaitTicks = 0;
-                    return;
-                }
-            }
-            Object game = puzzleBridge.gameAtMaster(autoPuzzlePosition);
-            if (game == null) game = puzzleBridge.nearbyGame(true);
-            boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
-            if (game != null) {
-                int[] detectedCenter = puzzleBridge.gameCenter(game);
-                if (detectedCenter != null) rewardCenter = detectedCenter;
-                if (puzzleBridge.detect(true) != null) {
-                    startPuzzleSolver(mc, puzzleBridge, session, hooks);
-                    return;
-                }
-                int[] center = detectedCenter;
-                if (withinInteractionReach(mc, center)) {
-                    state = State.REVEALING;
-                    puzzleWaitTicks = 0;
-                    return;
-                }
-                if (center != null && exploration != null && exploration.moveToPuzzleCenter(mc, center)) {
-                    state = State.POSITIONING;
-                    puzzleWaitTicks = 0;
-                    return;
-                }
+    private void tickOpening(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
+        ClientHooks hooks) {
+        puzzleWaitTicks++;
+        if (hooks.isExplorationDriven() && exploration != null
+            && autoPuzzlePosition != null
+            && !exploration.inTargetRoom(mc, autoPuzzlePosition)) {
+            if (exploration.navigating() || exploration.enterTargetRoom(mc, autoPuzzlePosition)) {
+                exploration.setAutomationStatus("Entering puzzle room");
+                puzzleWaitTicks = 0;
+            } else if (puzzleWaitTicks > 200) {
                 state = State.FAILED;
-                if (exploration != null)
-                    exploration.setAutomationStatus("Could not reach the board center; explorer held");
-                return;
-            }
-            if (autoPuzzlePosition != null) {
-                if (LootGamesBridge
-                    .visibleMasterFace(mc, autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])
-                    == null) {
-                    if (exploration != null && !exploration.navigating()) {
-                        exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
-                    }
-                    if (exploration != null && exploration.navigating()) {
-                        exploration.setAutomationStatus("Walking to puzzle center");
-                        puzzleWaitTicks = 0;
-                        return;
-                    }
-                    if (puzzleWaitTicks > 200) {
-                        state = State.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Could not reach puzzle master");
-                    }
-                    return;
-                }
-            }
-            if (autoPuzzlePosition != null && masterClickAttempts < 6
-                && puzzleWaitTicks - lastMasterClickTick >= 20
-                && puzzleBridge.activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])) {
-                masterClickAttempts++;
-                lastMasterClickTick = puzzleWaitTicks;
-                if (exploration != null) exploration.setAutomationStatus("Opening LootGames master");
-            }
-            if (game == null && masterInteractionSettled && puzzleWaitTicks <= 200 && exploration != null)
-                exploration.setAutomationStatus("Waiting for LootGames to create the puzzle");
-            if (puzzleWaitTicks > 200) {
-                state = State.FAILED;
-                if (exploration != null) exploration.setAutomationStatus(
-                    game == null ? "Opened puzzle could not be located; explorer held"
-                        : "Puzzle did not open; explorer held");
+                exploration.setAutomationStatus("No safe entrance to puzzle room");
             }
             return;
         }
-
-        if (state == State.POSITIONING) {
-            if (exploration != null && exploration.consumePuzzleCenterArrival()) {
+        int[] activator = puzzleBridge.nearbyFloorActivator();
+        if (activator != null && exploration != null) {
+            rewardCenter = activator.clone();
+            floorActivatorPosition = activator;
+            floorActivatorClicked = false;
+            if (withinInteractionReach(mc, activator) && puzzleBridge.hasClearView(activator)) {
                 state = State.REVEALING;
                 puzzleWaitTicks = 0;
-                centerClickAttempts = 0;
-                lastCenterClickTick = -40;
-            } else if (exploration == null || !exploration.navigating()) {
-                int[] center = floorActivatorPosition != null ? floorActivatorPosition
-                    : rewardCenter != null ? rewardCenter : autoPuzzlePosition;
-                if (center != null && puzzleBridge.clearMinesweeperObstruction(center)) {
-                    if (puzzleBridge.foliageClearingFailed()) {
-                        state = State.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Could not clear foliage");
-                    } else {
-                        clearingPositionFoliage = true;
-                        if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
-                    }
-                    return;
-                }
-                if (clearingPositionFoliage && exploration != null) {
-                    clearingPositionFoliage = false;
-                    if (exploration.moveToPuzzleCenter(mc, center)) return;
-                }
-                if (center != null && mc.thePlayer != null
-                    && mc.thePlayer.getDistanceSq(center[0] + 0.5D, center[1] + 0.5D, center[2] + 0.5D) <= 9.0D) {
-                    state = State.REVEALING;
-                    puzzleWaitTicks = 0;
-                    centerClickAttempts = 0;
-                    lastCenterClickTick = -40;
-                } else {
-                    state = State.FAILED;
-                    if (exploration != null)
-                        exploration.setAutomationStatus("Could not reach the board center; explorer held");
-                }
-            }
-            return;
-        }
-
-        if (state == State.POSITIONING_NEXT_STAGE) {
-            if (exploration != null && exploration.consumePuzzleCenterArrival()) {
-                state = State.REVEALING_NEXT_STAGE;
-                puzzleWaitTicks = 0;
-                lastCenterClickTick = -40;
-            } else if (exploration == null || !exploration.navigating()) {
-                state = State.REVEALING_NEXT_STAGE;
-                puzzleWaitTicks = 0;
-                lastCenterClickTick = -40;
-            }
-            return;
-        }
-
-        if (state == State.REVEALING) {
-            puzzleWaitTicks++;
-            DetectedGame revealed = puzzleBridge.detect(true);
-            Object game = puzzleBridge.nearbyGame(true);
-            Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
-            if (floorActivatorPosition != null) {
-                if (!floorActivatorClicked) {
-                    if (puzzleBridge.activateFloorActivator(floorActivatorPosition)) {
-                        floorActivatorClicked = true;
-                        lastCenterClickTick = puzzleWaitTicks;
-                        if (exploration != null) exploration.setAutomationStatus("Opening floor activator");
-                    }
-                    if (puzzleBridge.isClearingFoliage()) {
-                        puzzleWaitTicks--;
-                        if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
-                        return;
-                    }
-                    if (puzzleWaitTicks > 200 && !floorActivatorClicked) {
-                        state = State.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Could not click floor activator");
-                    }
-                    return;
-                }
-                if (activeGame == null) {
-                    if (puzzleWaitTicks > lastCenterClickTick + 200) {
-                        state = State.FAILED;
-                        if (exploration != null) exploration.setAutomationStatus("Floor activator did not open puzzle");
-                    }
-                    return;
-                }
-                floorActivatorPosition = null;
-                centerClickAttempts = 0;
-                lastCenterClickTick = puzzleWaitTicks - 20;
-            }
-            if (revealed != null && centerClickAttempts > 0) {
-                if (puzzleWaitTicks - lastCenterClickTick < 20) return;
-                startPuzzleSolver(mc, puzzleBridge, session, hooks);
                 return;
             }
-            if (centerClickAttempts < 4 && activeGame != null
-                && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
-                && puzzleBridge.activateBoardCenter(activeGame)) {
-                centerClickAttempts++;
+            if (exploration.moveToPuzzleCenter(mc, activator)) {
+                state = State.POSITIONING;
+                puzzleWaitTicks = 0;
+                return;
+            }
+        }
+        Object game = puzzleBridge.gameAtMaster(autoPuzzlePosition);
+        if (game == null) game = puzzleBridge.nearbyGame(true);
+        if (game != null) {
+            tickOpeningWithGame(mc, puzzleBridge, exploration, session, hooks, game);
+            return;
+        }
+        tickOpeningMaster(mc, puzzleBridge, exploration);
+    }
+
+    private void tickOpeningWithGame(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration,
+        SolverSession session, ClientHooks hooks, Object game) {
+        int[] detectedCenter = puzzleBridge.gameCenter(game);
+        if (detectedCenter != null) rewardCenter = detectedCenter;
+        if (puzzleBridge.detect(true) != null) {
+            startPuzzleSolver(mc, puzzleBridge, session, hooks);
+            return;
+        }
+        if (withinInteractionReach(mc, detectedCenter)) {
+            state = State.REVEALING;
+            puzzleWaitTicks = 0;
+            return;
+        }
+        if (detectedCenter != null && exploration != null && exploration.moveToPuzzleCenter(mc, detectedCenter)) {
+            state = State.POSITIONING;
+            puzzleWaitTicks = 0;
+            return;
+        }
+        state = State.FAILED;
+        if (exploration != null) exploration.setAutomationStatus("Could not reach the board center; explorer held");
+    }
+
+    private void tickOpeningMaster(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration) {
+        if (autoPuzzlePosition != null && LootGamesBridge
+            .visibleMasterFace(mc, autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2]) == null) {
+            if (exploration != null && !exploration.navigating()) {
+                exploration.moveToPuzzleCenter(mc, autoPuzzlePosition);
+            }
+            if (exploration != null && exploration.navigating()) {
+                exploration.setAutomationStatus("Walking to puzzle center");
+                puzzleWaitTicks = 0;
+                return;
+            }
+            if (puzzleWaitTicks > 200) {
+                state = State.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Could not reach puzzle master");
+            }
+            return;
+        }
+        boolean masterInteractionSettled = masterClickAttempts > 0 && puzzleWaitTicks - lastMasterClickTick >= 20;
+        if (autoPuzzlePosition != null && masterClickAttempts < 6
+            && puzzleWaitTicks - lastMasterClickTick >= 20
+            && puzzleBridge.activateMaster(autoPuzzlePosition[0], autoPuzzlePosition[1], autoPuzzlePosition[2])) {
+            masterClickAttempts++;
+            lastMasterClickTick = puzzleWaitTicks;
+            if (exploration != null) exploration.setAutomationStatus("Opening LootGames master");
+        }
+        if (masterInteractionSettled && puzzleWaitTicks <= 200 && exploration != null)
+            exploration.setAutomationStatus("Waiting for LootGames to create the puzzle");
+        if (puzzleWaitTicks > 200) {
+            state = State.FAILED;
+            if (exploration != null) exploration.setAutomationStatus("Opened puzzle could not be located; explorer held");
+        }
+    }
+
+    private void tickPositioning(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration) {
+        if (exploration != null && exploration.consumePuzzleCenterArrival()) {
+            enterRevealingState();
+            return;
+        }
+        if (exploration != null && exploration.navigating()) return;
+        int[] center = floorActivatorPosition != null ? floorActivatorPosition
+            : rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+        if (center != null && puzzleBridge.clearMinesweeperObstruction(center)) {
+            if (puzzleBridge.foliageClearingFailed()) {
+                state = State.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Could not clear foliage");
+            } else {
+                clearingPositionFoliage = true;
+                if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+            }
+            return;
+        }
+        if (clearingPositionFoliage && exploration != null) {
+            clearingPositionFoliage = false;
+            if (exploration.moveToPuzzleCenter(mc, center)) return;
+        }
+        if (center != null && mc.thePlayer != null
+            && mc.thePlayer.getDistanceSq(center[0] + 0.5D, center[1] + 0.5D, center[2] + 0.5D) <= 9.0D) {
+            enterRevealingState();
+            return;
+        }
+        state = State.FAILED;
+        if (exploration != null) exploration.setAutomationStatus("Could not reach the board center; explorer held");
+    }
+
+    private void enterRevealingState() {
+        state = State.REVEALING;
+        puzzleWaitTicks = 0;
+        centerClickAttempts = 0;
+        lastCenterClickTick = -40;
+    }
+
+    private void tickPositioningNextStage(Explorer exploration) {
+        if ((exploration != null && exploration.consumePuzzleCenterArrival())
+            || exploration == null
+            || !exploration.navigating()) {
+            state = State.REVEALING_NEXT_STAGE;
+            puzzleWaitTicks = 0;
+            lastCenterClickTick = -40;
+        }
+    }
+
+    private void tickRevealing(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration, SolverSession session,
+        ClientHooks hooks) {
+        puzzleWaitTicks++;
+        DetectedGame revealed = puzzleBridge.detect(true);
+        Object game = puzzleBridge.nearbyGame(true);
+        Object activeGame = game != null ? game : revealed == null ? null : revealed.game;
+        if (floorActivatorPosition != null && !handleFloorActivatorReveal(puzzleBridge, exploration, activeGame)) {
+            return;
+        }
+        if (revealed != null && centerClickAttempts > 0) {
+            if (puzzleWaitTicks - lastCenterClickTick >= 20) startPuzzleSolver(mc, puzzleBridge, session, hooks);
+            return;
+        }
+        if (centerClickAttempts < 4 && activeGame != null
+            && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
+            && puzzleBridge.activateBoardCenter(activeGame)) {
+            centerClickAttempts++;
+            lastCenterClickTick = puzzleWaitTicks;
+            if (exploration != null) exploration.setAutomationStatus("Revealing board");
+        }
+        if (puzzleBridge.isClearingFoliage()) {
+            puzzleWaitTicks--;
+            if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
+            return;
+        }
+        if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
+            state = State.FAILED;
+            if (exploration != null) exploration.setAutomationStatus("Board reveal failed");
+        }
+    }
+
+    private boolean handleFloorActivatorReveal(LootGamesBridge puzzleBridge, Explorer exploration, Object activeGame) {
+        if (!floorActivatorClicked) {
+            if (puzzleBridge.activateFloorActivator(floorActivatorPosition)) {
+                floorActivatorClicked = true;
                 lastCenterClickTick = puzzleWaitTicks;
-                if (exploration != null) exploration.setAutomationStatus("Revealing board");
+                if (exploration != null) exploration.setAutomationStatus("Opening floor activator");
             }
             if (puzzleBridge.isClearingFoliage()) {
                 puzzleWaitTicks--;
                 if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
-                return;
+                return false;
             }
-            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
+            if (puzzleWaitTicks > 200 && !floorActivatorClicked) {
                 state = State.FAILED;
-                if (exploration != null) exploration.setAutomationStatus("Board reveal failed");
+                if (exploration != null) exploration.setAutomationStatus("Could not click floor activator");
             }
+            return false;
+        }
+        if (activeGame == null) {
+            if (puzzleWaitTicks > lastCenterClickTick + 200) {
+                state = State.FAILED;
+                if (exploration != null) exploration.setAutomationStatus("Floor activator did not open puzzle");
+            }
+            return false;
+        }
+        floorActivatorPosition = null;
+        centerClickAttempts = 0;
+        lastCenterClickTick = puzzleWaitTicks - 20;
+        return true;
+    }
+
+    private void tickRevealingNextStage(Minecraft mc, LootGamesBridge puzzleBridge, Explorer exploration,
+        SolverSession session, ClientHooks hooks) {
+        puzzleWaitTicks++;
+        Object game = puzzleBridge.nearbyGame(true);
+        DetectedGame board = puzzleBridge.detect(true);
+        Object activeGame = game != null ? game : board == null ? null : board.game;
+        if (centerClickAttempts > 0 && board != null) {
+            if (puzzleWaitTicks - lastCenterClickTick >= 20) startPuzzleSolver(mc, puzzleBridge, session, hooks);
             return;
         }
-
-        if (state == State.REVEALING_NEXT_STAGE) {
-            puzzleWaitTicks++;
-            Object game = puzzleBridge.nearbyGame(true);
-            DetectedGame board = puzzleBridge.detect(true);
-            Object activeGame = game != null ? game : board == null ? null : board.game;
-            if (centerClickAttempts > 0 && board != null) {
-                if (puzzleWaitTicks - lastCenterClickTick < 20) return;
-                startPuzzleSolver(mc, puzzleBridge, session, hooks);
-                return;
-            }
-            if (centerClickAttempts < 4 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
-                && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
-                && puzzleBridge.activateBoardCenter(activeGame)) {
-                centerClickAttempts++;
-                lastCenterClickTick = puzzleWaitTicks;
-                if (exploration != null) exploration.setAutomationStatus("Revealing Minesweeper board");
-            }
-            if (puzzleBridge.isClearingFoliage()) {
-                puzzleWaitTicks--;
-                if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
-                return;
-            }
-            if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
-                state = State.FAILED;
-                if (exploration != null) exploration.setAutomationStatus("Stage reveal failed");
-            }
+        if (centerClickAttempts < 4 && puzzleBridge.canOpenMinesweeperBoard(activeGame)
+            && puzzleWaitTicks - lastCenterClickTick >= (centerClickAttempts == 0 ? 1 : 20)
+            && puzzleBridge.activateBoardCenter(activeGame)) {
+            centerClickAttempts++;
+            lastCenterClickTick = puzzleWaitTicks;
+            if (exploration != null) exploration.setAutomationStatus("Revealing Minesweeper board");
+        }
+        if (puzzleBridge.isClearingFoliage()) {
+            puzzleWaitTicks--;
+            if (exploration != null) exploration.setAutomationStatus("Clearing foliage");
             return;
         }
+        if (puzzleWaitTicks > (centerClickAttempts > 0 ? lastCenterClickTick + 100 : 600)) {
+            state = State.FAILED;
+            if (exploration != null) exploration.setAutomationStatus("Stage reveal failed");
+        }
+    }
 
-        if (state == State.SOLVING) {
-            if (puzzleCompletion.lost()) {
-                session.cancel("LootGames reported a loss; explorer held");
-                state = State.FAILED;
-                if (exploration != null) exploration.setAutomationStatus("Puzzle lost; explorer held");
-                return;
-            }
-            if (puzzleCompletion.won(mc.theWorld != null)) {
-                hooks.recordPuzzleSolved();
-                com.kyroxova.lootgamesolver.core.MiniGame completedGame = session.getGame();
-                session.cancel("Puzzle solved");
-                hooks.releaseMovementKeys(mc);
-                puzzleCompletion.clear();
-                state = State.IDLE;
-                int[] solvedPos = rewardCenter != null ? rewardCenter : autoPuzzlePosition;
-                int[] room = exploration == null ? null : exploration.verifiedRoomCenter(mc);
-                int[] cluster = ClientHooks.nearbyRewardCenter(mc, room);
-                if (cluster != null) solvedPos = cluster;
-                if (exploration != null) {
-                    exploration.markStructureSolved(mc, solvedPos);
-                }
-                if (hooks.isExplorationDriven() && exploration != null) {
-                    exploration.prepareRewardCollection(mc, solvedPos);
-                    hooks.ensureInventoryBaseline(mc);
-                    rewardLooter.start(mc, solvedPos, completedGame);
-                    hooks.setRewardCenter(solvedPos);
-                    hooks.setRewardPreCleanupPending(true);
-                    hooks.setRewardReturnPending(true);
-                } else {
-                    hooks.setRewardReturnPending(false);
-                    hooks.setRewardPreCleanupPending(false);
-                }
-                autoPuzzlePosition = null;
-            } else if (!session.isActive()) {
+    private void tickSolving(Minecraft mc, Explorer exploration, SolverSession session,
+        PuzzleCompletionGate puzzleCompletion, RewardChestLooter rewardLooter, ClientHooks hooks) {
+        if (puzzleCompletion.lost()) {
+            session.cancel("LootGames reported a loss; explorer held");
+            state = State.FAILED;
+            if (exploration != null) exploration.setAutomationStatus("Puzzle lost; explorer held");
+            return;
+        }
+        if (!puzzleCompletion.won(mc.theWorld != null)) {
+            if (!session.isActive()) {
                 state = State.FAILED;
                 if (exploration != null) exploration.setAutomationStatus("Solver stopped: " + session.getStatus());
             }
+            return;
         }
+        hooks.recordPuzzleSolved();
+        com.kyroxova.lootgamesolver.core.MiniGame completedGame = session.getGame();
+        session.cancel("Puzzle solved");
+        hooks.releaseMovementKeys(mc);
+        puzzleCompletion.clear();
+        state = State.IDLE;
+        int[] solvedPos = rewardCenter != null ? rewardCenter : autoPuzzlePosition;
+        int[] room = exploration == null ? null : exploration.verifiedRoomCenter(mc);
+        int[] cluster = ClientHooks.nearbyRewardCenter(mc, room);
+        if (cluster != null) solvedPos = cluster;
+        if (exploration != null) exploration.markStructureSolved(mc, solvedPos);
+        if (hooks.isExplorationDriven() && exploration != null) {
+            exploration.prepareRewardCollection(mc, solvedPos);
+            hooks.ensureInventoryBaseline(mc);
+            rewardLooter.start(mc, solvedPos, completedGame);
+            hooks.setRewardCenter(solvedPos);
+            hooks.setRewardPreCleanupPending(true);
+            hooks.setRewardReturnPending(true);
+        } else {
+            hooks.setRewardReturnPending(false);
+            hooks.setRewardPreCleanupPending(false);
+        }
+        autoPuzzlePosition = null;
     }
 
     public void startPuzzleSolver(Minecraft mc, LootGamesBridge puzzleBridge, SolverSession session,

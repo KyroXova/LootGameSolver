@@ -1,7 +1,6 @@
 package com.kyroxova.lootgamesolver.minecraft;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 
@@ -11,6 +10,8 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 import com.kyroxova.lootgamesolver.LootGameSolver;
+
+import cpw.mods.fml.relauncher.ReflectionHelper;
 
 public final class LootGamesTileAccess {
 
@@ -64,12 +65,14 @@ public final class LootGamesTileAccess {
             .newInstance(Integer.valueOf(x), Integer.valueOf(y));
     }
 
-    public static Field getFieldRecursive(Class<?> clazz, String fieldName) {
+    @SuppressWarnings("unchecked")
+    public static Object getFieldValue(Object target, String fieldName) {
+        if (target == null) return null;
+        Class<?> clazz = target.getClass();
         while (clazz != null && clazz != Object.class) {
             try {
-                Field field = clazz.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field;
+                clazz.getDeclaredField(fieldName);
+                return ReflectionHelper.getPrivateValue((Class<Object>) clazz, target, fieldName);
             } catch (NoSuchFieldException e) {
                 clazz = clazz.getSuperclass();
             }
@@ -145,7 +148,9 @@ public final class LootGamesTileAccess {
                 return new int[] { number(invoke(masterPos, "getX")), number(invoke(masterPos, "getY")),
                     number(invoke(masterPos, "getZ")) };
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            LootGameSolver.LOG.debug("Could not resolve LootGames master position", e);
+        }
         return null;
     }
 
@@ -163,7 +168,9 @@ public final class LootGamesTileAccess {
                         .getName();
                     if (MS_GAME.equals(gName) || SDK_GAME.equals(gName) || GOL_GAME.equals(gName)) return game;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                LootGameSolver.LOG.debug("Could not extract LootGames instance from tile", e);
+            }
         }
 
         net.minecraft.block.Block b = world.getBlock(x, y, z);
@@ -186,7 +193,9 @@ public final class LootGamesTileAccess {
                                 .getName();
                             if (MS_GAME.equals(gName) || SDK_GAME.equals(gName) || GOL_GAME.equals(gName)) return game;
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        LootGameSolver.LOG.debug("Could not extract LootGames instance from master tile", e);
+                    }
                 }
             }
         }

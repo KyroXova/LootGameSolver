@@ -75,41 +75,53 @@ public final class TrashCleanup {
             reset();
             return false;
         }
-        if (!opening && !open) {
-            if (!enabled || retryDelay > 0
-                || mc.currentScreen != null
-                || mc.thePlayer.inventory.getItemStack() != null
-                || nextTrash(mc) < 0) return false;
-            mc.thePlayer.sendChatMessage("/trash_can");
-            opening = true;
-            timeout = 0;
-            status = "Opening trash can";
-            return true;
-        }
-        if (opening) {
-            if (mc.currentScreen instanceof GuiChest && mc.thePlayer.openContainer instanceof ContainerChest) {
-                IInventory inventory = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
-                String name = inventory.getInventoryName();
-                if (inventory.getSizeInventory() >= 9
-                    && ("key.serverutilities.trash".equals(name) || "Trash Can".equalsIgnoreCase(name)
-                        || StatCollector.translateToLocal("key.serverutilities.trash")
-                            .equalsIgnoreCase(name)
-                        || (name != null && name.toLowerCase(java.util.Locale.ROOT)
-                            .contains("trash")))) {
-                    opening = false;
-                    open = true;
-                    wait = 10;
-                    return true;
-                }
-            }
-            if (++timeout > 80 || (mc.currentScreen != null && !(mc.currentScreen instanceof GuiChest))) {
+        if (!opening && !open) return tryOpenTrashCan(mc, enabled);
+        if (opening) return tickOpeningTrash(mc);
+        return tickOpenTrashScreen(mc);
+    }
+
+    private boolean tryOpenTrashCan(Minecraft mc, boolean enabled) {
+        if (!enabled || retryDelay > 0
+            || mc.currentScreen != null
+            || mc.thePlayer.inventory.getItemStack() != null
+            || nextTrash(mc) < 0) return false;
+        mc.thePlayer.sendChatMessage("/trash_can");
+        opening = true;
+        timeout = 0;
+        status = "Opening trash can";
+        return true;
+    }
+
+    private boolean tickOpeningTrash(Minecraft mc) {
+        if (mc.currentScreen instanceof GuiChest && mc.thePlayer.openContainer instanceof ContainerChest) {
+            IInventory inventory = ((ContainerChest) mc.thePlayer.openContainer).getLowerChestInventory();
+            if (isTrashInventory(inventory)) {
                 opening = false;
-                retryDelay = 200;
-                status = "Trash can unavailable; items kept";
-                return false;
+                open = true;
+                wait = 10;
+                return true;
             }
-            return true;
         }
+        if (++timeout > 80 || (mc.currentScreen != null && !(mc.currentScreen instanceof GuiChest))) {
+            opening = false;
+            retryDelay = 200;
+            status = "Trash can unavailable; items kept";
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isTrashInventory(IInventory inventory) {
+        if (inventory.getSizeInventory() < 9) return false;
+        String name = inventory.getInventoryName();
+        return "key.serverutilities.trash".equals(name) || "Trash Can".equalsIgnoreCase(name)
+            || StatCollector.translateToLocal("key.serverutilities.trash")
+                .equalsIgnoreCase(name)
+            || (name != null && name.toLowerCase(java.util.Locale.ROOT)
+                .contains("trash"));
+    }
+
+    private boolean tickOpenTrashScreen(Minecraft mc) {
         if (!(mc.currentScreen instanceof GuiChest) || !(mc.thePlayer.openContainer instanceof ContainerChest)) {
             open = false;
             retryDelay = 100;
@@ -135,6 +147,10 @@ public final class TrashCleanup {
             status = "Trash cleared";
             return true;
         }
+        return moveTrashSlot(mc, playerIndex);
+    }
+
+    private boolean moveTrashSlot(Minecraft mc, int playerIndex) {
         ContainerChest container = (ContainerChest) mc.thePlayer.openContainer;
         for (Object obj : container.inventorySlots) {
             Slot slot = (Slot) obj;
