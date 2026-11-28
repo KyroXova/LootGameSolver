@@ -323,33 +323,7 @@ public final class ExcavationPlanner {
         final GroundPathfinder.Terrain approachTerrain = explorer.walkingTerrain(w);
         int x = (int) Math.floor(mc.thePlayer.posX), y = (int) Math.floor(mc.thePlayer.boundingBox.minY);
         int z = (int) Math.floor(mc.thePlayer.posZ);
-        if (explorer.entranceCandidates.isEmpty()) {
-            explorer.entranceCandidate = 0;
-            int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
-                { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
-            for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
-                <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2) for (int[] direction : directions) {
-                    double norm = Math.hypot(direction[0], direction[1]);
-                    int gx = explorer.target.xCoord + (int) Math.round(direction[0] * radius / norm);
-                    int gz = explorer.target.zCoord + (int) Math.round(direction[1] * radius / norm);
-                    if (!ExcavationPolicy.preferredEntrance(gx, gz, explorer.target.xCoord, explorer.target.zCoord))
-                        continue;
-                    if (!w.blockExists(gx, y, gz)) continue;
-                    int surface = w.getHeightValue(gx, gz);
-                    int[] heights = { surface - 2, surface - 1, surface, surface + 1, y - 1, y, y + 1 };
-                    for (int i = 0; i < heights.length; i++) {
-                        int gy = heights[i];
-                        boolean duplicate = false;
-                        for (int j = 0; j < i; j++) if (heights[j] == gy) duplicate = true;
-                        if (!duplicate && gy > 0 && gy < w.getHeight() - 2 && dryShore(w, gx, gy, gz))
-                            explorer.entranceCandidates.add(new int[] { gx, gy, gz });
-                    }
-                }
-            final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
-            final int tx = explorer.target.xCoord, tz = explorer.target.zCoord;
-            explorer.entranceCandidates
-                .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
-        }
+        if (explorer.entranceCandidates.isEmpty()) collectDryEntranceCandidates(mc, explorer, w, y);
         for (int attempts = 0; attempts < 1
             && explorer.entranceCandidate < explorer.entranceCandidates.size(); attempts++) {
             int[] goal = explorer.entranceCandidates.get(explorer.entranceCandidate++);
@@ -421,6 +395,35 @@ public final class ExcavationPlanner {
         }
         explorer.entranceCandidates.clear();
         return false;
+    }
+
+    private static void collectDryEntranceCandidates(Minecraft mc, Explorer explorer, World w, int y) {
+        explorer.entranceCandidate = 0;
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
+            { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
+        for (int radius = (int) ExcavationPolicy.MIN_ENTRANCE_RADIUS; radius
+            <= ExcavationPolicy.MAX_ENTRANCE_RADIUS; radius += 2) {
+            for (int[] direction : directions) {
+                double norm = Math.hypot(direction[0], direction[1]);
+                int gx = explorer.target.xCoord + (int) Math.round(direction[0] * radius / norm);
+                int gz = explorer.target.zCoord + (int) Math.round(direction[1] * radius / norm);
+                if (!ExcavationPolicy.preferredEntrance(gx, gz, explorer.target.xCoord, explorer.target.zCoord)
+                    || !w.blockExists(gx, y, gz)) continue;
+                int surface = w.getHeightValue(gx, gz);
+                int[] heights = { surface - 2, surface - 1, surface, surface + 1, y - 1, y, y + 1 };
+                for (int i = 0; i < heights.length; i++) {
+                    int gy = heights[i];
+                    boolean duplicate = false;
+                    for (int j = 0; j < i; j++) if (heights[j] == gy) duplicate = true;
+                    if (!duplicate && gy > 0 && gy < w.getHeight() - 2 && dryShore(w, gx, gy, gz))
+                        explorer.entranceCandidates.add(new int[] { gx, gy, gz });
+                }
+            }
+        }
+        final double px = mc.thePlayer.posX, pz = mc.thePlayer.posZ;
+        final int tx = explorer.target.xCoord, tz = explorer.target.zCoord;
+        explorer.entranceCandidates
+            .sort((a, b) -> Double.compare(entranceScore(a, px, pz, tx, tz), entranceScore(b, px, pz, tx, tz)));
     }
 
     public boolean attemptStairStep(Minecraft mc, Explorer explorer, int destinationY) {

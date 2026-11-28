@@ -67,6 +67,9 @@ public final class InventoryProtection {
         return false;
     }
 
+    private static final String[] BAG_CONTAINER_TERMS = { "backpack", "knapsack", "satchel", "bag", "pouch", "holding",
+        "iteminventory" };
+
     public static boolean backpackContainer(String name) {
         if (name == null) return false;
         String type = name.toLowerCase(Locale.ROOT);
@@ -74,31 +77,8 @@ public final class InventoryProtection {
             return true;
         int dot = type.lastIndexOf('.');
         if (dot >= 0) type = type.substring(dot + 1);
-        if (type.contains("jetpack") || type.contains("copter")
-            || type.contains("batpack")
-            || type.contains("lappack")
-            || type.contains("energypack")
-            || type.contains("fluxpack")
-            || type.contains("capacitor")
-            || type.contains("battery")
-            || type.contains("charger")
-            || type.contains("charging")
-            || type.contains("quiver")
-            || type.contains("focus")
-            || type.contains("wand")
-            || type.contains("seedbag")
-            || type.contains("lunch")
-            || type.contains("trash")
-            || type.contains("sleeping")
-            || type.contains("feedbag")) {
-            return false;
-        }
-        return (type.contains("backpack") || type.contains("knapsack")
-            || type.contains("satchel")
-            || type.contains("bag")
-            || type.contains("pouch")
-            || type.contains("holding")
-            || type.contains("iteminventory"));
+        if (containsAny(type, EXCLUDED_BAG_TERMS)) return false;
+        return containsAny(type, BAG_CONTAINER_TERMS);
     }
 
     public static boolean essential(ItemStack stack) {

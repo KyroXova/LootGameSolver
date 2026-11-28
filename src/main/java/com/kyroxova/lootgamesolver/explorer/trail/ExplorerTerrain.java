@@ -155,50 +155,38 @@ public final class ExplorerTerrain {
     public static double walkSurfaceY(World world, int x, int y, int z) {
         net.minecraft.block.Block at = world.getBlock(x, y, z);
         if (at instanceof net.minecraft.block.BlockStairs) return y + 0.5D;
-        if (at == net.minecraft.init.Blocks.snow_layer) {
-            net.minecraft.block.Block underSnow = world.getBlock(x, y - 1, z);
-            if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
-                || underSnow == net.minecraft.init.Blocks.air
-                || underSnow.getMaterial()
-                    .isLiquid()) {
-                return -1D;
-            }
-            int meta = world.getBlockMetadata(x, y, z) & 7;
-            return y + (meta + 1) * 0.125D;
-        }
+        if (at == net.minecraft.init.Blocks.snow_layer) return snowLayerSurfaceY(world, x, y, z);
         net.minecraft.util.AxisAlignedBB box = at.getCollisionBoundingBoxFromPool(world, x, y, z);
-        if (box != null && box.maxY >= y + 0.05D
-            && box.maxY < y + 1D
-            && box.minX < x + 0.5D
-            && box.maxX > x + 0.5D
-            && box.minZ < z + 0.5D
-            && box.maxZ > z + 0.5D) {
-            return box.maxY;
-        }
+        if (box != null && box.maxY < y + 1D && boxCoversCenter(box, x, z, y + 0.05D)) return box.maxY;
+
         net.minecraft.block.Block below = world.getBlock(x, y - 1, z);
         if (below.getMaterial() == net.minecraft.block.material.Material.leaves) return -1D;
-        if (below == net.minecraft.init.Blocks.snow_layer) {
-            net.minecraft.block.Block underSnow = world.getBlock(x, y - 2, z);
-            if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
-                || underSnow == net.minecraft.init.Blocks.air
-                || underSnow.getMaterial()
-                    .isLiquid()) {
-                return -1D;
-            }
-            int meta = world.getBlockMetadata(x, y - 1, z) & 7;
-            return (y - 1) + (meta + 1) * 0.125D;
-        }
+        if (below == net.minecraft.init.Blocks.snow_layer) return snowLayerSurfaceY(world, x, y - 1, z);
         if (below.isNormalCube() || below.getMaterial() == net.minecraft.block.material.Material.ice
             || below == net.minecraft.init.Blocks.ice
             || below == net.minecraft.init.Blocks.packed_ice
             || below == net.minecraft.init.Blocks.snow) return y;
         net.minecraft.util.AxisAlignedBB belowBox = below.getCollisionBoundingBoxFromPool(world, x, y - 1, z);
-        if (belowBox != null && belowBox.maxY >= y
-            && belowBox.minX < x + 0.5D
-            && belowBox.maxX > x + 0.5D
-            && belowBox.minZ < z + 0.5D
-            && belowBox.maxZ > z + 0.5D) return y;
+        if (belowBox != null && boxCoversCenter(belowBox, x, z, y)) return y;
         return -1D;
+    }
+
+    private static double snowLayerSurfaceY(World world, int x, int snowY, int z) {
+        net.minecraft.block.Block underSnow = world.getBlock(x, snowY - 1, z);
+        if (underSnow.getMaterial() == net.minecraft.block.material.Material.leaves
+            || underSnow == net.minecraft.init.Blocks.air
+            || underSnow.getMaterial()
+                .isLiquid())
+            return -1D;
+        int meta = world.getBlockMetadata(x, snowY, z) & 7;
+        return snowY + (meta + 1) * 0.125D;
+    }
+
+    private static boolean boxCoversCenter(net.minecraft.util.AxisAlignedBB box, int x, int z, double minMaxY) {
+        return box.maxY >= minMaxY && box.minX < x + 0.5D
+            && box.maxX > x + 0.5D
+            && box.minZ < z + 0.5D
+            && box.maxZ > z + 0.5D;
     }
 
     public static boolean isDungeonWall(World world, int x, int y, int z) {
